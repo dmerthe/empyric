@@ -192,6 +192,7 @@ class InstrumentSet:
 
         return readings
 
+
 class HoldRoutine:
 
     def __init__(self, value, start, end, clock=None):
@@ -216,6 +217,7 @@ class HoldRoutine:
 
         if self.start <= self.time <= self.end:
             return value
+
 
 class RampRoutine:
 
@@ -243,6 +245,7 @@ class RampRoutine:
 
         if self.start <= self.time <= self.end:
             return start_value + (end_value - start_value)*(self.time - self.start) / (self.end - self.start)
+
 
 class SweepRoutine:
 
@@ -274,6 +277,7 @@ class SweepRoutine:
             except StopIteration:
                 self.values_iter = iter(self.values)
                 return next(self.values_iter)
+
 
 class PathRoutine:
 
@@ -336,7 +340,6 @@ class Schedule:
             pass
 
 
-
 class Runcard:
 
     def __init__(self):
@@ -348,6 +351,7 @@ class Runcard:
     def save(self):
         pass
 
+
 class Experiment:
 
     def __init__(self, runcard=None):
@@ -355,13 +359,10 @@ class Experiment:
         if runcard:
             self.from_runcard(runcard)
         else:
-            self.empty()
-
-    def empty(self):
-        self.header = {}
-        self.instruments = InstrumentSet()
-        self.schedule = Schedule()
-        self.record = DataFrame()
+            self.header = {}
+            self.instruments = InstrumentSet()
+            self.schedule = Schedule()
+            self.record = DataFrame()
 
     def from_runcard(self, runcard):
         pass
