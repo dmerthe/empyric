@@ -101,7 +101,7 @@ class InstrumentSet:
         if alarms:
             self.alarms = alarms
         else:
-            self.alarms = []
+            self.alarms = {}
 
         if presets:
             self.presets = presets
@@ -192,7 +192,33 @@ class InstrumentSet:
                 instrument = self.instruments[instrument_name]
                 readings[meter] = instrument.measure(meter_name)
 
+        self.check_alarms(readings)
+
         return readings
+
+    def check_alarms(self, readings):
+        """
+        Checks alarms, as specified by the alarms attribute.
+
+        :param readings:
+        :return: (dict) of alarms triggered (as keys) and protocols (as values)
+        """
+
+        triggered = {}
+
+        for alarm, config in self.alarms.items():
+
+            meter, condition, threshold, protocol = config
+
+            value = readings.get(meter, None)
+
+            if value is None:
+                continue
+
+            if instrumentation.alarm_map[condition](reading, threshold):
+                triggered[alarm] = protocol
+
+        return triggered
 
 
 class HoldRoutine:
@@ -336,7 +362,7 @@ class Schedule:
     def start(self):
         self.clock.start_clock()
 
-    def pause(self):
+    def stop(self):
         self.clock.pause()
 
     def resume(self):
