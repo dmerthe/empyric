@@ -5,6 +5,7 @@ from scipy.interpolate import interp1d
 
 import instrumentation
 
+
 class Clock:
     """
     Clock for keeping time, capable of running splits and pausing
@@ -47,6 +48,7 @@ class Clock:
             self.total_stoppage += time.time() - self.pause_time
             self.split_stoppage += time.time() - self.pause_time
             self.pause_time = None
+
 
 class MappedVariable:
     """
@@ -196,6 +198,7 @@ class InstrumentSet:
 class HoldRoutine:
 
     def __init__(self, value, start, end, clock=None):
+
         self.value = value
         self.start = start
         self.end = end
@@ -283,7 +286,6 @@ class PathRoutine:
 
     def __init__(self, values, start, end=None, clock=None):
 
-        self.values = values
         self.values_iter = iter(values)
         self.start = start
 
@@ -329,15 +331,22 @@ class Schedule:
             self.routines = {}
 
     def add(self, routine):
-        pass
+        self.routines = self.routines + routine
+
+    def start(self):
+        self.clock.start_clock()
+
+    def pause(self):
+        self.clock.pause()
+
+    def resume(self):
+        self.clock.resume()
 
     def __iter__(self):
         return self
 
     def __next__(self):
-
-        for routine in self.routines:
-            pass
+        return {knob_name: next(routine) for knob_name, routine in self.routines.items()}
 
 
 class Runcard:
