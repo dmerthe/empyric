@@ -1,7 +1,6 @@
 import time
 import numpy as np
 from pandas import DataFrame
-from scipy.interpolate import interp1d
 
 import instrumentation
 
