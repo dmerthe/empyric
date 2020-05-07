@@ -221,125 +221,130 @@ class InstrumentSet:
         return triggered
 
 
-class HoldRoutine:
+class Routine:
+    """
+    Base class for the routines.
+    """
 
-    def __init__(self, value, start, end, clock=None):
+    def __init__(self, times, values, clock=None):
 
-        self.value = value
-        self.start = start
-        self.end = end
+        self.times = times
+        self.values = values
+        try:
+            self.values_iter = iter(values)  # for use in the Path and Sweep subclasses
+        except TypeError:
+            pass
 
         if clock:
             self.clock = clock
         else:
             self.clock = Clock()
-            self.clock.start_clock()
 
-        self.time = -np.inf
+    def start(self):
+        self.clock.start_clock()
 
     def __iter__(self):
         return self
 
+
+class Hold(Routine):
+    """
+    Holds a value, given by the 'values' argument (1-element list or number), from the first time in 'times' to the second.
+
+    """
+
     def __next__(self):
 
-        self.time = self.clock.total_time()
+        try:
+            if len(self.times) == 1:
+                start = self.times[0]
+                end = np.inf
+            elif len(self.times) == 2:
+                start, end = self.times[:2]
+            else:
+                raise IndexError("The times argument must be either a 1- or 2- element list, or a number!")
+        except TypeError:
+            start = self.times
+            end = np.inf
 
-        if self.start <= self.time <= self.end:
+        try:
+            value = self.values[0]
+        except TypeError:
+            value = self.values
+
+        time = self.clock.total_time()
+
+        if start <= time <= end:
             return value
 
 
-class RampRoutine:
-
-    def __init__(self, start_value, end_value, start, end, clock=None):
-
-        self.start_value = start_value
-        self.end_value = end_value
-        self.start = start
-        self.end = end
-
-        if clock:
-            self.clock = clock
-        else:
-            self.clock = Clock()
-            self.clock.start_clock()
-
-        self.time = -np.inf
-
-    def __iter__(self):
-        return self
+class Ramp(Routine):
+    """
+    Linearly ramps a value from the first value in 'values' to the second, from the first time in 'times' to the second.
+    """
 
     def __next__(self):
 
-        self.time = self.clock.total_time()
-
-        if self.start <= self.time <= self.end:
-            return start_value + (end_value - start_value)*(self.time - self.start) / (self.end - self.start)
-
-
-class SweepRoutine:
-
-    def __init__(self, values, start, end, clock=None):
-
-        self.values = values
-        self.values_iter = iter(values)
-        self.start = start
-        self.end = end
-
-        if clock:
-            self.clock = clock
+        if len(self.times) == 1:
+            start = self.times[0]
+            end = np.inf
+        elif len(self.times) == 2:
+            start, end = self.times[:2]
         else:
-            self.clock = Clock()
-            self.clock.start_clock()
+            raise IndexError("The times argument must be either a 1- or 2-element list!")
 
-        self.time = -np.inf
+        start_value, end_value = self.values
 
-    def __iter__(self):
-        return self
+        time = self.clock.total_time()
+
+        if start <= time <= end:
+            return start_value + (end_value - start_value)*(time - start) / (end - start)
+
+
+class Transit(Routine):
+    """
+    Sequentially and immediately passes a value through the 'values' list argument, cutting it off at the single value of the 'times' argument.
+    """
 
     def __next__(self):
 
+        try:
+            if len(end) == 1:
+                end = times[0]
+            else:
+                raise IndexError("The times argument must be either a 1-element list, or a number!")
+        except TypeError:
+            end = times
+
         self.time = self.clock.total_time()
 
-        if self.start <= self.time <= self.end:
+        if self.time <= end:
+            return next(self.values_iter, None)
+
+
+class Sweep(Routine):
+    """
+    Sequentially and cyclically sweeps a value through the 'values' list argument, starting at the first time in 'times' to the last.
+    """
+
+    def __next__(self):
+
+        if len(self.times) == 1:
+            start = self.times[0]
+            end = np.inf
+        elif len(self.times) == 2:
+            start, end = self.times[:2]
+        else:
+            raise IndexError("The times argument must be either a 1- or 2-element list!")
+
+        time = self.clock.total_time()
+
+        if start <= time <= end:
             try:
                 return next(self.values_iter)
             except StopIteration:
-                self.values_iter = iter(self.values)
+                self.values_iter = iter(self.values)  # restart the sweep
                 return next(self.values_iter)
-
-
-class PathRoutine:
-
-    def __init__(self, values, start, end=None, clock=None):
-
-        self.values_iter = iter(values)
-        self.start = start
-
-        if end:
-            self.end = end
-        else:
-            self.end = np.inf
-
-        if clock:
-            self.clock = clock
-        else:
-            self.clock = Clock()
-            self.clock.start_clock()
-
-        self.time = -np.inf
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-
-        self.time = self.clock.total_time()
-
-        if self.time <= self.end:
-            try:
-                return next(self.values_iter)
-            except StopIteration:
-                return None
 
 
 class Schedule:
@@ -352,6 +357,8 @@ class Schedule:
         self.clock = Clock()
 
         if routines:
+            for routine in routines:
+                routine.clock = self.clock  # synchronize all clocks and control with Schedule methods below
             self.routines = routines
         else:
             self.routines = {}
@@ -372,7 +379,7 @@ class Schedule:
         return self
 
     def __next__(self):
-        return {knob_name: next(routine) for knob_name, routine in self.routines.items()}
+        return {knob: next(routine) for knob, routine in self.routines.items()}
 
 
 class Runcard:
