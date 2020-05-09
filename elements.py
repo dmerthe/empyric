@@ -3,8 +3,54 @@ import numbers
 import yaml
 import numpy as np
 from pandas import DataFrame
-
 import instrumentation
+
+def get_timestamp(path=None):
+    """
+    Generates a timestamp in the YYYYMMDD-HHmmss format
+
+    :param path: (string) path to get timestamp from; if None, a new timestamp will be generated and returned
+    :return: (string) the formatted timestamp
+    """
+
+    if path:
+        timestamp_format = re.compile(r'\d\d\d\d\d\d\d\d-\d\d\d\d\d\d')
+        timestamp_matches = timestamp_format.findall(path)
+        if len(timestamp_matches) > 0:
+            return timestamp_matches[-1]
+    else:
+        return time.strftime("%Y%m%d-%H%M%S", time.localtime())
+
+def timestamp_path(path, timestamp=None):
+    """
+
+    :param path: (str) path to which the timestamp will be appended or updated
+    :param timestamp: (string) if provided, this timestamp will be appended. If not provided, a new timestamp will be generated.
+    :return: (str) timestamped path
+    """
+
+    already_timestamped = False
+
+    if not timestamp:
+        timestamp = get_timestamp()
+
+    # separate extension
+    full_name = '.'.join(path.split('.')[:-1])
+    extension = '.' + path.split('.')[-1]
+
+    # If there is already a timestamp, replace it
+    # If there is not already a timestamp, append it
+
+    timestamp_format = re.compile(r'\d\d\d\d\d\d\d\d-\d\d\d\d\d\d')
+    timestamp_matches = timestamp_format.findall(path)
+
+    if len(timestamp_matches) > 0:
+        already_timestamped = True
+
+    if already_timestamped:
+        return '-'.join(full_name.split('-')[:-2]) + '-' + timestamp + extension
+    else:
+        return full_name + '-' + timestamp + extension
 
 
 class Clock:
@@ -94,12 +140,12 @@ class InstrumentSet:
         if specs:
             self.connect(specs)
 
-        self.mapped_vars = {}
-        if mapped_vars:
+        self.mapped_variables = {}
+        if variables:
             self.map_variables(variables)
 
         if alarms:
-            self.alarms = alarms
+            self.alarms = {alarm + {'triggered': False} for alarm in alarms}
         else:
             self.alarms = {}
 
@@ -140,7 +186,7 @@ class InstrumentSet:
         for name, mapping in variables.items():
 
             instrument, knob, meter = mapping['instrument'], mapping['knob'], mapping['meter']
-            self.mapped_vars = self.mapped_vars + {
+            self.mapped_variables = self.mapped_variables + {
                 name: MappedVariable(self.instruments[instrumnet], knob=knob, meter=meter)
             }
 
@@ -172,7 +218,7 @@ class InstrumentSet:
         for knob_name, value in knob_settings.items():
 
             if type(knob_name) is str:  # for mapped variables
-                self.mapped_vars[knob_name].set(value)
+                self.mapped_variables[knob_name].set(value)
             else:  # for unmapped variables
                 instrument_name, knob_name = knob_name
                 instrument = self.instruments[instrument_name]
@@ -187,16 +233,15 @@ class InstrumentSet:
         """
 
         if meters is None:
-            return {name: var.measure() for name, var in self.mapped_vars if var.meter}
-
+            return {name: var.measure() for name, var in self.mapped_variables.items() if var.meter}
 
         readings = {}
 
         for meter in meters:
 
-            if type(meter) is str:
-                readings[meter] = self.mapped_vars[meter].measure()
-            else:
+            if type(meter) is str:  # if meter is a mapped variable
+                readings[meter] = self.mapped_variables[meter].measure()
+            else:  # otherwise, the meter can be specified by the corresponding (instrument, meter) tuple
                 instrument_name, meter_name = meter
                 instrument = self.instruments[instrument_name]
                 readings[meter] = instrument.measure(meter_name)
@@ -209,25 +254,22 @@ class InstrumentSet:
         """
         Checks alarms, as specified by the alarms attribute.
 
-        :param readings:
-        :return: (dict) of alarms triggered (as keys) and protocols (as values)
+        :param readings: (dict) dictionary of readings
+        :return: (dict) dictionary of alarms triggered (as keys) and protocols (as values)
         """
-
-        triggered = {}
 
         for alarm, config in self.alarms.items():
 
-            meter, condition, threshold, protocol = config
+            meter, condition, threshold = config['meter'], config['condition'], config['threshold']
 
             value = readings.get(meter, None)
 
             if value is None:
                 continue
 
-            if instrumentation.alarm_map[condition](reading, threshold):
-                triggered[alarm] = protocol
-
-        return triggered
+            alarm_triggered = instrumentation.alarm_map[condition](value, threshold)
+            if alarm_triggered:
+                self.alarms[alarm]['triggered'] = True
 
 
 class Routine:
@@ -281,9 +323,9 @@ class Hold(Routine):
         except TypeError:
             value = self.values
 
-        time = self.clock.total_time()
+        now = self.clock.total_time()
 
-        if start <= time <= end:
+        if start <= now <= end:
             return value
 
 
@@ -304,10 +346,10 @@ class Ramp(Routine):
 
         start_value, end_value = self.values
 
-        time = self.clock.total_time()
+        now = self.clock.total_time()
 
-        if start <= time <= end:
-            return start_value + (end_value - start_value)*(time - start) / (end - start)
+        if start <= now <= end:
+            return start_value + (end_value - start_value)*(now - start) / (end - start)
 
 
 class Transit(Routine):
@@ -318,12 +360,12 @@ class Transit(Routine):
     def __next__(self):
 
         try:
-            if len(end) == 1:
-                end = times[0]
+            if len(self.times) == 1:
+                end = self.times[0]
             else:
                 raise IndexError("The times argument must be either a 1-element list, or a number!")
         except TypeError:
-            end = times
+            end = self.times
 
         self.time = self.clock.total_time()
 
@@ -346,9 +388,9 @@ class Sweep(Routine):
         else:
             raise IndexError("The times argument must be either a 1- or 2-element list!")
 
-        time = self.clock.total_time()
+        now = self.clock.total_time()
 
-        if start <= time <= end:
+        if start <= now <= end:
             try:
                 return next(self.values_iter)
             except StopIteration:
@@ -379,14 +421,14 @@ class Schedule:
             kind, values = spec['routine'], spec['values']
 
             times = []
-            for time in spec['times']:
-                if isinstance(time, numbers.Number):
-                    times.append(time)
-                elif isinstance(time, str):
+            for time_value in spec['times']:
+                if isinstance(time_value, numbers.Number):
+                    times.append(time_value)
+                elif isinstance(time_value, str):
                     # times can be specified in the runcard with units, such as minutes, hours or days, e.g.  "6 hours"
-                    value, unit = times.split(' ')
+                    value, unit = time_value.split(' ')
                     value = float(value)
-                    times.append(values*{'minutes': 60, 'hours': 3600, 'days': 86400}[unit])
+                    times.append(value*{'minutes': 60, 'hours': 3600, 'days': 86400}[unit])
 
             routine = {
                 'Hold': Hold,
@@ -419,10 +461,11 @@ class Experiment:
 
         self.clock = Clock()
 
-        self.runcard = {}
         self.from_runcard(runcard)
 
         self.record = DataFrame()  # Will contain history of knob settings and meter readings for the experiment.
+
+        self.terminate = False  # flag for terminating the experiment
 
     def from_runcard(self, runcard):
         """
@@ -433,7 +476,6 @@ class Experiment:
         """
         runcard_dict = yaml.load(runcard)
         self.runcard = runcard_dict
-
         self.description = runcard_dict["Description"]
 
         self.instruments = InstrumentSet(
@@ -445,32 +487,44 @@ class Experiment:
         )
 
         self.settings = runcard_dict['Experiment Settings']
-
         self.plotting = runcard_dict['Plotting']
-
         self.schedule = Schedule(runcard_dict['Schedule'])
 
-    def save(self, name=None):
+    def save(self):
 
-        if not name:
-            name = get_timestamp()
+        self.record.to_csv(timestamp_path('data.csv'))
 
-        yaml.dump(self.runcard, 'runcard_'+name+'.yaml')
+    def run(self, first=True):
 
-    def run(self, plot_interval=10):
+        if first:  # save the runcard for the experiment upon execution for record keeping
+            with open(timestamp_path('runcard.yaml'), 'w') as runcard_file:
+                yaml.dump(self.runcard, runcard_file)
 
         for configuration in self.schedule:
+
+            if self.terminate:
+                self.save()
+                break
 
             self.instruments.apply(configuration)
             readings = self.instruments.read()
 
-            record_time = {'TOTAL TIME': self.clock.total_time(), 'SCHEDULE TIME': self.schedule.clock.total_time()}
-            self.record = self.record.append(record_time + configuration + readings, ignore_index=True)
+            times = {'TOTAL TIME': self.clock.total_time(), 'SCHEDULE TIME': self.schedule.clock.total_time()}
+            self.record = self.record.append(times + configuration + readings, ignore_index=True)
 
-        if self.settings['ending'] == 'repeat':
-            self.schedule.clock.start_clock()  # reset of the schedule clock
-            self.run(plot_interval=plot_interval)
+        ending_option = self.settings['ending']
+        if ending_option == 'repeat':
+            self.schedule.clock.start_clock()  # reset the schedule clock
+            self.run(first=False)
+        elif ending_option == 'end':
+            self.end()
+        elif ending_option == 'hold':
+            while not self.terminate:
+                self.instruments.apply(configuration)  # reuse last configuration from loop above
+                readings = self.instruments.read()
+
+                times = {'TOTAL TIME': self.clock.total_time(), 'SCHEDULE TIME': self.schedule.clock.total_time()}
+                self.record = self.record.append(times + configuration + readings, ignore_index=True)
 
     def end(self):
-
         self.instruments.disconnect()
