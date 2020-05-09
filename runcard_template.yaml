@@ -1,0 +1,47 @@
+﻿Description:
+ operator: Mike
+ platform: Test Stand 1
+ comments: Who is Mike? There is no Test Stand 1
+
+Instruments:
+ Anode Keithley: 
+   kind: Kiethley2400
+   backend: gpib
+   address: GPIB::1::INSTR
+
+Variables:
+ Anode Voltage:
+   instrument: Anode Keithley
+   knob: voltage
+   meter: None
+ Anode Current:
+   instrument: Anode Keithley
+   knob: None
+   meter: current
+
+Presets:
+ Anode Voltage: 0
+
+Postsets:
+ Anode Voltage: 0
+
+Alarms:
+ Anode Overcurrent:
+   meter: Anode Current
+   condition: GREATER
+   threshold: 1
+   protocol: set_zero_voltage.yaml
+
+Experiment Settings:
+ ending: repeat
+
+Plotting:
+ plot 1:
+   x: [Anode Voltage]
+   y: [Anode Current]
+
+Schedule:
+ Anode Sweep:
+   routine: Sweep
+   times: [0, 6 hours]
+   values: [-5,-4,-3,-2,-1,0,1,2,3,4,5]

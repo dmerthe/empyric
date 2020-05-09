@@ -1,4 +1,6 @@
 import time
+import numbers
+import yaml
 import numpy as np
 from pandas import DataFrame
 
@@ -85,17 +87,16 @@ class InstrumentSet:
     Set of instruments to be used in an experiment, including presets, knob and meter specs and alarm protocols
     """
 
-    def __init__(self, specs=None, mapped_vars=None, alarms=None, presets=None, postsets=None):
+    def __init__(self, specs=None, variables=None, alarms=None, presets=None, postsets=None):
 
         self.instruments = {}  # Will contain a list of instrument instances from the instrumentation submodule
 
         if specs:
             self.connect(specs)
 
+        self.mapped_vars = {}
         if mapped_vars:
-            self.mapped_vars = mapped_vars
-        else:
-            self.mapped_vars = {}
+            self.map_variables(variables)
 
         if alarms:
             self.alarms = alarms
@@ -120,9 +121,9 @@ class InstrumentSet:
         :return: None
         """
 
-        for spec in specs:
+        for name, spec in specs.items():
 
-            name, kind, backend, address = spec
+            kind, backend, address = spec['kind'], spec['backend'], spec['address']
 
             if backend not in instrumentation.available_backends:
                 raise instrumentation.ConnectionError(f'{backend} is not a valid instrument communication backend!')
@@ -133,6 +134,15 @@ class InstrumentSet:
             self.instruments[name] = instrument
 
         self.apply(self.presets)
+
+    def map_variables(self, variables):
+
+        for name, mapping in variables.items():
+
+            instrument, knob, meter = mapping['instrument'], mapping['knob'], mapping['meter']
+            self.mapped_vars = self.mapped_vars + {
+                name: MappedVariable(self.instruments[instrumnet], knob=knob, meter=meter)
+            }
 
     def disconnect(self):
         """
@@ -352,18 +362,40 @@ class Schedule:
     """
 
     def __init__(self, routines=None):
+        """
+
+        :param routines: (dict) dictionary of routine specifications.
+        """
 
         self.clock = Clock()
 
+        self.routines = {}
         if routines:
-            for routine in routines:
-                routine.clock = self.clock  # synchronize all clocks and control with Schedule methods below
-            self.routines = routines
-        else:
-            self.routines = {}
+            self.add(routines)
 
-    def add(self, routine):
-        self.routines = self.routines + routine
+    def add(self, routines):
+
+        for name, spec in routines.items():
+            kind, values = spec['routine'], spec['values']
+
+            times = []
+            for time in spec['times']:
+                if isinstance(time, numbers.Number):
+                    times.append(time)
+                elif isinstance(time, str):
+                    # times can be specified in the runcard with units, such as minutes, hours or days, e.g.  "6 hours"
+                    value, unit = times.split(' ')
+                    value = float(value)
+                    times.append(values*{'minutes': 60, 'hours': 3600, 'days': 86400}[unit])
+
+            routine = {
+                'Hold': Hold,
+                'Ramp': Ramp,
+                'Sweep': Sweep,
+                'Transit': Transit
+            }[kind](times, values, self.clock)
+
+            self.routines = self.routines + {name: routine}
 
     def start(self):
         self.clock.start_clock()
@@ -381,47 +413,64 @@ class Schedule:
         return {knob: next(routine) for knob, routine in self.routines.items()}
 
 
-class Runcard:
-
-    def __init__(self):
-        pass
-
-    def load(self, path=None):
-        pass
-
-    def save(self):
-        pass
-
-
 class Experiment:
 
-    def __init__(self, runcard=None):
+    def __init__(self, runcard):
 
-        if runcard:
-            self.from_runcard(runcard)
-        else:
-            self.header = {}
-            self.instruments = InstrumentSet()
-            self.schedule = Schedule()
-            self.record = DataFrame()
+        self.clock = Clock()
+
+        self.runcard = {}
+        self.from_runcard(runcard)
+
+        self.record = DataFrame()  # Will contain history of knob settings and meter readings for the experiment.
 
     def from_runcard(self, runcard):
-        pass
+        """
+        Populates the experiment attributes from the given runcard.
 
-    def to_runcard(self, runcard):
-        pass
+        :param runcard: (file) runcard in the form of a binary file object.
+        :return: None
+        """
+        runcard_dict = yaml.load(runcard)
+        self.runcard = runcard_dict
+
+        self.description = runcard_dict["Description"]
+
+        self.instruments = InstrumentSet(
+            runcard_dict['Instruments'],
+            runcard_dict['Variables'],
+            runcard_dict['Alarms'],
+            runcard_dict['Presets'],
+            runcard_dict['Postsets']
+        )
+
+        self.settings = runcard_dict['Experiment Settings']
+
+        self.plotting = runcard_dict['Plotting']
+
+        self.schedule = Schedule(runcard_dict['Schedule'])
+
+    def save(self, name=None):
+
+        if not name:
+            name = get_timestamp()
+
+        yaml.dump(self.runcard, 'runcard_'+name+'.yaml')
 
     def run(self, plot_interval=10):
-
-        gui = ExperimentGUI()
-
-        self.instruments.initialize()
 
         for configuration in self.schedule:
 
             self.instruments.apply(configuration)
             readings = self.instruments.read()
 
-            self.record = self.record.append(configuretion + readings, ignore_index=True)
+            record_time = {'TOTAL TIME': self.clock.total_time(), 'SCHEDULE TIME': self.schedule.clock.total_time()}
+            self.record = self.record.append(record_time + configuration + readings, ignore_index=True)
 
-        instruments.finalize()
+        if self.settings['ending'] == 'repeat':
+            self.schedule.clock.start_clock()  # reset of the schedule clock
+            self.run(plot_interval=plot_interval)
+
+    def end(self):
+
+        self.instruments.disconnect()
