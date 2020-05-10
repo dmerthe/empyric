@@ -437,7 +437,7 @@ class Schedule:
                 'Transit': Transit
             }[kind](times, values, self.clock)
 
-            self.routines = self.routines + {name: routine}
+            self.routines.update({name:routine})
 
     def start(self):
         self.clock.start_clock()
@@ -458,6 +458,10 @@ class Schedule:
 class Experiment:
 
     def __init__(self, runcard):
+        """
+
+        :param runcard: (file) runcard file
+        """
 
         self.clock = Clock()
 
@@ -502,15 +506,20 @@ class Experiment:
 
         for configuration in self.schedule:
 
+            state = configuration
+
             if self.terminate:
                 self.save()
                 break
 
             self.instruments.apply(configuration)
             readings = self.instruments.read()
+            state.update(readings)
 
             times = {'TOTAL TIME': self.clock.total_time(), 'SCHEDULE TIME': self.schedule.clock.total_time()}
-            self.record = self.record.append(times + configuration + readings, ignore_index=True)
+            state.update(times)
+
+            self.record = self.record.append(line, ignore_index=True)
 
         ending_option = self.settings['ending']
         if ending_option == 'repeat':
@@ -522,9 +531,21 @@ class Experiment:
             while not self.terminate:
                 self.instruments.apply(configuration)  # reuse last configuration from loop above
                 readings = self.instruments.read()
+                state.update(readings)
 
                 times = {'TOTAL TIME': self.clock.total_time(), 'SCHEDULE TIME': self.schedule.clock.total_time()}
-                self.record = self.record.append(times + configuration + readings, ignore_index=True)
+                state.update(times)
+                self.record = self.record.append(state, ignore_index=True)
+        elif 'yaml' in ending_option:
+            # Ending option can be another experiment runcard,
+            # e.g. for a specific shutdown sequence or follow-up experiment
+            with open(ending_option, 'r') as runcard:
+                self.end(followup=runcard)
 
-    def end(self):
-        self.instruments.disconnect()
+    def end(self, followup=None):
+
+        if followup:
+            self.__init__(followup)
+            self.run()
+        else:
+            self.instruments.disconnect()
