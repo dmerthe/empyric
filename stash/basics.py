@@ -5,14 +5,18 @@ import time
 import importlib
 import warnings
 
+
 class ConnectionError(BaseException):
     pass
+
 
 class MeasurementError(BaseException):
     pass
 
+
 class SetError(BaseException):
     pass
+
 
 class Instrument(object):
     """
@@ -69,6 +73,7 @@ class Instrument(object):
                 elapsed_time = time.time() - start_time
 
         set_method(value)
+
 
 class TestInstrument(Instrument):
     """

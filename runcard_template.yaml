@@ -28,21 +28,30 @@ Postsets:
 
 Alarms:
  Anode Overcurrent:
-   meter: Anode Current
-   condition: GREATER
-   threshold: 1
+  meter: Anode Current
+  condition: GREATER
+  threshold: 1
    protocol: set_zero_voltage.yaml
 
 Experiment Settings:
  ending: repeat
+ save interval: 60
+ plot interval: 10
 
 Plotting:
  plot 1:
-   x: [Anode Voltage]
-   y: [Anode Current]
+  x: Anode Voltage
+  y: [Anode Current]
+  xlabel: 'Voltage (V)'
+  ylabel: 'Current (A)'
+  options:
+   linestyle: '-'
+   color: 'k'
+    
 
 Schedule:
  Anode Sweep:
    routine: Sweep
+   variable: Anode Voltage
    times: [0, 6 hours]
    values: [-5,-4,-3,-2,-1,0,1,2,3,4,5]

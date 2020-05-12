@@ -3,7 +3,42 @@ import numbers
 import yaml
 import numpy as np
 from pandas import DataFrame
-import instrumentation
+
+from mercury import instrumentation
+
+def stylize(label):
+
+    common_labels = {
+        'TIME': 'Time (s)',
+        'V_ANODE':'$V_{anode}$ (V)',
+        'V_CATHODE':'$V_{cathode}$ (V)',
+        'I_ANODE':'$I_{anode}$ (A)',
+        'I_CATHODE':'$I_{cathode}$ (A)',
+        'anode_PHI_BAR':'$\phi_a$ (eV)',
+        'cathode_PHI_BAR': '$\phi_c$ (eV)',
+        'gap_D':'$d_{ca}$ (cm)',
+        'cathode_T':'$T_c$ (K)',
+        'anode_T':'$T_a$ (K)',
+        'FAST_VOLTAGE': 'Voltage (V)',
+        'FAST_CURRENT': 'Current (A)',
+        'FAST_VOLTAGES':'Voltage (V)',
+        'FAST_CURRENTS':'Current (A)'
+    }
+
+    common_prefixes = (
+        'I','J','V','T','P'
+    )
+
+    if label in common_labels:
+        return common_labels[label]
+
+    prefix = label.split('_')[0]
+    if prefix in common_prefixes:
+        suffix = ('\/'.join(label.split('_')[1:])).lower()
+
+        return '$%s_{%s}$' % (prefix, suffix)
+
+    return label
 
 def get_timestamp(path=None):
     """
@@ -59,32 +94,19 @@ class Clock:
     """
 
     def __init__(self):
-        self.start_clock()
+        self.start()
 
-    def start_clock(self):
-        self.start = time.time()
-        self.split_start = time.time()
+    def start(self):
+        self.start_time = time.time()
 
         self.pause_time = None  # if paused, the time when the clock was paused
+        self.total_stoppage = 0  # amount of stoppage time, or total time while paused
 
-        self.total_stoppage = 0
-        self.split_stoppage = 0
-
-    def start_split(self):
-        self.split_stoppage = 0
-        self.split_start = time.time()
-
-    def split_time(self):
+    def time(self):
         if not self.pause_time:
-            return time.time() - self.split_start - self.split_stoppage
+            return time.time() - self.start_time - self.total_stoppage
         else:
-            return self.pause_time - self.split_start - self.split_stoppage
-
-    def total_time(self):
-        if not self.pause_time:
-            return time.time() - self.start - self.total_stoppage
-        else:
-            return self.pause_time - self.start - self.total_stoppage
+            return self.pause_time - self.start_time - self.total_stoppage
 
     def pause(self):
         if not self.pause_time:
@@ -93,7 +115,6 @@ class Clock:
     def resume(self):
         if self.pause_time:
             self.total_stoppage += time.time() - self.pause_time
-            self.split_stoppage += time.time() - self.pause_time
             self.pause_time = None
 
 
@@ -187,7 +208,7 @@ class InstrumentSet:
 
             instrument, knob, meter = mapping['instrument'], mapping['knob'], mapping['meter']
             self.mapped_variables = self.mapped_variables + {
-                name: MappedVariable(self.instruments[instrumnet], knob=knob, meter=meter)
+                name: MappedVariable(self.instruments[instrument], knob=knob, meter=meter)
             }
 
     def disconnect(self):
@@ -292,7 +313,7 @@ class Routine:
             self.clock = Clock()
 
     def start(self):
-        self.clock.start_clock()
+        self.clock.start()
 
     def __iter__(self):
         return self
@@ -323,7 +344,7 @@ class Hold(Routine):
         except TypeError:
             value = self.values
 
-        now = self.clock.total_time()
+        now = self.clock.time()
 
         if start <= now <= end:
             return value
@@ -346,7 +367,7 @@ class Ramp(Routine):
 
         start_value, end_value = self.values
 
-        now = self.clock.total_time()
+        now = self.clock.time()
 
         if start <= now <= end:
             return start_value + (end_value - start_value)*(now - start) / (end - start)
@@ -354,7 +375,7 @@ class Ramp(Routine):
 
 class Transit(Routine):
     """
-    Sequentially and immediately passes a value through the 'values' list argument, cutting it off at the single value of the 'times' argument.
+    Sequentially and immediately passes a value once through the 'values' list argument, cutting it off at the single value of the 'times' argument.
     """
 
     def __next__(self):
@@ -367,7 +388,7 @@ class Transit(Routine):
         except TypeError:
             end = self.times
 
-        self.time = self.clock.total_time()
+        self.time = self.clock.time()
 
         if self.time <= end:
             return next(self.values_iter, None)
@@ -375,7 +396,7 @@ class Transit(Routine):
 
 class Sweep(Routine):
     """
-    Sequentially and cyclically sweeps a value through the 'values' list argument, starting at the first time in 'times' to the last.
+    Sequentially and cyclically sweeps a value through the 'values' list argument, starting at the first time in 'times' and ending at the last.
     """
 
     def __next__(self):
@@ -388,7 +409,7 @@ class Sweep(Routine):
         else:
             raise IndexError("The times argument must be either a 1- or 2-element list!")
 
-        now = self.clock.total_time()
+        now = self.clock.time()
 
         if start <= now <= end:
             try:
@@ -418,7 +439,8 @@ class Schedule:
     def add(self, routines):
 
         for name, spec in routines.items():
-            kind, values = spec['routine'], spec['values']
+            kind, variable = spec['routine'], spec['variable']
+            values = spec['values']
 
             times = []
             for time_value in spec['times']:
@@ -437,10 +459,10 @@ class Schedule:
                 'Transit': Transit
             }[kind](times, values, self.clock)
 
-            self.routines.update({name:routine})
+            self.routines.update({name: (variable, routine)})
 
     def start(self):
-        self.clock.start_clock()
+        self.clock.start()
 
     def stop(self):
         self.clock.pause()
@@ -452,7 +474,7 @@ class Schedule:
         return self
 
     def __next__(self):
-        return {knob: next(routine) for knob, routine in self.routines.items()}
+        return {routine[0]: next(routine[1]) for routine in self.routines.values()}
 
 
 class Experiment:
@@ -464,6 +486,8 @@ class Experiment:
         """
 
         self.clock = Clock()
+        self.last_save = -np.inf
+        self.last_plot = -np.inf
 
         self.from_runcard(runcard)
 
@@ -494,36 +518,48 @@ class Experiment:
         self.plotting = runcard_dict['Plotting']
         self.schedule = Schedule(runcard_dict['Schedule'])
 
-    def save(self):
+    def save(self, save_now=False):
 
-        self.record.to_csv(timestamp_path('data.csv'))
+        now = self.clock.time()
+        save_interval = self.settings.get('save interval', 60)
+
+        if now >= self.last_save + save_interval or save_now:
+            self.record.to_csv(timestamp_path('data.csv'))
+            self.last_save = self.clock.time()
 
     def run(self, first=True):
 
         if first:  # save the runcard for the experiment upon execution for record keeping
-            with open(timestamp_path('runcard.yaml'), 'w') as runcard_file:
+            name = self.description.get('name','experiment')
+            with open(timestamp_path(name+'_runcard.yaml'), 'w') as runcard_file:
                 yaml.dump(self.runcard, runcard_file)
+
+            self.clock.start()
+
+        self.schedule.clock.start()  # start the schedule clock
 
         for configuration in self.schedule:
 
-            state = configuration
-
             if self.terminate:
-                self.save()
+                self.save('now')
                 break
+
+            state = configuration
 
             self.instruments.apply(configuration)
             readings = self.instruments.read()
             state.update(readings)
 
-            times = {'TOTAL TIME': self.clock.total_time(), 'SCHEDULE TIME': self.schedule.clock.total_time()}
+            times = {'TOTAL TIME': self.clock.time(), 'SCHEDULE TIME': self.schedule.clock.time()}
             state.update(times)
 
             self.record = self.record.append(line, ignore_index=True)
 
+            self.save()
+
+        # What to do when schedule is finished is determined by the 'ending' option of experiment settings
         ending_option = self.settings['ending']
         if ending_option == 'repeat':
-            self.schedule.clock.start_clock()  # reset the schedule clock
             self.run(first=False)
         elif ending_option == 'end':
             self.end()
@@ -533,7 +569,7 @@ class Experiment:
                 readings = self.instruments.read()
                 state.update(readings)
 
-                times = {'TOTAL TIME': self.clock.total_time(), 'SCHEDULE TIME': self.schedule.clock.total_time()}
+                times = {'TOTAL TIME': self.clock.time(), 'SCHEDULE TIME': self.schedule.clock.time()}
                 state.update(times)
                 self.record = self.record.append(state, ignore_index=True)
         elif 'yaml' in ending_option:
