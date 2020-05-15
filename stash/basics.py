@@ -33,7 +33,7 @@ class Instrument(object):
         try:
             measurement_method = self.__getattribute__('measure_'+meter.replace(' ','_'))
         except AttributeError:
-            raise MeasurementError('specified variable cannot be measured with this instrument')
+            raise MeasurementError(f"Given variable '{meter}' cannot be measured with this instrument")
 
         if sample_number == 1:
             measurement = measurement_method()

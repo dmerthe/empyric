@@ -1,7 +1,7 @@
 import pandas as pd
 
-from tempyral_dev.stash.basics import *
-from tempyral_dev.misc import *
+from mercury.stash.basics import *
+#from mercury.misc import *
 
 class Keithley2400(Instrument, GPIBDevice):
 

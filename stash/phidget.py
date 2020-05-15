@@ -1,5 +1,5 @@
 import importlib
-from tempyral_dev.stash.basics import *
+from mercury.stash.basics import *
 
 class TCReader(Instrument, PhidgetDevice):
 

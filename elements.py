@@ -1,44 +1,33 @@
 import time
+import datetime
 import numbers
-import yaml
+from ruamel.yaml import YAML
+import re
 import numpy as np
-from pandas import DataFrame
+import pandas as pd
 
 from mercury import instrumentation
 
-def stylize(label):
+yaml=YAML()
 
-    common_labels = {
-        'TIME': 'Time (s)',
-        'V_ANODE':'$V_{anode}$ (V)',
-        'V_CATHODE':'$V_{cathode}$ (V)',
-        'I_ANODE':'$I_{anode}$ (A)',
-        'I_CATHODE':'$I_{cathode}$ (A)',
-        'anode_PHI_BAR':'$\phi_a$ (eV)',
-        'cathode_PHI_BAR': '$\phi_c$ (eV)',
-        'gap_D':'$d_{ca}$ (cm)',
-        'cathode_T':'$T_c$ (K)',
-        'anode_T':'$T_a$ (K)',
-        'FAST_VOLTAGE': 'Voltage (V)',
-        'FAST_CURRENT': 'Current (A)',
-        'FAST_VOLTAGES':'Voltage (V)',
-        'FAST_CURRENTS':'Current (A)'
-    }
+def convert_time(time_value):
+    """
 
-    common_prefixes = (
-        'I','J','V','T','P'
-    )
+    :param time_value: (str/float) time value, possibly including units such as 'hours'
+    :return:
+    """
+    if isinstance(time_value, numbers.Number):
+        return time_value
+    elif isinstance(time_value, str):
+        # times can be specified in the runcard with units, such as minutes, hours or days, e.g.  "6 hours"
+        value, unit = time_value.split(' ')
+        value = float(value)
+        return value * {
+            'minutes': 60, 'minute': 60,
+            'hours': 3600, 'hour': 3600,
+            'days': 86400, 'day':86400
+        }[unit]
 
-    if label in common_labels:
-        return common_labels[label]
-
-    prefix = label.split('_')[0]
-    if prefix in common_prefixes:
-        suffix = ('\/'.join(label.split('_')[1:])).lower()
-
-        return '$%s_{%s}$' % (prefix, suffix)
-
-    return label
 
 def get_timestamp(path=None):
     """
@@ -99,23 +88,23 @@ class Clock:
     def start(self):
         self.start_time = time.time()
 
-        self.pause_time = None  # if paused, the time when the clock was paused
+        self.stop_time = None  # if paused, the time when the clock was paused
         self.total_stoppage = 0  # amount of stoppage time, or total time while paused
 
     def time(self):
-        if not self.pause_time:
+        if not self.stop_time:
             return time.time() - self.start_time - self.total_stoppage
         else:
-            return self.pause_time - self.start_time - self.total_stoppage
+            return self.stop_time - self.start_time - self.total_stoppage
 
-    def pause(self):
-        if not self.pause_time:
-            self.pause_time = time.time()
+    def stop(self):
+        if not self.stop_time:
+            self.stop_time = time.time()
 
     def resume(self):
-        if self.pause_time:
-            self.total_stoppage += time.time() - self.pause_time
-            self.pause_time = None
+        if self.stop_time:
+            self.total_stoppage += time.time() - self.stop_time
+            self.stop_time = None
 
 
 class MappedVariable:
@@ -129,8 +118,14 @@ class MappedVariable:
             raise TypeError('Need either a knob or meter specification!')
 
         self.instrument = instrument
-        self.knobs = knob
+
+        self.knob = knob
+        if knob == 'None':
+            self.knob = None
+
         self.meter = meter
+        if meter == 'None':
+            self.meter = None
 
     def set(self, value):
 
@@ -138,6 +133,13 @@ class MappedVariable:
             raise TypeError("Cannot set this variable, because it has no associated knob!")
 
         self.instrument.set(self.knob, value)
+
+    def get(self):
+
+        if self.knob is None:
+            raise TypeError("Get method is for knobs only!")
+
+        return self.instrument.knob_values[self.knob]
 
     def measure(self, sample_number=1):
 
@@ -154,10 +156,19 @@ class InstrumentSet:
     Set of instruments to be used in an experiment, including presets, knob and meter specs and alarm protocols
     """
 
+    # Alarm trigger classifications
+    alarm_map = {
+        'IS': lambda val, thres: val == thres,
+        'NOT': lambda val, thres: val != thres,
+        'GREATER': lambda val, thres: val > thres,
+        'GEQ': lambda val, thres: val > thres,
+        'LESS': lambda val, thres: val < thres,
+        'LEQ': lambda val, thres: val <= thres,
+    }
+
     def __init__(self, specs=None, variables=None, alarms=None, presets=None, postsets=None):
 
         self.instruments = {}  # Will contain a list of instrument instances from the instrumentation submodule
-
         if specs:
             self.connect(specs)
 
@@ -166,7 +177,7 @@ class InstrumentSet:
             self.map_variables(variables)
 
         if alarms:
-            self.alarms = {alarm + {'triggered': False} for alarm in alarms}
+            self.alarms = { name: {**alarm, 'triggered': False} for name, alarm in alarms.items() }
         else:
             self.alarms = {}
 
@@ -179,6 +190,8 @@ class InstrumentSet:
             self.postsets = postsets
         else:
             self.postsets = {}
+
+        self.apply(self.presets)
 
     def connect(self, specs):
         """
@@ -200,16 +213,12 @@ class InstrumentSet:
 
             self.instruments[name] = instrument
 
-        self.apply(self.presets)
-
     def map_variables(self, variables):
 
         for name, mapping in variables.items():
 
             instrument, knob, meter = mapping['instrument'], mapping['knob'], mapping['meter']
-            self.mapped_variables = self.mapped_variables + {
-                name: MappedVariable(self.instruments[instrument], knob=knob, meter=meter)
-            }
+            self.mapped_variables.update({name: MappedVariable(self.instruments[instrument], knob=knob, meter=meter)})
 
     def disconnect(self):
         """
@@ -218,9 +227,9 @@ class InstrumentSet:
         :return: None
         """
 
-        self.apply(postsets)
+        self.apply(self.postsets)
 
-        for instrument in self.instruments:
+        for instrument in self.instruments.values():
             instrument.disconnect()
 
         self.instruments = []
@@ -253,10 +262,10 @@ class InstrumentSet:
         :return: (dictionary) dictionary of measured values in the form, meter_name: value
         """
 
+        readings = {}
+
         if meters is None:
             return {name: var.measure() for name, var in self.mapped_variables.items() if var.meter}
-
-        readings = {}
 
         for meter in meters:
 
@@ -288,7 +297,7 @@ class InstrumentSet:
             if value is None:
                 continue
 
-            alarm_triggered = instrumentation.alarm_map[condition](value, threshold)
+            alarm_triggered = self.alarm_map[condition](value, threshold)
             if alarm_triggered:
                 self.alarms[alarm]['triggered'] = True
 
@@ -418,7 +427,6 @@ class Sweep(Routine):
                 self.values_iter = iter(self.values)  # restart the sweep
                 return next(self.values_iter)
 
-
 class Schedule:
     """
     Schedule of settings to be applied to knobs, implemented as an iterable to allow for flexibility in combining different kinds of routines
@@ -427,16 +435,23 @@ class Schedule:
     def __init__(self, routines=None):
         """
 
-        :param routines: (dict) dictionary of routine specifications.
+        :param routines: (dict) dictionary of routine specifications (following the runcard yaml format).
         """
 
         self.clock = Clock()
+        self.end_time = np.inf
 
         self.routines = {}
         if routines:
             self.add(routines)
 
     def add(self, routines):
+        """
+        Adds routines to the schedule, based on the given dictionary of specifications (following the runcard yaml format)
+
+        :param routines: (dict) dictionary of routine specifications.
+        :return: None
+        """
 
         for name, spec in routines.items():
             kind, variable = spec['routine'], spec['variable']
@@ -444,13 +459,7 @@ class Schedule:
 
             times = []
             for time_value in spec['times']:
-                if isinstance(time_value, numbers.Number):
-                    times.append(time_value)
-                elif isinstance(time_value, str):
-                    # times can be specified in the runcard with units, such as minutes, hours or days, e.g.  "6 hours"
-                    value, unit = time_value.split(' ')
-                    value = float(value)
-                    times.append(value*{'minutes': 60, 'hours': 3600, 'days': 86400}[unit])
+                times.append(convert_time(time_value))
 
             routine = {
                 'Hold': Hold,
@@ -465,7 +474,7 @@ class Schedule:
         self.clock.start()
 
     def stop(self):
-        self.clock.pause()
+        self.clock.stop()
 
     def resume(self):
         self.clock.resume()
@@ -474,7 +483,14 @@ class Schedule:
         return self
 
     def __next__(self):
-        return {routine[0]: next(routine[1]) for routine in self.routines.values()}
+
+        output = {}
+        for pair in self.routines.values():
+            knob, routine = pair
+            next_value = next(routine)
+            output.update({knob: next_value})
+
+        return output
 
 
 class Experiment:
@@ -485,17 +501,27 @@ class Experiment:
         :param runcard: (file) runcard file
         """
 
-        self.clock = Clock()
-        self.last_save = -np.inf
-        self.last_plot = -np.inf
+        self.clock = Clock()  # used for save timing
+        self.clock.start()
 
-        self.from_runcard(runcard)
+        self.last_step = -np.inf  # time of last step taken
+        self.last_save = -np.inf  # time of last save
 
-        self.record = DataFrame()  # Will contain history of knob settings and meter readings for the experiment.
+        self.build_from(runcard)  # build experiment from runcard
 
-        self.terminate = False  # flag for terminating the experiment
+        self.data = pd.DataFrame()  # Will contain history of knob settings and meter readings for the experiment.
 
-    def from_runcard(self, runcard):
+        self.running = False
+        self.finished = False  # flag for terminating the experiment
+        self.followup = self.settings.get('follow-up', None).strip()  # What to do when the experiment ends
+
+        # Make a list of follow-ups
+        if self.followup in [None, 'None']:
+            self.followup = [None]
+        elif isinstance(self.followup, str):
+            self.followup = [self.followup]
+
+    def build_from(self, runcard):
         """
         Populates the experiment attributes from the given runcard.
 
@@ -519,69 +545,80 @@ class Experiment:
         self.schedule = Schedule(runcard_dict['Schedule'])
 
     def save(self, save_now=False):
+        """
+
+        :param save_now: (bool/str) If False, saves will only occur at a maximum frequency defined by the 'save interval' experimt setting. Otherwise, experiment data is saved immediately.
+        :return: None
+        """
 
         now = self.clock.time()
         save_interval = self.settings.get('save interval', 60)
 
         if now >= self.last_save + save_interval or save_now:
-            self.record.to_csv(timestamp_path('data.csv'))
+            self.data.to_csv(timestamp_path('data.csv'))
             self.last_save = self.clock.time()
 
-    def run(self, first=True):
+    def __iter__(self):
+        return self
 
-        if first:  # save the runcard for the experiment upon execution for record keeping
-            name = self.description.get('name','experiment')
-            with open(timestamp_path(name+'_runcard.yaml'), 'w') as runcard_file:
+    def __next__(self):
+
+        # Stop if finished
+        if self.finished:
+            self.running = False
+            self.save('now')
+            self.schedule.clock.stop()
+            self.instruments.disconnect()
+            raise StopIteration
+
+        # On first iteration, save the runcard of executed experiment and start the schedule clock
+        if not self.running:
+            name = self.description.get('name', 'experiment')
+            with open(timestamp_path(name + '_runcard.yaml'), 'w') as runcard_file:
                 yaml.dump(self.runcard, runcard_file)
 
-            self.clock.start()
+            self.schedule.clock.start()  # start the schedule clock
+            self.running = True
 
-        self.schedule.clock.start()  # start the schedule clock
+        # Flag for termination if time has exceeded experiment duration
+        duration = convert_time(self.settings['duration'])
+        if self.schedule.clock.time() > duration:
+            self.finished = True
 
-        for configuration in self.schedule:
+        # Flag for termination if any alarms have been raised
+        for alarm in self.instruments.alarms.values():
+            if alarm['triggered']:
+                self.followup.insert(0, alarm['protocol'])
+                self.finished = True
 
-            if self.terminate:
-                self.save('now')
-                break
+        # Make sure time is right for next step
+        now = self.schedule.clock.time()
+        step_interval = self.settings.get('step interval', 0)
+        if now < self.last_step + step_interval:
+            time.sleep(self.last_step + step_interval - now)
 
-            state = configuration
+        self.last_step = self.schedule.clock.time()
 
-            self.instruments.apply(configuration)
-            readings = self.instruments.read()
-            state.update(readings)
+        # Take the next step in the experiment
+        configuration = next(self.schedule)
 
-            times = {'TOTAL TIME': self.clock.time(), 'SCHEDULE TIME': self.schedule.clock.time()}
-            state.update(times)
+        # Get previously set knob values if no corresponding routines are running
+        for knob, value in configuration.items():
+            if value is None:
+                configuration[knob] = self.instruments.mapped_variables[knob].get()
 
-            self.record = self.record.append(line, ignore_index=True)
+        state = configuration  # will contain knob values + meter readings + schedule time
 
-            self.save()
+        self.instruments.apply(configuration)
+        readings = self.instruments.read()
+        state.update(readings)
 
-        # What to do when schedule is finished is determined by the 'ending' option of experiment settings
-        ending_option = self.settings['ending']
-        if ending_option == 'repeat':
-            self.run(first=False)
-        elif ending_option == 'end':
-            self.end()
-        elif ending_option == 'hold':
-            while not self.terminate:
-                self.instruments.apply(configuration)  # reuse last configuration from loop above
-                readings = self.instruments.read()
-                state.update(readings)
+        times = {'Total Time': self.clock.time(), 'Schedule Time': self.schedule.clock.time()}
+        state.update(times)
 
-                times = {'TOTAL TIME': self.clock.time(), 'SCHEDULE TIME': self.schedule.clock.time()}
-                state.update(times)
-                self.record = self.record.append(state, ignore_index=True)
-        elif 'yaml' in ending_option:
-            # Ending option can be another experiment runcard,
-            # e.g. for a specific shutdown sequence or follow-up experiment
-            with open(ending_option, 'r') as runcard:
-                self.end(followup=runcard)
+        state = pd.Series(state, name = datetime.datetime.now())
+        self.data = self.data.append(state)
 
-    def end(self, followup=None):
+        self.save()
 
-        if followup:
-            self.__init__(followup)
-            self.run()
-        else:
-            self.instruments.disconnect()
+        return state

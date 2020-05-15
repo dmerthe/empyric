@@ -4,21 +4,28 @@
  platform: Test Stand 1
  comments: Who is Mike? There is no Test Stand 1
 
+Experiment Settings:
+ duration: 1 minute
+ follow-up: None
+ step interval: 0
+ plot interval: 10
+ save interval: 60
+
 Instruments:
- Anode Keithley: 
-   kind: Kiethley2400
-   backend: gpib
-   address: GPIB::1::INSTR
+ Anode Keithley:
+  kind: Keithley2400
+  backend: visa
+  address: "GPIB::2::INSTR"
 
 Variables:
  Anode Voltage:
-   instrument: Anode Keithley
-   knob: voltage
-   meter: None
+  instrument: Anode Keithley
+  knob: voltage
+  meter: None
  Anode Current:
-   instrument: Anode Keithley
-   knob: None
-   meter: current
+  instrument: Anode Keithley
+  knob: None
+  meter: current
 
 Presets:
  Anode Voltage: 0
@@ -31,27 +38,22 @@ Alarms:
   meter: Anode Current
   condition: GREATER
   threshold: 1
-   protocol: set_zero_voltage.yaml
-
-Experiment Settings:
- ending: repeat
- save interval: 60
- plot interval: 10
+  protocol: set_zero_voltage.yaml
 
 Plotting:
- plot 1:
+ Plot 1:
   x: Anode Voltage
   y: [Anode Current]
   xlabel: 'Voltage (V)'
   ylabel: 'Current (A)'
   options:
+   style: 'averaged'
    linestyle: '-'
    color: 'k'
-    
 
 Schedule:
  Anode Sweep:
-   routine: Sweep
-   variable: Anode Voltage
-   times: [0, 6 hours]
-   values: [-5,-4,-3,-2,-1,0,1,2,3,4,5]
+  routine: Sweep
+  variable: Anode Voltage
+  times: [0, 1 minutes]
+  values: [0,1,2,3,4,5,5,4,3,2,1,0]
