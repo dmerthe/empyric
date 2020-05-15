@@ -12,9 +12,10 @@ yaml=YAML()
 
 def convert_time(time_value):
     """
+    Converts a time of the form "number units" to the time in seconds.
 
     :param time_value: (str/float) time value, possibly including units such as 'hours'
-    :return:
+    :return: (int) time in seconds
     """
     if isinstance(time_value, numbers.Number):
         return time_value
@@ -507,45 +508,35 @@ class Experiment:
         self.last_step = -np.inf  # time of last step taken
         self.last_save = -np.inf  # time of last save
 
-        self.build_from(runcard)  # build experiment from runcard
+        self.runcard = runcard
+        self.description = runcard["Description"]
+
+        self.instruments = InstrumentSet(
+            runcard['Instruments'],
+            runcard['Variables'],
+            runcard['Alarms'],
+            runcard['Presets'],
+            runcard['Postsets']
+        )
+
+        self.settings = runcard['Experiment Settings']
+        self.plotting = runcard['Plotting']
+        self.schedule = Schedule(runcard['Schedule'])
 
         self.data = pd.DataFrame()  # Will contain history of knob settings and meter readings for the experiment.
 
-        self.running = False
-        self.finished = False  # flag for terminating the experiment
+        self.status = 'Not Started'
         self.followup = self.settings.get('follow-up', None).strip()  # What to do when the experiment ends
 
         # Make a list of follow-ups
         if self.followup in [None, 'None']:
-            self.followup = [None]
+            self.followup = []
         elif isinstance(self.followup, str):
             self.followup = [self.followup]
 
-    def build_from(self, runcard):
-        """
-        Populates the experiment attributes from the given runcard.
-
-        :param runcard: (file) runcard in the form of a binary file object.
-        :return: None
-        """
-        runcard_dict = yaml.load(runcard)
-        self.runcard = runcard_dict
-        self.description = runcard_dict["Description"]
-
-        self.instruments = InstrumentSet(
-            runcard_dict['Instruments'],
-            runcard_dict['Variables'],
-            runcard_dict['Alarms'],
-            runcard_dict['Presets'],
-            runcard_dict['Postsets']
-        )
-
-        self.settings = runcard_dict['Experiment Settings']
-        self.plotting = runcard_dict['Plotting']
-        self.schedule = Schedule(runcard_dict['Schedule'])
-
     def save(self, save_now=False):
         """
+        Save data, but at a maximum frequency set by the given save interval, unless overridden by the save_now keyword.
 
         :param save_now: (bool/str) If False, saves will only occur at a maximum frequency defined by the 'save interval' experimt setting. Otherwise, experiment data is saved immediately.
         :return: None
@@ -563,44 +554,18 @@ class Experiment:
 
     def __next__(self):
 
-        # Stop if finished
-        if self.finished:
-            self.running = False
-            self.save('now')
-            self.schedule.clock.stop()
-            self.instruments.disconnect()
-            raise StopIteration
-
-        # On first iteration, save the runcard of executed experiment and start the schedule clock
-        if not self.running:
-            name = self.description.get('name', 'experiment')
-            with open(timestamp_path(name + '_runcard.yaml'), 'w') as runcard_file:
-                yaml.dump(self.runcard, runcard_file)
-
+        # Start the schedule clock on first call
+        if self.status == 'Not Started':
             self.schedule.clock.start()  # start the schedule clock
-            self.running = True
-
-        # Flag for termination if time has exceeded experiment duration
-        duration = convert_time(self.settings['duration'])
-        if self.schedule.clock.time() > duration:
-            self.finished = True
-
-        # Flag for termination if any alarms have been raised
-        for alarm in self.instruments.alarms.values():
-            if alarm['triggered']:
-                self.followup.insert(0, alarm['protocol'])
-                self.finished = True
-
-        # Make sure time is right for next step
-        now = self.schedule.clock.time()
-        step_interval = self.settings.get('step interval', 0)
-        if now < self.last_step + step_interval:
-            time.sleep(self.last_step + step_interval - now)
-
-        self.last_step = self.schedule.clock.time()
+            self.status = 'Running'
 
         # Take the next step in the experiment
-        configuration = next(self.schedule)
+        if self.clock.time() < self.last_step + float(self.settings['step interval']):
+            return self.state
+
+        self.last_step = self.clock.time()
+
+        configuration = next(self.schedule)  # Get the text step from the schedule
 
         # Get previously set knob values if no corresponding routines are running
         for knob, value in configuration.items():
@@ -616,9 +581,30 @@ class Experiment:
         times = {'Total Time': self.clock.time(), 'Schedule Time': self.schedule.clock.time()}
         state.update(times)
 
-        state = pd.Series(state, name = datetime.datetime.now())
-        self.data = self.data.append(state)
+        self.state = pd.Series(state, name = datetime.datetime.now())
+        self.data = self.data.append(self.state)
 
         self.save()
 
-        return state
+        # Flag for termination if time has exceeded experiment duration
+        duration = convert_time(self.settings['duration'])
+        if self.schedule.clock.time() > duration:
+            self.status = 'Finished'
+
+        # Flag for termination if any alarms have been raised
+        for alarm in self.instruments.alarms.values():
+            if alarm['triggered']:
+                for task in self.followup:
+                    if task.lower() == 'repeat':
+                        self.follow.remove(task)  # Cancel repeat if alarm triggered
+                self.followup.append(alarm['protocol'])
+                self.status = 'Finished'
+
+        # Stop if finished
+        if self.status == 'Finished':
+            self.save('now')
+            self.schedule.clock.stop()
+            self.instruments.disconnect()
+            raise StopIteration
+
+        return self.state

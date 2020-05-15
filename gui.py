@@ -1,15 +1,18 @@
 import matplotlib
 matplotlib.use('TkAgg')
 
-import numpy as np
+import numbers
+import os
 import time
 import warnings
+import numpy as np
+import pandas as pd
 import tkinter as tk
 import matplotlib.pyplot as plt
 from tkinter.filedialog import askopenfilename, askopenfile
+from ruamel.yaml import YAML
 
-from mercury.elements import Experiment
-
+from mercury.elements import yaml, get_timestamp, timestamp_path, Experiment
 
 class ExperimentController():
 
@@ -23,27 +26,39 @@ class ExperimentController():
         if runcard_path is None:
             runcard_path = askopenfilename(title='Select Experiment Runcard')
 
-        self.run(runcard_path)
-
-    def run(self, runcard_path):
-
         with open(self.runcard_path, 'rb') as runcard:
-            self.experiment = Experiment(runcard)
+            self.runcard = yaml.load(runcard)
 
-        self.settings = self.experiment.settings
-        self.plotting = self.experiment.plotting
+        self.settings = self.runcard['Settings']
 
-        self.status_gui = StatusGUI(self.experiment)
+        self.run(self.runcard)
+
+    def run(self, runcard, repeat=False):
+
+        self.experiment = Experiment(runcard)
+
+        # Save executed runcard for record keeping
+        if not repeat:
+            name = self.experiment.description.get('name', 'experiment')
+            with open(timestamp_path(name + '_runcard.yaml'), 'w') as runcard_file:
+                yaml.dump(self.runcard, runcard_file)
+
+        self.status_gui = StatusGUI(self.root, self.experiment)
         self.plotter = Plotter(self.experiment.plotting)
 
         for step in self.experiment:
-
             self.status_gui.update(step)
-            self.update_plots(self.experiment.data)
+            self.plotter.plot(self.experiment.data)
 
-    def update_plots(self, data):
-        # Update plots showing collected experimental data
-        self.plotter.plot(data)
+        followup = self.experiment.followup
+
+        if len(followup) == 0:
+            self.status_gui.quit()
+        elif followup[0].lower() == 'repeat':
+            self.run(runcard_path, repeat=True)
+        else:
+            for task in followup:
+                self.run(task)
 
 
 class BasicDialog(tk.Toplevel):
@@ -186,13 +201,38 @@ class StatusGUI():
                                      width=10)
         self.stop_button.grid(row=i + 1, column=2)
 
-    def update(self, state=None):
+    def update(self, state=None, status=None):
 
         if state:
             for name, label in self.variable_status_labels.items():
                 label.config(text=str(state[name]))
 
+        if status:
+            self.status_label.config(text=status)
+        else:
+            self.status_label.config(text='Running')
+
         self.root.update()
+
+    def check_instr(self):
+        pass
+
+    def toggle_puase(self):
+        pass
+
+    def user_stop(self):
+        pass
+
+    def quit(self):
+
+        self.update(status='Finished with no follow-up. Closing...')
+        self.root.update()
+        time.sleep(1)
+        self.root.destroy()
+
+
+class PlotError(BaseException):
+    pass
 
 
 class Plotter():
@@ -205,11 +245,10 @@ class Plotter():
         n_cols = len(settings)
 
         self.settings = settings
-        self.figures = {}
-        self.axes = {}
+        self.plots = {}
 
-        for plot_name, plot_settings in settings.items():
-            self.figures[plot_name], self.axes[plot_name] = plt.subplots()
+        for plot_name in settings:
+            self.plots[plot_name] = plt.subplots()
 
     def plot(self, data):
         """
@@ -218,7 +257,54 @@ class Plotter():
         :param data: (DataFrame) data from which to make the plot, based on settings
         :return:
         """
-        pass
+
+        for name, plot in self.plots.items:
+
+            fig, ax = plot
+            settings = self.settings[name]
+            x = settings['x']
+            y = np.array([settings['y']]).flatten()
+            s  = settings.get('parameter', 'Time')  # parameter
+            xlabel = settings.get('xlabel', x)
+            ylabel = settings.get('ylabel', y[0])
+            plt_kwargs = settings['options']
+
+            ax.set_xlabel(xlabel)
+            ax.set_ylabel(ylabel)
+            ax.set_title(name)
+
+            y_data = data[y]
+
+            y_is_numeric = np.prod([isinstance(value, numbers.Number) for value in y_data.iloc[-1]].values)
+            y_is_file = np.prod([os.path.exists(str(value)) for value in y_data.iloc[-1]].values) > 1
+
+            if not y_is_numeric and not y_is_file:
+                raise TypeError('Y data must either be all numeric OR all path names pointing to data files')
+
+            if y_is_file:
+
+                last_entries = y_data.iloc[-1]
+
+                for file in last_entries:
+
+                    file_data = pd.read_csv(file)
+
+                    if s == 'Time':
+                        file_data[s] = file_data.index
+                    else:
+                        file_indices = file_data.index
+                        for index in file_indices:
+                            file_data[s][index] = data[s][index]
+
+                    file_data.plot(x=x_name, y=y_name, ax=ax)  # for lines
+                    file_data.plot(x=x_name, y=y_name, kind='scatter', c=s,ax=ax, colormap='viridis')
+
+            elif x == 'Time':  # Plot some regular numbers versus time
+                y_data.plot(ax=ax,**plt_kwargs)
+            else:  # Plot some regular numbers versus some other numbers
+                y_data.plot(x=x, ax=ax, **plt_kwargs)
+
+            plt.pause(0.1)
 
 
 class InstrumentConfigGUI():
