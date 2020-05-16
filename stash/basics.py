@@ -33,7 +33,7 @@ class Instrument(object):
         try:
             measurement_method = self.__getattribute__('measure_'+meter.replace(' ','_'))
         except AttributeError:
-            raise MeasurementError(f"Given variable '{meter}' cannot be measured with this instrument")
+            raise MeasurementError(f"'{meter}' cannot be measured on {self.name}")
 
         if sample_number == 1:
             measurement = measurement_method()
@@ -54,7 +54,7 @@ class Instrument(object):
         try:
             set_method = self.__getattribute__('set_'+knob.replace(' ','_'))
         except AttributeError:
-            raise SetError(f'{knob} cannot be set on {self.instrument_name}')
+            raise SetError(f"'{knob}' cannot be set on {self.name}")
 
         if value is None:  # A None value passed into this function indicates that no change in setting is to be made
             return

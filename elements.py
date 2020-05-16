@@ -7,75 +7,9 @@ import numpy as np
 import pandas as pd
 
 from mercury import instrumentation
+from mercury.util_funcs import *
 
 yaml=YAML()
-
-def convert_time(time_value):
-    """
-    Converts a time of the form "number units" to the time in seconds.
-
-    :param time_value: (str/float) time value, possibly including units such as 'hours'
-    :return: (int) time in seconds
-    """
-    if isinstance(time_value, numbers.Number):
-        return time_value
-    elif isinstance(time_value, str):
-        # times can be specified in the runcard with units, such as minutes, hours or days, e.g.  "6 hours"
-        value, unit = time_value.split(' ')
-        value = float(value)
-        return value * {
-            'minutes': 60, 'minute': 60,
-            'hours': 3600, 'hour': 3600,
-            'days': 86400, 'day':86400
-        }[unit]
-
-
-def get_timestamp(path=None):
-    """
-    Generates a timestamp in the YYYYMMDD-HHmmss format
-
-    :param path: (string) path to get timestamp from; if None, a new timestamp will be generated and returned
-    :return: (string) the formatted timestamp
-    """
-
-    if path:
-        timestamp_format = re.compile(r'\d\d\d\d\d\d\d\d-\d\d\d\d\d\d')
-        timestamp_matches = timestamp_format.findall(path)
-        if len(timestamp_matches) > 0:
-            return timestamp_matches[-1]
-    else:
-        return time.strftime("%Y%m%d-%H%M%S", time.localtime())
-
-def timestamp_path(path, timestamp=None):
-    """
-
-    :param path: (str) path to which the timestamp will be appended or updated
-    :param timestamp: (string) if provided, this timestamp will be appended. If not provided, a new timestamp will be generated.
-    :return: (str) timestamped path
-    """
-
-    already_timestamped = False
-
-    if not timestamp:
-        timestamp = get_timestamp()
-
-    # separate extension
-    full_name = '.'.join(path.split('.')[:-1])
-    extension = '.' + path.split('.')[-1]
-
-    # If there is already a timestamp, replace it
-    # If there is not already a timestamp, append it
-
-    timestamp_format = re.compile(r'\d\d\d\d\d\d\d\d-\d\d\d\d\d\d')
-    timestamp_matches = timestamp_format.findall(path)
-
-    if len(timestamp_matches) > 0:
-        already_timestamped = True
-
-    if already_timestamped:
-        return '-'.join(full_name.split('-')[:-2]) + '-' + timestamp + extension
-    else:
-        return full_name + '-' + timestamp + extension
 
 
 class Clock:
@@ -121,11 +55,11 @@ class MappedVariable:
         self.instrument = instrument
 
         self.knob = knob
-        if knob == 'None':
+        if knob.lower() == 'none':
             self.knob = None
 
         self.meter = meter
-        if meter == 'None':
+        if meter.lower() == 'none':
             self.meter = None
 
     def set(self, value):
@@ -211,6 +145,7 @@ class InstrumentSet:
 
             instrument = instrumentation.__dict__[kind](address, backend=backend.lower())
             instrument.name = name
+            instrument.mapped_variables = {}
 
             self.instruments[name] = instrument
 
@@ -220,6 +155,11 @@ class InstrumentSet:
 
             instrument, knob, meter = mapping['instrument'], mapping['knob'], mapping['meter']
             self.mapped_variables.update({name: MappedVariable(self.instruments[instrument], knob=knob, meter=meter)})
+            if knob:
+                self.instruments[instrument].mapped_variables[knob] = name
+            if meter:
+                self.instruments[instrument].mapped_variables[meter] = name
+
 
     def disconnect(self):
         """
@@ -329,7 +269,7 @@ class Routine:
         return self
 
 
-class Hold(Routine):
+class Idle(Routine):
     """
     Holds a value, given by the 'values' argument (1-element list or number), from the first time in 'times' to the second.
 
@@ -349,10 +289,7 @@ class Hold(Routine):
             start = self.times
             end = np.inf
 
-        try:
-            value = self.values[0]
-        except TypeError:
-            value = self.values
+        value = np.array([self.values]).flatten()[0]
 
         now = self.clock.time()
 
@@ -463,7 +400,7 @@ class Schedule:
                 times.append(convert_time(time_value))
 
             routine = {
-                'Hold': Hold,
+                'Idle': Idle,
                 'Ramp': Ramp,
                 'Sweep': Sweep,
                 'Transit': Transit
@@ -519,7 +456,7 @@ class Experiment:
             runcard['Postsets']
         )
 
-        self.settings = runcard['Experiment Settings']
+        self.settings = runcard['Settings']
         self.plotting = runcard['Plotting']
         self.schedule = Schedule(runcard['Schedule'])
 

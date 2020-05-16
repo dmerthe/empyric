@@ -2,8 +2,56 @@ import os
 import datetime
 import pandas as pd
 
-from mercury.elements import get_timestamp, timestamp_path
 from mercury.stash.basics import *
+from mercury.util_funcs import *
+
+def get_timestamp(path=None):
+    """
+    Generates a timestamp in the YYYYMMDD-HHmmss format
+
+    :param path: (string) path to get timestamp from; if None, a new timestamp will be generated and returned
+    :return: (string) the formatted timestamp
+    """
+
+    if path:
+        timestamp_format = re.compile(r'\d\d\d\d\d\d\d\d-\d\d\d\d\d\d')
+        timestamp_matches = timestamp_format.findall(path)
+        if len(timestamp_matches) > 0:
+            return timestamp_matches[-1]
+    else:
+        return time.strftime("%Y%m%d-%H%M%S", time.localtime())
+
+def timestamp_path(path, timestamp=None):
+    """
+
+    :param path: (str) path to which the timestamp will be appended or updated
+    :param timestamp: (string) if provided, this timestamp will be appended. If not provided, a new timestamp will be generated.
+    :return: (str) timestamped path
+    """
+
+    already_timestamped = False
+
+    if not timestamp:
+        timestamp = get_timestamp()
+
+    # separate extension
+    full_name = '.'.join(path.split('.')[:-1])
+    extension = '.' + path.split('.')[-1]
+
+    # If there is already a timestamp, replace it
+    # If there is not already a timestamp, append it
+
+    timestamp_format = re.compile(r'\d\d\d\d\d\d\d\d-\d\d\d\d\d\d')
+    timestamp_matches = timestamp_format.findall(path)
+
+    if len(timestamp_matches) > 0:
+        already_timestamped = True
+
+    if already_timestamped:
+        return '-'.join(full_name.split('-')[:-2]) + '-' + timestamp + extension
+    else:
+        return full_name + '-' + timestamp + extension
+
 
 class Keithley2400(Instrument, GPIBDevice):
 
@@ -206,10 +254,9 @@ class Keithley2400(Instrument, GPIBDevice):
             path = args[0]
 
         self.knob_values['fast voltages'] = path
-
         fast_voltage_data = pd.read_csv(path)
 
-        self.fast_voltages = fast_voltage_data['Voltage']
+        self.fast_voltages = fast_voltage_data['Voltage'].values
 
     def measure_fast_currents(self):
 
@@ -231,7 +278,7 @@ class Keithley2400(Instrument, GPIBDevice):
 
         list_length = len(self.fast_voltages)
 
-        if list_length > 100:
+        if list_length >= 100:
             sub_lists = [self.fast_voltages[i*100:(i+1)*100] for i in range(list_length // 100)]
         else:
             sub_lists = []
@@ -256,15 +303,17 @@ class Keithley2400(Instrument, GPIBDevice):
 
         # Save data to same path
         timestamp = datetime.datetime.now()
-        new_iv_data = pd.DataFrame({self.name + ' Voltage':self.fast_voltages, self.name + ' Current':current_list}
-                                   , index=pd.date_range(start=timestamp), periods=len(current_list))
+        new_iv_data = pd.DataFrame({
+            self.mapped_variables['fast voltages']: self.fast_voltages,
+            self.mapped_variables['fast currents']: current_list}
+                                   , index=pd.date_range(start=timestamp, periods=len(current_list)))
 
         if os.path.isfile(path):
-            fast_iv_data = pd.read_csv(path)
+            fast_iv_data = pd.read_csv(path, index_col=0)
         else:
-            fast_iv_data = pd.DataFrame({self.name + ' Voltage':[], self.name + ' Current':[]})
+            fast_iv_data = pd.DataFrame({self.mapped_variables['fast voltages']:[], self.mapped_variables['fast currents']:[]})
 
-        fast_iv_data = fast_iv_data.append(new_iv_data)
+        fast_iv_data = fast_iv_data.append(new_iv_data, sort=False)
         fast_iv_data.to_csv(path)
 
         self.write(':SOUR:VOLT:MODE FIX')

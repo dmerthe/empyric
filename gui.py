@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from tkinter.filedialog import askopenfilename, askopenfile
 from ruamel.yaml import YAML
 
-from mercury.elements import yaml, get_timestamp, timestamp_path, Experiment
+from mercury.elements import yaml, timestamp_path, Experiment
 
 class ExperimentController():
 
@@ -28,7 +28,7 @@ class ExperimentController():
 
         os.chdir(os.path.dirname(runcard_path))
 
-        with open(self.runcard_path, 'rb') as runcard:
+        with open(runcard_path, 'rb') as runcard:
             self.runcard = yaml.load(runcard)
 
         self.settings = self.runcard['Settings']
@@ -166,11 +166,13 @@ class StatusGUI():
 
     def __init__(self, parent, experiment):
 
+        self.parent = parent
+
         self.experiment_name = experiment.description['name']
-        self.variables = experiment.instrument.mapped_variables
+        self.variables = experiment.instruments.mapped_variables
 
         self.root = tk.Toplevel(self.parent)
-        self.root.title('Experiment: ' + experiment_name)
+        self.root.title('Experiment: ' + self.experiment_name)
 
         tk.Label(self.root, text='Status:').grid(row=0, column=0, sticky=tk.E)
 
@@ -205,7 +207,7 @@ class StatusGUI():
 
     def update(self, state=None, status=None):
 
-        if state:
+        if state is not None:
             for name, label in self.variable_status_labels.items():
                 label.config(text=str(state[name]))
 
@@ -219,7 +221,7 @@ class StatusGUI():
     def check_instr(self):
         pass
 
-    def toggle_puase(self):
+    def toggle_pause(self):
         pass
 
     def user_stop(self):
@@ -231,6 +233,7 @@ class StatusGUI():
         self.root.update()
         time.sleep(1)
         self.root.destroy()
+        self.parent.focus_set()
 
 
 class PlotError(BaseException):
@@ -260,7 +263,7 @@ class Plotter():
         :return:
         """
 
-        for name, plot in self.plots.items:
+        for name, plot in self.plots.items():
 
             fig, ax = plot
             settings = self.settings[name]
@@ -269,7 +272,7 @@ class Plotter():
             s  = settings.get('parameter', 'Time')  # parameter
             xlabel = settings.get('xlabel', x)
             ylabel = settings.get('ylabel', y[0])
-            plt_kwargs = settings['options']
+            plt_kwargs = settings.get('options', {})
 
             ax.set_xlabel(xlabel)
             ax.set_ylabel(ylabel)
@@ -277,7 +280,7 @@ class Plotter():
 
             y_data = data[y]
 
-            y_is_numeric = np.prod([isinstance(value, numbers.Number) for value in y_data.iloc[-1]].values)
+            y_is_numeric = np.prod([isinstance(value, numbers.Number) for value in y_data.iloc[-1].values])
             y_is_file = os.path.exists(str(y_data[y[0]].values[-1]))
 
             if not y_is_numeric and not y_is_file:
