@@ -26,6 +26,8 @@ class ExperimentController():
         if runcard_path is None:
             runcard_path = askopenfilename(title='Select Experiment Runcard')
 
+        os.chdir(os.path.dirname(runcard_path))
+
         with open(self.runcard_path, 'rb') as runcard:
             self.runcard = yaml.load(runcard)
 
@@ -276,28 +278,36 @@ class Plotter():
             y_data = data[y]
 
             y_is_numeric = np.prod([isinstance(value, numbers.Number) for value in y_data.iloc[-1]].values)
-            y_is_file = np.prod([os.path.exists(str(value)) for value in y_data.iloc[-1]].values) > 1
+            y_is_file = os.path.exists(str(y_data[y[0]].values[-1]))
 
             if not y_is_numeric and not y_is_file:
                 raise TypeError('Y data must either be all numeric OR all path names pointing to data files')
 
             if y_is_file:
 
-                last_entries = y_data.iloc[-1]
+                if len(y) > 1:
+                    raise PlotError('Only one x-y pair can be plotted in each plot showing a dependence on a third parameter!')
 
-                for file in last_entries:
+                data_file = y_data[y[0]].values[-1]
 
-                    file_data = pd.read_csv(file)
+                file_data = pd.read_csv(data_file)
 
-                    if s == 'Time':
-                        file_data[s] = file_data.index
-                    else:
-                        file_indices = file_data.index
-                        for index in file_indices:
-                            file_data[s][index] = data[s][index]
+                if s == 'Time':
+                    file_data[s] = file_data.index
+                else:
 
-                    file_data.plot(x=x_name, y=y_name, ax=ax)  # for lines
-                    file_data.plot(x=x_name, y=y_name, kind='scatter', c=s,ax=ax, colormap='viridis')
+                    file_indices = file_data.index  # timestamps for the referenced data file
+                    data_indices = data.index  # timestamps for the main data file, slightly different from the file indices
+
+                    unique_file_indices = np.unique(file_indices).sort()
+
+                    index_map = {file_index: data_index for file_index, data_index in zip(file_indices, data_indices)}
+
+                    for index in file_indices:
+                        file_data[s][index] = data[s][index_map[index]]
+
+                file_data.plot(x=x, y=y[0], ax=ax, kind='scatter',
+                               s=10, c=s, colormap='viridis')
 
             elif x == 'Time':  # Plot some regular numbers versus time
                 y_data.plot(ax=ax,**plt_kwargs)

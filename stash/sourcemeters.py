@@ -1,7 +1,9 @@
+import os
+import datetime
 import pandas as pd
 
+from mercury.elements import get_timestamp, timestamp_path
 from mercury.stash.basics import *
-#from mercury.misc import *
 
 class Keithley2400(Instrument, GPIBDevice):
 
@@ -205,9 +207,9 @@ class Keithley2400(Instrument, GPIBDevice):
 
         self.knob_values['fast voltages'] = path
 
-        fast_iv_data = pd.read_csv(path, engine='python')
+        fast_voltage_data = pd.read_csv(path)
 
-        self.fast_voltages = fast_iv_data['VOLTAGE']
+        self.fast_voltages = fast_voltage_data['Voltage']
 
     def measure_fast_currents(self):
 
@@ -221,7 +223,8 @@ class Keithley2400(Instrument, GPIBDevice):
 
         self.write(':SOUR:VOLT:MODE LIST')
 
-        path = self.knob_values['fast voltages']
+        local_path = self.name+'-fast_iv_measurement.csv'
+        path = os.path.join(os.getcwd(), local_path)
 
         if not path:
             raise MeasurementError('File path for fast IV sweep voltages have not been stored!')
@@ -252,15 +255,22 @@ class Keithley2400(Instrument, GPIBDevice):
         self.connection.timeout = 1000  # put it back
 
         # Save data to same path
-        timestamp = get_timestamp()
-        fast_iv_data = pd.read_csv(path)
-        fast_iv_data[f'CURRENT-{timestamp}'] = current_list
-        fast_iv_data.to_csv(path, index=False)
+        timestamp = datetime.datetime.now()
+        new_iv_data = pd.DataFrame({self.name + ' Voltage':self.fast_voltages, self.name + ' Current':current_list}
+                                   , index=pd.date_range(start=timestamp), periods=len(current_list))
+
+        if os.path.isfile(path):
+            fast_iv_data = pd.read_csv(path)
+        else:
+            fast_iv_data = pd.DataFrame({self.name + ' Voltage':[], self.name + ' Current':[]})
+
+        fast_iv_data = fast_iv_data.append(new_iv_data)
+        fast_iv_data.to_csv(path)
 
         self.write(':SOUR:VOLT:MODE FIX')
         #self.write(':TRIG:COUN 1')
 
-        return f'CURRENT-{timestamp}'
+        return path
 
 
 class Keithley2651A(Instrument, GPIBDevice):
