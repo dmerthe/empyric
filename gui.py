@@ -245,79 +245,113 @@ class Plotter():
     Handler for plotting data based on the runcard plotting settings and data context
     """
 
-    def __init__(self, settings):
+    colors = ['k', 'r', 'b', 'm', 'g', 'c', 'y', '0.5']
+    linestyles = ['-', '--', ':']
 
-        n_cols = len(settings)
+    def __init__(self, data, settings):
+        """
+        PLot data based on settings
 
+        :param data: (DataFrame) Dataframe containing the data to be plotted.
+        :param settings: (dict) dictionary of plot settings
+        """
+
+        self.data = data
         self.settings = settings
-        self.plots = {}
 
+        self.plots = {}
         for plot_name in settings:
             self.plots[plot_name] = plt.subplots()
 
-    def plot(self, data):
-        """
-        Plot the specified data
+    def plot(self, save=False, **kwargs):
 
-        :param data: (DataFrame) data from which to make the plot, based on settings
-        :return:
-        """
+        
 
-        for name, plot in self.plots.items():
+        if save:
+            self.save()
 
-            fig, ax = plot
-            settings = self.settings[name]
-            x = settings['x']
-            y = np.array([settings['y']]).flatten()
-            s  = settings.get('parameter', 'Time')  # parameter
-            xlabel = settings.get('xlabel', x)
-            ylabel = settings.get('ylabel', y[0])
-            plt_kwargs = settings.get('options', {})
+    def save(self):
+        pass
 
-            ax.set_xlabel(xlabel)
-            ax.set_ylabel(ylabel)
-            ax.set_title(name)
+    def _plot_averaged(self, y, x=None, **kwargs):
+        pass
 
-            y_data = data[y]
+    def _plot_errorbars(self, y, x=None, **kwargs):
+        pass
 
-            y_is_numeric = np.prod([isinstance(value, numbers.Number) for value in y_data.iloc[-1].values])
-            y_is_file = os.path.exists(str(y_data[y[0]].values[-1]))
+    def _plot_parametric(self, y, x, s=None, **kwargs):
+        pass
 
-            if not y_is_numeric and not y_is_file:
-                raise TypeError('Y data must either be all numeric OR all path names pointing to data files')
+    def _plot_order(self, y, x, s=None, **kwargs):
+        pass
 
-            if y_is_file:
-
-                if len(y) > 1:
-                    raise PlotError('Only one x-y pair can be plotted in each plot showing a dependence on a third parameter!')
-
-                data_file = y_data[y[0]].values[-1]
-
-                file_data = pd.read_csv(data_file)
-
-                if s == 'Time':
-                    file_data[s] = file_data.index
-                else:
-
-                    file_indices = file_data.index  # timestamps for the referenced data file
-                    data_indices = data.index  # timestamps for the main data file, slightly different from the file indices
-
-                    unique_file_indices = np.unique(file_indices).sort()
-
-                    index_map = {file_index: data_index for file_index, data_index in zip(file_indices, data_indices)}
-
-                    for index in file_indices:
-                        file_data[s][index] = data[s][index_map[index]]
-
-                file_data.plot(x=x, y=y[0], ax=ax, kind='scatter',
-                               s=10, c=s, colormap='viridis')
-
-            elif x == 'Time':  # Plot some regular numbers versus time
-                y_data.plot(ax=ax,**plt_kwargs)
-            else:  # Plot some regular numbers versus some other numbers
-                y_data.plot(x=x, ax=ax, **plt_kwargs)
-
-            plt.pause(0.1)
+    # def plot(self, data):
+    #     """
+    #     Plot the specified data
+    #
+    #     :param data: (DataFrame) data from which to make the plot, based on settings
+    #     :return:
+    #     """
+    #
+    #     for name, plot in self.plots.items():
+    #
+    #         fig, ax = plot
+    #         settings = self.settings[name]
+    #         x = settings['x']
+    #         y = np.array([settings['y']]).flatten()
+    #         s  = settings.get('parameter', 'Time')  # parameter
+    #         xlabel = settings.get('xlabel', x)
+    #         ylabel = settings.get('ylabel', y[0])
+    #         plt_kwargs = settings.get('options', {})
+    #
+    #         ax.set_xlabel(xlabel)
+    #         ax.set_ylabel(ylabel)
+    #         ax.set_title(name)
+    #
+    #         y_data = data[y]
+    #
+    #         y_is_numeric = np.prod([isinstance(value, numbers.Number) for value in y_data.iloc[-1].values])
+    #         y_is_file = os.path.exists(str(y_data[y[0]].values[-1]))
+    #
+    #         if not y_is_numeric and not y_is_file:
+    #             raise TypeError('Y data must either be all numeric OR all path names pointing to data files')
+    #
+    #         if y_is_file:
+    #
+    #             if len(y) > 1:
+    #                 raise PlotError('Only one x-y pair can be plotted in each plot showing a dependence on a third parameter!')
+    #
+    #             data_file = y_data[y[0]].values[-1]
+    #
+    #             file_data = pd.read_csv(data_file)
+    #
+    #             if s == 'Time':
+    #                 file_data[s] = file_data.index
+    #             else:
+    #
+    #                 file_indices = file_data.index  # timestamps for the referenced data file
+    #                 data_indices = data.index  # timestamps for the main data file, slightly different from the file indices
+    #
+    #                 unique_file_indices = np.unique(file_indices).sort()
+    #
+    #                 index_map = {file_index: data_index for file_index, data_index in zip(file_indices, data_indices)}
+    #
+    #                 for index in file_indices:
+    #                     file_data[s][index] = data[s][index_map[index]]
+    #
+    #             file_data.plot(x=x, y=y[0], ax=ax, kind='scatter',
+    #                            s=10, c=s, colormap='viridis')
+    #
+    #         elif x == 'Time':  # Plot some regular numbers versus time
+    #             y_data.plot(ax=ax,**plt_kwargs)
+    #             ax.legend()
+    #         else:  # Plot some regular numbers versus some other numbers
+    #             y_data.plot(x=x, ax=ax, **plt_kwargs)
+    #             ax.legend()
+    #
+    #         ax.grid(True)
+    #
+    #         plt.pause(0.1)
 
 
 class InstrumentConfigGUI():

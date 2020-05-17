@@ -16,6 +16,7 @@ def convert_time(time_value):
         value, unit = time_value.split(' ')
         value = float(value)
         return value * {
+            'seconds': 1, 'second':1,
             'minutes': 60, 'minute': 60,
             'hours': 3600, 'hour': 3600,
             'days': 86400, 'day':86400
