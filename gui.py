@@ -13,6 +13,7 @@ from tkinter.filedialog import askopenfilename, askopenfile
 from ruamel.yaml import YAML
 
 from mercury.elements import yaml, timestamp_path, Experiment
+from mercury.util_funcs import convert_time
 
 class ExperimentController():
 
@@ -46,11 +47,20 @@ class ExperimentController():
                 yaml.dump(self.runcard, runcard_file)
 
         self.status_gui = StatusGUI(self.root, self.experiment)
-        self.plotter = Plotter(self.experiment.plotting)
+        self.plotter = Plotter(self.experiment.data, self.experiment.plotting,
+                               interval = convert_time(self.settings['plot interval']))
+        for state in self.experiment:
 
-        for step in self.experiment:
-            self.status_gui.update(step)
-            self.plotter.plot(self.experiment.data)
+            self.status_gui.update(state, status=f'Running: {state.name}')
+            self.plotter.plot(save=True)
+
+            # Stop the schedule clock and stop iterating if the user pauses the experiment
+            if self.status_gui.paused:
+                self.experiment.schedule.clock.stop()
+                while self.status_gui.paused:
+                    self.status_gui.update(state)
+                    plt.pause(0.01)
+                self.experiment.schedule.clock.resume()
 
         followup = self.experiment.followup
 
@@ -63,102 +73,6 @@ class ExperimentController():
                 self.run(task)
 
 
-class BasicDialog(tk.Toplevel):
-    """
-    General purpose dialog window
-
-    """
-
-    def __init__(self, parent, title = None):
-
-        tk.Toplevel.__init__(self, parent)
-        self.transient(parent)
-
-        if title:
-            self.title(title)
-
-        self.parent = parent
-
-        self.result = None
-
-        body = tk.Frame(self)
-        self.initial_focus = self.body(body)
-        body.pack(padx=5, pady=5)
-
-        self.buttonbox()
-
-        self.grab_set()
-
-        if not self.initial_focus:
-            self.initial_focus = self
-
-        self.protocol("WM_DELETE_WINDOW", self.cancel)
-
-        self.geometry("+%d+%d" % (parent.winfo_rootx()+50,
-                                  parent.winfo_rooty()+50))
-
-        self.initial_focus.focus_set()
-
-        self.wait_window(self)
-
-    # construction hooks
-
-    def body(self, master):
-        # create dialog body.  return widget that should have
-        # initial focus.  this method should be overridden
-
-        pass
-
-    def buttonbox(self):
-        # add standard button box. override if you don't want the
-        # standard buttons
-
-        box = tk.Frame(self)
-
-        w = tk.Button(box, text="Apply", width=10, command=self.apply)
-        w.pack(side=tk.LEFT, padx=5, pady=5)
-        w = tk.Button(box, text="OK", width=10, command=self.ok, default=tk.ACTIVE)
-        w.pack(side=tk.LEFT, padx=5, pady=5)
-        w = tk.Button(box, text="Cancel", width=10, command=self.cancel)
-        w.pack(side=tk.LEFT, padx=5, pady=5)
-
-        self.bind("<Return>", self.ok)
-        self.bind("<Escape>", self.cancel)
-
-        box.pack()
-
-    # standard button semantics
-
-    def ok(self, event=None):
-
-        if not self.validate():
-            self.initial_focus.focus_set() # put focus back
-            return
-
-        self.withdraw()
-        self.update_idletasks()
-
-        self.apply()
-
-        self.cancel()
-
-    def cancel(self, event=None):
-
-        # put focus back to the parent window
-        self.parent.focus_set()
-        self.destroy()
-
-    # command hooks
-
-    def validate(self):
-
-        return 1 # override
-
-    def apply(self):
-
-        pass # override
-
-
 class StatusGUI():
     """
     GUI showing experimental progress and values of all experiment variables, allowing the user to stop or pause the experiment.
@@ -167,12 +81,14 @@ class StatusGUI():
     def __init__(self, parent, experiment):
 
         self.parent = parent
+        self.experiment = experiment
 
-        self.experiment_name = experiment.description['name']
+        self.paused = False
+
         self.variables = experiment.instruments.mapped_variables
 
         self.root = tk.Toplevel(self.parent)
-        self.root.title('Experiment: ' + self.experiment_name)
+        self.root.title('Experiment: ' + self.experiment.description['name'])
 
         tk.Label(self.root, text='Status:').grid(row=0, column=0, sticky=tk.E)
 
@@ -214,21 +130,34 @@ class StatusGUI():
         if status:
             self.status_label.config(text=status)
         else:
-            self.status_label.config(text='Running')
+            if self.paused:
+                self.status_label.config(text='Paused by user')
+            else:
+                self.status_label.config(text='Running')
 
         self.root.update()
 
     def check_instr(self):
-        pass
+        instrument_gui = InstrumentConfigGUI(self.root, self.instruments, runcard_warning=True)
 
     def toggle_pause(self):
-        pass
+
+        self.paused = not self.paused
+
+        if self.paused:
+            self.update(status='Paused by user')
+            self.pause_button.config(text='Resume')
+            self.config_button.config(state=tk.NORMAL)
+        else:
+            self.update(status='Resumed by user')
+            self.pause_button.config(text='Pause')
+            self.config_button.config(state=tk.DISABLED)
 
     def user_stop(self):
-        pass
+        self.update(status='Stopped by User')
+        self.experiment.status = 'Finished'  # tells the experiment to stop iterating
 
-    def quit(self):
-
+    def quit(self, message=None):
         self.update(status='Finished with no follow-up. Closing...')
         self.root.update()
         time.sleep(1)
@@ -245,10 +174,7 @@ class Plotter():
     Handler for plotting data based on the runcard plotting settings and data context
     """
 
-    colors = ['k', 'r', 'b', 'm', 'g', 'c', 'y', '0.5']
-    linestyles = ['-', '--', ':']
-
-    def __init__(self, data, settings):
+    def __init__(self, data, settings, interval=None):
         """
         PLot data based on settings
 
@@ -259,107 +185,170 @@ class Plotter():
         self.data = data
         self.settings = settings
 
+        self.last_plot = -np.inf
+
+        if interval is None:
+            self.interval = 0
+        else:
+            self.interval = interval
+
         self.plots = {}
         for plot_name in settings:
             self.plots[plot_name] = plt.subplots()
 
-    def plot(self, save=False, **kwargs):
+    def plot(self, plot_now=False, save=False):
 
-        
+        # Only plot if sufficient time has passed since the last plot generation
+        now = time.time()
+        if now < self.last_plot + self.interval or plot_now:
+            return
+
+        self.last_plot = now
+
+        # Make the plots, by name and style
+        for name, settings in self.settings.items():
+
+            style = settings['style'].lower()
+
+            if style == 'none' or style == 'all':
+                self._plot_all(name)
+            elif style == 'averaged':
+                self._plot_averaged(name)
+            elif style == 'errorbars':
+                self._plot_errorbars(name)
+            elif style == 'parametric':
+                self._plot_parametric(name)
+            elif style == 'order':
+                self._plot_order(name)
+            else:
+                raise PlotError(f"Plotting style '{style}' not recognized!")
 
         if save:
             self.save()
 
     def save(self):
-        pass
 
-    def _plot_averaged(self, y, x=None, **kwargs):
-        pass
+        for name, plot in self.plots.items():
+            fig, ax = plot
+            fig.savefig('plot-'+name+'.png')
 
-    def _plot_errorbars(self, y, x=None, **kwargs):
-        pass
+    def _plot_all(self, name):
 
-    def _plot_parametric(self, y, x, s=None, **kwargs):
-        pass
+        fig, ax = self.plots[name]
+        ax.clear()
 
-    def _plot_order(self, y, x, s=None, **kwargs):
-        pass
+        x = self.settings[name]['x']
+        y = self.settings[name]['y']
 
-    # def plot(self, data):
-    #     """
-    #     Plot the specified data
-    #
-    #     :param data: (DataFrame) data from which to make the plot, based on settings
-    #     :return:
-    #     """
-    #
-    #     for name, plot in self.plots.items():
-    #
-    #         fig, ax = plot
-    #         settings = self.settings[name]
-    #         x = settings['x']
-    #         y = np.array([settings['y']]).flatten()
-    #         s  = settings.get('parameter', 'Time')  # parameter
-    #         xlabel = settings.get('xlabel', x)
-    #         ylabel = settings.get('ylabel', y[0])
-    #         plt_kwargs = settings.get('options', {})
-    #
-    #         ax.set_xlabel(xlabel)
-    #         ax.set_ylabel(ylabel)
-    #         ax.set_title(name)
-    #
-    #         y_data = data[y]
-    #
-    #         y_is_numeric = np.prod([isinstance(value, numbers.Number) for value in y_data.iloc[-1].values])
-    #         y_is_file = os.path.exists(str(y_data[y[0]].values[-1]))
-    #
-    #         if not y_is_numeric and not y_is_file:
-    #             raise TypeError('Y data must either be all numeric OR all path names pointing to data files')
-    #
-    #         if y_is_file:
-    #
-    #             if len(y) > 1:
-    #                 raise PlotError('Only one x-y pair can be plotted in each plot showing a dependence on a third parameter!')
-    #
-    #             data_file = y_data[y[0]].values[-1]
-    #
-    #             file_data = pd.read_csv(data_file)
-    #
-    #             if s == 'Time':
-    #                 file_data[s] = file_data.index
-    #             else:
-    #
-    #                 file_indices = file_data.index  # timestamps for the referenced data file
-    #                 data_indices = data.index  # timestamps for the main data file, slightly different from the file indices
-    #
-    #                 unique_file_indices = np.unique(file_indices).sort()
-    #
-    #                 index_map = {file_index: data_index for file_index, data_index in zip(file_indices, data_indices)}
-    #
-    #                 for index in file_indices:
-    #                     file_data[s][index] = data[s][index_map[index]]
-    #
-    #             file_data.plot(x=x, y=y[0], ax=ax, kind='scatter',
-    #                            s=10, c=s, colormap='viridis')
-    #
-    #         elif x == 'Time':  # Plot some regular numbers versus time
-    #             y_data.plot(ax=ax,**plt_kwargs)
-    #             ax.legend()
-    #         else:  # Plot some regular numbers versus some other numbers
-    #             y_data.plot(x=x, ax=ax, **plt_kwargs)
-    #             ax.legend()
-    #
-    #         ax.grid(True)
-    #
-    #         plt.pause(0.1)
+        plt_kwargs = self.settings[name]['options']
 
+        self.data.plot(y=y,x=x, ax=ax, kind='line', **plt_kwargs)
+
+        return fig, ax
+
+    def _plot_averaged(self, name):
+
+        fig, ax = self.plots[name]
+        ax.clear()
+
+        x = self.settings[name]['x']
+        y = self.settings[name]['y']
+
+        plt_kwargs = self.settings[name]['options']
+
+        averaged_data = self.data.groupby(x).mean()
+
+        averaged_data.plot(y=y, ax=ax, kind='line', **plt_kwargs)
+
+        return fig, ax
+
+    def _plot_errorbars(self, name):
+
+        fig, ax = self.plots[name]
+        ax.clear()
+
+        x = self.settings[name]['x']
+        y = self.settings[name]['y']
+
+        plt_kwargs = self.settings[name]['options']
+
+        self.data.boxplot(column=y, by=x, ax=ax, **plt_kwargs)
+
+        return fig, ax
+
+    def _plot_parametric(self, name):
+
+        fig, ax = self.plots[name]
+        ax.clear()
+
+        x = self.settings[name]['x']
+        y = np.array([self.settings[name]['y']]).flatten()[0]
+        c = self.settings[name].get('parameter', 'Time')
+
+        # Handle simple numeric data
+        y_is_numeric = isinstance(self.data[y].values[0], numbers.Number)
+
+        if y_is_numeric:
+
+            if c not in self.data.columns:
+                c = self.data.index
+            else:
+                c = self.data[c]
+
+            self.data.plot(y=y, x=x, c=c, ax=ax, **plt_kwargs)
+
+        # Handle data stored in a file
+        y_is_path = isinstance(self.data[y].values[0], str)
+
+        if y_is_path:
+
+            data_file = self.data[y].values[-1]
+            file_data = pd.read_csv(data_file)
+
+            if c == 'Time':
+                file_data[c] = file_data.index
+            else:
+                file_indices = file_data.index  # timestamps for the referenced data file
+                data_indices = self.data.index  # timestamps for the main data set, can be slightly different from the file timestamps
+
+                unique_file_indices = np.unique(file_indices).sort()
+
+                index_map = {file_index: data_index for file_index, data_index in zip(unique_file_indices, data_indices)}
+
+                for index in file_indices:
+                    file_data[s][index] = data[s][index_map[index]]
+
+            file_data.scatterplot(x=x, y=y, ax=ax, kind='scatter', s=10, c=c, colormap='viridis')
+
+        return fig, ax
+
+    def _plot_order(self, name):
+
+        fig, ax = self._plot_all(name, colors=colors)
+
+        colors = [line.get_color() for line in ax.get_lines()]
+
+        x = self.settings[name]['x']
+        y = self.settings[name]['y']
+
+        # Show arrows pointing in the direction of the scan
+        num_points = len(self.data[x])
+        for yy, color in zip(y, colors):
+            for i in range(num_points - 1):
+                x1, x2 = self.data[x].iloc[i], self.data[x].iloc[i + 1]
+                y1, y2 = self.data[yy].iloc[i], self.data[yy].iloc[i + 1]
+                axes.annotate('', xytext=(x1, y1),
+                              xy=(0.5 * (x1 + x2), 0.5 * (y1+ y1)),
+                              arrowprops=dict(arrowstyle='->', color=color))
+
+        return fig, ax
 
 class InstrumentConfigGUI():
     """
     Once the instruments are selected, this window allows the user to configure and test instruments before setting up an experiment
     """
 
-    def __init__(self, parent, instruments):
+    def __init__(self, parent, instruments, runcard_warning=False):
 
         self.finished = False
 
@@ -369,6 +358,8 @@ class InstrumentConfigGUI():
         self.root.title('Instrument Config/Test')
 
         self.instruments = instruments
+
+        self.runcard_warning = runcard_warning
 
         tk.Label(self.root, text='Instruments:', font=('Arial', 14), justify=tk.LEFT).grid(row=0, column=0, sticky=tk.W)
 
@@ -412,7 +403,97 @@ class InstrumentConfigGUI():
 
     def config(self, instrument):
 
+        if self.runcard_warning:
+            RuncardDepartureDialog(self.root)
+
         dialog = ConfigTestDialog(self.root, instrument, title='Config/Test: '+instrument.name)
+
+
+class BasicDialog(tk.Toplevel):
+    """
+    General purpose dialog window
+
+    """
+
+    def __init__(self, parent, title=None):
+
+        tk.Toplevel.__init__(self, parent)
+        self.transient(parent)
+
+        if title:
+            self.title(title)
+
+        self.parent = parent
+
+        self.result = None
+
+        body = tk.Frame(self)
+        self.initial_focus = self.body(body)
+        body.pack(padx=5, pady=5)
+
+        self.buttonbox()
+
+        self.grab_set()
+
+        if not self.initial_focus:
+            self.initial_focus = self
+
+        self.protocol("WM_DELETE_WINDOW", self.cancel)
+
+        self.geometry("+%d+%d" % (parent.winfo_rootx() + 50,
+                                  parent.winfo_rooty() + 50))
+
+        self.initial_focus.focus_set()
+
+        self.wait_window(self)
+
+    # construction hooks
+
+    def body(self, master):
+        # create dialog body.  return widget that should have
+        # initial focus.  this method should be overridden
+
+        pass
+
+    def buttonbox(self):
+        # add standard button box. override if you don't want the
+        # standard buttons
+
+        box = tk.Frame(self)
+
+        w = tk.Button(box, text="OK", width=10, command=self.ok, default=tk.ACTIVE)
+        w.pack(side=tk.LEFT, padx=5, pady=5)
+
+        self.bind("<Return>", self.ok)
+
+        box.pack()
+
+    # standard button semantics
+
+    def ok(self, event=None):
+
+        if not self.validate():
+            self.initial_focus.focus_set()  # put focus back
+            return
+
+        self.withdraw()
+        self.update_idletasks()
+
+        self.apply()
+
+        self.parent.focus_set()
+        self.destroy()
+
+    def validate(self):
+
+        return 1  # override
+
+
+class RuncardDepartureDialog(BasicDialog):
+
+    def body(self, master):
+        self.title('WARNING')
+        tk.Label(master, text='If you make any changes, you will deviate from the runcard!').pack()
 
 
 class ConfigTestDialog(BasicDialog):
@@ -499,8 +580,3 @@ class ConfigTestDialog(BasicDialog):
             self.measure_buttons[meter].grid(row=i, column=5)
 
             i += 1
-
-    def apply(self):
-
-        for knob in self.instrument.knobs:
-            self.apply_knob_entry(knob)
