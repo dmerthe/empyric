@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import tkinter as tk
 import matplotlib.pyplot as plt
+from matplotlib.cm import ScalarMappable
 from tkinter.filedialog import askopenfilename, askopenfile
 from ruamel.yaml import YAML
 
@@ -48,7 +49,8 @@ class ExperimentController():
 
         self.status_gui = StatusGUI(self.root, self.experiment)
         self.plotter = Plotter(self.experiment.data, self.experiment.plotting,
-                               interval = convert_time(self.settings['plot interval']))
+                               interval=convert_time(self.settings['plot interval']))
+
         for state in self.experiment:
 
             self.status_gui.update(state, status=f'Running: {state.name}')
@@ -208,7 +210,7 @@ class Plotter():
         # Make the plots, by name and style
         for name, settings in self.settings.items():
 
-            style = settings['style'].lower()
+            style = settings.get('style', 'none')
 
             if style == 'none' or style == 'all':
                 self._plot_all(name)
@@ -230,7 +232,7 @@ class Plotter():
 
         for name, plot in self.plots.items():
             fig, ax = plot
-            fig.savefig('plot-'+name+'.png')
+            fig.savefig(name+'.png')
 
     def _plot_all(self, name):
 
@@ -240,7 +242,11 @@ class Plotter():
         x = self.settings[name]['x']
         y = self.settings[name]['y']
 
-        plt_kwargs = self.settings[name]['options']
+        y_is_path = isinstance(self.data[y].values[0], str)
+        if y_is_path:
+            return self._plot_parametric(name)
+
+        plt_kwargs = self.settings[name].get('options',{})
 
         self.data.plot(y=y,x=x, ax=ax, kind='line', **plt_kwargs)
 
@@ -254,7 +260,7 @@ class Plotter():
         x = self.settings[name]['x']
         y = self.settings[name]['y']
 
-        plt_kwargs = self.settings[name]['options']
+        plt_kwargs = self.settings[name].get('options',{})
 
         averaged_data = self.data.groupby(x).mean()
 
@@ -270,16 +276,73 @@ class Plotter():
         x = self.settings[name]['x']
         y = self.settings[name]['y']
 
-        plt_kwargs = self.settings[name]['options']
+        plt_kwargs = self.settings[name].get('options',{})
 
         self.data.boxplot(column=y, by=x, ax=ax, **plt_kwargs)
 
         return fig, ax
 
+    # def _plot_parametric(self, name):
+    #
+    #     fig, ax = self.plots[name]
+    #     ax.clear()
+    #
+    #     fig_axes = fig.get_axes()
+    #     if len(fig_axes) > 2:
+    #         fig_axes[1].remove()
+    #         ax.
+    #         fig.canvas.draw_idle()
+    #
+    #     x = self.settings[name]['x']
+    #     y = np.array([self.settings[name]['y']]).flatten()[0]
+    #     c = self.settings[name].get('parameter', 'Time')
+    #
+    #     # Handle simple numeric data
+    #     y_is_numeric = isinstance(self.data[y].values[0], numbers.Number)
+    #
+    #     if y_is_numeric:
+    #
+    #         if c not in self.data.columns:
+    #             self.data[c] = self.data.index
+    #
+    #         self.data.plot.scatter(y=y, x=x, c=c, ax=ax, **plt_kwargs)
+    #
+    #     # Handle data stored in a file
+    #     y_is_path = isinstance(self.data[y].values[0], str)
+    #
+    #     if y_is_path:
+    #
+    #         data_file = self.data[y].values[-1]
+    #         file_data = pd.read_csv(data_file, index_col=0)
+    #         file_data.index = pd.to_datetime(file_data.index, infer_datetime_format=True)  # convert to pandas DateTime index
+    #
+    #         if c == 'Time':
+    #             first_datetime = pd.date_range(start=file_data.index[0], end=file_data.index[0], periods=len(file_data.index))
+    #             file_data[c] = (file_data.index - first_datetime).total_seconds()
+    #         else:
+    #             file_indices = file_data.index  # timestamps for the referenced data file
+    #             data_indices = self.data.index  # timestamps for the main data set, can be slightly different from the file timestamps
+    #
+    #             unique_file_indices = np.unique(file_indices).sort()
+    #
+    #             index_map = {file_index: data_index for file_index, data_index in zip(unique_file_indices, data_indices)}
+    #
+    #             for index in file_indices:
+    #                 file_data[c][index] = data[c][index_map[index]]
+    #
+    #         file_data.plot.scatter(x=x, y=y, ax=ax, s=10, c=c, colormap='viridis')
+    #
+    #     return fig, ax
+
     def _plot_parametric(self, name):
 
         fig, ax = self.plots[name]
         ax.clear()
+
+        # Color plot according to elapsed time
+        colormap = 'viridis'  # Determines colormap to use for plotting timeseries data
+        plt.rcParams['image.cmap'] = colormap
+        cmap = plt.get_cmap('viridis')
 
         x = self.settings[name]['x']
         y = np.array([self.settings[name]['y']]).flatten()[0]
@@ -291,11 +354,14 @@ class Plotter():
         if y_is_numeric:
 
             if c not in self.data.columns:
-                c = self.data.index
-            else:
-                c = self.data[c]
+                indices = file_data.index
+                self.data[c] = self.data.index
+                first_datetime = pd.date_range(start=indices[0], end=indices[0],
+                                               periods=len(file_data.index))
 
-            self.data.plot(y=y, x=x, c=c, ax=ax, **plt_kwargs)
+            x_data = self.data[x].values
+            y_data = self.data[y].values
+            c_data = self.data[c].values
 
         # Handle data stored in a file
         y_is_path = isinstance(self.data[y].values[0], str)
@@ -303,22 +369,50 @@ class Plotter():
         if y_is_path:
 
             data_file = self.data[y].values[-1]
-            file_data = pd.read_csv(data_file)
+            file_data = pd.read_csv(data_file, index_col=0)
+            file_data.index = pd.to_datetime(file_data.index, infer_datetime_format=True)  # convert to pandas DateTime index
 
             if c == 'Time':
-                file_data[c] = file_data.index
+                first_datetime = pd.date_range(start=file_data.index[0], end=file_data.index[0], periods=len(file_data.index))
+                file_data[c] = (file_data.index - first_datetime).total_seconds()
             else:
                 file_indices = file_data.index  # timestamps for the referenced data file
                 data_indices = self.data.index  # timestamps for the main data set, can be slightly different from the file timestamps
-
                 unique_file_indices = np.unique(file_indices).sort()
-
                 index_map = {file_index: data_index for file_index, data_index in zip(unique_file_indices, data_indices)}
-
                 for index in file_indices:
-                    file_data[s][index] = data[s][index_map[index]]
+                    file_data[c][index] = data[c][index_map[index]]
 
-            file_data.scatterplot(x=x, y=y, ax=ax, kind='scatter', s=10, c=c, colormap='viridis')
+            x_data = file_data[x].values
+            y_data = file_data[y].values
+            c_data = file_data[c].values
+
+        c_min, c_max = [np.floor(np.amin(c_data)), np.ceil(np.amax(c_data))]
+        norm = plt.Normalize(vmin=c_min, vmax=c_max)
+
+        # Add the colorbar, if the figure doesn't already have one
+        try:
+            fig.has_colorbar
+            fig.scalarmappable.set_clim(vmin=c_min, vmax=c_max)
+            fig.cbar.update_normal(fig.scalarmappable)
+            fig.cbar.ax.set_ylabel(c)
+
+        except AttributeError:
+
+            fig.scalarmappable = ScalarMappable(cmap=cmap, norm=norm)
+            fig.scalarmappable.set_array(np.linspace(c_min, c_max, 1000))
+
+            fig.cbar = plt.colorbar(fig.scalarmappable, ax=ax)
+            fig.cbar.ax.set_ylabel(c)
+            fig.has_colorbar = True
+
+        # Draw the plot
+        for i in range(x_data.shape[0] - 1):
+            ax.plot(x_data[i: i + 2], y_data[i: i + 2],
+                               color=cmap(norm(np.mean(c_data[i: i + 2]))))
+
+        ax.set_xlabel(x)
+        ax.set_ylabel(y)
 
         return fig, ax
 

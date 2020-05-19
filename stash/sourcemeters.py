@@ -270,8 +270,7 @@ class Keithley2400(Instrument, GPIBDevice):
 
         self.write(':SOUR:VOLT:MODE LIST')
 
-        local_path = self.name+'-fast_iv_measurement.csv'
-        path = os.path.join(os.getcwd(), local_path)
+        path = self.name+'-fast_iv_measurement.csv'
 
         if not path:
             raise MeasurementError('File path for fast IV sweep voltages have not been stored!')
@@ -302,11 +301,10 @@ class Keithley2400(Instrument, GPIBDevice):
         self.connection.timeout = 1000  # put it back
 
         # Save data to same path
-        timestamp = datetime.datetime.now()
         new_iv_data = pd.DataFrame({
             self.mapped_variables['fast voltages']: self.fast_voltages,
             self.mapped_variables['fast currents']: current_list}
-                                   , index=pd.date_range(start=timestamp, periods=len(current_list)))
+                                   , index=pd.date_range(start=pd.datetime.today(), end=pd.datetime.today(), periods=len(current_list)))
 
         if os.path.isfile(path):
             fast_iv_data = pd.read_csv(path, index_col=0)
