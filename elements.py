@@ -9,7 +9,7 @@ import pandas as pd
 from mercury import instrumentation
 from mercury.utilities import *
 
-yaml=YAML()
+yaml = YAML()
 
 
 class Clock:
@@ -484,7 +484,7 @@ class Experiment:
         save_interval = self.settings.get('save interval', 60)
 
         if now >= self.last_save + save_interval or save_now:
-            self.data.to_csv(timestamp_path('data.csv'))
+            self.data.to_csv(timestamp_path('data.csv', timestamp=self.timestamp))
             self.last_save = self.clock.time()
 
     def __iter__(self):
@@ -496,6 +496,7 @@ class Experiment:
         if self.status == 'Not Started':
             self.schedule.clock.start()  # start the schedule clock
             self.status = 'Running'
+            self.timestamp = get_timestamp()
 
         # Take the next step in the experiment
         if self.clock.time() < self.last_step + float(self.settings['step interval']):

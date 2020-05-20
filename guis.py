@@ -178,7 +178,7 @@ class PlotError(BaseException):
     pass
 
 
-class Plotter():
+class Plotter:
     """
     Handler for plotting data based on the runcard plotting settings and data context
     """

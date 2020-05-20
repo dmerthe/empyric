@@ -40,9 +40,7 @@ class TCReader(Instrument, PhidgetDevice):
 
         PhidgetException = importlib.import_module("Phidget22.PhidgetException").PhidgetException
 
-        result = self.connection.getTemperature()
-
-        return result
+        return self.connection.getTemperature()
 
 
 
