@@ -160,7 +160,6 @@ class InstrumentSet:
             if meter:
                 self.instruments[instrument].mapped_variables[meter] = name
 
-
     def disconnect(self):
         """
         Disconnects communications with all instruments
@@ -434,6 +433,12 @@ class Schedule:
 
 class Experiment:
 
+    default_settings = {'duration': np.inf,
+                        'follow-up': None,
+                        'step interval': 0,
+                        'plot interval': 10,
+                        'save interval': 60}
+
     def __init__(self, runcard):
         """
 
@@ -452,13 +457,13 @@ class Experiment:
         self.instruments = InstrumentSet(
             runcard['Instruments'],
             runcard['Variables'],
-            runcard['Alarms'],
-            runcard['Presets'],
-            runcard['Postsets']
+            runcard.get('Alarms', None),
+            runcard.get('Presets', None),
+            runcard.get('Postsets', None)
         )
 
-        self.settings = runcard['Settings']
-        self.plotting = runcard['Plotting']
+        self.settings = runcard.get('Settings', self.default_settings)
+        self.plotting = runcard.get('Plotting', None)
         self.schedule = Schedule(runcard['Schedule'])
 
         self.data = pd.DataFrame(columns=self.instruments.mapped_variables.keys())  # Will contain history of knob settings and meter readings for the experiment.
@@ -504,24 +509,24 @@ class Experiment:
 
         self.last_step = self.clock.time()
 
-        configuration = next(self.schedule)  # Get the text step from the schedule
+        configuration = next(self.schedule)  # Get the next step from the schedule
+
+        self.instruments.apply(configuration)  # apply settings to knobs
+        readings = self.instruments.read()  # checking meter readings
+        state = readings
 
         # Get previously set knob values if no corresponding routines are running
         for name, variable in self.instruments.mapped_variables.items():
             if variable.knob and name not in configuration:
                 configuration[name] = variable.get()
 
-        state = configuration  # will contain knob values + meter readings + schedule time
+        state.update(configuration)  # will contain knob values + meter readings + schedule time
 
-        self.instruments.apply(configuration)
-        readings = self.instruments.read()
-        state.update(readings)
-
-        times = {'Time': self.clock.time(), 'Schedule Time': self.schedule.clock.time()}
+        times = {'Total Time': self.clock.time(), 'Schedule Time': self.schedule.clock.time()}
         state.update(times)
 
-        self.state = pd.Series(state, name = datetime.datetime.now())
-        self.data.loc[self.state.name] =  self.state
+        self.state = pd.Series(state, name=datetime.datetime.now())
+        self.data.loc[self.state.name] = self.state
 
         self.save()
 

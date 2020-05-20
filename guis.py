@@ -19,7 +19,7 @@ from mercury.utilities import convert_time
 plt.ion()
 
 # Guis for controlling ongoing experiments
-class ExperimentController():
+class ExperimentController:
 
     def __init__(self, runcard_path=None):
 
@@ -80,7 +80,7 @@ class ExperimentController():
                 self.run(task)
 
 
-class StatusGUI():
+class StatusGUI:
     """
     GUI showing experimental progress and values of all experiment variables, allowing the user to stop or pause the experiment.
     """
@@ -183,7 +183,7 @@ class Plotter:
     Handler for plotting data based on the runcard plotting settings and data context
     """
 
-    def __init__(self, data, settings, interval=None):
+    def __init__(self, data, settings=None, interval=None):
         """
         PLot data based on settings
 
@@ -192,7 +192,10 @@ class Plotter:
         """
 
         self.data = data
-        self.settings = settings
+        if settings:
+            self.settings = settings
+        else:
+            self.settings = {}
 
         self.last_plot = -np.inf
 
@@ -416,7 +419,7 @@ class Plotter:
 
         return fig, ax
 
-class InstrumentConfigGUI():
+class InstrumentConfigGUI:
     """
     Once the instruments are selected, this window allows the user to configure and test instruments before setting up an experiment
     """
