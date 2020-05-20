@@ -14,8 +14,9 @@ from tkinter.filedialog import askopenfilename, askopenfile
 from ruamel.yaml import YAML
 
 from mercury.elements import yaml, timestamp_path, Experiment
-from mercury.util_funcs import convert_time
+from mercury.utilities import convert_time
 
+# Guis for controlling ongoing experiments
 class ExperimentController():
 
     def __init__(self, runcard_path=None):
@@ -51,16 +52,16 @@ class ExperimentController():
         self.plotter = Plotter(self.experiment.data, self.experiment.plotting,
                                interval=convert_time(self.settings['plot interval']))
 
-        for state in self.experiment:
-
-            self.status_gui.update(state, status=f'Running: {state.name}')
+        # Main iteraton loop, going through steps in the experiment
+        for step in self.experiment:
+            self.status_gui.update(step, status=f'Running: {step.name}')
             self.plotter.plot(save=True)
 
             # Stop the schedule clock and stop iterating if the user pauses the experiment
             if self.status_gui.paused:
                 self.experiment.schedule.clock.stop()
                 while self.status_gui.paused:
-                    self.status_gui.update(state)
+                    self.status_gui.update(step)
                     plt.pause(0.01)
                 self.experiment.schedule.clock.resume()
 
@@ -123,11 +124,11 @@ class StatusGUI():
                                      width=10)
         self.stop_button.grid(row=i + 1, column=2)
 
-    def update(self, state=None, status=None):
+    def update(self, step=None, status=None):
 
-        if state is not None:
+        if step is not None:
             for name, label in self.variable_status_labels.items():
-                label.config(text=str(state[name]))
+                label.config(text=str(step[name]))
 
         if status:
             self.status_label.config(text=status)

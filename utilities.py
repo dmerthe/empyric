@@ -1,3 +1,4 @@
+# Miscellaneous utility functions
 import time
 import re
 import numbers

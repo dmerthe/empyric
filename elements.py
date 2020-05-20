@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from mercury import instrumentation
-from mercury.util_funcs import *
+from mercury.utilities import *
 
 yaml=YAML()
 
