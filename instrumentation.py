@@ -3,7 +3,7 @@
 from mercury.stash.sourcemeters import *
 from mercury.stash.supplies import *
 from mercury.stash.multimeters import *
-from mercury.stash.phidget import *
+from mercury.stash.thermometers import *
 from mercury.stash.barometers import *
 
 available_backends = ['serial', 'visa', 'linux', 'phidget', 'test']

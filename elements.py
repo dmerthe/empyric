@@ -153,7 +153,7 @@ class InstrumentSet:
 
         for name, mapping in variables.items():
 
-            instrument, knob, meter = mapping['instrument'], mapping['knob'], mapping['meter']
+            instrument, knob, meter = mapping['instrument'], mapping.get('knob', 'none'), mapping.get('meter', 'none')
             self.mapped_variables.update({name: MappedVariable(self.instruments[instrument], knob=knob, meter=meter)})
             if knob:
                 self.instruments[instrument].mapped_variables[knob] = name
@@ -426,7 +426,8 @@ class Schedule:
         for pair in self.routines.values():
             knob, routine = pair
             next_value = next(routine)
-            output.update({knob: next_value})
+            if next_value is not None:
+                output.update({knob: next_value})
 
         return output
 
@@ -505,9 +506,9 @@ class Experiment:
         configuration = next(self.schedule)  # Get the text step from the schedule
 
         # Get previously set knob values if no corresponding routines are running
-        for knob, value in configuration.items():
-            if value is None:
-                configuration[knob] = self.instruments.mapped_variables[knob].get()
+        for name, variable in self.instruments.mapped_variables.items():
+            if variable.knob and name not in configuration:
+                configuration[name] = variable.get()
 
         state = configuration  # will contain knob values + meter readings + schedule time
 

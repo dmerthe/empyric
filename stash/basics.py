@@ -296,14 +296,12 @@ class PhidgetDevice():
 
     supported_backends = ['phidget']
 
-    def connect(self, *args):
+    def connect(self, address=None, kind=None):
 
-        if len(args) > 0:
-            address = args[0]
-        else:
+        if address is None:
             try:
                 address = self.address
-            except(AttributeError):
+            except AttributeError:
                 raise(ConnectionError('Device address has not been specified!'))
 
         address_parts = address.split('-')
@@ -311,17 +309,21 @@ class PhidgetDevice():
         serial_number = int(address_parts[0])
         port_numbers = [int(value) for value in address_parts[1:]]
 
-        ts = importlib.import_module('Phidget22.Devices.TemperatureSensor')
+        if kind is None:
+            try:
+                device_class = self.device_class
+            except AttributeError:
+                raise (ConnectionError('Phidget device class has not been specified!'))
 
         if len(port_numbers) == 1: # TC reader connected directly by USB to PC
-            self.connection = ts.TemperatureSensor()
+            self.connection = device_class()
             self.connection.setDeviceSerialNumber(serial_number)
             self.connection.setChannel(port_numbers[0])
             self.connection.open()
             self.name = self.name + f"-{address}"
 
         elif len(port_numbers) == 2: # TC reader connected to PC via VINT hub
-            self.connection = ts.TemperatureSensor()
+            self.connection = device_class()
             self.connection.setDeviceSerialNumber(serial_number)
             self.connection.setHubPort(port_numbers[0])
             self.connection.setChannel(port_numbers[1])

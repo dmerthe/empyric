@@ -3,7 +3,7 @@ import datetime
 import pandas as pd
 
 from mercury.stash.basics import *
-from mercury.util_funcs import *
+from mercury.utilities import *
 
 def get_timestamp(path=None):
     """
@@ -100,6 +100,7 @@ class Keithley2400(Instrument, GPIBDevice):
         self.set_source(source)
         self.set_meter(meter)
         self.output_on()
+        self.knob_values[self.source] = 0
 
     def set_source(self, variable):
 

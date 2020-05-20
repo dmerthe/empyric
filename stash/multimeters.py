@@ -85,18 +85,18 @@ class Keithley2110(Instrument, SerialDevice):
         if self.meter != 'voltage':
             self.write('FUNC "VOLT"')
 
-        return self.query('READ?')
+        return float(self.query('READ?'))
 
     def measure_current(self):
 
         if self.meter != 'current':
             self.write('FUNC "CURR"')
 
-        return self.query('READ?')
+        return float(self.query('READ?'))
 
     def measure_temperature(self):
 
         if self.meter != 'temperature':
             self.write('FUNC "TCO"')
 
-        return self.query('READ?')
+        return float(self.query('READ?'))

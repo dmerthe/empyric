@@ -1,4 +1,4 @@
-from tempyral_dev.stash.basics import *
+from mercury.stash.basics import *
 
 class Keithley2260B(Instrument, SerialDevice):
     """

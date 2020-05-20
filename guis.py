@@ -16,6 +16,8 @@ from ruamel.yaml import YAML
 from mercury.elements import yaml, timestamp_path, Experiment
 from mercury.utilities import convert_time
 
+plt.ion()
+
 # Guis for controlling ongoing experiments
 class ExperimentController():
 
@@ -29,7 +31,9 @@ class ExperimentController():
         if runcard_path is None:
             runcard_path = askopenfilename(title='Select Experiment Runcard')
 
-        os.chdir(os.path.dirname(runcard_path))
+        working_dir = os.path.dirname(runcard_path)
+        if working_dir != '':
+            os.chdir(os.path.dirname(runcard_path))
 
         with open(runcard_path, 'rb') as runcard:
             self.runcard = yaml.load(runcard)
@@ -124,6 +128,8 @@ class StatusGUI():
                                      width=10)
         self.stop_button.grid(row=i + 1, column=2)
 
+        self.root.update()
+
     def update(self, step=None, status=None):
 
         if step is not None:
@@ -141,7 +147,7 @@ class StatusGUI():
         self.root.update()
 
     def check_instr(self):
-        instrument_gui = InstrumentConfigGUI(self.root, self.instruments, runcard_warning=True)
+        instrument_gui = InstrumentConfigGUI(self.root, self.experiment.instruments, runcard_warning=True)
 
     def toggle_pause(self):
 
@@ -241,15 +247,23 @@ class Plotter():
         ax.clear()
 
         x = self.settings[name]['x']
-        y = self.settings[name]['y']
+        y = np.array([self.settings[name]['y']]).flatten()
 
-        y_is_path = isinstance(self.data[y].values[0], str)
+        y_is_path = isinstance(self.data[y].to_numpy().flatten()[0], str)
         if y_is_path:
             return self._plot_parametric(name)
 
         plt_kwargs = self.settings[name].get('options',{})
 
-        self.data.plot(y=y,x=x, ax=ax, kind='line', **plt_kwargs)
+        if x.lower() ==  'time':
+            self.data.plot(y=y,ax=ax, kind='line', **plt_kwargs)
+        else:
+            self.data.plot(y=y, ax=ax, kind='line', **plt_kwargs)
+
+        ax.set_title(name)
+        ax.grid()
+        ax.set_xlabel(x)
+        ax.set_ylabel(y[0])
 
         return fig, ax
 
@@ -259,13 +273,18 @@ class Plotter():
         ax.clear()
 
         x = self.settings[name]['x']
-        y = self.settings[name]['y']
+        y = np.array([self.settings[name]['y']]).flatten()
 
         plt_kwargs = self.settings[name].get('options',{})
 
         averaged_data = self.data.groupby(x).mean()
 
         averaged_data.plot(y=y, ax=ax, kind='line', **plt_kwargs)
+
+        ax.set_title(name)
+        ax.grid(True)
+        ax.set_xlabel(x)
+        ax.set_ylabel(y[0])
 
         return fig, ax
 
@@ -275,65 +294,18 @@ class Plotter():
         ax.clear()
 
         x = self.settings[name]['x']
-        y = self.settings[name]['y']
+        y = np.array([self.settings[name]['y']]).flatten()
 
         plt_kwargs = self.settings[name].get('options',{})
 
         self.data.boxplot(column=y, by=x, ax=ax, **plt_kwargs)
 
-        return fig, ax
+        ax.set_title(name)
+        ax.grid(True)
+        ax.set_xlabel(x)
+        ax.set_ylabel(y[0])
 
-    # def _plot_parametric(self, name):
-    #
-    #     fig, ax = self.plots[name]
-    #     ax.clear()
-    #
-    #     fig_axes = fig.get_axes()
-    #     if len(fig_axes) > 2:
-    #         fig_axes[1].remove()
-    #         ax.
-    #         fig.canvas.draw_idle()
-    #
-    #     x = self.settings[name]['x']
-    #     y = np.array([self.settings[name]['y']]).flatten()[0]
-    #     c = self.settings[name].get('parameter', 'Time')
-    #
-    #     # Handle simple numeric data
-    #     y_is_numeric = isinstance(self.data[y].values[0], numbers.Number)
-    #
-    #     if y_is_numeric:
-    #
-    #         if c not in self.data.columns:
-    #             self.data[c] = self.data.index
-    #
-    #         self.data.plot.scatter(y=y, x=x, c=c, ax=ax, **plt_kwargs)
-    #
-    #     # Handle data stored in a file
-    #     y_is_path = isinstance(self.data[y].values[0], str)
-    #
-    #     if y_is_path:
-    #
-    #         data_file = self.data[y].values[-1]
-    #         file_data = pd.read_csv(data_file, index_col=0)
-    #         file_data.index = pd.to_datetime(file_data.index, infer_datetime_format=True)  # convert to pandas DateTime index
-    #
-    #         if c == 'Time':
-    #             first_datetime = pd.date_range(start=file_data.index[0], end=file_data.index[0], periods=len(file_data.index))
-    #             file_data[c] = (file_data.index - first_datetime).total_seconds()
-    #         else:
-    #             file_indices = file_data.index  # timestamps for the referenced data file
-    #             data_indices = self.data.index  # timestamps for the main data set, can be slightly different from the file timestamps
-    #
-    #             unique_file_indices = np.unique(file_indices).sort()
-    #
-    #             index_map = {file_index: data_index for file_index, data_index in zip(unique_file_indices, data_indices)}
-    #
-    #             for index in file_indices:
-    #                 file_data[c][index] = data[c][index_map[index]]
-    #
-    #         file_data.plot.scatter(x=x, y=y, ax=ax, s=10, c=c, colormap='viridis')
-    #
-    #     return fig, ax
+        return fig, ax
 
     def _plot_parametric(self, name):
 
@@ -411,7 +383,8 @@ class Plotter():
         for i in range(x_data.shape[0] - 1):
             ax.plot(x_data[i: i + 2], y_data[i: i + 2],
                                color=cmap(norm(np.mean(c_data[i: i + 2]))))
-
+        ax.set_title(name)
+        ax.grid(True)
         ax.set_xlabel(x)
         ax.set_ylabel(y)
 
@@ -424,7 +397,7 @@ class Plotter():
         colors = [line.get_color() for line in ax.get_lines()]
 
         x = self.settings[name]['x']
-        y = self.settings[name]['y']
+        y = np.array([self.settings[name]['y']]).flatten()
 
         # Show arrows pointing in the direction of the scan
         num_points = len(self.data[x])
@@ -435,6 +408,11 @@ class Plotter():
                 axes.annotate('', xytext=(x1, y1),
                               xy=(0.5 * (x1 + x2), 0.5 * (y1+ y1)),
                               arrowprops=dict(arrowstyle='->', color=color))
+
+        ax.set_title(name)
+        ax.grid(True)
+        ax.set_xlabel(x)
+        ax.set_ylabel(y[0])
 
         return fig, ax
 
