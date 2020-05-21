@@ -149,6 +149,11 @@ class InstrumentSet:
 
             self.instruments[name] = instrument
 
+            # Apply quicksets
+            for knob in instrument.knobs:
+                if knob in spec:
+                    instrument.set(knob, spec[knob])
+
     def map_variables(self, variables):
 
         for name, mapping in variables.items():

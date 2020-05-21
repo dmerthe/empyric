@@ -108,7 +108,7 @@ class StatusGUI:
 
         i = 1
         for variable in self.variables:
-            tk.Label(self.root, text=variable, width=20, anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
+            tk.Label(self.root, text=variable, width=30, anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
             self.variable_status_labels[variable] = tk.Label(self.root, text='', relief=tk.SUNKEN, width=40)
             self.variable_status_labels[variable].grid(row=i, column=1, columnspan=2, sticky=tk.W)
 
@@ -242,7 +242,7 @@ class Plotter:
 
         for name, plot in self.plots.items():
             fig, ax = plot
-            fig.savefig(name+'.png')
+            fig.savefig(timestamp_path(name+'.png'))
 
     def _plot_all(self, name):
 
