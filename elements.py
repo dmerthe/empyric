@@ -14,7 +14,7 @@ yaml = YAML()
 
 class Clock:
     """
-    Clock for keeping time, capable of running splits and pausing
+    Clock for keeping time
     """
 
     def __init__(self):
@@ -376,7 +376,6 @@ class Schedule:
         """
 
         self.clock = Clock()
-        self.end_time = np.inf
 
         self.routines = {}
         if routines:
@@ -457,13 +456,13 @@ class Experiment:
         self.instruments = InstrumentSet(
             runcard['Instruments'],
             runcard['Variables'],
-            runcard.get('Alarms', None),
-            runcard.get('Presets', None),
-            runcard.get('Postsets', None)
+            runcard.get('Alarms', None),  # Optional
+            runcard.get('Presets', None),  # Optional
+            runcard.get('Postsets', None)  # Optional
         )
 
-        self.settings = runcard.get('Settings', self.default_settings)
-        self.plotting = runcard.get('Plotting', None)
+        self.settings = runcard.get('Settings', self.default_settings)  # Optional; if given use default settings above
+        self.plotting = runcard.get('Plotting', None)  # Optional
         self.schedule = Schedule(runcard['Schedule'])
 
         data_columns = list(self.instruments.mapped_variables.keys())
@@ -471,7 +470,7 @@ class Experiment:
         self.data = pd.DataFrame(columns=data_columns)  # Will contain history of knob settings and meter readings for the experiment.
 
         self.status = 'Not Started'
-        self.followup = self.settings.get('follow-up', None).strip()  # What to do when the experiment ends
+        self.followup = self.settings.get('follow-up', None)  # What to do when the experiment ends
 
         # Make a list of follow-ups
         if self.followup in [None, 'None']:
@@ -505,9 +504,16 @@ class Experiment:
             self.status = 'Running'
             self.timestamp = get_timestamp()
 
+        # Stop if finished
+        if self.status == 'Finished':
+            self.save('now')
+            self.schedule.clock.stop()
+            self.instruments.disconnect()
+            raise StopIteration
+
         # Take the next step in the experiment
         if self.clock.time() < self.last_step + float(self.settings['step interval']):
-            return self.state
+            return self.state  # Only apply settings at frequency limited by 'step interval' setting
 
         self.last_step = self.clock.time()
 
@@ -515,14 +521,14 @@ class Experiment:
 
         self.instruments.apply(configuration)  # apply settings to knobs
         readings = self.instruments.read()  # checking meter readings
-        state = readings
+        state = readings  # will contain knob values + meter readings + time values
 
         # Get previously set knob values if no corresponding routines are running
         for name, variable in self.instruments.mapped_variables.items():
             if variable.knob and name not in configuration:
                 configuration[name] = variable.get()
 
-        state.update(configuration)  # will contain knob values + meter readings + schedule time
+        state.update(configuration)
 
         times = {'Total Time': self.clock.time(), 'Schedule Time': self.schedule.clock.time()}
         state.update(times)
@@ -542,15 +548,8 @@ class Experiment:
             if alarm['triggered']:
                 for task in self.followup:
                     if task.lower() == 'repeat':
-                        self.follow.remove(task)  # Cancel repeat if alarm triggered
-                self.followup.append(alarm['protocol'])
+                        self.followup.remove(task)  # Cancel repeat if alarm triggered
+                self.followup.insert(0, alarm['protocol']) # put any triggered alarm protocols at top of follow-up list
                 self.status = 'Finished'
-
-        # Stop if finished
-        if self.status == 'Finished':
-            self.save('now')
-            self.schedule.clock.stop()
-            self.instruments.disconnect()
-            raise StopIteration
 
         return self.state
