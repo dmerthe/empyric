@@ -466,7 +466,9 @@ class Experiment:
         self.plotting = runcard.get('Plotting', None)
         self.schedule = Schedule(runcard['Schedule'])
 
-        self.data = pd.DataFrame(columns=self.instruments.mapped_variables.keys())  # Will contain history of knob settings and meter readings for the experiment.
+        data_columns = list(self.instruments.mapped_variables.keys())
+        data_columns += ['Total Time', 'Schedule Time']
+        self.data = pd.DataFrame(columns=data_columns)  # Will contain history of knob settings and meter readings for the experiment.
 
         self.status = 'Not Started'
         self.followup = self.settings.get('follow-up', None).strip()  # What to do when the experiment ends
