@@ -72,7 +72,7 @@ class ExperimentController:
         if len(followup) == 0:
             self.status_gui.quit()
         elif followup[0].lower() == 'repeat':
-            self.experiment.reset()
+            self.__init__(self.runcard)
             self.run()
         else:
             for task in followup:
@@ -171,7 +171,6 @@ class StatusGUI:
         self.root.update()
         time.sleep(1)
         self.root.destroy()
-        self.parent.focus_set()
 
 
 class PlotError(BaseException):
