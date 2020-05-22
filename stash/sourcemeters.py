@@ -260,7 +260,7 @@ class Keithley2400(Instrument, GPIBDevice):
         new_iv_data = pd.DataFrame({
             self.mapped_variables['fast voltages']: self.fast_voltages,
             self.mapped_variables['fast currents']: current_list}
-                                   , index=pd.date_range(start=pd.datetime.today(), end=pd.datetime.today(), periods=len(current_list)))
+                                   , index=pd.date_range(start=datetime.datetime.now(), end=datetime.datetime.now(), periods=len(current_list)))
 
         if os.path.isfile(path):
             fast_iv_data = pd.read_csv(path, index_col=0)

@@ -40,7 +40,7 @@ class ExperimentController:
 
         self.settings = self.runcard['Settings']
 
-        self.experiment = Experiment(runcard)
+        self.experiment = Experiment(self.runcard)
 
         name = self.experiment.description.get('name', 'experiment')
         with open(timestamp_path(name + '_runcard.yaml'), 'w') as runcard_file:

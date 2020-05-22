@@ -497,7 +497,7 @@ class Experiment:
         """
 
         now = self.clock.time()
-        save_interval = self.settings.get('save interval', 60)
+        save_interval = convert_time(self.settings.get('save interval', 60))
 
         if now >= self.last_save + save_interval or save_now:
             self.data.to_csv(timestamp_path('data.csv', timestamp=self.timestamp))
@@ -523,7 +523,7 @@ class Experiment:
             raise StopIteration
 
         # Take the next step in the experiment
-        if self.clock.time() < self.last_step + float(self.settings['step interval']):
+        if self.clock.time() < self.last_step + convert_time(self.settings['step interval']):
             return self.state  # Only apply settings at frequency limited by 'step interval' setting
 
         self.last_step = self.clock.time()
