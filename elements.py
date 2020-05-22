@@ -484,9 +484,7 @@ class Experiment:
             self.followup = [self.followup]
 
     def reset(self):
-        self.last_step = -np.inf  # reset the step timer
-        self.last_save = -np.inf  # reset the save timer
-        self.status = "Not Started"  # flag to restart experiment and schedule clocks
+        self.__init__(self.runcard)
 
     def save(self, save_now=False):
         """
