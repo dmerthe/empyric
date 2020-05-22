@@ -253,7 +253,7 @@ class Plotter:
         if y_is_path:
             return self._plot_parametric(name)
 
-        plt_kwargs = self.settings[name].get('options',{})
+        plt_kwargs = self.settings[name].get('options', {})
 
         if x.lower() ==  'time':
             self.data.plot(y=y,ax=ax, kind='line', **plt_kwargs)
@@ -262,8 +262,8 @@ class Plotter:
 
         ax.set_title(name)
         ax.grid()
-        ax.set_xlabel(x)
-        ax.set_ylabel(y[0])
+        ax.set_xlabel(self.settings[name].get('xlabel', x))
+        ax.set_ylabel(self.settings[name].get('ylabel', y[0]))
 
         return fig, ax
 
@@ -283,8 +283,8 @@ class Plotter:
 
         ax.set_title(name)
         ax.grid(True)
-        ax.set_xlabel(x)
-        ax.set_ylabel(y[0])
+        ax.set_xlabel(self.settings[name].get('xlabel', x))
+        ax.set_ylabel(self.settings[name].get('ylabel', y[0]))
 
         return fig, ax
 
@@ -302,8 +302,8 @@ class Plotter:
 
         ax.set_title(name)
         ax.grid(True)
-        ax.set_xlabel(x)
-        ax.set_ylabel(y[0])
+        ax.set_xlabel(self.settings[name].get('xlabel', x))
+        ax.set_ylabel(self.settings[name].get('ylabel', y[0]))
 
         return fig, ax
 
@@ -368,7 +368,7 @@ class Plotter:
             fig.has_colorbar
             fig.scalarmappable.set_clim(vmin=c_min, vmax=c_max)
             fig.cbar.update_normal(fig.scalarmappable)
-            fig.cbar.ax.set_ylabel(c)
+            fig.cbar.ax.set_ylabel(self.settings[name].get('clabel', c))
 
         except AttributeError:
 
@@ -385,8 +385,8 @@ class Plotter:
                                color=cmap(norm(np.mean(c_data[i: i + 2]))))
         ax.set_title(name)
         ax.grid(True)
-        ax.set_xlabel(x)
-        ax.set_ylabel(y)
+        ax.set_xlabel(self.settings[name].get('xlabel', x))
+        ax.set_ylabel(self.settings[name].get('ylabel', y))
 
         return fig, ax
 
@@ -411,8 +411,8 @@ class Plotter:
 
         ax.set_title(name)
         ax.grid(True)
-        ax.set_xlabel(x)
-        ax.set_ylabel(y[0])
+        ax.set_xlabel(self.settings[name].get('xlabel', x))
+        ax.set_ylabel(self.settings[name].get('ylabel', y[0]))
 
         return fig, ax
 
