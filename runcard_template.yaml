@@ -4,7 +4,7 @@
  platform: Test Stand 1
  comments: Who is Mike? There is no Test Stand 1
 
-Experiment Settings:
+Settings:
  duration: 1 minute
  follow-up: None
  step interval: 0
@@ -15,16 +15,15 @@ Instruments:
  Anode Keithley:
   kind: Keithley2400
   backend: visa
-  address: "GPIB::2::INSTR"
+  address: "GPIB0::1::INSTR"
+  nplc: 1
 
 Variables:
  Anode Voltage:
   instrument: Anode Keithley
   knob: voltage
-  meter: None
  Anode Current:
   instrument: Anode Keithley
-  knob: None
   meter: current
 
 Presets:
@@ -41,15 +40,11 @@ Alarms:
   protocol: set_zero_voltage.yaml
 
 Plotting:
- Plot 1:
+ IV Curve:
   x: Anode Voltage
-  y: [Anode Current]
+  y: Anode Current
   xlabel: 'Voltage (V)'
   ylabel: 'Current (A)'
-  options:
-   style: 'averaged'
-   linestyle: '-'
-   color: 'k'
 
 Schedule:
  Anode Sweep:
