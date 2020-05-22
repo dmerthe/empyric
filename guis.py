@@ -11,7 +11,6 @@ import tkinter as tk
 import matplotlib.pyplot as plt
 from matplotlib.cm import ScalarMappable
 from tkinter.filedialog import askopenfilename, askopenfile
-from ruamel.yaml import YAML
 
 from mercury.elements import yaml, timestamp_path, Experiment
 from mercury.utilities import convert_time
@@ -59,11 +58,13 @@ class ExperimentController:
 
             # Stop the schedule clock and stop iterating if the user pauses the experiment
             if self.status_gui.paused:
-                self.experiment.schedule.clock.stop()
+                self.experiment.schedule.stop()
                 while self.status_gui.paused:
                     self.status_gui.update(step)
                     plt.pause(0.01)
                 self.experiment.schedule.clock.resume()
+
+            plt.pause(0.01)
 
         followup = self.experiment.followup
 
@@ -162,6 +163,7 @@ class StatusGUI:
     def user_stop(self):
         self.update(status='Stopped by User')
         self.experiment.status = 'Finished'  # tells the experiment to stop iterating
+        self.experiment.followup = []  # cancel any follow-ups as well
 
     def quit(self, message=None):
         self.update(status='Finished with no follow-up. Closing...')
@@ -209,7 +211,7 @@ class Plotter:
 
         # Only plot if sufficient time has passed since the last plot generation
         now = time.time()
-        if now < self.last_plot + self.interval or plot_now:
+        if now < self.last_plot + self.interval and not plot_now:
             return
 
         self.last_plot = now

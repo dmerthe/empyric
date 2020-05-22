@@ -437,16 +437,18 @@ class Schedule:
 
 class Experiment:
 
-    default_settings = {'duration': np.inf,
-                        'follow-up': None,
-                        'step interval': 0,
-                        'plot interval': 10,
-                        'save interval': 60}
+    default_settings = {
+        'duration': np.inf,
+        'follow-up': None,
+        'step interval': 0,
+        'plot interval': 10,
+        'save interval': 60
+    }
 
     def __init__(self, runcard):
         """
 
-        :param runcard: (file) runcard file
+        :param runcard: (dict) runcard in dictionary form (built from a yaml file)
         """
 
         self.clock = Clock()  # used for save timing
@@ -465,23 +467,23 @@ class Experiment:
             runcard.get('Postsets', None)  # Optional
         )
 
-        self.settings = runcard.get('Settings', self.default_settings)  # Optional; if given use default settings above
+        self.settings = runcard.get('Settings', self.default_settings)  # Optional; if not given, use default settings above
         self.plotting = runcard.get('Plotting', None)  # Optional
         self.schedule = Schedule(runcard['Schedule'])
 
         # Prepare for data collection
-        data_columns = list(self.instruments.mapped_variables.keys())
-        data_columns += ['Total Time', 'Schedule Time']
-        self.data = pd.DataFrame(columns=data_columns)  # Will contain history of knob settings and meter readings for the experiment.
+        self.data = pd.DataFrame(
+            columns=['Total Time', 'Schedule Time'] + list(self.instruments.mapped_variables)
+        )  # Will contain history of knob settings and meter readings for the experiment.
 
         self.status = 'Not Started'
-        self.followup = self.settings.get('follow-up', None)  # What to do when the experiment ends
+        self.followup = self.settings.get('follow-up', [])
 
-        # Make a list of follow-ups
-        if self.followup in [None, 'None']:
-            self.followup = []
-        elif isinstance(self.followup, str):
-            self.followup = [self.followup]
+        if isinstance(self.followup, str):
+            if self.followup.lower() == 'none':
+                self.followup = []
+            else:
+                self.followup = [self.followup]
 
     def reset(self):
         self.__init__(self.runcard)
@@ -506,17 +508,16 @@ class Experiment:
 
     def __next__(self):
 
-        # Start the schedule clock on first call
+        # Start the clocks on first iteration and get things going
         if self.status == 'Not Started':
             self.clock.start()  # start the experiment clock (real time)
-            self.schedule.clock.start()  # start the schedule clock (excludes pauses)
+            self.schedule.start()  # start the schedule clock (excludes pauses)
             self.status = 'Running'
             self.timestamp = get_timestamp()
 
-        # Stop if finished
+        # Save and disconnect from instruments if finished
         if self.status == 'Finished':
             self.save('now')
-            self.schedule.clock.stop()
             self.instruments.disconnect()
             raise StopIteration
 
@@ -526,11 +527,9 @@ class Experiment:
 
         self.last_step = self.clock.time()
 
-        configuration = next(self.schedule)  # Get the next step from the schedule
+        state = {'Total Time': self.clock.time(), 'Schedule Time': self.schedule.clock.time()}
 
-        self.instruments.apply(configuration)  # apply settings to knobs
-        readings = self.instruments.read()  # checking meter readings
-        state = readings  # will contain knob values + meter readings + time values
+        configuration = next(self.schedule)  # Get the next step from the schedule
 
         # Get previously set knob values if no corresponding routines are running
         for name, variable in self.instruments.mapped_variables.items():
@@ -539,8 +538,9 @@ class Experiment:
 
         state.update(configuration)
 
-        times = {'Total Time': self.clock.time(), 'Schedule Time': self.schedule.clock.time()}
-        state.update(times)
+        self.instruments.apply(configuration)  # apply settings to knobs
+        readings = self.instruments.read()  # checking meter readings
+        state.update(readings)  # will contain knob values + meter readings + time values
 
         self.state = pd.Series(state, name=datetime.datetime.now())
         self.data.loc[self.state.name] = self.state
@@ -555,9 +555,9 @@ class Experiment:
         # Flag for termination if any alarms have been raised
         for alarm in self.instruments.alarms.values():
             if alarm['triggered']:
-                for task in self.followup:
+                for task in self.followup:  # Cancel repeat if alarm triggered
                     if task.lower() == 'repeat':
-                        self.followup.remove(task)  # Cancel repeat if alarm triggered
+                        self.followup.remove(task)
                 self.followup.insert(0, alarm['protocol']) # put any triggered alarm protocols at top of follow-up list
                 self.status = 'Finished'
 

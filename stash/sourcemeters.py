@@ -228,9 +228,6 @@ class Keithley2400(Instrument, GPIBDevice):
 
         path = self.name+'-fast_iv_measurement.csv'
 
-        if not path:
-            raise MeasurementError('File path for fast IV sweep voltages have not been stored!')
-
         list_length = len(self.fast_voltages)
 
         if list_length >= 100:
@@ -256,7 +253,7 @@ class Keithley2400(Instrument, GPIBDevice):
 
         self.connection.timeout = 1000  # put it back
 
-        # Save data to same path
+        # Save fast Iv data
         new_iv_data = pd.DataFrame({
             self.mapped_variables['fast voltages']: self.fast_voltages,
             self.mapped_variables['fast currents']: current_list}
@@ -435,6 +432,8 @@ class Keithley2651A(Instrument, GPIBDevice):
 
     def set_fast_voltages(self, *args):
 
+        self.set_source('voltage')
+
         if len(args) == 0:
             filedialog = importlib.import_module('tkinter.filedialog')
             path = filedialog.askopenfilename(title="Select CSV File with Fast IV Voltages")
@@ -443,9 +442,9 @@ class Keithley2651A(Instrument, GPIBDevice):
 
         self.knob_values['fast voltages'] = path
 
-        fast_iv_data = pd.read_csv(path, engine='python')
+        fast_voltage_data = pd.read_csv(path)
 
-        self.fast_voltages = fast_iv_data['VOLTAGE']
+        self.fast_voltages = fast_voltage_data['Voltage'].values
 
     def measure_fast_currents(self):
 
@@ -457,10 +456,7 @@ class Keithley2651A(Instrument, GPIBDevice):
         if len(self.fast_voltages) == 0:
             raise MeasurementError('Fast IV sweep voltages have not been set!')
 
-        path = self.knob_values['fast voltages']
-
-        if not path:
-            raise MeasurementError('File path for fast IV sweep voltages have not been stored!')
+        path = self.name+'-fast_iv_measurement.csv'
 
         list_length = len(self.fast_voltages)
 
@@ -487,10 +483,18 @@ class Keithley2651A(Instrument, GPIBDevice):
 
         self.connection.timeout = 1000  # put it back
 
-        # Save data to same path
-        timestamp = get_timestamp()
-        fast_iv_data = pd.read_csv(path)
-        fast_iv_data[f'CURRENT-{timestamp}'] = current_list
-        fast_iv_data.to_csv(path, index=False)
+        # Save fast IV data
+        new_iv_data = pd.DataFrame({
+            self.mapped_variables['fast voltages']: self.fast_voltages,
+            self.mapped_variables['fast currents']: current_list}
+                                   , index=pd.date_range(start=datetime.datetime.now(), end=datetime.datetime.now(), periods=len(current_list)))
 
-        return f'CURRENT-{timestamp}'
+        if os.path.isfile(path):
+            fast_iv_data = pd.read_csv(path, index_col=0)
+        else:
+            fast_iv_data = pd.DataFrame({self.mapped_variables['fast voltages']:[], self.mapped_variables['fast currents']:[]})
+
+        fast_iv_data = fast_iv_data.append(new_iv_data, sort=False)
+        fast_iv_data.to_csv(path)
+
+        return path
