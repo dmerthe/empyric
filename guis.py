@@ -40,21 +40,17 @@ class ExperimentController:
 
         self.settings = self.runcard['Settings']
 
-        self.run(self.runcard)
-
-    def run(self, runcard, repeat=False):
-
         self.experiment = Experiment(runcard)
 
-        # Save executed runcard for record keeping
-        if not repeat:
-            name = self.experiment.description.get('name', 'experiment')
-            with open(timestamp_path(name + '_runcard.yaml'), 'w') as runcard_file:
-                yaml.dump(self.runcard, runcard_file)
+        name = self.experiment.description.get('name', 'experiment')
+        with open(timestamp_path(name + '_runcard.yaml'), 'w') as runcard_file:
+            yaml.dump(self.runcard, runcard_file)
 
         self.status_gui = StatusGUI(self.root, self.experiment)
         self.plotter = Plotter(self.experiment.data, self.experiment.plotting,
                                interval=convert_time(self.settings['plot interval']))
+
+    def run(self):
 
         # Main iteraton loop, going through steps in the experiment
         for step in self.experiment:
@@ -74,7 +70,8 @@ class ExperimentController:
         if len(followup) == 0:
             self.status_gui.quit()
         elif followup[0].lower() == 'repeat':
-            self.run(runcard_path, repeat=True)
+            self.experiment.reset()
+            self.run()
         else:
             for task in followup:
                 self.run(task)

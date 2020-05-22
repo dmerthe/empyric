@@ -450,7 +450,6 @@ class Experiment:
         """
 
         self.clock = Clock()  # used for save timing
-        self.clock.start()
 
         self.last_step = -np.inf  # time of last step taken
         self.last_save = -np.inf  # time of last save
@@ -470,6 +469,7 @@ class Experiment:
         self.plotting = runcard.get('Plotting', None)  # Optional
         self.schedule = Schedule(runcard['Schedule'])
 
+        # Prepare for data collection
         data_columns = list(self.instruments.mapped_variables.keys())
         data_columns += ['Total Time', 'Schedule Time']
         self.data = pd.DataFrame(columns=data_columns)  # Will contain history of knob settings and meter readings for the experiment.
@@ -482,6 +482,11 @@ class Experiment:
             self.followup = []
         elif isinstance(self.followup, str):
             self.followup = [self.followup]
+
+    def reset(self):
+        self.last_step = -np.inf  # reset the step timer
+        self.last_save = -np.inf  # reset the save timer
+        self.status = "Not Started"  # flag to restart experiment and schedule clocks
 
     def save(self, save_now=False):
         """
@@ -505,7 +510,8 @@ class Experiment:
 
         # Start the schedule clock on first call
         if self.status == 'Not Started':
-            self.schedule.clock.start()  # start the schedule clock
+            self.clock.start()  # start the experiment clock (real time)
+            self.schedule.clock.start()  # start the schedule clock (excludes pauses)
             self.status = 'Running'
             self.timestamp = get_timestamp()
 
