@@ -12,10 +12,11 @@ import matplotlib.pyplot as plt
 from matplotlib.cm import ScalarMappable
 from tkinter.filedialog import askopenfilename, askopenfile
 
-from mercury.elements import yaml, timestamp_path, Experiment
-from mercury.utilities import convert_time
+from mercury.elements import Experiment
+from mercury.utilities import *
 
 plt.ion()
+
 
 # Guis for controlling ongoing experiments
 class ExperimentController:
@@ -191,6 +192,7 @@ class Plotter:
         """
 
         self.data = data
+
         if settings:
             self.settings = settings
         else:
@@ -206,6 +208,8 @@ class Plotter:
         self.plots = {}
         for plot_name in settings:
             self.plots[plot_name] = plt.subplots()
+
+        self.timestamp = get_timestamp()
 
     def plot(self, plot_now=False, save=False):
 
@@ -241,7 +245,7 @@ class Plotter:
 
         for name, plot in self.plots.items():
             fig, ax = plot
-            fig.savefig(timestamp_path(name+'.png'))
+            fig.savefig(timestamp_path(name+'.png', timestamp=self.timestamp))
 
     def _plot_all(self, name):
 

@@ -1,15 +1,12 @@
 import time
 import datetime
 import numbers
-from ruamel.yaml import YAML
 import re
 import numpy as np
 import pandas as pd
 
 from mercury import instrumentation
 from mercury.utilities import *
-
-yaml = YAML()
 
 
 class Clock:

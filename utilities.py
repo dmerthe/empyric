@@ -2,6 +2,9 @@
 import time
 import re
 import numbers
+from ruamel.yaml import YAML
+
+yaml = YAML()
 
 def convert_time(time_value):
     """
