@@ -432,8 +432,6 @@ class Keithley2651A(Instrument, GPIBDevice):
 
     def set_fast_voltages(self, *args):
 
-        self.set_source('voltage')
-
         if len(args) == 0:
             filedialog = importlib.import_module('tkinter.filedialog')
             path = filedialog.askopenfilename(title="Select CSV File with Fast IV Voltages")
