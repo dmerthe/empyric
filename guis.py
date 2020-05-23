@@ -69,14 +69,18 @@ class ExperimentController:
 
         followup = self.experiment.followup
 
+        self.status_gui.quit()
+        self.plotter.quit()
+
         if len(followup) == 0:
-            self.status_gui.quit()
+            return
         elif followup[0].lower() == 'repeat':
             self.__init__(self.runcard)
             self.run()
         else:
             for task in followup:
-                self.run(task)
+                self.__init__(task)
+                self.run()
 
 
 class StatusGUI:
@@ -420,6 +424,12 @@ class Plotter:
         ax.set_ylabel(self.settings[name].get('ylabel', y[0]))
 
         return fig, ax
+
+    def quit(self):
+
+        for plot in self.plots:
+            fig, _ = plot
+            plt.close(fig)
 
 class InstrumentConfigGUI:
     """
