@@ -40,24 +40,37 @@ class ExperimentController:
         with open(runcard_path, 'rb') as runcard:
             self.runcard = yaml.load(runcard)
 
+        # Set up the experiment
         self.settings = self.runcard['Settings']
 
         self.experiment = Experiment(self.runcard)
 
         name = self.experiment.description.get('name', 'experiment')
         with open(timestamp_path(name + '_runcard.yaml'), 'w') as runcard_file:
-            yaml.dump(self.runcard, runcard_file)
+            yaml.dump(self.runcard, runcard_file)  # save executed runcard for record keeping
 
-        self.status_gui = StatusGUI(self.root, self.experiment)
-        self.plotter = Plotter(self.experiment.data, self.experiment.plotting,
-                               interval=convert_time(self.settings['plot interval']))
+        # Set up the main user interface
+        self.status_gui = StatusGUI(parent=self.root, experiment=self.experiment)
+
+        # Set up the data plotter
+        self.plot_interval = convert_time(self.settings['plot interval'])
+        self.plotter = Plotter(data=self.experiment.data,
+                               settings=self.experiment.plotting)
+
+        self.last_plot = -np.inf
 
     def run(self):
 
         # Main iteraton loop, going through steps in the experiment
         for step in self.experiment:
             self.status_gui.update(step, status=f'Running: {step.name}')
-            self.plotter.plot(save=True)
+
+            # Plot data if sufficient time has passed since the last plot generation
+            now = time.time()
+            if now >= self.last_plot + self.plot_interval:
+                self.plotter.plot()
+                self.plotter.save()
+                self.last_plot = now
 
             # Stop the schedule clock and stop iterating if the user pauses the experiment
             if self.status_gui.paused:
@@ -69,10 +82,11 @@ class ExperimentController:
 
             plt.pause(0.01)
 
+        # Experiment prescribed by runcard has ended, do any follow-up experiments or shut things down
         followup = self.experiment.followup
 
         self.status_gui.quit()
-        self.plotter.quit()
+        self.plotter.close()
 
         if len(followup) == 0:
             return
@@ -87,7 +101,9 @@ class ExperimentController:
 
 class StatusGUI:
     """
-    GUI showing experimental progress and values of all experiment variables, allowing the user to stop or pause the experiment.
+    GUI showing experimental progress and values of all experiment variables.
+    This GUI allows the user to stop or pause the experiment.
+    When paused, the user can also directly interact with instruments through the "Check" button.
     """
 
     def __init__(self, parent, experiment):
@@ -188,7 +204,7 @@ class Plotter:
     Handler for plotting data based on the runcard plotting settings and data context
     """
 
-    def __init__(self, data, settings=None, interval=None):
+    def __init__(self, data, settings=None):
         """
         PLot data based on settings
 
@@ -203,27 +219,20 @@ class Plotter:
         else:
             self.settings = {}
 
-        self.last_plot = -np.inf
-
-        if interval is None:
-            self.interval = 0
-        else:
-            self.interval = interval
-
         self.plots = {}
         for plot_name in settings:
             self.plots[plot_name] = plt.subplots()
 
         self.timestamp = get_timestamp()
 
-    def plot(self, plot_now=False, save=False):
+    def configure(self, settings=None, interval=None):
 
-        # Only plot if sufficient time has passed since the last plot generation
-        now = time.time()
-        if now < self.last_plot + self.interval and not plot_now:
-            return
+        if settings:
+            self.settings = settings
+        if interval:
+            self.interval = interval
 
-        self.last_plot = now
+    def plot(self):
 
         # Make the plots, by name and style
         for name, settings in self.settings.items():
@@ -243,14 +252,18 @@ class Plotter:
             else:
                 raise PlotError(f"Plotting style '{style}' not recognized!")
 
-        if save:
-            self.save()
+    def save(self, plot_name=None, save_as=None):
 
-    def save(self):
-
-        for name, plot in self.plots.items():
-            fig, ax = plot
-            fig.savefig(timestamp_path(name+'.png', timestamp=self.timestamp))
+        if plot_name:
+            fig, ax = self.plots[plot_name]
+            if save_as:
+                fig.savefig(timestamp_path(save_as + '.png', timestamp=self.timestamp))
+            else:
+                fig.savefig(timestamp_path(plot_name + '.png', timestamp=self.timestamp))
+        else:
+            for name, plot in self.plots.items():
+                fig, ax = plot
+                fig.savefig(timestamp_path(name+'.png', timestamp=self.timestamp))
 
     def _plot_all(self, name):
 
@@ -435,11 +448,15 @@ class Plotter:
 
         return fig, ax
 
-    def quit(self):
+    def close(self, plot_name=None):
 
-        for plot in self.plots.values():
-            fig, _ = plot
+        if plot_name:
+            fig, _ = self.plots[plot_name]
             plt.close(fig)
+        else:
+            for plot in self.plots.values():
+                fig, _ = plot
+                plt.close(fig)
 
 class InstrumentConfigGUI:
     """
@@ -602,7 +619,6 @@ class ConfigTestDialog(BasicDialog):
     def __init__(self, parent, instrument, title=None):
 
         self.instrument = instrument
-
         BasicDialog.__init__(self, parent, title=title)
 
     def apply_knob_entry(self, knob):

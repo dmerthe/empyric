@@ -6,7 +6,7 @@ Description:
 
 Settings:
  duration: 2 minutes
- follow-up: "henon_followup_runcard.yaml"
+ follow-up: "henon_runcard.yaml"
  step interval: 1
  plot interval: 5
  save interval: 30
@@ -62,7 +62,7 @@ Schedule:
   routine: Idle
   variable: Parameter a
   times: [0, 2 minutes]
-  values: 1.4
+  values: 1.25
  Set Parameter b:
   routine: Idle
   variable: Parameter b

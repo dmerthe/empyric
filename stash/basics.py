@@ -112,10 +112,48 @@ class HenonMachine(Instrument):
         return
 
     def set_a(self, value):
-        self.knob_values['a'] = value
+        if self.knob_values['a'] == value:
+            return
+
+        a = value
+        self.knob_values['a'] = a
+        b  = self.knob_values['b']
+
+        x, y = 2*np.random.rand() - 1, 0.5*np.random.rand() - 0.25
+        self.step = 0
+
+        self.x_values = [x]
+        self.y_values = [y]
+        N = int(1e3)
+        for i in range(N):
+            x_new = 1 - a * x ** 2 + y
+            y_new = b * x
+            x = x_new
+            y = y_new
+            self.x_values.append(x)
+            self.y_values.append(y)
 
     def set_b(self, value):
-        self.knob_values['a'] = value
+        if self.knob_values['b'] == value:
+            return
+
+        a = self.knob_values['a']
+        b = value
+        self.knob_values['b'] = b
+
+        x, y = 2 * np.random.rand() - 1, 0.5 * np.random.rand() - 0.25
+        self.step = 0
+
+        self.x_values = [x]
+        self.y_values = [y]
+        N = int(1e3)
+        for i in range(N):
+            x_new = 1 - a * x ** 2 + y
+            y_new = b * x
+            x = x_new
+            y = y_new
+            self.x_values.append(x)
+            self.y_values.append(y)
 
     def measure_x(self):
 
@@ -135,7 +173,7 @@ class HenonMachine(Instrument):
 
     def measure_pseudostep(self):
 
-        return int(0.5*self.step) % 20
+        return int(0.5*self.step) % 10
 
 
 class GPIBDevice():
