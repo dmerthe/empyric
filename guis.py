@@ -31,6 +31,8 @@ class ExperimentController:
         if runcard_path is None:
             runcard_path = askopenfilename(title='Select Experiment Runcard')
 
+        self.runcard_path = runcard_path
+
         working_dir = os.path.dirname(runcard_path)
         if working_dir != '':
             os.chdir(os.path.dirname(runcard_path))
@@ -75,7 +77,7 @@ class ExperimentController:
         if len(followup) == 0:
             return
         elif followup[0].lower() == 'repeat':
-            self.__init__(self.runcard)
+            self.__init__(self.runcard_path)
             self.run()
         else:
             for task in followup:
@@ -267,7 +269,7 @@ class Plotter:
         if x.lower() ==  'time':
             self.data.plot(y=y,ax=ax, kind='line', **plt_kwargs)
         else:
-            self.data.plot(y=y, ax=ax, kind='line', **plt_kwargs)
+            self.data.plot(y=y, x=x, ax=ax, kind='line', **plt_kwargs)
 
         ax.set_title(name)
         ax.grid()
@@ -307,7 +309,7 @@ class Plotter:
 
         plt_kwargs = self.settings[name].get('options',{})
 
-        self.data.boxplot(column=y, by=x, ax=ax, **plt_kwargs)
+        self.data.boxplot(column=y[0], by=x, ax=ax, **plt_kwargs)
 
         ax.set_title(name)
         ax.grid(True)
@@ -320,6 +322,10 @@ class Plotter:
 
         fig, ax = self.plots[name]
         ax.clear()
+
+        marker = self.settings[name].get('marker', None)
+        if marker.lower() == 'none':
+            marker = None
 
         # Color plot according to elapsed time
         colormap = 'viridis'  # Determines colormap to use for plotting timeseries data
@@ -336,7 +342,6 @@ class Plotter:
         if y_is_numeric:
 
             if c not in self.data.columns:
-                indices = file_data.index
                 self.data[c] = self.data.index
                 first_datetime = pd.date_range(start=indices[0], end=indices[0],
                                                periods=len(file_data.index))
@@ -389,9 +394,14 @@ class Plotter:
             fig.has_colorbar = True
 
         # Draw the plot
-        for i in range(x_data.shape[0] - 1):
-            ax.plot(x_data[i: i + 2], y_data[i: i + 2],
-                               color=cmap(norm(np.mean(c_data[i: i + 2]))))
+        if marker:
+            for i in range(x_data.shape[0]):
+                ax.plot([x_data[i]], [y_data[i]], marker=marker, markersize=3,
+                                   color=cmap(norm(np.mean(c_data[i]))))
+        else:
+            for i in range(x_data.shape[0] - 1):
+                ax.plot(x_data[i: i + 2], y_data[i: i + 2],
+                                   color=cmap(norm(np.mean(c_data[i: i + 2]))))
         ax.set_title(name)
         ax.grid(True)
         ax.set_xlabel(self.settings[name].get('xlabel', x))
@@ -401,7 +411,7 @@ class Plotter:
 
     def _plot_order(self, name):
 
-        fig, ax = self._plot_all(name, colors=colors)
+        fig, ax = self._plot_all(name)
 
         colors = [line.get_color() for line in ax.get_lines()]
 
@@ -414,8 +424,8 @@ class Plotter:
             for i in range(num_points - 1):
                 x1, x2 = self.data[x].iloc[i], self.data[x].iloc[i + 1]
                 y1, y2 = self.data[yy].iloc[i], self.data[yy].iloc[i + 1]
-                axes.annotate('', xytext=(x1, y1),
-                              xy=(0.5 * (x1 + x2), 0.5 * (y1+ y1)),
+                ax.annotate('', xytext=(x1, y1),
+                              xy=(0.5 * (x1 + x2), 0.5 * (y1+ y2)),
                               arrowprops=dict(arrowstyle='->', color=color))
 
         ax.set_title(name)
@@ -427,7 +437,7 @@ class Plotter:
 
     def quit(self):
 
-        for plot in self.plots:
+        for plot in self.plots.values():
             fig, _ = plot
             plt.close(fig)
 
@@ -436,7 +446,7 @@ class InstrumentConfigGUI:
     Once the instruments are selected, this window allows the user to configure and test instruments before setting up an experiment
     """
 
-    def __init__(self, parent, instruments, runcard_warning=False):
+    def __init__(self, parent, instruments_set, runcard_warning=False):
 
         self.finished = False
 
@@ -445,7 +455,7 @@ class InstrumentConfigGUI:
         self.root = tk.Toplevel(self.parent)
         self.root.title('Instrument Config/Test')
 
-        self.instruments = instruments
+        self.instruments = instruments_set.instruments
 
         self.runcard_warning = runcard_warning
 
@@ -456,7 +466,7 @@ class InstrumentConfigGUI:
         self.instrument_labels = {}
         self.config_buttons = {}
 
-        for name, instrument in instruments.items():
+        for name, instrument in self.instruments.items():
 
             instrument_label = tk.Label(self.root, text=name)
             instrument_label.grid(row=i, column=0)
@@ -526,7 +536,7 @@ class BasicDialog(tk.Toplevel):
         if not self.initial_focus:
             self.initial_focus = self
 
-        self.protocol("WM_DELETE_WINDOW", self.cancel)
+        self.protocol("WM_DELETE_WINDOW", self.ok)
 
         self.geometry("+%d+%d" % (parent.winfo_rootx() + 50,
                                   parent.winfo_rooty() + 50))
@@ -566,8 +576,6 @@ class BasicDialog(tk.Toplevel):
 
         self.withdraw()
         self.update_idletasks()
-
-        self.apply()
 
         self.parent.focus_set()
         self.destroy()

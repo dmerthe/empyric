@@ -75,87 +75,67 @@ class Instrument(object):
         set_method(value)
 
 
-class TestInstrument(Instrument):
+class HenonMachine(Instrument):
     """
     Simulation of an instrument based on the 'test.csv' file in the utopya directory.
     It has two knobs and two meters, useful for testing functionality of the utopya module
     in the absence of real instruments.
     """
 
-    name = 'Test Instrument'
+    name = 'Henon Machine'
 
-    knobs = ('knob1','knob2')
+    knobs = ('a','b')
 
-    meters = ('meter1','meter2')
+    meters = ('x', 'y', 'pseudostep')
 
-    def __init__(self, *args,  **kwargs):
-        # address argument is not used, but put here to be consistent with all other instruments
+    def __init__(self, adress=None, backend=None):
+        # address and backend arguments are not used, but put them here to be consistent with all other instruments
+        a = 1.4
+        b = 0.3
+        N = int(1e3)
+        self.knob_values = {'a': a, 'b': b, 'N': N}
 
-        cwd = os.getcwd() # save the current working directory, so that we can go back to it later
+        x, y = 2*np.random.rand() - 1, 0.5*np.random.rand() - 0.25
+        self.step = 0
 
-        # locate the test instrument csv file and load it into a Dataframe
-        user_paths = os.environ['PYTHONPATH'].split(os.pathsep)
-
-        test_df = None
-
-        for dir in user_paths:
-
-            try:
-                os.chdir(dir)
-            except FileNotFoundError:
-                continue
-
-            for sub_dir in [sub_dir for sub_dir in os.listdir() if os.path.isdir(sub_dir)]:
-
-                if sub_dir == 'tempyral':
-
-                    os.chdir(sub_dir)
-
-                    self.path = dir+'/'+sub_dir+'/test/test_instrument.csv'
-
-        test_df = pandas.read_csv(self.path)
-
-        self.knob_values = {knob: test_df[knob].iloc[0] for knob in TestInstrument.knobs}
+        self.x_values = [x]
+        self.y_values = [y]
+        for i in range(N):
+            x_new = 1 - a * x ** 2 + y
+            y_new = b * x
+            x = x_new
+            y = y_new
+            self.x_values.append(x)
+            self.y_values.append(y)
 
     def disconnect(self):
-
         return
 
-    def set_knob1(self, value):
+    def set_a(self, value):
+        self.knob_values['a'] = value
 
-        test_df = pandas.read_csv(self.path)
+    def set_b(self, value):
+        self.knob_values['a'] = value
 
-        test_df['knob1'] = value
+    def measure_x(self):
 
-        self.knob_values['knob1'] = value
+        x = self.x_values[int(0.5*self.step)]
 
-        test_df.to_csv(self.path, index=False)
+        self.step += 1
 
-    def set_knob2(self, value):
+        return x
 
-        test_df = pandas.read_csv(self.path)
+    def measure_y(self):
 
-        test_df['knob2'] = value
+        y = self.y_values[int(0.5*self.step)]
 
-        self.knob_values['knob2'] = value
+        self.step += 1
 
-        test_df.to_csv(self.path, index=False)
+        return y
 
-    def measure_meter1(self):
+    def measure_pseudostep(self):
 
-        test_df = pandas.read_csv(self.path)
-
-        value = test_df['meter1'].iloc[0]
-
-        return value
-
-    def measure_meter2(self):
-
-        test_df = pandas.read_csv(self.path)
-
-        value = test_df['meter2'].iloc[0]
-
-        return value
+        return int(0.5*self.step) % 20
 
 
 class GPIBDevice():

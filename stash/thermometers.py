@@ -1,19 +1,19 @@
 import importlib
 import numpy as np
-from Phidget22.Devices.TemperatureSensor import TemperatureSensor
 from mercury.stash.basics import *
 
 class TCReader(Instrument, PhidgetDevice):
 
     name = 'TCReader1101'
 
-    device_class = TemperatureSensor
-
     knobs = ('type',)
 
     meters = ('temperature',)
 
     def __init__(self, address, backend='phidget'):
+
+        ts = importlib.import_module('Phidget22.Devices.TemperatureSensor')
+        self.device_class = ts.TemperatureSensor
 
         self.address = address
 

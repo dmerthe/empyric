@@ -6,4 +6,4 @@ from mercury.stash.multimeters import *
 from mercury.stash.thermometers import *
 from mercury.stash.barometers import *
 
-available_backends = ['serial', 'visa', 'linux', 'phidget', 'test']
+available_backends = ['serial', 'visa', 'linux', 'phidget', 'test', 'chaos']
