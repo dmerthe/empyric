@@ -273,6 +273,7 @@ class Plotter:
         x = self.settings[name]['x']
         y = np.array([self.settings[name]['y']]).flatten()
 
+        # If data points to a file, then generate a parametric plot
         y_is_path = isinstance(self.data[y].to_numpy().flatten()[0], str)
         if y_is_path:
             return self._plot_parametric(name)
@@ -458,71 +459,6 @@ class Plotter:
                 fig, _ = plot
                 plt.close(fig)
 
-class InstrumentConfigGUI:
-    """
-    Once the instruments are selected, this window allows the user to configure and test instruments before setting up an experiment
-    """
-
-    def __init__(self, parent, instruments_set, runcard_warning=False):
-
-        self.finished = False
-
-        self.parent = parent
-
-        self.root = tk.Toplevel(self.parent)
-        self.root.title('Instrument Config/Test')
-
-        self.instruments = instruments_set.instruments
-
-        self.runcard_warning = runcard_warning
-
-        tk.Label(self.root, text='Instruments:', font=('Arial', 14), justify=tk.LEFT).grid(row=0, column=0, sticky=tk.W)
-
-        i = 1
-
-        self.instrument_labels = {}
-        self.config_buttons = {}
-
-        for name, instrument in self.instruments.items():
-
-            instrument_label = tk.Label(self.root, text=name)
-            instrument_label.grid(row=i, column=0)
-
-            self.instrument_labels[name] = instrument_label
-
-            config_button = tk.Button(self.root, text = 'Config/Test', command = lambda instr = instrument: self.config(instr))
-            config_button.grid(row=i,column=1)
-
-            self.config_buttons[name] = config_button
-
-            i+=1
-
-        self.ok_button = tk.Button(self.root, text='OK', font=('Arial', 14), command=self.okay, width=20)
-        self.ok_button.grid(row=i, column=0, columnspan=2)
-
-        while not self.finished:
-            self.update()
-            time.sleep(0.05)
-
-        self.root.destroy()
-        self.parent.focus_set()
-
-    def update(self):
-
-        if not self.finished:
-            self.root.update()
-
-    def okay(self):
-
-        self.finished = True
-
-    def config(self, instrument):
-
-        if self.runcard_warning:
-            RuncardDepartureDialog(self.root)
-
-        dialog = ConfigTestDialog(self.root, instrument, title='Config/Test: '+instrument.name)
-
 
 class BasicDialog(tk.Toplevel):
     """
@@ -602,6 +538,49 @@ class BasicDialog(tk.Toplevel):
         return 1  # override
 
 
+class InstrumentConfigGUI(BasicDialog):
+    """
+    Once the instruments are selected, this window allows the user to configure and test instruments before setting up an experiment
+    """
+
+    def __init__(self, parent, instruments_set, runcard_warning=False):
+
+        self.instruments = instruments_set.instruments
+        self.runcard_warning = runcard_warning
+
+        BasicDialog.__init__(self, parent, title='Instrument Config/Test')
+
+    def body(self, master):
+
+        tk.Label(master, text='Instruments:', font=('Arial', 14), justify=tk.LEFT).grid(row=0, column=0, sticky=tk.W)
+
+        i = 1
+
+        self.instrument_labels = {}
+        self.config_buttons = {}
+
+        for name, instrument in self.instruments.items():
+
+            instrument_label = tk.Label(master, text=name)
+            instrument_label.grid(row=i, column=0)
+
+            self.instrument_labels[name] = instrument_label
+
+            config_button = tk.Button(master, text = 'Config/Test', command = lambda instr = instrument: self.config(instr))
+            config_button.grid(row=i,column=1)
+
+            self.config_buttons[name] = config_button
+
+            i+=1
+
+    def config(self, instrument):
+
+        if self.runcard_warning:
+            RuncardDepartureDialog(self)
+
+        dialog = ConfigTestDialog(self, instrument)
+
+
 class RuncardDepartureDialog(BasicDialog):
 
     def body(self, master):
@@ -616,10 +595,10 @@ class ConfigTestDialog(BasicDialog):
 
     """
 
-    def __init__(self, parent, instrument, title=None):
+    def __init__(self, parent, instrument):
 
         self.instrument = instrument
-        BasicDialog.__init__(self, parent, title=title)
+        BasicDialog.__init__(self, parent, title='Config/Test: '+instrument.name)
 
     def apply_knob_entry(self, knob):
         value = self.knob_entries[knob].get()
