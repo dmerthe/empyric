@@ -18,7 +18,7 @@ from mercury.utilities import *
 plt.ion()
 
 
-# Guis for controlling ongoing experiments
+# Guis for controlling and monitoring ongoing experiments
 class ExperimentController:
 
     def __init__(self, runcard_path=None):
@@ -63,7 +63,7 @@ class ExperimentController:
 
         # Main iteraton loop, going through steps in the experiment
         for step in self.experiment:
-            self.status_gui.update(step, status=f'Running: {step.name}')
+            self.status_gui.update(step, status=self.experiment.status)
 
             # Plot data if sufficient time has passed since the last plot generation
             now = time.time()
@@ -82,11 +82,11 @@ class ExperimentController:
 
             plt.pause(0.01)
 
-        # Experiment prescribed by runcard has ended, do any follow-up experiments or shut things down
-        followup = self.experiment.followup
-
         self.status_gui.quit()
         self.plotter.close()
+
+        # Experiment prescribed by runcard has ended, do any follow-up experiments or shut things down
+        followup = self.experiment.followup
 
         if len(followup) == 0:
             return
@@ -120,7 +120,7 @@ class StatusGUI:
 
         tk.Label(self.root, text='Status:').grid(row=0, column=0, sticky=tk.E)
 
-        self.status_label = tk.Label(self.root, text='Getting started...', width=40, relief=tk.SUNKEN)
+        self.status_label = tk.Label(self.root, text='Getting started.', width=40, relief=tk.SUNKEN)
         self.status_label.grid(row=0, column=1, columnspan=2, sticky=tk.W)
 
         tk.Label(self.root, text='', font=("Arial", 14, 'bold')).grid(row=1, column=0, sticky=tk.E)
@@ -163,7 +163,7 @@ class StatusGUI:
             if self.paused:
                 self.status_label.config(text='Paused by user')
             else:
-                self.status_label.config(text='Running')
+                self.status_label.config(text=self.experiment.status)
 
         self.root.update()
 
@@ -175,7 +175,6 @@ class StatusGUI:
         self.paused = not self.paused
 
         if self.paused:
-            self.update(status='Paused by user')
             self.pause_button.config(text='Resume')
             self.config_button.config(state=tk.NORMAL)
         else:
@@ -184,12 +183,12 @@ class StatusGUI:
             self.config_button.config(state=tk.DISABLED)
 
     def user_stop(self):
-        self.update(status='Stopped by User')
-        self.experiment.status = 'Finished'  # tells the experiment to stop iterating
-        self.experiment.followup = []  # cancel any follow-ups as well
+        self.experiment.status = 'Finished: Stopped by user'  # tells the experiment to stop iterating
+        self.update(status=self.experiment.status)
+        self.experiment.followup = []  # cancel any follow-ups
+        self.quit()
 
-    def quit(self, message=None):
-        self.update(status='Finished with no follow-up. Closing...')
+    def quit(self):
         self.root.update()
         time.sleep(1)
         self.root.destroy()
@@ -460,6 +459,7 @@ class Plotter:
                 plt.close(fig)
 
 
+# GUIs for instrument acess
 class BasicDialog(tk.Toplevel):
     """
     General purpose dialog window
@@ -671,3 +671,7 @@ class ConfigTestDialog(BasicDialog):
             self.measure_buttons[meter].grid(row=i, column=5)
 
             i += 1
+
+
+# Runcard Wizard GUI
+

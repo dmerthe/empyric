@@ -204,19 +204,18 @@ class InstrumentSet:
         :return: (dictionary) dictionary of measured values in the form, meter_name: value
         """
 
-        readings = {}
+        if meters:
+            readings = {}
+            for meter in meters:
 
-        if meters is None:
-            return {name: var.measure() for name, var in self.mapped_variables.items() if var.meter}
-
-        for meter in meters:
-
-            if type(meter) is str:  # if meter is a mapped variable
-                readings[meter] = self.mapped_variables[meter].measure()
-            else:  # otherwise, the meter can be specified by the corresponding (instrument, meter) tuple
-                instrument_name, meter_name = meter
-                instrument = self.instruments[instrument_name]
-                readings[meter] = instrument.measure(meter_name)
+                if type(meter) is str:  # if meter is a mapped variable
+                    readings[meter] = self.mapped_variables[meter].measure()
+                else:  # otherwise, the meter can be specified by the corresponding (instrument, meter) tuple
+                    instrument_name, meter_name = meter
+                    instrument = self.instruments[instrument_name]
+                    readings[meter] = instrument.measure(meter_name)
+        else:
+            readings = {name: var.measure() for name, var in self.mapped_variables.items() if var.meter}
 
         self.check_alarms(readings)
 
@@ -379,6 +378,8 @@ class Schedule:
 
         self.clock = Clock()
 
+        self.total_time = 0
+
         self.routines = {}
         if routines:
             self.add(routines)
@@ -398,6 +399,10 @@ class Schedule:
             times = []
             for time_value in spec['times']:
                 times.append(convert_time(time_value))
+
+            max_time = np.max(times)
+            if max_time > self.total_time:
+                self.total_time = max_time
 
             routine = {
                 'Idle': Idle,
@@ -482,9 +487,6 @@ class Experiment:
             else:
                 self.followup = [self.followup]
 
-    def reset(self):
-        self.__init__(self.runcard)
-
     def save(self, save_now=False):
         """
         Save data, but at a maximum frequency set by the given save interval, unless overridden by the save_now keyword.
@@ -513,10 +515,22 @@ class Experiment:
             self.timestamp = get_timestamp()
 
         # Save and disconnect from instruments if finished
-        if self.status == 'Finished':
+        if 'Finished' in self.status:
             self.save('now')
             self.instruments.disconnect()
             raise StopIteration
+
+        # Update experiment status
+        remaining_time = self.schedule.total_time - self.schedule.clock.time()
+        units = 'seconds'
+        if remaining_time > 60:
+            remaining_time = remaining_time/60
+            units = 'minutes'
+            if remaining_time > 60:
+                remaining_time = remaining_time / 60
+                units = 'hours'
+
+        self.status = f"Running: {np.round(remaining_time, 2)} {units} remaining"
 
         # Take the next step in the experiment
         if self.clock.time() < self.last_step + convert_time(self.settings['step interval']):
@@ -547,15 +561,16 @@ class Experiment:
         # Flag for termination if time has exceeded experiment duration
         duration = convert_time(self.settings['duration'])
         if self.schedule.clock.time() > duration:
-            self.status = 'Finished'
+            self.status = 'Finished: Schedule completed'
 
         # Flag for termination if any alarms have been raised
-        for alarm in self.instruments.alarms.values():
+        alarm_protocols = []
+        for name, alarm in self.instruments.alarms.items():
             if alarm['triggered']:
-                for task in self.followup:  # Cancel repeat if alarm triggered
-                    if task.lower() == 'repeat':
-                        self.followup.remove(task)
-                self.followup.insert(0, alarm['protocol']) # put any triggered alarm protocols at top of follow-up list
-                self.status = 'Finished'
+                alarm_protocols.append(alarm['protocol'])
+                self.status = f"Finished: {name} alarm triggered! Executing {alarm['protocol']}..."
+
+        if len(alarm_protocols) > 0:
+            self.followup = alarm_protocols  # Cancel any scheduled follow-ups and just execute alarm protocols
 
         return self.state
