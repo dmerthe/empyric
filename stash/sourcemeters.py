@@ -466,7 +466,6 @@ class Keithley2651A(Instrument, GPIBDevice):
         self.write('vlist = {%s}' % voltage_string)
         self.write(f'SweepVListMeasureI(smua, vlist, 0.01, {len(self.fast_voltages)})')
         raw_response = self.query(f'printbuffer(1, {len(self.fast_voltages)}, smua.nvbuffer1)').strip()
-        print(raw_response)
         current_list = [float(current_str) for current_str in raw_response.split(',')]
 
         self.connection.timeout = 1000  # put it back
