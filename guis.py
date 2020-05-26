@@ -137,17 +137,17 @@ class StatusGUI:
 
         tk.Label(self.root, text='', font=("Arial", 14, 'bold')).grid(row=i, column=0, sticky=tk.E)
 
-        self.config_button = tk.Button(self.root, text='Check', font=("Arial", 14, 'bold'), command=self.check_instr,
-                                       width=10, state=tk.DISABLED)
-        self.config_button.grid(row=i + 1, column=0)
+        self.config_button = tk.Button(self.root, text='Instruments...', font=("Arial", 14, 'bold'), command=self.check_instr,
+                                       width=22, state=tk.DISABLED)
+        self.config_button.grid(row=i + 1, column=1, columnspan=2)
 
         self.pause_button = tk.Button(self.root, text='Pause', font=("Arial", 14, 'bold'), command=self.toggle_pause,
                                       width=10)
-        self.pause_button.grid(row=i + 1, column=1)
+        self.pause_button.grid(row=i + 2, column=1)
 
         self.stop_button = tk.Button(self.root, text='Stop', font=("Arial", 14, 'bold'), command=self.user_stop,
                                      width=10)
-        self.stop_button.grid(row=i + 1, column=2)
+        self.stop_button.grid(row=i + 2, column=2)
 
         self.root.update()
 
