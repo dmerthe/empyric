@@ -239,15 +239,15 @@ class Plotter:
             style = settings.get('style', 'none')
 
             if style == 'none' or style == 'all':
-                self._plot_all(name)
+                return self._plot_all(name)
             elif style == 'averaged':
-                self._plot_averaged(name)
+                return self._plot_averaged(name)
             elif style == 'errorbars':
-                self._plot_errorbars(name)
+                return self._plot_errorbars(name)
             elif style == 'parametric':
-                self._plot_parametric(name)
+                return self._plot_parametric(name)
             elif style == 'order':
-                self._plot_order(name)
+                return self._plot_order(name)
             else:
                 raise PlotError(f"Plotting style '{style}' not recognized!")
 
@@ -286,6 +286,7 @@ class Plotter:
 
         ax.set_title(name)
         ax.grid()
+        ax.ticklabel_format(axis='y', style='sci', scilimits=(-2, 4))
         ax.set_xlabel(self.settings[name].get('xlabel', x))
         ax.set_ylabel(self.settings[name].get('ylabel', y[0]))
 
@@ -307,6 +308,7 @@ class Plotter:
 
         ax.set_title(name)
         ax.grid(True)
+        ax.ticklabel_format(axis='y', style='sci', scilimits=(-2, 4))
         ax.set_xlabel(self.settings[name].get('xlabel', x))
         ax.set_ylabel(self.settings[name].get('ylabel', y[0]))
 
@@ -326,6 +328,7 @@ class Plotter:
 
         ax.set_title(name)
         ax.grid(True)
+        ax.ticklabel_format(axis='y', style='sci', scilimits=(-2, 4))
         ax.set_xlabel(self.settings[name].get('xlabel', x))
         ax.set_ylabel(self.settings[name].get('ylabel', y[0]))
 
@@ -435,6 +438,7 @@ class Plotter:
                                    color=cmap(norm(np.mean(c_data[i: i + 2]))))
         ax.set_title(name)
         ax.grid(True)
+        ax.ticklabel_format(axis='y', style='sci', scilimits=(-2, 4))
         ax.set_xlabel(self.settings[name].get('xlabel', x))
         ax.set_ylabel(self.settings[name].get('ylabel', y))
 
@@ -461,6 +465,7 @@ class Plotter:
 
         ax.set_title(name)
         ax.grid(True)
+        ax.ticklabel_format(axis='y', style='sci', scilimits=(-2, 4))
         ax.set_xlabel(self.settings[name].get('xlabel', x))
         ax.set_ylabel(self.settings[name].get('ylabel', y[0]))
 
