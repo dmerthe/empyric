@@ -370,6 +370,16 @@ class Plotter:
             y_data = self.data[y].values
             c_data = self.data[c].values
 
+            # Rescale time if needed
+            if c == 'Time':
+                units = 'seconds'
+                if np.max(self.data[c].values) > 60:
+                    units = 'minutes'
+                    self.data[c] = self.data[c] / 60
+                    if np.max(self.data[c].values) > 60:
+                        units = 'hour'
+                        self.data[c] = self.data[c] / 60
+
         # Handle data stored in a file
         y_is_path = isinstance(self.data[y].values[0], str)
 
@@ -382,6 +392,16 @@ class Plotter:
             if c == 'Time':
                 first_datetime = pd.date_range(start=file_data.index[0], end=file_data.index[0], periods=len(file_data.index))
                 file_data[c] = (file_data.index - first_datetime).total_seconds()
+
+                # Rescale time if needed
+                units = 'seconds'
+                if np.max(file_data[c].values) > 60:
+                    units = 'minutes'
+                    file_data[c] = file_data[c] / 60
+                    if np.max(file_data.values) > 60:
+                        units = 'hour'
+                        file_data[c] = file_data[c] / 60
+
             else:
                 file_indices = file_data.index  # timestamps for the referenced data file
                 data_indices = self.data.index  # timestamps for the main data set, can be slightly different from the file timestamps
@@ -393,16 +413,6 @@ class Plotter:
             x_data = file_data[x].values
             y_data = file_data[y].values
             c_data = file_data[c].values
-
-        # Rescale time if needed
-        if c == 'Time':
-            units = 'seconds'
-            if np.max(self.data[c].values) > 60:
-                units = 'minutes'
-                self.data[c] = self.data[c] / 60
-                if np.max(self.data[c].values) > 60:
-                    units = 'hour'
-                    self.data[c] = self.data[c] / 60
 
         c_min, c_max = [np.floor(np.amin(c_data)), np.ceil(np.amax(c_data))]
         norm = plt.Normalize(vmin=c_min, vmax=c_max)

@@ -459,18 +459,14 @@ class Keithley2651A(Instrument, GPIBDevice):
 
         path = self.name+'-fast_iv_measurement.csv'
 
-        voltage_str = ', '.join([f'{voltage}' for voltage in self.fast_voltages])
+        voltage_string = ', '.join([f'{voltage}' for voltage in self.fast_voltages])
 
-        self.connection.timeout = np.inf  # Sweeps can take a while, give it time to finish
+        self.connection.timeout = float('inf')  # give it up to a minute to do sweep
 
-        self.write('smua.reset()')
-        self.set_voltage_range(self.voltage_range)
-        self.set_current_range(self.current_range)
-        self.set_nplc(self.nplc)
-        self.write('vlist = {%s}' % voltage_str)
-        self.write(f'SweepVListMeasureI(smua, vlist, 0.05, {len(voltage_list)})')
-
+        self.write('vlist = {%s}' % voltage_string)
+        self.write(f'SweepVListMeasureI(smua, vlist, 0.01, {len(self.fast_voltages)})')
         raw_response = self.query(f'printbuffer(1, {len(self.fast_voltages)}, smua.nvbuffer1)').strip()
+        print(raw_response)
         current_list = [float(current_str) for current_str in raw_response.split(',')]
 
         self.connection.timeout = 1000  # put it back
