@@ -336,7 +336,7 @@ class Plotter:
         fig, ax = self.plots[name]
         ax.clear()
 
-        marker = self.settings[name].get('marker', None)
+        marker = self.settings[name].get('marker', 'None')
         if marker.lower() == 'none':
             marker = None
 
@@ -349,15 +349,19 @@ class Plotter:
         y = np.array([self.settings[name]['y']]).flatten()[0]
         c = self.settings[name].get('parameter', 'Time')
 
+        if c not in self.data.columns and c != 'Time':
+            raise PlotError(f'Parameter {c} not in data!')
+
         # Handle simple numeric data
         y_is_numeric = isinstance(self.data[y].values[0], numbers.Number)
 
         if y_is_numeric:
 
-            if c not in self.data.columns:
-                self.data[c] = self.data.index
+            if c == 'Time':
+                indices = self.data.index
                 first_datetime = pd.date_range(start=indices[0], end=indices[0],
-                                               periods=len(file_data.index))
+                                               periods=len(indices))
+                self.data[c] = (self.data.index - first_datetime).total_seconds()
 
             x_data = self.data[x].values
             y_data = self.data[y].values
@@ -387,6 +391,16 @@ class Plotter:
             y_data = file_data[y].values
             c_data = file_data[c].values
 
+        # Rescale time if needed
+        if c == 'Time':
+            units = 'seconds'
+            if np.max(self.data[c].values) > 60:
+                units = 'minutes'
+                self.data[c] = self.data[c] / 60
+                if np.max(self.data[c].values) > 60:
+                    units = 'hour'
+                    self.data[c] = self.data[c] / 60
+
         c_min, c_max = [np.floor(np.amin(c_data)), np.ceil(np.amax(c_data))]
         norm = plt.Normalize(vmin=c_min, vmax=c_max)
 
@@ -395,7 +409,6 @@ class Plotter:
             fig.has_colorbar
             fig.scalarmappable.set_clim(vmin=c_min, vmax=c_max)
             fig.cbar.update_normal(fig.scalarmappable)
-            fig.cbar.ax.set_ylabel(self.settings[name].get('clabel', c))
 
         except AttributeError:
 
@@ -403,8 +416,13 @@ class Plotter:
             fig.scalarmappable.set_array(np.linspace(c_min, c_max, 1000))
 
             fig.cbar = plt.colorbar(fig.scalarmappable, ax=ax)
-            fig.cbar.ax.set_ylabel(c)
             fig.has_colorbar = True
+
+        if c == 'Time':
+            fig.cbar.ax.set_ylabel('Time ' + f" ({units})")
+        else:
+            fig.cbar.ax.set_ylabel(self.settings[name].get('clabel', c))
+
 
         # Draw the plot
         if marker:
