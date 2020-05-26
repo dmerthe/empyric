@@ -413,6 +413,7 @@ class Keithley2651A(Instrument, GPIBDevice):
             self.write(f'smua.source.limitv = {voltage_range}')
 
         self.knob_values['voltage range'] = voltage_range
+        self.voltage_range = voltage_range
 
     def set_current_range(self, current_range):
 
@@ -423,12 +424,14 @@ class Keithley2651A(Instrument, GPIBDevice):
             self.write(f'smua.source.limiti = {current_range}')
 
         self.knob_values['current range'] = current_range
+        self.current_range = current_range
 
     def set_nplc(self, nplc):
 
         self.write(f'smua.measure.nplc = {nplc}')
 
         self.knob_values['nplc'] = nplc
+        self.nplc = nplc
 
     def set_fast_voltages(self, *args):
 
@@ -442,7 +445,7 @@ class Keithley2651A(Instrument, GPIBDevice):
 
         fast_voltage_data = pd.read_csv(path)
 
-        self.fast_voltages = fast_voltage_data['Voltage'].values
+        self.fast_voltages = np.round(fast_voltage_data['Voltage'].values, 2)
 
     def measure_fast_currents(self):
 
@@ -456,28 +459,19 @@ class Keithley2651A(Instrument, GPIBDevice):
 
         path = self.name+'-fast_iv_measurement.csv'
 
-        list_length = len(self.fast_voltages)
+        voltage_str = ', '.join([f'{voltage}' for voltage in self.fast_voltages])
 
-        if list_length > 100:
-            sub_lists = [self.fast_voltages[i*100:(i+1)*100] for i in range(list_length // 100)]
-        else:
-            sub_lists = []
+        self.connection.timeout = np.inf  # Sweeps can take a while, give it time to finish
 
-        if list_length % 100 > 0:
-            sub_lists.append(self.fast_voltages[-(list_length % 100):])
+        self.write('smua.reset()')
+        self.set_voltage_range(self.voltage_range)
+        self.set_current_range(self.current_range)
+        self.set_nplc(self.nplc)
+        self.write('vlist = {%s}' % voltage_str)
+        self.write(f'SweepVListMeasureI(smua, vlist, 0.05, {len(voltage_list)})')
 
-        current_list = []
-
-        self.connection.timeout = float('inf')  # the response times can be long
-
-        for voltage_list in sub_lists:
-
-            voltage_str = ', '.join([f'{voltage}' for voltage in voltage_list])
-            self.write('vlist = {%s}' % voltage_str)
-            self.write(f'SweepVListMeasureI(smua, vlist, {0.01}, {len(voltage_list)})')
-
-            raw_response = self.query(f'printbuffer(1, {len(voltage_list)}, smua.nvbuffer1)').strip()
-            current_list += [float(current_str) for current_str in raw_response.split(',')]
+        raw_response = self.query(f'printbuffer(1, {len(self.fast_voltages)}, smua.nvbuffer1)').strip()
+        current_list = [float(current_str) for current_str in raw_response.split(',')]
 
         self.connection.timeout = 1000  # put it back
 
