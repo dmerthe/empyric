@@ -234,22 +234,26 @@ class Plotter:
     def plot(self):
 
         # Make the plots, by name and style
+        new_plots = {}
+
         for name, settings in self.settings.items():
 
             style = settings.get('style', 'none')
 
             if style == 'none' or style == 'all':
-                return self._plot_all(name)
+                new_plots[name] = self._plot_all(name)
             elif style == 'averaged':
-                return self._plot_averaged(name)
+                new_plots[name] = self._plot_averaged(name)
             elif style == 'errorbars':
-                return self._plot_errorbars(name)
+                new_plots[name] = self._plot_errorbars(name)
             elif style == 'parametric':
-                return self._plot_parametric(name)
+                new_plots[name] = self._plot_parametric(name)
             elif style == 'order':
-                return self._plot_order(name)
+                new_plots[name] = self._plot_order(name)
             else:
                 raise PlotError(f"Plotting style '{style}' not recognized!")
+
+        return new_plots
 
     def save(self, plot_name=None, save_as=None):
 
