@@ -35,7 +35,7 @@ class ExperimentController:
 
         working_dir = os.path.dirname(runcard_path)
         if working_dir != '':
-            os.chdir(os.path.dirname(runcard_path))
+            os.chdir(working_dir)
 
         with open(runcard_path, 'rb') as runcard:
             self.runcard = yaml.load(runcard)
@@ -45,8 +45,13 @@ class ExperimentController:
 
         self.experiment = Experiment(self.runcard)
 
+        # Create a new directory for each runcard execution and store a copy of executed runcard and all data there
         name = self.experiment.description.get('name', 'experiment')
-        with open(timestamp_path(name + '_runcard.yaml'), 'w') as runcard_file:
+        timestamp = get_timestamp()
+        working_dir = os.join(working_dir, name + '-' + timestamp)
+        os.chdir(working_dir)
+
+        with open(timestamp_path(name + '_runcard.yaml', timestamp=timestamp), 'w') as runcard_file:
             yaml.dump(self.runcard, runcard_file)  # save executed runcard for record keeping
 
         # Set up the main user interface
@@ -97,7 +102,6 @@ class ExperimentController:
             for task in followup:
                 self.__init__(task)
                 self.run()
-
 
 class StatusGUI:
     """
