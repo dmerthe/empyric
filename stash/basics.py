@@ -337,7 +337,7 @@ class PhidgetDevice():
             self.connection = device_class()
             self.connection.setDeviceSerialNumber(serial_number)
             self.connection.setChannel(port_numbers[0])
-            self.connection.open()
+            self.connection.openWaitForAttachment(5000)
             self.name = self.name + f"-{address}"
 
         elif len(port_numbers) == 2: # TC reader connected to PC via VINT hub
@@ -345,7 +345,7 @@ class PhidgetDevice():
             self.connection.setDeviceSerialNumber(serial_number)
             self.connection.setHubPort(port_numbers[0])
             self.connection.setChannel(port_numbers[1])
-            self.connection.open()
+            self.connection.openWaitForAttachment(5000)
             self.name = self.name + f"-{address}"
 
         else: # It's possible to daisy-chain hubs and other Phidget devices, but is not implemented here
