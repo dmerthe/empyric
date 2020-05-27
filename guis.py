@@ -423,7 +423,7 @@ class Plotter:
             y_data = file_data[y].values
             c_data = file_data[c].values
 
-        c_min, c_max = [np.floor(np.amin(c_data)), np.ceil(np.amax(c_data))]
+        c_min, c_max = [np.min(c_data), np.max(c_data)]
         norm = plt.Normalize(vmin=c_min, vmax=c_max)
 
         # Add the colorbar, if the figure doesn't already have one
