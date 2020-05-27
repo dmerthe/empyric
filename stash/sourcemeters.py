@@ -210,9 +210,14 @@ class Keithley2400(Instrument, GPIBDevice):
             path = args[0]
 
         self.knob_values['fast voltages'] = path
-        fast_voltage_data = pd.read_csv(path)
 
+        working_subdir = os.getcwd()
+        os.chdir('..')
+
+        fast_voltage_data = pd.read_csv(path)
         self.fast_voltages = fast_voltage_data['Voltage'].values
+
+        os.chdir(working_subdir)
 
     def measure_fast_currents(self):
 
@@ -443,9 +448,14 @@ class Keithley2651A(Instrument, GPIBDevice):
 
         self.knob_values['fast voltages'] = path
 
+        working_subdir = os.getcwd()
+        os.chdir('..')  #  fast voltages should be in the parent working directory, along with the runcard
+
         fast_voltage_data = pd.read_csv(path)
 
         self.fast_voltages = np.round(fast_voltage_data['Voltage'].values, 2)
+
+        os.chdir(working_subdir)  # return to the current working directory
 
     def measure_fast_currents(self):
 
