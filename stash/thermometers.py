@@ -37,10 +37,18 @@ class TCReader(Instrument, PhidgetDevice):
         self.knob_values['type'] = type
 
     def measure_temperature(self):
+        attempts = 5
 
         PhidgetException = importlib.import_module("Phidget22.PhidgetException").PhidgetException
 
-        return self.connection.getTemperature()
+        for i in range(attempts):
+            try:
+                return self.connection.getTemperature()
+            except PhidgetException:
+                time.sleep(0.1)
+
+        return -273.15  # if measurement fails
+
 
 
 
