@@ -48,7 +48,8 @@ class ExperimentController:
         # Create a new directory for each runcard execution and store a copy of executed runcard and all data there
         name = self.experiment.description.get('name', 'experiment')
         timestamp = get_timestamp()
-        working_dir = os.join(working_dir, name + '-' + timestamp)
+        working_dir = os.path.join(working_dir, name + '-' + timestamp)
+        os.mkdir(working_dir)
         os.chdir(working_dir)
 
         with open(timestamp_path(name + '_runcard.yaml', timestamp=timestamp), 'w') as runcard_file:
