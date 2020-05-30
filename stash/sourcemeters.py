@@ -22,7 +22,8 @@ class Keithley2400(Instrument, GPIBDevice):
         'voltage range',
         'current range',
         'nplc',
-        'delay'
+        'delay',
+        'output'
     )
 
     # Tuple of available meters; for every meter there should be a measure_meter method below
@@ -52,7 +53,7 @@ class Keithley2400(Instrument, GPIBDevice):
         self.set_current_range(current_range)
         self.set_source(source)
         self.set_meter(meter)
-        self.output_on()
+        self.set_output('ON')
         self.knob_values[self.source] = 0
 
     def set_source(self, variable):
@@ -99,6 +100,19 @@ class Keithley2400(Instrument, GPIBDevice):
     def output_off(self):
 
         self.write(':OUTP OFF')
+
+    def set_output(self, output):
+
+        if output in [0, None, 'OFF', 'off']:
+            self.output_off()
+            self.knob_values['output'] = 'OFF'
+        elif output in [1, 'ON', 'on']:
+            self.set_source(self.source)
+            self.set_meter(self.meter)
+            self.output_on()
+            self.knob_values['output'] = 'ON'
+        else:
+            raise SetError(f'Ouput setting {output} not recognized!')
 
     def measure_voltage(self):
 
@@ -293,7 +307,8 @@ class Keithley2651A(Instrument, GPIBDevice):
         'current',
         'voltage range',
         'current range',
-        'nplc'
+        'nplc',
+        'output'
     )
 
     # Tuple of available meters; for every meter there should be a measure_meter method below
@@ -372,6 +387,17 @@ class Keithley2651A(Instrument, GPIBDevice):
     def output_off(self):
 
         self.write('smua.source.output = smua.OUTPUT_OFF')
+
+    def set_output(self, output):
+
+        if output in [0, None, 'OFF', 'off']:
+            self.output_off()
+            self.knob_values['output'] = 'OFF'
+        elif output in [1, 'ON', 'on']:
+            self.output_on()
+            self.knob_values['output'] = 'ON'
+        else:
+            raise SetError(f'Ouput setting {output} not recognized!')
 
     def measure_voltage(self):
 

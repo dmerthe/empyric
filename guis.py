@@ -365,7 +365,7 @@ class Plotter:
             raise PlotError(f'Parameter {c} not in data!')
 
         # Handle simple numeric data
-        y_is_numeric = isinstance(self.data[y].values[0], numbers.Number)
+        y_is_numeric = isinstance(self.data[y].values[0], numbers.Number) or self.data[y].values[0] in [None, np.nan]
 
         if y_is_numeric:
 
