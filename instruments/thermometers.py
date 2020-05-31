@@ -1,6 +1,6 @@
 import importlib
 import numpy as np
-from mercury.stash.basics import *
+from mercury.instruments.basics import *
 
 class TCReader(Instrument, PhidgetDevice):
 

@@ -42,7 +42,6 @@ class ExperimentController:
 
         # Set up the experiment
         self.settings = self.runcard['Settings']
-
         self.experiment = Experiment(self.runcard)
 
         # Create a new directory for each runcard execution and store a copy of executed runcard and all data there
@@ -65,44 +64,54 @@ class ExperimentController:
 
         self.last_plot = -np.inf
 
-    def run(self):
-
-        # Main iteraton loop, going through steps in the experiment
-        for step in self.experiment:
-            self.status_gui.update(step, status=self.experiment.status)
-
-            # Plot data if sufficient time has passed since the last plot generation
-            now = time.time()
-            if now >= self.last_plot + self.plot_interval:
-                self.plotter.plot()
-                self.plotter.save()
-                self.last_plot = now
-
-            # Stop the schedule clock and stop iterating if the user pauses the experiment
-            if self.status_gui.paused:
-                self.experiment.schedule.stop()
-                while self.status_gui.paused:
-                    self.status_gui.update(step)
-                    plt.pause(0.01)
-                self.experiment.schedule.clock.resume()
-
-            plt.pause(0.01)
-
-        self.status_gui.quit()
-        self.plotter.close()
+        # Run the main loop
+        self.interval = int(float(self.experiment.settings['step interval'])*1000)
+        self.root.after(self.interval, self.step)
+        self.root.mainloop()
 
         # Experiment prescribed by runcard has ended, do any follow-up experiments or shut things down
+        self.plotter.close()
+
+        os.chdir('..')
         followup = self.experiment.followup
 
         if len(followup) == 0:
             return
         elif followup[0].lower() == 'repeat':
             self.__init__(self.runcard_path)
-            self.run()
         else:
             for task in followup:
                 self.__init__(task)
-                self.run()
+
+    def step(self):
+
+        try:
+            step = next(self.experiment)
+        except StopIteration:
+            self.root.quit()
+            self.root.destroy()
+            return None
+
+        self.status_gui.update(step, status=self.experiment.status)
+
+        # Plot data if sufficient time has passed since the last plot generation
+        now = time.time()
+        if now >= self.last_plot + self.plot_interval:
+            self.plotter.plot()
+            self.plotter.save()
+            self.last_plot = now
+
+        # Stop the schedule clock and stop iterating if the user pauses the experiment
+        if self.status_gui.paused:
+            self.experiment.schedule.stop()
+            while self.status_gui.paused:
+                self.status_gui.update(step)
+                plt.pause(0.01)
+            self.experiment.schedule.clock.resume()
+
+        plt.pause(0.01)
+
+        self.root.after(self.interval, self.step)
 
 class StatusGUI:
     """
@@ -121,6 +130,7 @@ class StatusGUI:
         self.variables = experiment.instruments.mapped_variables
 
         self.root = tk.Toplevel(self.parent)
+        self.root.attributes("-topmost", True)
         self.root.title('Experiment: ' + self.experiment.description['name'])
 
         tk.Label(self.root, text='Status:').grid(row=0, column=0, sticky=tk.E)
@@ -134,7 +144,7 @@ class StatusGUI:
 
         i = 1
         for variable in self.variables:
-            tk.Label(self.root, text=variable, width=30, anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
+            tk.Label(self.root, text=variable, width=len(variable), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
             self.variable_status_labels[variable] = tk.Label(self.root, text='', relief=tk.SUNKEN, width=40)
             self.variable_status_labels[variable].grid(row=i, column=1, columnspan=2, sticky=tk.W)
 
@@ -154,8 +164,6 @@ class StatusGUI:
                                      width=10)
         self.stop_button.grid(row=i + 2, column=2)
 
-        self.root.update()
-
     def update(self, step=None, status=None):
 
         if step is not None:
@@ -170,7 +178,7 @@ class StatusGUI:
             else:
                 self.status_label.config(text=self.experiment.status)
 
-        self.root.update()
+        self.root.lift()
 
     def check_instr(self):
         instrument_gui = InstrumentConfigGUI(self.root, self.experiment.instruments, runcard_warning=True)
@@ -191,12 +199,6 @@ class StatusGUI:
         self.experiment.status = 'Finished: Stopped by user'  # tells the experiment to stop iterating
         self.update(status=self.experiment.status)
         self.experiment.followup = []  # cancel any follow-ups
-        self.quit()
-
-    def quit(self):
-        self.root.update()
-        time.sleep(1)
-        self.root.destroy()
 
 
 class PlotError(BaseException):

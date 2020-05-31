@@ -250,8 +250,23 @@ class Routine:
 
     def __init__(self, times, values, clock=None):
 
-        self.times = times
-        self.values = values
+        self.times = np.array([times]).flatten()
+        self.start_time = -np.inf
+        self.stop_time = np.inf
+        self.interval = 0
+
+        self.last_call = -np.inf  # last time the __next__ method has been called
+
+        if len(self.times) >= 1:
+            self.start_time = self.times[0]
+
+        if len(self.times) >= 2:
+            self.stop_time = self.times[1]
+
+        if len(self.times) >= 3:
+            self.interval = self.times[2]
+
+        self.values = np.array([values]).flatten()
         try:
             self.values_iter = iter(values)  # for use in the Path and Sweep subclasses
         except TypeError:
@@ -277,24 +292,10 @@ class Idle(Routine):
 
     def __next__(self):
 
-        try:
-            if len(self.times) == 1:
-                start = self.times[0]
-                end = np.inf
-            elif len(self.times) == 2:
-                start, end = self.times[:2]
-            else:
-                raise IndexError("The times argument must be either a 1- or 2- element list, or a number!")
-        except TypeError:
-            start = self.times
-            end = np.inf
-
-        value = np.array([self.values]).flatten()[0]
-
         now = self.clock.time()
-
-        if start <= now <= end:
-            return value
+        if self.start_time <= now <= self.stop_time and now >= self.last_call + self.interval:
+            self.last_call = now
+            return self.values[0]
 
 
 class Ramp(Routine):
@@ -304,20 +305,13 @@ class Ramp(Routine):
 
     def __next__(self):
 
-        if len(self.times) == 1:
-            start = self.times[0]
-            end = np.inf
-        elif len(self.times) == 2:
-            start, end = self.times[:2]
-        else:
-            raise IndexError("The times argument must be either a 1- or 2-element list!")
-
-        start_value, end_value = self.values
+        start_value, end_value = self.values[0], self.values[1]
+        start_time, end_time = self.start_time, self.stop_time
 
         now = self.clock.time()
-
-        if start <= now <= end:
-            return start_value + (end_value - start_value)*(now - start) / (end - start)
+        if start_time <= now <= end_time and now >= self.last_call + self.interval:
+            self.last_call = now
+            return start_value + (end_value - start_value)*(now - start_time) / (end_time - start_time)
 
 
 class Transit(Routine):
@@ -327,17 +321,8 @@ class Transit(Routine):
 
     def __next__(self):
 
-        try:
-            if len(self.times) == 1:
-                end = self.times[0]
-            else:
-                raise IndexError("The times argument must be either a 1-element list, or a number!")
-        except TypeError:
-            end = self.times
-
-        self.time = self.clock.time()
-
-        if self.time <= end:
+        now = self.clock.time()
+        if now <= self.stop_time:
             return next(self.values_iter, None)
 
 
@@ -348,17 +333,8 @@ class Sweep(Routine):
 
     def __next__(self):
 
-        if len(self.times) == 1:
-            start = self.times[0]
-            end = np.inf
-        elif len(self.times) == 2:
-            start, end = self.times[:2]
-        else:
-            raise IndexError("The times argument must be either a 1- or 2-element list!")
-
         now = self.clock.time()
-
-        if start <= now <= end:
+        if self.start_time <= now <= self.stop_time and now >= self.last_call + self.interval:
             try:
                 return next(self.values_iter)
             except StopIteration:
@@ -378,7 +354,7 @@ class Schedule:
 
         self.clock = Clock()
 
-        self.total_time = 0
+        self.stop_time = 0
 
         self.routines = {}
         if routines:
@@ -392,6 +368,8 @@ class Schedule:
         :return: None
         """
 
+
+
         for name, spec in routines.items():
             kind, variable = spec['routine'], spec['variable']
             values = spec['values']
@@ -400,16 +378,15 @@ class Schedule:
             for time_value in spec['times']:
                 times.append(convert_time(time_value))
 
-            max_time = np.max(times)
-            if max_time > self.total_time:
-                self.total_time = max_time
-
             routine = {
                 'Idle': Idle,
                 'Ramp': Ramp,
                 'Sweep': Sweep,
                 'Transit': Transit
             }[kind](times, values, self.clock)
+
+            if routine.stop_time > self.stop_time:
+                self.stop_time = routine.stop_time
 
             self.routines.update({name: (variable, routine)})
 
@@ -433,6 +410,9 @@ class Schedule:
             next_value = next(routine)
             if next_value is not None:
                 output.update({knob: next_value})
+
+        if self.clock.time() >= self.stop_time:
+            raise StopIteration
 
         return output
 
@@ -521,7 +501,7 @@ class Experiment:
             raise StopIteration
 
         # Update experiment status
-        remaining_time = self.schedule.total_time - self.schedule.clock.time()
+        remaining_time = self.schedule.stop_time - self.schedule.clock.time()
         units = 'seconds'
         if remaining_time > 60:
             remaining_time = remaining_time/60
@@ -530,7 +510,10 @@ class Experiment:
                 remaining_time = remaining_time / 60
                 units = 'hours'
 
-        self.status = f"Running: {np.round(remaining_time, 2)} {units} remaining"
+        if remaining_time == np.inf:
+            self.status = f"Running indefinitely"
+        else:
+            self.status = f"Running: {np.round(remaining_time, 2)} {units} remaining"
 
         # Take the next step in the experiment
         if self.clock.time() < self.last_step + convert_time(self.settings['step interval']):

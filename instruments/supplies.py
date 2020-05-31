@@ -1,4 +1,4 @@
-from mercury.stash.basics import *
+from mercury.instruments.basics import *
 
 class Keithley2260B(Instrument, SerialDevice):
     """

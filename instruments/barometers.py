@@ -1,4 +1,4 @@
-from mercury.stash.basics import *
+from mercury.instruments.basics import *
 
 class BRAX3XXX(Instrument, SerialDevice):
     """
