@@ -1,12 +1,12 @@
 Description:
- name: Mercury Test
+ name: Mercury Test - Henon Map
  operator: Tester Person
  platform: Cyberspace
  comments: This runcard tests many features of the Mercury package
 
 Settings:
  duration: 2 minutes
- follow-up: "henon_followup_runcard.yaml"
+ follow-up: "henon_map_followup.yaml"
  step interval: 0
  plot interval: 5
  save interval: 30

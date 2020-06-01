@@ -1,42 +1,70 @@
-# A Human is just another instrument
+# A human is just another instrument
 
-from basics import *
+from mercury.instruments.basics import *
 
-class User(Instrument):
+class ConsoleUser(Instrument):
 
     name = 'User'
 
-    supported_backends = ['console','twilio']
+    knobs = ('prompt', )
 
-    knobs = ('message',)
+    meters = ('response',)
 
-    meters = ('reply',)
+    def __init__(self, address=None, backend=None):
 
-    def __init__(self, *args, **kwargs):
+        self.knob_values = {'prompt': ''}
 
-        if len(args) > 0:
-            self.address = args[0]
-        else:
-            self.address = None
+    def set_prompt(self, prompt):
 
-        self.backend = kwargs.pop('backend', 'console')
+        self.knob_values['prompt'] = prompt
 
-        if self.backend == 'twilio':
-            self.connection = TwilioDevice(self.address)
-        if self.backend == 'console':
-            self.connection = ConsoleDevice()
+    def measure_response(self):
 
-        self.knob_values = {knob: test_df[knob].iloc[0] for knob in User.knobs}
-
-    def set_message(self, message):
-
-        if self.knob_values['message'] != message: # prevents spamming; only send message if message has changed
-            self.knob_values['message'] = message
-            self.connection.write(message)
-
-    def measure_reply(self):
-
-        return self.connection.query(self.knob_values['message'])
+        return input(self.knob_values['prompt'] )
 
     def disconnect(self):
         pass
+
+class SMSUser(Instrument, TwilioDevice):
+
+    name = 'SMSUser'
+
+    knobs = ('prompt', 'wait time')
+
+    meters = ('response',)
+
+    def __init__(self, address, backend='twilio'):
+
+        phone_number = address
+        self.connect(phone_number)
+
+        self.knob_values = {'prompt': '', 'wait time': 5*60}
+
+        # Find last received message
+        _, self.last_received = self.read()
+
+    def set_prompt(self, prompt):
+        self.knob_values['prompt'] = prompt
+        self.write(prompt)
+
+    def measure_response(self):
+
+        waiting  = True
+        wait_time = self.knob_values['wait time']
+
+        start_time = time.time()
+
+        while waiting:  # wait for a response
+            body, date_received = self.read()  # get the most recent SMS
+
+            time_difference = date_received - self.last_received
+
+            # Check if a the message is new
+            if time_difference.total_seconds() > 0:
+                waiting = False
+
+            if time.time() - start_time > wait_time:
+                body, date_received = 'NO REPLY', datetime.datetime.fromtimestamp(0)
+
+        self.last_received = date_received
+        return body

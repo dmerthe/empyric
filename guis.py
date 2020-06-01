@@ -113,6 +113,7 @@ class ExperimentController:
 
         self.root.after(self.interval, self.step)
 
+
 class StatusGUI:
     """
     GUI showing experimental progress and values of all experiment variables.
@@ -154,15 +155,15 @@ class StatusGUI:
 
         self.config_button = tk.Button(self.root, text='Instruments...', font=("Arial", 14, 'bold'), command=self.check_instr,
                                        width=22, state=tk.DISABLED)
-        self.config_button.grid(row=i + 1, column=1, columnspan=2)
+        self.config_button.grid(row=i + 1, column=2)
 
         self.pause_button = tk.Button(self.root, text='Pause', font=("Arial", 14, 'bold'), command=self.toggle_pause,
                                       width=10)
-        self.pause_button.grid(row=i + 2, column=1)
+        self.pause_button.grid(row=i + 1, column=1)
 
         self.stop_button = tk.Button(self.root, text='Stop', font=("Arial", 14, 'bold'), command=self.user_stop,
                                      width=10)
-        self.stop_button.grid(row=i + 2, column=2)
+        self.stop_button.grid(row=i + 1, column=0)
 
     def update(self, step=None, status=None):
 
@@ -181,6 +182,7 @@ class StatusGUI:
         self.root.lift()
 
     def check_instr(self):
+
         instrument_gui = InstrumentConfigGUI(self.root, self.experiment.instruments, runcard_warning=True)
 
     def toggle_pause(self):
@@ -188,6 +190,7 @@ class StatusGUI:
         self.paused = not self.paused
 
         if self.paused:
+            self.update(status='Paused by user')
             self.pause_button.config(text='Resume')
             self.config_button.config(state=tk.NORMAL)
         else:
@@ -196,6 +199,10 @@ class StatusGUI:
             self.config_button.config(state=tk.DISABLED)
 
     def user_stop(self):
+
+        if self.paused:
+            self.paused = False
+
         self.experiment.status = 'Finished: Stopped by user'  # tells the experiment to stop iterating
         self.update(status=self.experiment.status)
         self.experiment.followup = []  # cancel any follow-ups

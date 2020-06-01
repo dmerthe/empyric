@@ -1,10 +1,13 @@
 import os
 import pandas
 import numpy as np
+import datetime
 import time
 import importlib
 import warnings
+from tkinter.filedialog import askopenfilename
 
+from mercury.utilities import yaml
 
 class ConnectionError(BaseException):
     pass
@@ -81,6 +84,8 @@ class HenonMachine(Instrument):
     It has two knobs and two meters, useful for testing functionality of the utopya module
     in the absence of real instruments.
     """
+
+    supported_backends = ['chaos']
 
     name = 'Henon Machine'
 
@@ -355,46 +360,43 @@ class PhidgetDevice():
 
         self.connection.close()
 
-class ConsoleDevice():
-
-    supported_backends = ['console']
-
-    def connect(self, *args, **kwargs):
-        pass
-
-    def write(self, message):
-
-        print(message)
-
-    def query(self, message):
-
-        return input(message)
-
-    def read(self):
-
-        return 'None'
 
 class TwilioDevice():
 
     supported_backends = ['twilio']
 
-    def connect(self, phone_number):
+    def connect(self, phone_number, backend='twilio'):
 
-        Client = importlib.import_module('Client',package='twilio.rest')
+        if backend != 'twilio':
+            raise ConnectionError(f"Backend '{backend}' not  supported!")
 
-        self.client = Client("AC2adbf0c1d8877fd83462fddb044b1ecd", "6c176312ec91dcb732fc96f4214ec499")
-        self.phone_number = phone_number
+        Client = importlib.import_module('twilio.rest').Client
+
+        with open(askopenfilename(title='Select Twilio Credentials'),'rb') as credentials_file:
+            credentials = yaml.load(credentials_file)
+            account_sid = credentials['sid']
+            auth_token = credentials['token']
+            self.from_number = credentials['number']
+
+        self.to_number = phone_number
+
+        self.client = Client(account_sid, auth_token)
 
     def write(self, message):
 
-        client.messages.create(
-            to=self.phone_number,
-            from_="+12064017596",
+        self.client.messages.create(
+            to=self.to_number,
+            from_=self.from_number,
             body=message
         )
 
     def read(self):
+        incoming_messages = self.client.messages.list(from_=self.to_number, to=self.from_number, limit=1)
 
-        return None
+        if len(incoming_messages) > 0:
+            return incoming_messages[-1].body, incoming_messages[-1].date_sent
+        else:
+            return '', datetime.datetime.fromtimestamp(0)
 
-
+    def disconnect(self):
+        pass

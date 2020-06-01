@@ -467,55 +467,45 @@ class Experiment:
             else:
                 self.followup = [self.followup]
 
-    def save(self, save_now=False):
+    def initialize(self):
         """
-        Save data, but at a maximum frequency set by the given save interval, unless overridden by the save_now keyword.
+        Called on first step of experiment. Starts the clocks, update status and get a timestamp.
 
-        :param save_now: (bool/str) If False, saves will only occur at a maximum frequency defined by the 'save interval' experimt setting. Otherwise, experiment data is saved immediately.
         :return: None
         """
+        self.clock.start()  # start the experiment clock (real time)
+        self.schedule.start()  # start the schedule clock (excludes pauses)
+        self.status = 'Running'
+        self.timestamp = get_timestamp()
 
-        now = self.clock.time()
-        save_interval = convert_time(self.settings.get('save interval', 60))
+    def update_status(self):
+        """
+        Updates the status read by the Status GUI and used to indicate status of the experiment.
 
-        if now >= self.last_save + save_interval or save_now:
-            self.data.to_csv(timestamp_path('data.csv', timestamp=self.timestamp))
-            self.last_save = self.clock.time()
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-
-        # Start the clocks on first iteration and get things going
-        if self.status == 'Not Started':
-            self.clock.start()  # start the experiment clock (real time)
-            self.schedule.start()  # start the schedule clock (excludes pauses)
-            self.status = 'Running'
-            self.timestamp = get_timestamp()
-
-        # Save and disconnect from instruments if finished
-        if 'Finished' in self.status:
-            self.save('now')
-            self.instruments.disconnect()
-            raise StopIteration
-
-        # Update experiment status
+        :return: None
+        """
         remaining_time = self.schedule.stop_time - self.schedule.clock.time()
-        units = 'seconds'
-        if remaining_time > 60:
-            remaining_time = remaining_time/60
-            units = 'minutes'
-            if remaining_time > 60:
-                remaining_time = remaining_time / 60
-                units = 'hours'
 
-        if remaining_time == np.inf:
+        if 'Paused' in self.status:  # If paused, keep showing the same status
+            return
+        elif remaining_time == np.inf:
             self.status = f"Running indefinitely"
         else:
+            units = 'seconds'
+            if remaining_time > 60:
+                remaining_time = remaining_time / 60
+                units = 'minutes'
+                if remaining_time > 60:
+                    remaining_time = remaining_time / 60
+                    units = 'hours'
             self.status = f"Running: {np.round(remaining_time, 2)} {units} remaining"
 
-        # Take the next step in the experiment
+    def next_step(self):
+        """
+        Progresses the experiment according to its schedule.
+
+        :return: None
+        """
         if self.clock.time() < self.last_step + convert_time(self.settings['step interval']):
             return self.state  # Only apply settings at frequency limited by 'step interval' setting
 
@@ -541,19 +531,116 @@ class Experiment:
 
         self.save()
 
-        # Flag for termination if time has exceeded experiment duration
+    def check_time(self):
+        """
+        If experiment time has exceeded duration setting or schedule time has exceeded the scheduled stop time,
+        end the experiment.
+
+        :return: None
+        """
         duration = convert_time(self.settings['duration'])
-        if self.schedule.clock.time() > duration:
+        if self.schedule.clock.time() > self.schedule.stop_time:
             self.status = 'Finished: Schedule completed'
 
-        # Flag for termination if any alarms have been raised
-        alarm_protocols = []
+        if self.clock.time() > duration:
+            self.status = 'Finished: Experiment duration exceeded'
+
+    def check_alarms(self):
+        """
+        Check alarms in the instrument set, and follow-up with corresponding protocols if triggered
+
+        :return: None
+        """
+        alarm_followups = []  # list of runcards to be executed upon terminating this experiment
         for name, alarm in self.instruments.alarms.items():
             if alarm['triggered']:
-                alarm_protocols.append(alarm['protocol'])
-                self.status = f"Finished: {name} alarm triggered! Executing {alarm['protocol']}..."
 
-        if len(alarm_protocols) > 0:
-            self.followup = alarm_protocols  # Cancel any scheduled follow-ups and just execute alarm protocols
+                protocol = alarm['protocol']
+                if protocol.lower() == 'pause':
+                    #  Pause until alarm is no longer triggered
+                    self.schedule.clock.stop()
+                    self.status = f"Schedule Paused: {name} alarm triggered!"
+                elif 'yaml' in protocol:
+                    # End this experiment and execute the specified runcard
+                    alarm_followups.append(protocol)
+                    self.status = f"Finished: {name} alarm triggered! Executing {protocol}..."
+                elif 'check' in protocol.lower():
+                    # Check an indicator (meter) to decide what to do
+                    decider_name = protocol.split(' ')[1:]
+                    decider = self.instruments.mapped_variables[decider_name]
+                    self.status = f"Paused: {name} alarm triggered! Checking with {decider_name}..."
+
+                    instrument = decider.instrument
+                    if 'prompt' in instrument.knobs:  # true for ConsoleUser and SMSUser
+                        # Give context to human
+                        prompt = f"Alarm {name} triggered while running {self.description[name]}! DISABLE, PAUSE or END?"
+                        instrument.set('prompt', prompt)
+
+                    decision = decider.measure()
+                    if decision.upper() == 'DISABLE':
+                        self.instruments.alarms.pop(name)  # permanently removes alarm from experiment instrument set
+                    elif decision.upper() == 'PAUSE':
+                        #  Pause until alarm is no longer triggered
+                        self.instruments.alarms[name]['protocol'] == 'pause'
+                        self.schedule.clock.stop()
+                        self.status = f"Schedule Paused: {name} alarm triggered!"
+                    elif decision.upper() == 'END':
+                        # End experiment immediately
+                        self.instruments.alarms[name]['protocol'] == 'end'
+                        self.status = f"Finished: {name} alarm triggered! Ending immediately"
+
+                else:
+                    # End experiment immediately
+                    self.status = f"Finished: {name} alarm triggered! Ending immediately"
+
+            else:
+                # Unpause, if protocol was to pause and alarm no longer triggered
+                if self.status == f"Schedule Paused: {name} alarm triggered!":
+                    self.schedule.clock.resume()
+                    self.status = f"Running: {name} alarm is no longer triggered"
+
+        if len(alarm_followups) > 0:
+            self.followup = alarm_followups  # Cancel any scheduled follow-ups and just execute alarm protocols
+
+    def save(self, save_now=False):
+        """
+        Save data, but at a maximum frequency set by the given save interval, unless overridden by the save_now keyword.
+
+        :param save_now: (bool/str) If False, saves will only occur at a maximum frequency defined by the 'save interval' experimt setting. Otherwise, experiment data is saved immediately.
+        :return: None
+        """
+
+        now = self.clock.time()
+        save_interval = convert_time(self.settings.get('save interval', 60))
+
+        if now >= self.last_save + save_interval or save_now:
+            self.data.to_csv(timestamp_path('data.csv', timestamp=self.timestamp))
+            self.last_save = self.clock.time()
+
+    def finalize(self):
+        """
+        Called whenever status indicates that experiment has finished. Saves data and disconnects from instruments.
+
+        :return: None
+        """
+        self.save('now')
+        self.instruments.disconnect()
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+
+        if 'Not Started' in self.status:
+            self.initialize()
+
+        if 'Finished' in self.status:
+            self.finalize()
+            raise StopIteration
+
+        self.next_step()
+        self.check_time()
+        self.check_alarms()
+        self.update_status()
 
         return self.state

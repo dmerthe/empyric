@@ -1,13 +1,13 @@
 Description:
-  name: Mercury Test
+  name: Mercury Test - SMS User
   operator: Tester Person
   platform: Cyberspace
-  comments: This runcard tests many features of the Mercury package
+  comments: This runcard tests the SMS feature of Mercury
 
 Settings:
   duration: 2 minutes
-  follow-up: henon_runcard.yaml
-  step interval: 1
+  follow-up: None
+  step interval: 5
   plot interval: 5
   save interval: 30
 
@@ -16,8 +16,18 @@ Instruments:
     kind: HenonMachine
     backend: chaos
     address: 0
+  User:
+    kind: SMSUser
+    backend: twilio
+    address: '+12099170097'
 
 Variables:
+  User Prompt:
+    instrument: User
+    knob: prompt
+  User Response:
+    instrument: User
+    meter: response
   Parameter a:
     instrument: Henon Machine
     knob: a
@@ -34,35 +44,27 @@ Variables:
     instrument: Henon Machine
     meter: y
 
+Alarms:
+  User Stop:
+    meter: Coordinate x
+    condition: LESS
+    threshold: -1
+    protocol: check User
+
 Plotting:
-  Step Plot:
-    x: Time
-    y: Step
-  X Plot:
-    x: Step
-    y: Coordinate x
-    style: averaged
-  Y Plot:
-    x: Step
-    y: Coordinate y
-    style: errorbars
   Attractor Parametric Plot:
     x: Coordinate x
     y: Coordinate y
     parameter: Step
     style: parametric
     marker: o
-  Attractor Order Plot:
-    x: Coordinate x
-    y: Coordinate y
-    style: order
 
 Schedule:
   Set Parameter a:
     routine: Idle
     variable: Parameter a
     times: [0, 2 minutes]
-    values: 1.25
+    values: 1.4
   Set Parameter b:
     routine: Idle
     variable: Parameter b
