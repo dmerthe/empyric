@@ -267,10 +267,9 @@ class Routine:
             self.interval = self.times[2]
 
         self.values = np.array([values]).flatten()
-        try:
-            self.values_iter = iter(values)  # for use in the Path and Sweep subclasses
-        except TypeError:
-            pass
+
+        if isinstance(self, Sweep) or isinstance(self, Transit):
+            self.values_iter = iter(self.values)
 
         if clock:
             self.clock = clock
@@ -293,7 +292,7 @@ class Idle(Routine):
     def __next__(self):
 
         now = self.clock.time()
-        if self.start_time <= now <= self.stop_time and now >= self.last_call + self.interval:
+        if self.start_time <= now < self.stop_time and now >= self.last_call + self.interval:
             self.last_call = now
             return self.values[0]
 
@@ -309,7 +308,7 @@ class Ramp(Routine):
         start_time, end_time = self.start_time, self.stop_time
 
         now = self.clock.time()
-        if start_time <= now <= end_time and now >= self.last_call + self.interval:
+        if start_time <= now < end_time and now >= self.last_call + self.interval:
             self.last_call = now
             return start_value + (end_value - start_value)*(now - start_time) / (end_time - start_time)
 
@@ -322,7 +321,7 @@ class Transit(Routine):
     def __next__(self):
 
         now = self.clock.time()
-        if now <= self.stop_time:
+        if now < self.stop_time:
             return next(self.values_iter, None)
 
 
@@ -334,7 +333,7 @@ class Sweep(Routine):
     def __next__(self):
 
         now = self.clock.time()
-        if self.start_time <= now <= self.stop_time and now >= self.last_call + self.interval:
+        if self.start_time <= now < self.stop_time and now >= self.last_call + self.interval:
             try:
                 return next(self.values_iter)
             except StopIteration:

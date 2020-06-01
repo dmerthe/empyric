@@ -119,14 +119,20 @@ class Keithley2400(Instrument, GPIBDevice):
         if self.meter != 'voltage':
             self.set_meter('voltage')
 
-        return float(self.query(':READ?').strip())
+        if self.knob_values['output'] == 'ON':
+            return float(self.query(':READ?').strip())
+        else:
+            return np.nan
 
     def measure_current(self):
 
         if self.meter != 'current':
             self.set_meter('current')
 
-        return float(self.query(':READ?').strip())
+        if self.knob_values['output'] == 'ON':
+            return float(self.query(':READ?').strip())
+        else:
+            return 0
 
     def set_voltage(self, voltage):
 
@@ -404,14 +410,20 @@ class Keithley2651A(Instrument, GPIBDevice):
         if self.meter != 'voltage':
             self.set_meter('voltage')
 
-        return float(self.query('print(smua.measure.v())').strip())
+        if self.knob_values['output'] == 'ON':
+            return float(self.query('print(smua.measure.v())').strip())
+        else:
+            return np.nan
 
     def measure_current(self):
 
         if self.meter != 'current':
             self.set_meter('current')
 
-        return float(self.query('print(smua.measure.i())').strip())
+        if self.knob_values['output'] == 'ON':
+            return float(self.query('print(smua.measure.i())').strip())
+        else:
+            return 0
 
     def set_voltage(self, voltage):
 
