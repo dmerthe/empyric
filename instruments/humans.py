@@ -6,7 +6,8 @@ class ConsoleUser(Instrument):
 
     name = 'User'
 
-    knobs = ('prompt', )
+    knobs = ('prompt',  # message or query to send to user
+             'cooldown')  # minimum time before sending repeat messages
 
     meters = ('response',)
 
@@ -15,21 +16,26 @@ class ConsoleUser(Instrument):
         self.knob_values = {'prompt': ''}
 
     def set_prompt(self, prompt):
-
         self.knob_values['prompt'] = prompt
+
+    def set_cooldown(self, cooldown):
+        self.know_values['cooldown'] = cooldown
 
     def measure_response(self):
 
-        return input(self.knob_values['prompt'] )
+        if time.time() >= self.last_sent + self.know_values['cooldown'] or new_message:  # don't spam people
+            return input(self.knob_values['prompt'] )
 
     def disconnect(self):
-        pass
+        return
 
 class SMSUser(Instrument, TwilioDevice):
 
     name = 'SMSUser'
 
-    knobs = ('prompt', 'wait time')
+    knobs = ('prompt',  # message or query to send to user
+             'wait time', # time to wait for a user response
+             'cooldown')  # minimum time before sending repeat messages
 
     meters = ('response',)
 
@@ -38,14 +44,25 @@ class SMSUser(Instrument, TwilioDevice):
         phone_number = address
         self.connect(phone_number)
 
-        self.knob_values = {'prompt': '', 'wait time': 5*60}
+        self.knob_values = {'prompt': '', 'wait time': 5*60, 'cooldown':30*60}
 
         # Find last received message
+        self.last_sent = -np.inf
         _, self.last_received = self.read()
 
     def set_prompt(self, prompt):
+
+        new_message = (self.knob_values['prompt'] != prompt)
         self.knob_values['prompt'] = prompt
-        self.write(prompt)
+
+        if time.time() >= self.last_sent + self.know_values['cooldown'] or new_message:  # don't spam people
+            self.write(prompt)
+
+    def set_wait_time(self, wait_time):
+        self.knob_values['wait time'] = wait_time
+
+    def set_cooldown(self, cooldown):
+        self.know_values['cooldown'] = cooldown
 
     def measure_response(self):
 

@@ -135,10 +135,10 @@ class InstrumentSet:
 
         for name, spec in specs.items():
 
-            kind, backend, address = spec['kind'], spec['backend'], spec['address']
+            kind, backend, address = spec['kind'], spec.get('backend', 'auto'), spec['address']
 
-            if backend not in instrumentation.available_backends:
-                raise instrumentation.ConnectionError(f'{backend} is not a valid instrument communication backend!')
+            if backend == 'auto':
+                backend == instrumentation.__dict__[kind].default_backend
 
             instrument = instrumentation.__dict__[kind](address, backend=backend.lower())
             instrument.name = name
@@ -272,12 +272,12 @@ class Routine:
             self.values_iter = iter(self.values)
 
         if clock:
-            self.clock = clock
+            if not isinstance(clock, Clock):
+                raise TypeError('Routine clock must be an instance of Clock!')
+            else:
+                self.clock = clock
         else:
             self.clock = Clock()
-
-    def start(self):
-        self.clock.start()
 
     def __iter__(self):
         return self

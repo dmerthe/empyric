@@ -182,27 +182,29 @@ class HenonMachine(Instrument):
 
 
 class GPIBDevice():
+    """
+    Generic base class for handling communication with GPIB instruments.
 
     """
-    Generic base class for handling communication with GPIB instruments
-    """
-    supported_backends = ['visa','linux-gpib']
+    supported_backends = ['visa', 'linux-gpib']
     # Default GPIB communication settings
     delay = 0.1
-    backend = 'visa'
+    default_backend = 'visa'
 
-    def connect(self, *args):
+    def connect(self):
+        """
+        Connect through the GPIB interface. Child class should have address and backend attributes upon calling this method.
+
+        :return: None
+        """
+
+        try:
+            address = self.address
+        except(AttributeError):
+            raise (ConnectionError('Device address has not been specified!'))
 
         if self.backend not in self.supported_backends:
-            raise ConnectionError('Specified backend is not supported!')
-
-        if len(args) > 0:
-            address = args[0]
-        else:
-            try:
-                address = self.address
-            except(AttributeError):
-                raise(ConnectionError('Device address has not been specified!'))
+            raise ConnectionError(f'Backend {self.backend} is not supported!')
 
         if self.backend == 'visa':
             visa = importlib.import_module('visa')
@@ -215,31 +217,24 @@ class GPIBDevice():
             self.name = self.name + f"-GPIB{address.split('/')[-1]}"
 
     def disconnect(self):
-
         self.connection.close()
 
     def write(self, command):
-
         self.connection.write(command)
 
     def read(selfs):
-
         self.connection.read()
 
     def query(self, question, delay = None):
-
         if delay:
             return self.connection.query(question, delay=delay)
         else:
             return self.connection.query(question, delay=self.delay)
 
-
     def identify(self):
-
         return self.query('*IDN?')
 
     def reset(self):
-
         self.write('*RST')
 
 
@@ -255,30 +250,29 @@ class SerialDevice():
     baudrate = 9600
     timeout = 1.0
     delay = 0.1
-    backend = 'visa'
+    default_backend = 'visa'
 
-    def connect(self, *args):
+    def connect(self):
+
+        try:
+            address = self.address
+        except(AttributeError):
+            raise (ConnectionError('Device address has not been specified!'))
 
         if self.backend not in self.supported_backends:
-            raise ConnectionError('Specified backend is not supported!')
-
-        if len(args) > 0:
-            address = args[0]
-        else:
-            try:
-                address = self.address
-            except(AttributeError):
-                raise(ConnectionError('Device address has not been specified!'))
+            raise ConnectionError(f'Backend {self.backend} is not supported!')
 
         if self.backend == 'visa':
             visa = importlib.import_module('visa')
-            self.connection = visa.ResourceManager().open_resource(address)
-            self.connection.baudrate = self.baudrate
+            resource_manager = visa.ResourceManager()
+            self.connection = resource_manager.open_resource(address, baud_rate=self.baudrate)
             self.name = self.name + f"-{address}"
         if self.backend == 'serial':
             serial = importlib.import_module('serial')
             self.connection = serial.Serial(port=address, baudrate=self.baudrate, timeout=self.delay)
             self.name = self.name + f"-{address}"
+        else:
+            raise ConnectionError(f'Backend {self.backend} is not supported!')
 
     def disconnect(self):
 
@@ -318,25 +312,27 @@ class SerialDevice():
 class PhidgetDevice():
 
     supported_backends = ['phidget']
+    default_backend = 'phidget'
 
-    def connect(self, address=None, kind=None):
+    def connect(self, kind=None):
 
-        if address is None:
-            try:
-                address = self.address
-            except AttributeError:
-                raise(ConnectionError('Device address has not been specified!'))
+        try:
+            address = self.address
+        except AttributeError:
+            raise(ConnectionError('Device address has not been specified!'))
+
+        if self.backend not in self.supported_backends:
+            raise ConnectionError(f'Backend {self.backend} is not supported!')
 
         address_parts = address.split('-')
 
         serial_number = int(address_parts[0])
         port_numbers = [int(value) for value in address_parts[1:]]
 
-        if kind is None:
-            try:
-                device_class = self.device_class
-            except AttributeError:
-                raise (ConnectionError('Phidget device class has not been specified!'))
+        try:
+            device_class = self.device_class
+        except AttributeError:
+            raise (ConnectionError('Phidget device class has not been specified!'))
 
         if len(port_numbers) == 1: # TC reader connected directly by USB to PC
             self.connection = device_class()
@@ -364,8 +360,14 @@ class PhidgetDevice():
 class TwilioDevice():
 
     supported_backends = ['twilio']
+    default_backend = 'twilio'
 
-    def connect(self, phone_number, backend='twilio'):
+    def connect(self):
+
+        try:
+            phone_number = self.phone_number
+        except AttributeError:
+            raise(ConnectionError('Device address has not been specified!'))
 
         if backend != 'twilio':
             raise ConnectionError(f"Backend '{backend}' not  supported!")
@@ -399,4 +401,4 @@ class TwilioDevice():
             return '', datetime.datetime.fromtimestamp(0)
 
     def disconnect(self):
-        pass
+        return

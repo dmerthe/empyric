@@ -6,5 +6,3 @@ from mercury.instruments.multimeters import *
 from mercury.instruments.thermometers import *
 from mercury.instruments.barometers import *
 from mercury.instruments.humans import *
-
-available_backends = ['serial', 'visa', 'linux', 'phidget', 'test', 'twilio', 'chaos']
