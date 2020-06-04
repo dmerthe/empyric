@@ -4,7 +4,7 @@ from mercury.instruments.basics import *
 
 class ConsoleUser(Instrument):
 
-    name = 'User'
+    name = 'ConsoleUser'
 
     knobs = ('prompt',  # message or query to send to user
              'cooldown')  # minimum time before sending repeat messages
@@ -13,7 +13,10 @@ class ConsoleUser(Instrument):
 
     def __init__(self, address=None, backend=None):
 
-        self.knob_values = {'prompt': ''}
+        self.knob_values = {'prompt': '', 'cooldown':60}
+
+        self.last_response = ''
+        self.last_message = ''
 
     def set_prompt(self, prompt):
         self.knob_values['prompt'] = prompt
@@ -23,8 +26,13 @@ class ConsoleUser(Instrument):
 
     def measure_response(self):
 
+        new_message = (self.knob_values['prompt'] != self.last_message)
+
         if time.time() >= self.last_sent + self.know_values['cooldown'] or new_message:  # don't spam people
-            return input(self.knob_values['prompt'] )
+            self.last_response = input(self.knob_values['prompt'] )
+            return self.last_response
+        else:
+            self.last_response
 
     def disconnect(self):
         return
