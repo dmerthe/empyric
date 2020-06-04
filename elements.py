@@ -138,7 +138,7 @@ class InstrumentSet:
             kind, backend, address = spec['kind'], spec.get('backend', 'auto'), spec['address']
 
             if backend == 'auto':
-                backend == instrumentation.__dict__[kind].default_backend
+                backend = instrumentation.__dict__[kind].default_backend
 
             instrument = instrumentation.__dict__[kind](address, backend=backend.lower())
             instrument.name = name

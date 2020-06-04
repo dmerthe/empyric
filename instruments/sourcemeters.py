@@ -351,7 +351,7 @@ class Keithley2651A(Instrument, GPIBDevice):
         self.set_current_range(current_range)
         self.set_source(source)
         self.set_meter(meter)
-        self.output_on()
+        self.set_output('ON')
 
     def set_source(self, variable):
 

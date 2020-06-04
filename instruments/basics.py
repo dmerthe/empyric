@@ -211,7 +211,7 @@ class GPIBDevice():
             resource_manager = visa.ResourceManager()
             self.connection = resource_manager.open_resource(address)
             self.name = self.name+f"-GPIB{address.split('::')[1]}"
-        if self.backend == 'linux-gpib':
+        elif self.backend == 'linux-gpib':
             linux = importlib.import_module('linux')
             self.connection = linux.Gpib(name=0, pad=address)
             self.name = self.name + f"-GPIB{address.split('/')[-1]}"
@@ -267,12 +267,10 @@ class SerialDevice():
             resource_manager = visa.ResourceManager()
             self.connection = resource_manager.open_resource(address, baud_rate=self.baudrate)
             self.name = self.name + f"-{address}"
-        if self.backend == 'serial':
+        elif self.backend == 'serial':
             serial = importlib.import_module('serial')
             self.connection = serial.Serial(port=address, baudrate=self.baudrate, timeout=self.delay)
             self.name = self.name + f"-{address}"
-        else:
-            raise ConnectionError(f'Backend {self.backend} is not supported!')
 
     def disconnect(self):
 
