@@ -98,7 +98,7 @@ class InstrumentSet:
         'LEQ': lambda val, thres: val <= thres,
     }
 
-    def __init__(self, specs=None, variables=None, alarms=None, presets=None, postsets=None):
+    def __init__(self, specs=None, variables=None, feedback=None, alarms=None, presets=None, postsets=None):
 
         self.instruments = {}  # Will contain a list of instrument instances from the instrumentation submodule
         if specs:
@@ -107,6 +107,11 @@ class InstrumentSet:
         self.mapped_variables = {}
         if variables:
             self.map_variables(variables)
+
+        if feedback:
+            self.feedback = feedback
+        else:
+            feedback = {}
 
         if alarms:
             self.alarms = { name: {**alarm, 'triggered': False} for name, alarm in alarms.items() }
@@ -220,6 +225,20 @@ class InstrumentSet:
         self.check_alarms(readings)
 
         return readings
+
+    def apply_feedback(self, readings):
+        """
+        Uses information from meters to apply feedback to knobs
+
+        :param readings: (dict) dictionary of readings
+        :return: None
+        """
+
+        for loop, config in self.feedback.items():
+
+            meter, knob, target = config['meter'], config['knob'], config['target']
+
+            # do something that encourages meter to go to target
 
     def check_alarms(self, readings):
         """
