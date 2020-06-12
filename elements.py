@@ -498,13 +498,13 @@ class Experiment:
 
     def update_status(self):
         """
-        Updates the status read by the Status GUI and used to indicate status of the experiment.
+        Updates the experiment status for control and monitoring purposes.
 
         :return: None
         """
         remaining_time = self.schedule.stop_time - self.schedule.clock.time()
 
-        if 'Paused' in self.status:  # If paused, keep showing the same status
+        if 'Paused' in self.status:  # When paused, status does not change
             return
         elif remaining_time == np.inf:
             self.status = f"Running indefinitely"
@@ -569,7 +569,8 @@ class Experiment:
 
         :return: None
         """
-        alarm_followups = []  # list of runcards to be executed upon terminating this experiment
+        alarm_followups = []  # list of alarm protocols (runcards) to be executed upon terminating this experiment
+        
         for name, alarm in self.instruments.alarms.items():
             if alarm['triggered']:
 
@@ -589,12 +590,14 @@ class Experiment:
                     self.status = f"Paused: {name} alarm triggered! Checking with {decider_name}..."
 
                     instrument = decider.instrument
+
                     if 'prompt' in instrument.knobs:  # true for ConsoleUser and SMSUser
                         # Give context to human
                         prompt = f"Alarm {name} triggered while running {self.description[name]}! DISABLE, PAUSE or END?"
                         instrument.set('prompt', prompt)
 
                     decision = decider.measure()
+
                     if decision.upper() == 'DISABLE':
                         self.instruments.alarms.pop(name)  # permanently removes alarm from experiment instrument set
                     elif decision.upper() == 'PAUSE':
@@ -612,7 +615,7 @@ class Experiment:
                     self.status = f"Finished: {name} alarm triggered! Ending immediately"
 
             else:
-                # Unpause, if protocol was to pause and alarm no longer triggered
+                # Unpause, if alarm protocol was to pause (PAUSE condition above) and alarm no longer triggered
                 if self.status == f"Schedule Paused: {name} alarm triggered!":
                     self.schedule.clock.resume()
                     self.status = f"Running: {name} alarm is no longer triggered"

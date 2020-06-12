@@ -19,7 +19,12 @@ plt.ion()
 
 
 # Guis for controlling and monitoring ongoing experiments
+
 class ExperimentController:
+    """
+    Main controller object for running experiments
+
+    """
 
     def __init__(self, runcard_path=None):
 
@@ -90,7 +95,7 @@ class ExperimentController:
         except StopIteration:
             self.root.quit()
             self.root.destroy()
-            return None
+            return
 
         self.status_gui.update(step, status=self.experiment.status)
 
