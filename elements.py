@@ -267,7 +267,7 @@ class Routine:
     Base class for the routines.
     """
 
-    def __init__(self, times, values, clock=None):
+    def __init__(self, times, values, signal=None, clock=None):
 
         self.times = np.array([times]).flatten()
         self.start_time = -np.inf
@@ -287,8 +287,22 @@ class Routine:
 
         self.values = np.array([values]).flatten()
 
+        # Some attributes for special routines
         if isinstance(self, Sweep) or isinstance(self, Transit):
             self.values_iter = iter(self.values)
+
+        if isinstance(self, Feedback):
+            if signal is None:
+                raise AttributeError('Feedback routine requires a signal (meter)!')
+            self.signal = signal
+
+            simple_pid = importlib.import_module('simple_pid')
+            self.controller = simple_pid.PID(setpoint=self.values[0])
+
+            if self.interval > 0:
+                self.controller.sample_time = self.interval
+
+            self.history = {'times':[], 'inputs':[], 'outputs':[]}
 
         if clock:
             if not isinstance(clock, Clock):
@@ -342,6 +356,7 @@ class Transit(Routine):
         now = self.clock.time()
         if now < self.stop_time:
             return next(self.values_iter, None)
+            self.last_call = now
 
 
 class Sweep(Routine):
@@ -358,6 +373,37 @@ class Sweep(Routine):
             except StopIteration:
                 self.values_iter = iter(self.values)  # restart the sweep
                 return next(self.values_iter)
+
+            self.last_call = now
+
+
+class PIDFeedback(Routine):
+    """
+    Provides basic a PID feedback loop, with the signal attribute giving the error signal
+    """
+
+    def __next__(self):
+
+        now = self.clock.time()
+        if self.start_time <= now < self.stop_time and now >= self.last_call + self.interval:
+            self.last_call = now
+
+            input = signal.measure()
+            output = self.controller(input)
+
+            if len(self.history['times']) < 1000:
+                self.history['times'].append(now)
+                self.history['inputs'].append(input)
+                self.history['outputs'].append(output)
+            else:
+                self.history['times'] = self.history['times'][-999:] + [now]
+                self.history['inputs'] = self.history['inputs'][-999:] + [input]
+                self.history['outputs'] = self.history['outputs'][-999] + [output]
+
+            self.controller.tunings = tune_pid(self.controller, self.history)
+
+            return output
+
 
 class Schedule:
     """
@@ -396,12 +442,14 @@ class Schedule:
             for time_value in spec['times']:
                 times.append(convert_time(time_value))
 
+            signal = spec.get('signal', None)
+
             routine = {
                 'Idle': Idle,
                 'Ramp': Ramp,
                 'Sweep': Sweep,
                 'Transit': Transit
-            }[kind](times, values, self.clock)
+            }[kind](times, values, signal, self.clock)
 
             if routine.stop_time > self.stop_time:
                 self.stop_time = routine.stop_time

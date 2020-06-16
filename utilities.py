@@ -72,3 +72,15 @@ def timestamp_path(path, timestamp=None):
         return '-'.join(full_name.split('-')[:-2]) + '-' + timestamp + extension
     else:
         return full_name + '-' + timestamp + extension
+
+def tune_pid(controller, history):
+
+    Kp, Ki, Kd = controller.tunings
+
+    times = history['times']
+    inputs = history['inputs']
+    outputs = history['outputs']
+
+    
+
+    return Kp, Ki, Kd
