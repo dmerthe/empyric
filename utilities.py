@@ -2,10 +2,12 @@
 import time
 import re
 import numbers
+from scipy.optimize import curve_fit
 from ruamel.yaml import YAML
 
 yaml = YAML()
 
+# Time keeping
 def convert_time(time_value):
     """
     Converts a time of the form "number units" to the time in seconds.
@@ -17,14 +19,21 @@ def convert_time(time_value):
         return time_value
     elif isinstance(time_value, str):
         # times can be specified in the runcard with units, such as minutes, hours or days, e.g.  "6 hours"
-        value, unit = time_value.split(' ')
-        value = float(value)
-        return value * {
-            'seconds': 1, 'second':1,
-            'minutes': 60, 'minute': 60,
-            'hours': 3600, 'hour': 3600,
-            'days': 86400, 'day':86400
-        }[unit]
+        time_parts = time_value.split(' ')
+
+        if len(time_parts) == 1:
+            return float(time_parts[0])
+        elif len(time_parts) == 2:
+            value, unit = time_parts
+            value = float(value)
+            return value * {
+                'seconds': 1, 'second':1,
+                'minutes': 60, 'minute': 60,
+                'hours': 3600, 'hour': 3600,
+                'days': 86400, 'day':86400
+            }[unit]
+        else:
+            raise ValueError(f'Unrecognized time format for {time_value}!')
 
 def get_timestamp(path=None):
     """
@@ -72,15 +81,3 @@ def timestamp_path(path, timestamp=None):
         return '-'.join(full_name.split('-')[:-2]) + '-' + timestamp + extension
     else:
         return full_name + '-' + timestamp + extension
-
-def tune_pid(controller, history):
-
-    Kp, Ki, Kd = controller.tunings
-
-    times = history['times']
-    inputs = history['inputs']
-    outputs = history['outputs']
-
-    
-
-    return Kp, Ki, Kd

@@ -1,3 +1,3 @@
 from mercury.guis import ExperimentController
 
-controller = ExperimentController('sms_test.yaml')
+controller = ExperimentController('henon_map_test.yaml')

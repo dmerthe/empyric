@@ -2,6 +2,7 @@ import time
 import datetime
 import numbers
 import re
+import importlib
 import numpy as np
 import pandas as pd
 
@@ -267,9 +268,9 @@ class Routine:
     Base class for the routines.
     """
 
-    def __init__(self, times, values, signal=None, clock=None):
+    def __init__(self, **kwargs):
 
-        self.times = np.array([times]).flatten()
+        self.times = np.array([kwargs['times']]).flatten()
         self.start_time = -np.inf
         self.stop_time = np.inf
         self.interval = 0
@@ -277,38 +278,54 @@ class Routine:
         self.last_call = -np.inf  # last time the __next__ method has been called
 
         if len(self.times) >= 1:
-            self.start_time = self.times[0]
+            self.start_time = convert_time(self.times[0])
 
         if len(self.times) >= 2:
-            self.stop_time = self.times[1]
+            self.stop_time = convert_time(self.times[1])
 
         if len(self.times) >= 3:
-            self.interval = self.times[2]
+            self.interval = convert_time(self.times[2])
 
-        self.values = np.array([values]).flatten()
+        self.values = np.array([kwargs['values']]).flatten()
 
-        # Some attributes for special routines
+        # Sweep and Transit subclasses iterate through values
         if isinstance(self, Sweep) or isinstance(self, Transit):
             self.values_iter = iter(self.values)
 
-        if isinstance(self, Feedback):
-            if signal is None:
-                raise AttributeError('Feedback routine requires a signal (meter)!')
-            self.signal = signal
+        # PIDControl subclass requires an input and gain settings
+        if isinstance(self, PIDControl):
+            if 'input' not in kwargs:
+                raise AttributeError('PIDControl routine requires an input (meter)!')
+            self.input = kwargs['input']
 
             simple_pid = importlib.import_module('simple_pid')
             self.controller = simple_pid.PID(setpoint=self.values[0])
 
-            if self.interval > 0:
+            if 'Kp' not in kwargs:
+                raise AttributeError('PIDControl routine requires at least a proportional gain!')
+
+            self.controller.tunings = (
+                kwargs['Kp'], 0, 0
+            )
+
+            if 'Ki' in kwargs:  # use given integral gain
+                self.controller.Ki = kwargs['Ki']
+            elif 'Ti' in kwargs:  # or use integral time constant
+                self.controller.Ki = kwargs['Kp'] / kwargs['Ti']
+
+            if 'Kd' in kwargs:  # use given derivative gain
+                self.controller.Kd = kwargs['Kd']
+            elif 'Td' in kwargs:  # or use given derivative time constant
+                self.controller.Kd = kwargs['Kp'] / kwargs['Td']
+
+            if self.interval > 0:  # Ideally, the PID controller is operated at a fixed time interval
                 self.controller.sample_time = self.interval
 
-            self.history = {'times':[], 'inputs':[], 'outputs':[]}
-
-        if clock:
+        if 'clock' in kwargs:
             if not isinstance(clock, Clock):
                 raise TypeError('Routine clock must be an instance of Clock!')
             else:
-                self.clock = clock
+                self.clock = kwargs['clock']
         else:
             self.clock = Clock()
 
@@ -377,9 +394,9 @@ class Sweep(Routine):
             self.last_call = now
 
 
-class PIDFeedback(Routine):
+class PIDControl(Routine):
     """
-    Provides basic a PID feedback loop, with the signal attribute giving the error signal
+    Provides basic a PID feedback loop, with the input attribute giving the error signal
     """
 
     def __next__(self):
@@ -388,19 +405,9 @@ class PIDFeedback(Routine):
         if self.start_time <= now < self.stop_time and now >= self.last_call + self.interval:
             self.last_call = now
 
-            input = signal.measure()
-            output = self.controller(input)
-
-            if len(self.history['times']) < 1000:
-                self.history['times'].append(now)
-                self.history['inputs'].append(input)
-                self.history['outputs'].append(output)
-            else:
-                self.history['times'] = self.history['times'][-999:] + [now]
-                self.history['inputs'] = self.history['inputs'][-999:] + [input]
-                self.history['outputs'] = self.history['outputs'][-999] + [output]
-
-            self.controller.tunings = tune_pid(self.controller, self.history)
+            # Get input and determine output
+            input_ = self.input.measure()
+            output = self.controller(input_)
 
             return output
 
@@ -432,24 +439,16 @@ class Schedule:
         :return: None
         """
 
-
-
         for name, spec in routines.items():
-            kind, variable = spec['routine'], spec['variable']
-            values = spec['values']
-
-            times = []
-            for time_value in spec['times']:
-                times.append(convert_time(time_value))
-
-            signal = spec.get('signal', None)
+            kind, variable = spec.pop('routine'), spec.pop('variable')
 
             routine = {
                 'Idle': Idle,
                 'Ramp': Ramp,
                 'Sweep': Sweep,
-                'Transit': Transit
-            }[kind](times, values, signal, self.clock)
+                'Transit': Transit,
+                'PIDControl': PIDControl
+            }[kind](**spec)
 
             if routine.stop_time > self.stop_time:
                 self.stop_time = routine.stop_time
