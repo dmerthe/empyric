@@ -13,7 +13,10 @@ from matplotlib.cm import ScalarMappable
 from tkinter.filedialog import askopenfilename, askopenfile
 
 from mercury.elements import Experiment
-from mercury.utilities import *
+from mercury.utilities.timetools import *
+from ruamel.yaml import YAML
+
+yaml = YAML()
 
 plt.ion()
 

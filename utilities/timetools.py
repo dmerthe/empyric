@@ -3,9 +3,6 @@ import time
 import re
 import numbers
 from scipy.optimize import curve_fit
-from ruamel.yaml import YAML
-
-yaml = YAML()
 
 # Time keeping
 def convert_time(time_value):

@@ -7,7 +7,10 @@ import importlib
 import warnings
 from tkinter.filedialog import askopenfilename
 
-from mercury.utilities import yaml
+from mercury.utilities.timetools import *
+from ruamel.yaml import YAML
+
+yaml = YAML()
 
 class ConnectionError(BaseException):
     pass

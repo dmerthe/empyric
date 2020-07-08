@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from mercury import instrumentation
-from mercury.utilities import *
+from mercury.utilities.timetools import *
 
 
 class Clock:
@@ -320,6 +320,8 @@ class Routine:
 
             if self.interval > 0:  # Ideally, the PID controller is operated at a fixed time interval
                 self.controller.sample_time = self.interval
+
+            self.model = kwargs.get('model', None)
 
         if 'clock' in kwargs:
             if not isinstance(clock, Clock):
