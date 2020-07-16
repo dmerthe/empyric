@@ -1,13 +1,10 @@
-import os
-import pandas
 import numpy as np
 import datetime
 import time
 import importlib
-import warnings
 from tkinter.filedialog import askopenfilename
 
-from mercury.utilities.timetools import *
+from mercury.utilities import tiempo
 from ruamel.yaml import YAML
 
 yaml = YAML()
@@ -31,9 +28,10 @@ class Instrument(object):
 
     def measure(self, meter, sample_number = 1):
         """
+        Measure the value of a variable associated with this instrument
 
-        :param variable: (string) name of the variable to be measured
-        :return: (float) measured value of the variable
+        :param meter: (string) name of the variable to be measured
+        :return: (float/string) measured value of the variable
         """
 
         try:
@@ -48,10 +46,11 @@ class Instrument(object):
 
         return measurement
 
-    def set(self, knob, value, ramp_time = 0.0):
+    def set(self, knob, value, ramp_time=0.0):
         """
+        Set the value of a variable associated with this instrument
 
-        :param variable: (string) name of variable to be set
+        :param knob: (string) name of variable to be set
         :param value: (float/string) value of new variable setting
         :param ramp_time: (float) time in seconds to ramp from starting value to new value
         :return: None
@@ -68,15 +67,16 @@ class Instrument(object):
         if ramp_time > 0.0:
 
             start_value = self.knob_values[knob]
-            start_time = time.time()
+            start_time = tiempo.time()
             elapsed_time = 0.0
 
             while elapsed_time < ramp_time:
 
-                set_method(start_value + (value - start_value)*elapsed_time/ramp_time)
-                time.sleep(0.5)
+                current_value = start_value + (value - start_value)*elapsed_time/ramp_time
+                set_method(current_value)
+                tiempo.sleep(0.5)
 
-                elapsed_time = time.time() - start_time
+                elapsed_time = tiempo.time() - start_time
 
         set_method(value)
 
@@ -184,7 +184,7 @@ class HenonMachine(Instrument):
         return int(0.5*self.step) % 10
 
 
-class GPIBDevice():
+class GPIBDevice:
     """
     Generic base class for handling communication with GPIB instruments.
 
@@ -225,7 +225,7 @@ class GPIBDevice():
     def write(self, command):
         self.connection.write(command)
 
-    def read(selfs):
+    def read(self):
         self.connection.read()
 
     def query(self, question, delay = None):
@@ -241,15 +241,14 @@ class GPIBDevice():
         self.write('*RST')
 
 
-class SerialDevice():
-
+class SerialDevice:
     """
     Generic base class for handling communication with instruments with the serial (pyserial) backend
     This includes devices that are connected by USB or Serial cable
     """
 
     # Default serial communication parameters
-    supported_backends = ['serial','visa']
+    supported_backends = ['serial', 'visa']
     baudrate = 9600
     timeout = 1.0
     delay = 0.1
@@ -297,7 +296,7 @@ class SerialDevice():
     def query(self, question):
 
         self.write(question)
-        time.sleep(self.delay)
+        tiempo.sleep(self.delay)
         result = self.read()
         return result
 
@@ -310,7 +309,25 @@ class SerialDevice():
         self.write('*RST')
 
 
-class PhidgetDevice():
+class USBDevice:
+    """
+    Generic base class for pure USB devices
+    """
+
+
+    pass
+
+
+class MEInstrument:
+
+    supported_backends = ['me_api']
+    default_backend = 'me_api'
+
+    def connect(self):
+        pass
+
+
+class PhidgetDevice:
 
     supported_backends = ['phidget']
     default_backend = 'phidget'
@@ -358,20 +375,17 @@ class PhidgetDevice():
         self.connection.close()
 
 
-class TwilioDevice():
+class TwilioDevice:
 
     supported_backends = ['twilio']
     default_backend = 'twilio'
 
-    def connect(self):
+    def connect(self, **kwargs):
 
         try:
             phone_number = self.phone_number
         except AttributeError:
             raise(ConnectionError('Device address has not been specified!'))
-
-        if backend != 'twilio':
-            raise ConnectionError(f"Backend '{backend}' not  supported!")
 
         Client = importlib.import_module('twilio.rest').Client
 

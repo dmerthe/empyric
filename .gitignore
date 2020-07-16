@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Windows BS
+.idea/
+
 # C extensions
 *.so
 

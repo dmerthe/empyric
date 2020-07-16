@@ -1,43 +1,11 @@
-import time
 import datetime
-import numbers
-import re
 import importlib
 import numpy as np
 import pandas as pd
 
 from mercury import instrumentation
-from mercury.utilities.timetools import *
-
-
-class Clock:
-    """
-    Clock for keeping time
-    """
-
-    def __init__(self):
-        self.start()
-
-    def start(self):
-        self.start_time = time.time()
-
-        self.stop_time = None  # if paused, the time when the clock was paused
-        self.total_stoppage = 0  # amount of stoppage time, or total time while paused
-
-    def time(self):
-        if not self.stop_time:
-            return time.time() - self.start_time - self.total_stoppage
-        else:
-            return self.stop_time - self.start_time - self.total_stoppage
-
-    def stop(self):
-        if not self.stop_time:
-            self.stop_time = time.time()
-
-    def resume(self):
-        if self.stop_time:
-            self.total_stoppage += time.time() - self.stop_time
-            self.stop_time = None
+from mercury.utilities import tiempo
+from mercury.utilities import alarms
 
 
 class MappedVariable:
@@ -89,19 +57,10 @@ class InstrumentSet:
     Set of instruments to be used in an experiment, including presets, knob and meter specs and alarm protocols
     """
 
-    # Alarm trigger classifications
-    alarm_map = {
-        'IS': lambda val, thres: val == thres,
-        'NOT': lambda val, thres: val != thres,
-        'GREATER': lambda val, thres: val > thres,
-        'GEQ': lambda val, thres: val > thres,
-        'LESS': lambda val, thres: val < thres,
-        'LEQ': lambda val, thres: val <= thres,
-    }
-
     def __init__(self, specs=None, variables=None, feedback=None, alarms=None, presets=None, postsets=None):
 
         self.instruments = {}  # Will contain a list of instrument instances from the instrumentation submodule
+
         if specs:
             self.connect(specs)
 
@@ -112,7 +71,7 @@ class InstrumentSet:
         if feedback:
             self.feedback = feedback
         else:
-            feedback = {}
+            self.feedback = {}
 
         if alarms:
             self.alarms = { name: {**alarm, 'triggered': False} for name, alarm in alarms.items() }
@@ -258,7 +217,7 @@ class InstrumentSet:
             if value is None:
                 continue
 
-            alarm_triggered = self.alarm_map[condition](value, threshold)
+            alarm_triggered = alarms.alarm_map[condition](value, threshold)
             if alarm_triggered:
                 self.alarms[alarm]['triggered'] = True
 
@@ -278,13 +237,13 @@ class Routine:
         self.last_call = -np.inf  # last time the __next__ method has been called
 
         if len(self.times) >= 1:
-            self.start_time = convert_time(self.times[0])
+            self.start_time = tiempo.convert_time(self.times[0])
 
         if len(self.times) >= 2:
-            self.stop_time = convert_time(self.times[1])
+            self.stop_time = tiempo.convert_time(self.times[1])
 
         if len(self.times) >= 3:
-            self.interval = convert_time(self.times[2])
+            self.interval = tiempo.convert_time(self.times[2])
 
         self.values = np.array([kwargs['values']]).flatten()
 
@@ -324,12 +283,9 @@ class Routine:
             self.model = kwargs.get('model', None)
 
         if 'clock' in kwargs:
-            if not isinstance(clock, Clock):
-                raise TypeError('Routine clock must be an instance of Clock!')
-            else:
-                self.clock = kwargs['clock']
+            self.clock = kwargs['clock']
         else:
-            self.clock = Clock()
+            self.clock = tiempo.Clock()
 
     def __iter__(self):
         return self
@@ -425,7 +381,7 @@ class Schedule:
         :param routines: (dict) dictionary of routine specifications (following the runcard yaml format).
         """
 
-        self.clock = Clock()
+        self.clock = tiempo.Clock()
 
         self.stop_time = 0
 
@@ -500,17 +456,17 @@ class Experiment:
         :param runcard: (dict) runcard in dictionary form (built from a yaml file)
         """
 
-        self.clock = Clock()  # used for save timing
+        self.clock = tiempo.Clock()  # used for save timing
 
         self.last_step = -np.inf  # time of last step taken
         self.last_save = -np.inf  # time of last save
 
         self.runcard = runcard
-        self.description = runcard["Description"]
+        self.description = runcard["Description"]  # Required
 
         self.instruments = InstrumentSet(
-            runcard['Instruments'],
-            runcard['Variables'],
+            runcard['Instruments'],  # Required
+            runcard['Variables'],  # Required
             runcard.get('Alarms', None),  # Optional
             runcard.get('Presets', None),  # Optional
             runcard.get('Postsets', None)  # Optional
@@ -518,7 +474,7 @@ class Experiment:
 
         self.settings = runcard.get('Settings', self.default_settings)  # Optional; if not given, use default settings above
         self.plotting = runcard.get('Plotting', None)  # Optional
-        self.schedule = Schedule(runcard['Schedule'])
+        self.schedule = Schedule(runcard['Schedule'])  # Required
 
         # Prepare for data collection
         self.data = pd.DataFrame(
@@ -526,9 +482,10 @@ class Experiment:
         )  # Will contain history of knob settings and meter readings for the experiment.
 
         self.status = 'Not Started'
-        self.followup = self.settings.get('follow-up', [])
+        self.followup = self.settings.get('follow-up', [])  # list of followup experiments or actions
 
-        if isinstance(self.followup, str):
+        if isinstance(self.followup, str):  # In the runcard, a followup can be indicated by a single string
+            # convert to list
             if self.followup.lower() == 'none':
                 self.followup = []
             else:
@@ -543,7 +500,7 @@ class Experiment:
         self.clock.start()  # start the experiment clock (real time)
         self.schedule.start()  # start the schedule clock (excludes pauses)
         self.status = 'Running'
-        self.timestamp = get_timestamp()
+        self.timestamp = tiempo.get_timestamp()
 
     def update_status(self):
         """
@@ -573,7 +530,7 @@ class Experiment:
 
         :return: None
         """
-        if self.clock.time() < self.last_step + convert_time(self.settings['step interval']):
+        if self.clock.time() < self.last_step + tiempo.convert_time(self.settings['step interval']):
             return self.state  # Only apply settings at frequency limited by 'step interval' setting
 
         self.last_step = self.clock.time()
@@ -605,7 +562,7 @@ class Experiment:
 
         :return: None
         """
-        duration = convert_time(self.settings['duration'])
+        duration = tiempo.convert_time(self.settings['duration'])
         if self.schedule.clock.time() > self.schedule.stop_time:
             self.status = 'Finished: Schedule completed'
 
@@ -681,10 +638,10 @@ class Experiment:
         """
 
         now = self.clock.time()
-        save_interval = convert_time(self.settings.get('save interval', 60))
+        save_interval = tiempo.convert_time(self.settings.get('save interval', 60))
 
         if now >= self.last_save + save_interval or save_now:
-            self.data.to_csv(timestamp_path('data.csv', timestamp=self.timestamp))
+            self.data.to_csv(tiempo.timestamp_path('data.csv', timestamp=self.timestamp))
             self.last_save = self.clock.time()
 
     def finalize(self):
