@@ -46,7 +46,7 @@ class Keithley2400(Instrument):
         self.nplc = kwargs.get('nplc', 0.1)
         self.connect()
 
-        self.reset()
+        self.write('*RST')
         self.set_delay(kwargs.get('delay', 0.1))
         self.set_voltage_range(kwargs.get('voltage_range', 200))
         self.set_current_range(kwargs.get('current_range', 100e-3))
