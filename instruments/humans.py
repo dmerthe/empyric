@@ -37,7 +37,7 @@ class ConsoleUser(Instrument):
     def disconnect(self):
         return
 
-class SMSUser(Instrument, TwilioDevice):
+class SMSUser(Instrument):
 
     name = 'SMSUser'
 

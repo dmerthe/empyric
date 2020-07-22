@@ -70,7 +70,7 @@ class Keithley2260B(Instrument):
         else:
             warnings.warn('Invalid output state setting!')
 
-class BK9183B(Instrument,):
+class BK9183B(Instrument):
 
     name = 'BK9183B'
 
