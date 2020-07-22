@@ -82,7 +82,7 @@ class Instrument(object):
 
         set_method(value)
 
-    def connect(self, **kwargs):
+    def connect(self):
 
         if self.backend == 'serial':
             serial = importlib.import_module('serial')
@@ -117,7 +117,7 @@ class Instrument(object):
                 if self.name in api_module.__dict__:
 
                     instr_class = api_module.__dict__[self.name]
-                    self.connection = instr_class(self.address, **kwargs)
+                    self.connection = instr_class(self.address)
 
                 else:
                     raise ConnectionError(f"{self.name} is not supported by the ME APIs")
@@ -340,282 +340,245 @@ class HenonMachine(Instrument):
         return int(0.5*self.step) % 10
 
 
-class GPIBDevice:
-    """
-    Generic base class for handling communication with GPIB instruments.
-
-    """
-    supported_backends = ['visa', 'linux-gpib', 'me-api']
-    # Default GPIB communication settings
-    delay = 0.1
-    default_backend = 'visa'
-
-    def connect(self, **kwargs):
-        """
-        Connect through the GPIB interface. Child class should have address and backend attributes upon calling this method.
-
-        :return: None
-        """
-
-        try:
-            address = self.address
-        except(AttributeError):
-            raise (ConnectionError('Device address has not been specified!'))
-
-        if self.backend not in self.supported_backends:
-            raise ConnectionError(f'Backend {self.backend} is not supported!')
-
-        if self.backend == 'visa':
-            visa = importlib.import_module('visa')
-            resource_manager = visa.ResourceManager()
-            self.connection = resource_manager.open_resource(address)
-            self.name = self.name+f"-GPIB{address.split('::')[1]}"
-        elif self.backend == 'linux-gpib':
-            linux = importlib.import_module('linux')
-            self.connection = linux.Gpib(name=0, pad=address)
-            self.name = self.name + f"-GPIB{address.split('/')[-1]}"
-
-    def disconnect(self):
-        self.connection.close()
-
-    def write(self, command):
-        self.connection.write(command)
-
-    def read(self):
-        self.connection.read()
-
-    def query(self, question, delay = None):
-        if delay:
-            return self.connection.query(question, delay=delay)
-        else:
-            return self.connection.query(question, delay=self.delay)
-
-    def identify(self):
-        return self.connection.query('*IDN?')
-
-    def reset(self):
-        self.connection.write('*RST')
-
-
-class SerialDevice:
-    """
-    Generic base class for handling communication with instruments with the serial (pyserial) backend
-    This includes devices that are connected by USB or Serial cable
-    """
-
-    # Default serial communication parameters
-    supported_backends = ['serial', 'visa']
-    baudrate = 9600
-    timeout = 1.0
-    delay = 0.1
-    default_backend = 'visa'
-
-    def connect(self):
-
-        try:
-            address = self.address
-        except(AttributeError):
-            raise (ConnectionError('Device address has not been specified!'))
-
-        if self.backend not in self.supported_backends:
-            raise ConnectionError(f'Backend {self.backend} is not supported!')
-
-        if self.backend == 'visa':
-            visa = importlib.import_module('visa')
-            resource_manager = visa.ResourceManager()
-            self.connection = resource_manager.open_resource(address, baud_rate=self.baudrate)
-            self.name = self.name + f"-{address}"
-        elif self.backend == 'serial':
-            serial = importlib.import_module('serial')
-            self.connection = serial.Serial(port=address, baudrate=self.baudrate, timeout=self.delay)
-            self.name = self.name + f"-{address}"
-
-    def disconnect(self):
-
-        self.connection.close()
-
-    def write(self, command):
-
-        if self.backend == 'serial':
-            padded_command = '\r%s\r\n' % command
-            self.connection.write(padded_command.encode())
-        if self.backend == 'visa':
-            self.connection.write(command)
-
-    def read(self):
-
-        if self.backend == 'serial':
-            return self.connection.read(100).decode().strip()
-        if self.backend == 'visa':
-            return self.connection.read()
-
-    def query(self, question):
-
-        self.write(question)
-        tiempo.sleep(self.delay)
-        result = self.read()
-        return result
-
-    def identify(self):
-
-        return self.query('*IDN?')
-
-    def reset(self):
-
-        self.write('*RST')
-
-
-class USBDevice:
-    """
-    Generic base class for pure USB devices
-    """
-
-
-    pass
-
-
-class PhidgetDevice:
-
-    supported_backends = ['phidget']
-    default_backend = 'phidget'
-
-    def connect(self, kind=None):
-
-        try:
-            address = self.address
-        except AttributeError:
-            raise(ConnectionError('Device address has not been specified!'))
-
-        if self.backend not in self.supported_backends:
-            raise ConnectionError(f'Backend {self.backend} is not supported!')
-
-        address_parts = address.split('-')
-
-        serial_number = int(address_parts[0])
-        port_numbers = [int(value) for value in address_parts[1:]]
-
-        try:
-            device_class = self.device_class
-        except AttributeError:
-            raise (ConnectionError('Phidget device class has not been specified!'))
-
-        if len(port_numbers) == 1: # TC reader connected directly by USB to PC
-            self.connection = device_class()
-            self.connection.setDeviceSerialNumber(serial_number)
-            self.connection.setChannel(port_numbers[0])
-            self.connection.openWaitForAttachment(5000)
-            self.name = self.name + f"-{address}"
-
-        elif len(port_numbers) == 2: # TC reader connected to PC via VINT hub
-            self.connection = device_class()
-            self.connection.setDeviceSerialNumber(serial_number)
-            self.connection.setHubPort(port_numbers[0])
-            self.connection.setChannel(port_numbers[1])
-            self.connection.openWaitForAttachment(5000)
-            self.name = self.name + f"-{address}"
-
-        else: # It's possible to daisy-chain hubs and other Phidget devices, but is not implemented here
-            raise ConnectionError('Support for daisy-chained Phidget devices not supported!')
-
-    def disconnect(self):
-
-        self.connection.close()
-
-
-class TwilioDevice:
-
-    supported_backends = ['twilio']
-    default_backend = 'twilio'
-
-    def connect(self, **kwargs):
-
-        try:
-            phone_number = self.phone_number
-        except AttributeError:
-            raise(ConnectionError('Device address has not been specified!'))
-
-        Client = importlib.import_module('twilio.rest').Client
-
-        with open(askopenfilename(title='Select Twilio Credentials'),'rb') as credentials_file:
-            credentials = yaml.load(credentials_file)
-            account_sid = credentials['sid']
-            auth_token = credentials['token']
-            self.from_number = credentials['number']
-
-        self.to_number = phone_number
-
-        self.client = Client(account_sid, auth_token)
-
-    def write(self, message):
-
-        self.client.messages.create(
-            to=self.to_number,
-            from_=self.from_number,
-            body=message
-        )
-
-    def read(self):
-        incoming_messages = self.client.messages.list(from_=self.to_number, to=self.from_number, limit=1)
-
-        if len(incoming_messages) > 0:
-            return incoming_messages[-1].body, incoming_messages[-1].date_sent
-        else:
-            return '', datetime.datetime.fromtimestamp(0)
-
-    def disconnect(self):
-        return
-
-
-class MEDevice(Instrument):
-
-    supported_backends = ['me_api']
-    default_backend = 'me_api'
-
-    def __init__(self, **kwargs):
-
-        try:
-            self.name = kwargs.pop('kind')
-        except KeyError:
-            raise ConnectionError(f"Instrument class not specified!")
-
-        resource_id = kwargs.pop('address')
-
-        self.connect(resource_id, **kwargs)
-
-    def connect(self, resource_id, **kwargs):
-
-        # get list of ME APIs
-        instr_mod_path = importlib.import_module('instruments').__file__
-        instr_apis = [path.split('.')[0] for path in os.listdir(os.path.dirname(instr_mod_path)) if '.py' in path]
-
-        for api in instr_apis:
-
-            api_module = importlib.import_module(api)
-
-            if self.name in api_module.__dict__:
-
-                instr_class = api_module.__dict__[self.name]
-                self.connection = instr_class(resource_id, **kwargs)
-
-            else:
-                raise ConnectionError(f"{self.name} is not supported by the ME APIs")
-
-            # Assign measure_x and set_x methods to instrument object
-            method_list = [meth for meth in dir(self.connection) if callable(getattr(self.connection, meth))]
-
-            for method in method_list:
-                if 'measure_' in method or 'set_' in method:
-                    self.__setattr__(method, self.connection.__getattribute__(method))
-
-    def write(self, message):
-        self.connection.write(message)
-
-    def read(self):
-        return self.connection.read()
-
-    def query(self, question):
-        self.write(question)
-        return self.read()
-
-    def disconnect(self):
-        self.connection.disconnect()
+# class GPIBDevice:
+#     """
+#     Generic base class for handling communication with GPIB instruments.
+#
+#     """
+#     supported_backends = ['visa', 'linux-gpib', 'me-api']
+#     # Default GPIB communication settings
+#     delay = 0.1
+#     default_backend = 'visa'
+#
+#     def connect(self, **kwargs):
+#         """
+#         Connect through the GPIB interface. Child class should have address and backend attributes upon calling this method.
+#
+#         :return: None
+#         """
+#
+#         try:
+#             address = self.address
+#         except(AttributeError):
+#             raise (ConnectionError('Device address has not been specified!'))
+#
+#         if self.backend not in self.supported_backends:
+#             raise ConnectionError(f'Backend {self.backend} is not supported!')
+#
+#         if self.backend == 'visa':
+#             visa = importlib.import_module('visa')
+#             resource_manager = visa.ResourceManager()
+#             self.connection = resource_manager.open_resource(address)
+#             self.name = self.name+f"-GPIB{address.split('::')[1]}"
+#         elif self.backend == 'linux-gpib':
+#             linux = importlib.import_module('linux')
+#             self.connection = linux.Gpib(name=0, pad=address)
+#             self.name = self.name + f"-GPIB{address.split('/')[-1]}"
+#
+#     def disconnect(self):
+#         self.connection.close()
+#
+#     def write(self, command):
+#         self.connection.write(command)
+#
+#     def read(self):
+#         self.connection.read()
+#
+#     def query(self, question, delay = None):
+#         if delay:
+#             return self.connection.query(question, delay=delay)
+#         else:
+#             return self.connection.query(question, delay=self.delay)
+#
+#     def identify(self):
+#         return self.connection.query('*IDN?')
+#
+#     def reset(self):
+#         self.connection.write('*RST')
+#
+#
+# class SerialDevice:
+#     """
+#     Generic base class for handling communication with instruments with the serial (pyserial) backend
+#     This includes devices that are connected by USB or Serial cable
+#     """
+#
+#     # Default serial communication parameters
+#     supported_backends = ['serial', 'visa']
+#     baudrate = 9600
+#     timeout = 1.0
+#     delay = 0.1
+#     default_backend = 'visa'
+#
+#     def connect(self):
+#
+#         try:
+#             address = self.address
+#         except(AttributeError):
+#             raise (ConnectionError('Device address has not been specified!'))
+#
+#         if self.backend not in self.supported_backends:
+#             raise ConnectionError(f'Backend {self.backend} is not supported!')
+#
+#         if self.backend == 'visa':
+#             visa = importlib.import_module('visa')
+#             resource_manager = visa.ResourceManager()
+#             self.connection = resource_manager.open_resource(address, baud_rate=self.baudrate)
+#             self.name = self.name + f"-{address}"
+#         elif self.backend == 'serial':
+#             serial = importlib.import_module('serial')
+#             self.connection = serial.Serial(port=address, baudrate=self.baudrate, timeout=self.delay)
+#             self.name = self.name + f"-{address}"
+#
+#     def disconnect(self):
+#
+#         self.connection.close()
+#
+#     def write(self, command):
+#
+#         if self.backend == 'serial':
+#             padded_command = '\r%s\r\n' % command
+#             self.connection.write(padded_command.encode())
+#         if self.backend == 'visa':
+#             self.connection.write(command)
+#
+#     def read(self):
+#
+#         if self.backend == 'serial':
+#             return self.connection.read(100).decode().strip()
+#         if self.backend == 'visa':
+#             return self.connection.read()
+#
+#     def query(self, question):
+#
+#         self.write(question)
+#         tiempo.sleep(self.delay)
+#         result = self.read()
+#         return result
+#
+#     def identify(self):
+#
+#         return self.query('*IDN?')
+#
+#     def reset(self):
+#
+#         self.write('*RST')
+#
+#
+# class USBDevice:
+#     """
+#     Generic base class for pure USB devices
+#     """
+#
+#
+#     pass
+#
+#
+# class PhidgetDevice:
+#
+#     supported_backends = ['phidget']
+#     default_backend = 'phidget'
+#
+#     def connect(self, kind=None):
+#
+#         try:
+#             address = self.address
+#         except AttributeError:
+#             raise(ConnectionError('Device address has not been specified!'))
+#
+#         if self.backend not in self.supported_backends:
+#             raise ConnectionError(f'Backend {self.backend} is not supported!')
+#
+#         address_parts = address.split('-')
+#
+#         serial_number = int(address_parts[0])
+#         port_numbers = [int(value) for value in address_parts[1:]]
+#
+#         try:
+#             device_class = self.device_class
+#         except AttributeError:
+#             raise (ConnectionError('Phidget device class has not been specified!'))
+#
+#         if len(port_numbers) == 1: # TC reader connected directly by USB to PC
+#             self.connection = device_class()
+#             self.connection.setDeviceSerialNumber(serial_number)
+#             self.connection.setChannel(port_numbers[0])
+#             self.connection.openWaitForAttachment(5000)
+#             self.name = self.name + f"-{address}"
+#
+#         elif len(port_numbers) == 2: # TC reader connected to PC via VINT hub
+#             self.connection = device_class()
+#             self.connection.setDeviceSerialNumber(serial_number)
+#             self.connection.setHubPort(port_numbers[0])
+#             self.connection.setChannel(port_numbers[1])
+#             self.connection.openWaitForAttachment(5000)
+#             self.name = self.name + f"-{address}"
+#
+#         else: # It's possible to daisy-chain hubs and other Phidget devices, but is not implemented here
+#             raise ConnectionError('Support for daisy-chained Phidget devices not supported!')
+#
+#     def disconnect(self):
+#
+#         self.connection.close()
+#
+#
+# class TwilioDevice:
+#
+#     supported_backends = ['twilio']
+#     default_backend = 'twilio'
+#
+#     def connect(self, **kwargs):
+#
+#         try:
+#             phone_number = self.phone_number
+#         except AttributeError:
+#             raise(ConnectionError('Device address has not been specified!'))
+#
+#         Client = importlib.import_module('twilio.rest').Client
+#
+#         with open(askopenfilename(title='Select Twilio Credentials'),'rb') as credentials_file:
+#             credentials = yaml.load(credentials_file)
+#             account_sid = credentials['sid']
+#             auth_token = credentials['token']
+#             self.from_number = credentials['number']
+#
+#         self.to_number = phone_number
+#
+#         self.client = Client(account_sid, auth_token)
+#
+#     def write(self, message):
+#
+#         self.client.messages.create(
+#             to=self.to_number,
+#             from_=self.from_number,
+#             body=message
+#         )
+#
+#     def read(self):
+#         incoming_messages = self.client.messages.list(from_=self.to_number, to=self.from_number, limit=1)
+#
+#         if len(incoming_messages) > 0:
+#             return incoming_messages[-1].body, incoming_messages[-1].date_sent
+#         else:
+#             return '', datetime.datetime.fromtimestamp(0)
+#
+#     def disconnect(self):
+#         return
+#
+#
+# class MEDevice(Instrument):
+#
+#     supported_backends = ['me_api']
+#     default_backend = 'me_api'
+#
+#     def __init__(self, address, **kwargs):
+#
+#         try:
+#             self.name = kwargs.pop('kind')
+#         except KeyError:
+#             raise ConnectionError(f"Instrument class not specified!")
+#
+#         self.address = kwargs.pop('address')
+#         self.backend = self.default_backend
+#
+#         self.connect(**kwargs)

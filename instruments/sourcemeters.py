@@ -38,7 +38,7 @@ class Keithley2400(Instrument):
         self.address = address
         self.backend = kwargs.get('backend', 'visa')
 
-        self.knob_values = {knob:None for knob in Keithley2400.knobs}
+        self.knob_values = {knob: None for knob in Keithley2400.knobs}
 
         self.fast_voltages = None  # Used for fast IV sweeps
         self.meter = kwargs.get('meter', 'current')
