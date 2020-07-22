@@ -110,24 +110,32 @@ class Instrument(object):
             instr_mod_path = importlib.import_module('instruments').__file__
             instr_apis = [path.split('.')[0] for path in os.listdir(os.path.dirname(instr_mod_path)) if '.py' in path]
 
+            supported = False
+
             for api in instr_apis:
 
-                api_module = importlib.import_module(api)
+                try:
+                    api_module = importlib.import_module(api)
+                except ModuleNotFoundError as error:
+                    print(f'Attempted tp import {api} and got Error: {error}')
+                    continue
 
                 if self.name in api_module.__dict__:
+
+                    supported = True
 
                     instr_class = api_module.__dict__[self.name]
                     self.connection = instr_class(self.address)
 
-                else:
-                    raise ConnectionError(f"{self.name} is not supported by the ME APIs")
+                    # Assign measure_x and set_x methods to instrument object
+                    method_list = [meth for meth in dir(self.connection) if callable(getattr(self.connection, meth))]
 
-                # Assign measure_x and set_x methods to instrument object
-                method_list = [meth for meth in dir(self.connection) if callable(getattr(self.connection, meth))]
+                    for method in method_list:
+                        if 'measure_' in method or 'set_' in method:
+                            self.__setattr__(method, self.connection.__getattribute__(method))
 
-                for method in method_list:
-                    if 'measure_' in method or 'set_' in method:
-                        self.__setattr__(method, self.connection.__getattribute__(method))
+            if not supported:
+                raise ConnectionError(f"{self.name} is not supported by the ME APIs")
 
         elif self.backend == 'phidget':
 

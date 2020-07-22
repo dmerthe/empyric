@@ -44,7 +44,7 @@ class Keithley2400(Instrument):
         self.meter = kwargs.get('meter', 'current')
         self.source = kwargs.get('source', 'voltage')
         self.nplc = kwargs.get('nplc', 0.1)
-        self.connect(**kwargs)
+        self.connect()
 
         self.reset()
         self.set_delay(kwargs.get('delay', 0.1))
