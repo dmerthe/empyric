@@ -125,7 +125,13 @@ class Instrument(object):
                     supported = True
 
                     instr_class = api_module.__dict__[self.name]
-                    self.connection = instr_class(self.address)
+
+                    for backend in instr_class.supported_backends:
+                        try:
+                            self.connection = instr_class(self.address, backend=backend)
+                            break
+                        except BaseException as error:
+                            print(f'Tried connecting with {backend} backend, but got error: {error}')
 
                     # Assign measure_x and set_x methods to instrument object
                     method_list = [meth for meth in dir(self.connection) if callable(getattr(self.connection, meth))]
