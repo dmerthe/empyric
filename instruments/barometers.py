@@ -1,6 +1,6 @@
 from mercury.instruments.basics import *
 
-class BRAX3XXX(Instrument, SerialDevice):
+class BRAX3XXX(Instrument):
     """
     Keithley 2110 multimeter instrument
     """

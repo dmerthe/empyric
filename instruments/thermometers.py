@@ -2,7 +2,7 @@ import importlib
 import numpy as np
 from mercury.instruments.basics import *
 
-class TCReader(Instrument, PhidgetDevice):
+class TCReader(Instrument):
 
     name = 'TCReader1101'
 
@@ -10,18 +10,21 @@ class TCReader(Instrument, PhidgetDevice):
 
     meters = ('temperature',)
 
-    def __init__(self, address, backend='phidget'):
+    def __init__(self, address):
 
         ts = importlib.import_module('Phidget22.Devices.TemperatureSensor')
+        self.PhidgetException = importlib.import_module("Phidget22.PhidgetException").PhidgetException
+
         self.device_class = ts.TemperatureSensor
 
         self.address = address
+        self.backend = 'phidget'
 
         self.connect()
 
-        self.knob_values = {'type':'K'}
+        self.knob_values = {'type': 'K'}
 
-    def set_type(self, type):
+    def set_type(self, type_):
 
         types = importlib.import_module('Phidget22.ThermocoupleType')
 
@@ -32,20 +35,18 @@ class TCReader(Instrument, PhidgetDevice):
             'E': types.ThermocoupleType.THERMOCOUPLE_TYPE_E,
         }
 
-        self.connection.setThermocoupleType(type_dict[type])
+        self.connection.setThermocoupleType(type_dict[type_])
 
-        self.knob_values['type'] = type
+        self.knob_values['type'] = type_
 
     def measure_temperature(self):
         attempts = 5
 
-        PhidgetException = importlib.import_module("Phidget22.PhidgetException").PhidgetException
-
         for i in range(attempts):
             try:
                 return self.connection.getTemperature()
-            except PhidgetException:
-                time.sleep(0.1)
+            except self.PhidgetException:
+                tiempo.sleep(0.1)
 
         return -273.15  # if measurement fails
 
