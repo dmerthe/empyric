@@ -126,14 +126,19 @@ class Instrument(object):
 
                     instr_class = api_module.__dict__[self.name]
 
+                    backend_supported = False
                     for backend in instr_class.supported_backends:
                         try:
                             self.connection = instr_class(self.address, backend=backend)
+                            backend_supported = True
                             break
                         except BaseException as error:
                             print(f'Tried connecting with {backend} backend, but got error: {error}')
 
-                    # Assign measure_x and set_x methods to instrument object
+                    if not backend_supported:
+                        raise ConnectionError(f"Unable to find suitable backend!")
+
+                    # Override measure and set methods with with those from the ME API
                     method_list = [meth for meth in dir(self.connection) if callable(getattr(self.connection, meth))]
 
                     for method in method_list:
