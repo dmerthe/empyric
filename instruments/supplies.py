@@ -1,6 +1,6 @@
 from mercury.instruments.basics import *
 
-class Keithley2260B(Instrument, SerialDevice):
+class Keithley2260B(Instrument):
     """
     Keithley 2260B Power supply, usually either 360 W or 720 W
     """
@@ -70,7 +70,7 @@ class Keithley2260B(Instrument, SerialDevice):
         else:
             warnings.warn('Invalid output state setting!')
 
-class BK9183B(Instrument, SerialDevice):
+class BK9183B(Instrument,):
 
     name = 'BK9183B'
 

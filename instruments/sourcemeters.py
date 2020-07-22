@@ -6,7 +6,7 @@ from mercury.instruments.basics import *
 from mercury.utilities import *
 
 
-class Keithley2400(Instrument, GPIBDevice):
+class Keithley2400(Instrument):
 
     """
     Keithley 2400 Sourcemeter, a 20 W power supply and picoammeter
@@ -33,26 +33,26 @@ class Keithley2400(Instrument, GPIBDevice):
         'fast currents'
     )
 
-    def __init__(self, address, current_range = 100e-3, voltage_range = 200, delay = 0.1, backend = 'visa', source='voltage', meter='current', nplc = 0.1):
+    def __init__(self, address, **kwargs):
 
         self.address = address
-        self.backend = backend
+        self.backend = kwargs.get('backend', 'visa')
 
         self.knob_values = {knob:None for knob in Keithley2400.knobs}
 
         self.fast_voltages = None  # Used for fast IV sweeps
-        self.meter = meter
-        self.source = source
-        self.nplc = nplc
-        self.connect()
+        self.meter = kwargs.get('meter', 'current')
+        self.source = kwargs.get('source', 'voltage')
+        self.nplc = kwargs.get('nplc', 0.1)
+        self.connect(**kwargs)
 
         self.reset()
-        self.set_nplc(nplc)
-        self.set_delay(delay)
-        self.set_voltage_range(voltage_range)
-        self.set_current_range(current_range)
-        self.set_source(source)
-        self.set_meter(meter)
+        self.set_delay(kwargs.get('delay', 0.1))
+        self.set_voltage_range(kwargs.get('voltage_range', 200))
+        self.set_current_range(kwargs.get('current_range', 100e-3))
+        self.set_source(self.source)
+        self.set_meter(self.meter)
+        self.set_nplc(self.nplc)
         self.set_output('ON')
         self.knob_values[self.source] = 0
 
@@ -298,7 +298,7 @@ class Keithley2400(Instrument, GPIBDevice):
         return path
 
 
-class Keithley2651A(Instrument, GPIBDevice):
+class Keithley2651A(Instrument):
 
     """
     Keithley 2651A High Power Sourcemeter, a 200 W power supply and microammeter

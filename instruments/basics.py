@@ -1,6 +1,6 @@
 import numpy as np
 import datetime
-import time
+import os
 import importlib
 from tkinter.filedialog import askopenfilename
 
@@ -26,7 +26,9 @@ class Instrument(object):
     Generic base class for any instrument that measures and/or controls some set of variables
     """
 
-    def measure(self, meter, sample_number = 1):
+    supported_backends = ['serial', 'visa', 'usb', 'linux-gpib', 'me-api', 'phidget', 'twilio']
+
+    def measure(self, meter, sample_number=1):
         """
         Measure the value of a variable associated with this instrument
 
@@ -79,6 +81,160 @@ class Instrument(object):
                 elapsed_time = tiempo.time() - start_time
 
         set_method(value)
+
+    def connect(self, **kwargs):
+
+        if self.backend == 'serial':
+            serial = importlib.import_module('serial')
+            self.connection = serial.Serial(port=self.address, baudrate=self.baudrate, timeout=self.delay)
+            self.name = self.name + f"-{self.address}"
+
+        elif self.backend == 'visa':
+            visa = importlib.import_module('visa')
+            resource_manager = visa.ResourceManager()
+            self.connection = resource_manager.open_resource(self.address)
+            self.name = self.name + f"-GPIB{self.address.split('::')[1]}"
+
+        elif self.backend == 'usb':
+            usb = importlib.import_module('usbtmc')
+            self.connection = usb.Instrument(self.address)
+
+        elif self.backend == 'linux-gpib':
+            linux = importlib.import_module('linux')
+            self.connection = linux.Gpib(name=0, pad=self.address)
+            self.name = self.name + f"-GPIB{self.address.split('/')[-1]}"
+
+        elif self.backend == 'me-api':
+
+            # get list of ME APIs
+            instr_mod_path = importlib.import_module('instruments').__file__
+            instr_apis = [path.split('.')[0] for path in os.listdir(os.path.dirname(instr_mod_path)) if '.py' in path]
+
+            for api in instr_apis:
+
+                api_module = importlib.import_module(api)
+
+                if self.name in api_module.__dict__:
+
+                    instr_class = api_module.__dict__[self.name]
+                    self.connection = instr_class(self.address, **kwargs)
+
+                else:
+                    raise ConnectionError(f"{self.name} is not supported by the ME APIs")
+
+                # Assign measure_x and set_x methods to instrument object
+                method_list = [meth for meth in dir(self.connection) if callable(getattr(self.connection, meth))]
+
+                for method in method_list:
+                    if 'measure_' in method or 'set_' in method:
+                        self.__setattr__(method, self.connection.__getattribute__(method))
+
+        elif self.backend == 'phidget':
+
+            try:
+                address = self.address
+            except AttributeError:
+                raise (ConnectionError('Device address has not been specified!'))
+
+            if self.backend not in self.supported_backends:
+                raise ConnectionError(f'Backend {self.backend} is not supported!')
+
+            address_parts = address.split('-')
+
+            serial_number = int(address_parts[0])
+            port_numbers = [int(value) for value in address_parts[1:]]
+
+            try:
+                device_class = self.device_class
+            except AttributeError:
+                raise (ConnectionError('Phidget device class has not been specified!'))
+
+            if len(port_numbers) == 1:  # TC reader connected directly by USB to PC
+                self.connection = device_class()
+                self.connection.setDeviceSerialNumber(serial_number)
+                self.connection.setChannel(port_numbers[0])
+                self.connection.openWaitForAttachment(5000)
+                self.name = self.name + f"-{address}"
+
+            elif len(port_numbers) == 2:  # TC reader connected to PC via VINT hub
+                self.connection = device_class()
+                self.connection.setDeviceSerialNumber(serial_number)
+                self.connection.setHubPort(port_numbers[0])
+                self.connection.setChannel(port_numbers[1])
+                self.connection.openWaitForAttachment(5000)
+                self.name = self.name + f"-{address}"
+
+            else:  # It's possible to daisy-chain hubs and other Phidget devices, but is not implemented here
+                raise ConnectionError('Support for daisy-chained Phidget devices not supported!')
+
+        elif self.backend == 'twilio':
+
+            try:
+                phone_number = self.phone_number
+            except AttributeError:
+                raise (ConnectionError('Device address has not been specified!'))
+
+            Client = importlib.import_module('twilio.rest').Client
+
+            with open(askopenfilename(title='Select Twilio Credentials'), 'rb') as credentials_file:
+                credentials = yaml.load(credentials_file)
+                account_sid = credentials['sid']
+                auth_token = credentials['token']
+                self.from_number = credentials['number']
+
+            self.to_number = phone_number
+
+            self.client = Client(account_sid, auth_token)
+
+        else:
+            raise ConnectionError(f"Backned {backend} not supported!")
+
+    def disconnect(self):
+
+        self.connection.close()
+
+    def write(self, message):
+
+        if self.backend == 'serial':
+            padded_message = '\r%s\r\n' % message
+            self.connection.write(padded_message.encode())
+
+        if self.backend in ['visa', 'usb', 'linux-gpib', 'me-api']:
+            self.write(message)
+
+        if self.backend == 'twilio':
+            self.client.messages.create(
+                to=self.to_number,
+                from_=self.from_number,
+                body=message
+            )
+
+    def read(self):
+
+        if self.backend == 'serial':
+            return self.connection.read(100).decode().strip()
+
+        if self.backend in ['visa', 'usb', 'linux-gpib', 'me-api']:
+            return self.connection.read()
+
+        if self.backend == 'twillio':
+            incoming_messages = self.client.messages.list(from_=self.to_number, to=self.from_number, limit=1)
+
+            if len(incoming_messages) > 0:
+                return incoming_messages[-1].body, incoming_messages[-1].date_sent
+            else:
+                return '', datetime.datetime.fromtimestamp(0)
+
+    def query(self, question, delay=None):
+
+        self.write(question)
+
+        if delay:
+            tiempo.sleep(delay)
+        if 'delay' in self.__dict__:
+            tiempo.sleep(self.delay)
+
+        return self.read()
 
 
 class HenonMachine(Instrument):
@@ -189,12 +345,12 @@ class GPIBDevice:
     Generic base class for handling communication with GPIB instruments.
 
     """
-    supported_backends = ['visa', 'linux-gpib']
+    supported_backends = ['visa', 'linux-gpib', 'me-api']
     # Default GPIB communication settings
     delay = 0.1
     default_backend = 'visa'
 
-    def connect(self):
+    def connect(self, **kwargs):
         """
         Connect through the GPIB interface. Child class should have address and backend attributes upon calling this method.
 
@@ -235,10 +391,10 @@ class GPIBDevice:
             return self.connection.query(question, delay=self.delay)
 
     def identify(self):
-        return self.query('*IDN?')
+        return self.connection.query('*IDN?')
 
     def reset(self):
-        self.write('*RST')
+        self.connection.write('*RST')
 
 
 class SerialDevice:
@@ -316,15 +472,6 @@ class USBDevice:
 
 
     pass
-
-
-class MEInstrument:
-
-    supported_backends = ['me_api']
-    default_backend = 'me_api'
-
-    def connect(self):
-        pass
 
 
 class PhidgetDevice:
@@ -417,3 +564,58 @@ class TwilioDevice:
 
     def disconnect(self):
         return
+
+
+class MEDevice(Instrument):
+
+    supported_backends = ['me_api']
+    default_backend = 'me_api'
+
+    def __init__(self, **kwargs):
+
+        try:
+            self.name = kwargs.pop('kind')
+        except KeyError:
+            raise ConnectionError(f"Instrument class not specified!")
+
+        resource_id = kwargs.pop('address')
+
+        self.connect(resource_id, **kwargs)
+
+    def connect(self, resource_id, **kwargs):
+
+        # get list of ME APIs
+        instr_mod_path = importlib.import_module('instruments').__file__
+        instr_apis = [path.split('.')[0] for path in os.listdir(os.path.dirname(instr_mod_path)) if '.py' in path]
+
+        for api in instr_apis:
+
+            api_module = importlib.import_module(api)
+
+            if self.name in api_module.__dict__:
+
+                instr_class = api_module.__dict__[self.name]
+                self.connection = instr_class(resource_id, **kwargs)
+
+            else:
+                raise ConnectionError(f"{self.name} is not supported by the ME APIs")
+
+            # Assign measure_x and set_x methods to instrument object
+            method_list = [meth for meth in dir(self.connection) if callable(getattr(self.connection, meth))]
+
+            for method in method_list:
+                if 'measure_' in method or 'set_' in method:
+                    self.__setattr__(method, self.connection.__getattribute__(method))
+
+    def write(self, message):
+        self.connection.write(message)
+
+    def read(self):
+        return self.connection.read()
+
+    def query(self, question):
+        self.write(question)
+        return self.read()
+
+    def disconnect(self):
+        self.connection.disconnect()

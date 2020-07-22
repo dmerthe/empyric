@@ -61,7 +61,7 @@ class InstrumentSet:
 
         self.instruments = {}  # Will contain a list of instrument instances from the instrumentation submodule
 
-        if specs:
+        if specs:  # instrument specifications
             self.connect(specs)
 
         self.mapped_variables = {}

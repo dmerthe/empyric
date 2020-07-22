@@ -13,7 +13,7 @@ from matplotlib.cm import ScalarMappable
 from tkinter.filedialog import askopenfilename, askopenfile
 
 from mercury.elements import Experiment
-from mercury.utilities.timetools import *
+from mercury.utilities.tiempo import *
 from ruamel.yaml import YAML
 
 yaml = YAML()
@@ -103,7 +103,7 @@ class ExperimentController:
         self.status_gui.update(step, status=self.experiment.status)
 
         # Plot data if sufficient time has passed since the last plot generation
-        now = time.time()
+        now = time()
         if now >= self.last_plot + self.plot_interval:
             self.plotter.plot()
             self.plotter.save()

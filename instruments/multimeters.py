@@ -1,6 +1,6 @@
 from mercury.instruments.basics import *
 
-class Keithley2110(Instrument, SerialDevice):
+class Keithley2110(Instrument):
     """
     Keithley 2110 digital multimeter instrument
     """
@@ -18,7 +18,7 @@ class Keithley2110(Instrument, SerialDevice):
         'temperature'
     )
 
-    def __init__(self, address, backend = 'visa', meter='current', voltage_range = None, current_range = None):
+    def __init__(self, address, backend='visa', meter='current', voltage_range = None, current_range = None):
 
         self.address = address
         self.backend = backend
