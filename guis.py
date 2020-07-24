@@ -407,7 +407,7 @@ class Plotter:
                     units = 'minutes'
                     self.data[c] = self.data[c] / 60
                     if np.max(self.data[c].values) > 60:
-                        units = 'hour'
+                        units = 'hours'
                         self.data[c] = self.data[c] / 60
 
         # Handle data stored in a file
@@ -429,7 +429,7 @@ class Plotter:
                     units = 'minutes'
                     file_data[c] = file_data[c] / 60
                     if np.max(file_data.values) > 60:
-                        units = 'hour'
+                        units = 'hours'
                         file_data[c] = file_data[c] / 60
 
             else:
@@ -438,7 +438,7 @@ class Plotter:
                 unique_file_indices = np.unique(file_indices).sort()
                 index_map = {file_index: data_index for file_index, data_index in zip(unique_file_indices, data_indices)}
                 for index in file_indices:
-                    file_data[c][index] = data[c][index_map[index]]
+                    file_data[c][index] = self.data[c][index_map[index]]
 
             x_data = file_data[x].values
             y_data = file_data[y].values
