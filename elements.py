@@ -465,11 +465,12 @@ class Experiment:
         self.description = runcard["Description"]  # Required
 
         self.instruments = InstrumentSet(
-            runcard['Instruments'],  # Required
-            runcard['Variables'],  # Required
-            runcard.get('Alarms', None),  # Optional
-            runcard.get('Presets', None),  # Optional
-            runcard.get('Postsets', None)  # Optional
+            specs=runcard['Instruments'],  # Required
+            variables=runcard['Variables'],  # Required
+            feedback=runcard.get('Feeback', None),  # Optional
+            alarms=runcard.get('Alarms', None),  # Optional
+            presets=runcard.get('Presets', None),  # Optional
+            postsets=runcard.get('Postsets', None)  # Optional
         )
 
         self.settings = runcard.get('Settings', self.default_settings)  # Optional; if not given, use default settings above

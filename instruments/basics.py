@@ -136,7 +136,7 @@ class Instrument(object):
                             print(f'Tried connecting with {backend} backend, but got error: {error}')
 
                     if not backend_supported:
-                        raise ConnectionError(f"Unable to find suitable backend!")
+                        raise ConnectionError(f"Unable to find suitable backend for {self.name} at {self.address}!")
 
                     # # Override measure and set methods with with those from the ME API
                     # method_list = [meth for meth in dir(self.connection) if callable(getattr(self.connection, meth))]

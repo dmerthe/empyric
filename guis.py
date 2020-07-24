@@ -298,6 +298,10 @@ class Plotter:
         x = self.settings[name]['x']
         y = np.array([self.settings[name]['y']]).flatten()
 
+        for var in y:
+            if var not in self.data.columns:
+                raise PlotError(f'Specified variable {var} is not in data set. Check variable names in plot specification.')
+
         # If data points to a file, then generate a parametric plot
         y_is_path = isinstance(self.data[y].to_numpy().flatten()[0], str)
         if y_is_path:
