@@ -66,14 +66,14 @@ class Keithley2400(Instrument):
         if variable == 'voltage':
 
             self.write(':SOUR:FUNC VOLT')
-            self.set_voltage_range(self.voltage_range)
+            self.set_voltage_range(self.knob_values['voltage range'])
 
             self.knob_values['current'] = None
 
         if variable == 'current':
 
             self.write(':SOUR:FUNC CURR')
-            self.set_current_range(self.current_range)
+            self.set_current_range(self.knob_values['current range'])
 
             self.knob_values['voltage'] = None
 
@@ -84,13 +84,13 @@ class Keithley2400(Instrument):
         if variable == 'voltage':
 
             self.write(':SENS:FUNC "VOLT"')
-            self.write(':SENS:VOLT:RANG %.2E' % self.voltage_range)
+            self.write(':SENS:VOLT:RANG %.2E' % self.knob_values['voltage range'])
             self.write(':FORM:ELEM VOLT')
 
         if variable == 'current':
 
             self.write(':SENS:FUNC "CURR"')
-            self.write(':SENS:CURR:RANG %.2E' % self.current_range)
+            self.write(':SENS:CURR:RANG %.2E' % self.knob_values['current range'])
             self.write(':FORM:ELEM CURR')
 
     def output_on(self):
@@ -167,18 +167,18 @@ class Keithley2400(Instrument):
             except IndexError:
                 nearest = -1
 
-            self.voltage_range = allowed_voltage_ranges[nearest]
+            self.knob_values['voltage range'] = allowed_voltage_ranges[nearest]
 
             Warning(f'Given voltage range not an option, setting to {allowed_voltage_ranges[nearest]} V instead')
 
         else:
-            self.voltage_range = voltage_range
+            self.knob_values['voltage range'] = voltage_range
 
         if self.source == 'voltage':
-            self.write(':SOUR:VOLT:RANG %.2E' % self.voltage_range)
+            self.write(':SOUR:VOLT:RANG %.2E' % self.knob_values['voltage range'])
         else:
-            self.write(':SENS:VOLT:PROT %.2E' % self.voltage_range)
-            self.write(':SENS:VOLT:RANG %.2E' % self.voltage_range)
+            self.write(':SENS:VOLT:PROT %.2E' % self.knob_values['voltage range'])
+            self.write(':SENS:VOLT:RANG %.2E' % self.knob_values['voltage range'])
 
         self.knob_values['voltage range'] = voltage_range
 
@@ -190,18 +190,18 @@ class Keithley2400(Instrument):
             # Find nearest encapsulating current range
             nearest = np.argwhere( current_range <= np.array(allowed_current_ranges[:-1]) ).flatten()[0]
 
-            self.current_range = allowed_current_ranges[nearest]
+            self.knob_values['current range'] = allowed_current_ranges[nearest]
 
             Warning(f'Given current range not an option, setting to {allowed_current_ranges[nearest]} A instead')
 
         else:
-            self.current_range = current_range
+            self.knob_values['current range'] = current_range
 
         if self.source == 'current':
-            self.write(':SOUR:CURR:RANG %.2E' % self.current_range)
+            self.write(':SOUR:CURR:RANG %.2E' % self.knob_values['current range'])
         else:
-            self.write(':SENS:CURR:PROT %.2E' % self.current_range)
-            self.write(':SENS:CURR:RANG %.2E' % self.current_range)
+            self.write(':SENS:CURR:PROT %.2E' % self.knob_values['current range'])
+            self.write(':SENS:CURR:RANG %.2E' % self.knob_values['current range'])
 
         self.knob_values['current range'] = current_range
 

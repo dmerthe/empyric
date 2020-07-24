@@ -138,12 +138,12 @@ class Instrument(object):
                     if not backend_supported:
                         raise ConnectionError(f"Unable to find suitable backend!")
 
-                    # Override measure and set methods with with those from the ME API
-                    method_list = [meth for meth in dir(self.connection) if callable(getattr(self.connection, meth))]
-
-                    for method in method_list:
-                        if 'measure_' in method or 'set_' in method:
-                            self.__setattr__(method, self.connection.__getattribute__(method))
+                    # # Override measure and set methods with with those from the ME API
+                    # method_list = [meth for meth in dir(self.connection) if callable(getattr(self.connection, meth))]
+                    #
+                    # for method in method_list:
+                    #     if 'measure_' in method or 'set_' in method:
+                    #         self.__setattr__(method, self.connection.__getattribute__(method))
 
             if not supported:
                 raise ConnectionError(f"{self.name} is not supported by the ME APIs")
@@ -219,7 +219,7 @@ class Instrument(object):
             self.connection.write(padded_message.encode())
 
         if self.backend in ['visa', 'usb', 'linux-gpib', 'me-api']:
-            self.write(message)
+            self.connection.write(message)
 
         if self.backend == 'twilio':
             self.client.messages.create(
@@ -245,6 +245,9 @@ class Instrument(object):
                 return '', datetime.datetime.fromtimestamp(0)
 
     def query(self, question, delay=None):
+
+        if self.backend == 'me-api':
+            return self.connection.query(question)
 
         self.write(question)
 
