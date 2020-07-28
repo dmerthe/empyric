@@ -1,9 +1,15 @@
 from mercury.instruments.basics import *
 
+
 class BRAX3XXX(Instrument):
     """
     Keithley 2110 multimeter instrument
     """
+
+    supported_backends = ['serial', 'me-api']
+    default_backend = 'serial'
+
+    baudrate = 9600
 
     name = "BRAX3XXX"
 
@@ -19,19 +25,18 @@ class BRAX3XXX(Instrument):
         'ig state'
     )
 
-    def __init__(self, address, backend='serial'):
-
-        self.address = address
-        self.backend = backend
+    def __init__(self, address, **kwargs):
 
         self.knob_values = {knob: None for knob in BRAX3XXX.knobs}
 
-        self.connect(address)
+        # Set up communication
+        self.address = address
+        self.backend = kwargs.get('backend', self.default_backend)
+        self.connect()
 
-        self.knob_values['filament'] = 1
-        self.knob_values['ig state'] = 'OFF'
-
-        self.read()
+        # Set up instrument
+        self.set_filament(kwargs.get('filament', 1))
+        self.set_ig_state(kwargs.get('ig_state', 1))
 
     def set_ig_state(self, state):
 
@@ -41,6 +46,8 @@ class BRAX3XXX(Instrument):
             self.write(f'#IG{number} ON<CR>')
         if state == 'OFF':
             self.write(f'#IG{number} OFF<CR>')
+
+        self.read()  # discard the response
 
     def set_filament(self, number):
 
@@ -57,21 +64,24 @@ class BRAX3XXX(Instrument):
 
     def measure_cg1_pressure(self):
 
-        try:
-            return float(self.query('#RDCG1<CR>')[4:-4])
-        except ValueError:
-            return float(self.query('#RDCG1<CR>')[4:-4])
+        for i in range(3):
+            try:
+                return float(self.query('#RDCG1<CR>')[4:-4])
+            except ValueError:
+                pass
 
     def measure_cg2_pressure(self):
 
-        try:
-            return float(self.query('#RDCG2<CR>')[4:-4])
-        except ValueError:
-            return float(self.query('#RDCG2<CR>')[4:-4])
+        for i in range(3):
+            try:
+                return float(self.query('#RDCG2<CR>')[4:-4])
+            except ValueError:
+                pass
 
     def measure_ig_pressure(self):
 
-        try:
-            return float(self.query('#RDIG<CR>')[4:])
-        except ValueError:
-            return float(self.query('#RDIG<CR>')[4:])
+        for i in range(3):
+            try:
+                return float(self.query('#RDIG<CR>')[4:])
+            except ValueError:
+                pass

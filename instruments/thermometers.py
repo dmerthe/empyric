@@ -4,25 +4,30 @@ from mercury.instruments.basics import *
 
 class TCReader(Instrument):
 
+    supported_backends = ['phidget']
+    default_backend = 'phidget'
+
     name = 'TCReader1101'
 
+    # Available knobs
     knobs = ('type',)
 
+    # Available meters
     meters = ('temperature',)
 
-    def __init__(self, address):
+    def __init__(self, address, **kwargs):
 
+        self.knob_values = {'type': 'K'}
+
+        # Set up communication
         ts = importlib.import_module('Phidget22.Devices.TemperatureSensor')
         self.PhidgetException = importlib.import_module("Phidget22.PhidgetException").PhidgetException
 
         self.device_class = ts.TemperatureSensor
 
         self.address = address
-        self.backend = 'phidget'
-
+        self.backend = kwargs.get('backend', self.default_backend)
         self.connect()
-
-        self.knob_values = {'type': 'K'}
 
     def set_type(self, type_):
 

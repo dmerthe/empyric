@@ -1,10 +1,8 @@
 import matplotlib
 matplotlib.use('TkAgg')
 
-import numbers
 import os
 import time
-import warnings
 import numpy as np
 import pandas as pd
 import tkinter as tk
@@ -188,6 +186,7 @@ class StatusGUI:
                 self.status_label.config(text=self.experiment.status)
 
         self.root.lift()
+        self.root.update()
 
     def check_instr(self):
 

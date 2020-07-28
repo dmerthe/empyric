@@ -206,7 +206,7 @@ class Instrument(object):
             self.client = Client(account_sid, auth_token)
 
         else:
-            raise ConnectionError(f"Backned {backend} not supported!")
+            raise ConnectionError(f"Backend {self.backend} not supported!")
 
     def disconnect(self):
 

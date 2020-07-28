@@ -5,9 +5,13 @@ class Keithley2110(Instrument):
     Keithley 2110 digital multimeter instrument
     """
 
+    supported_backends = ['visa', 'usb', 'me-api']
+    default_backend = ['visa']
+
     name = "Keithley2110"
 
     knobs = (
+        'meter'
         'voltage range',
         'current range'
     )
@@ -18,24 +22,26 @@ class Keithley2110(Instrument):
         'temperature'
     )
 
-    def __init__(self, address, backend='visa', meter='current', voltage_range = None, current_range = None):
+    def __init__(self, address, **kwargs):
 
+        self.knob_values = {knob: None for knob in self.knob_values}
+
+        # Set up communication
         self.address = address
-        self.backend = backend
-
-        self.knob_values = {knob: None for knob in Keithley2110.knobs}
-
-        self.meter = meter
-
+        self.backend = kwargs.get('backend', self.default_backend)
         self.connect()
 
-        if voltage_range:
-            self.set_voltage_range(voltage_range)
+        # Set up instrument
+        if 'meter' in kwargs:
+            self.set_meter(kwargs['meter'])
+
+        if 'voltage_range' in kwargs:
+            self.set_voltage_range(kwargs['voltage range'])
         else:
             self.set_voltage_range('AUTO')
 
-        if current_range:
-            self.set_current_range(current_range)
+        if 'current range' in kwargs:
+            self.set_current_range(kwargs['current range'])
         else:
             self.set_current_range('AUTO')
 
@@ -82,21 +88,28 @@ class Keithley2110(Instrument):
 
     def measure_voltage(self):
 
-        if self.meter != 'voltage':
+        if self.knob_values['meter'] != 'voltage':
             self.write('FUNC "VOLT"')
+            self.knob_values['meter'] = 'voltage'
 
         return float(self.query('READ?'))
 
     def measure_current(self):
 
-        if self.meter != 'current':
+        if self.knob_values['meter'] != 'current':
             self.write('FUNC "CURR"')
+            self.knob_values['meter'] = 'current'
 
         return float(self.query('READ?'))
 
     def measure_temperature(self):
 
-        if self.meter != 'temperature':
+        if self.knob_values['meter'] != 'temperature':
             self.write('FUNC "TCO"')
+            self.knob_values['meter'] = 'temperature'
 
         return float(self.query('READ?'))
+
+    def set_meter(self, meter):
+
+        self.measure(meter)

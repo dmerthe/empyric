@@ -8,13 +8,16 @@ from mercury.utilities import *
 
 class Keithley2400(Instrument):
 
+    supported_backends = ['visa', 'linux-gpib', 'me-api']
+    default_backend = ['visa']
+
     """
     Keithley 2400 Sourcemeter, a 20 W power supply and picoammeter
     """
 
     name = 'Keithley2400'
 
-    # Tuple of available knobs; for every knob there should be a set_knob method below
+    # Available knobs
     knobs = (
         'voltage',
         'fast voltages',
@@ -26,7 +29,7 @@ class Keithley2400(Instrument):
         'output'
     )
 
-    # Tuple of available meters; for every meter there should be a measure_meter method below
+    # Available meters
     meters = (
         'voltage',
         'current',
@@ -35,26 +38,25 @@ class Keithley2400(Instrument):
 
     def __init__(self, address, **kwargs):
 
-        self.address = address
-        self.backend = kwargs.get('backend', 'visa')
-
         self.knob_values = {knob: None for knob in Keithley2400.knobs}
 
-        self.fast_voltages = None  # Used for fast IV sweeps
-        self.meter = kwargs.get('meter', 'current')
-        self.source = kwargs.get('source', 'voltage')
-        self.nplc = kwargs.get('nplc', 0.1)
+        # Set up communication
+        self.address = address
+        self.backend = kwargs.get('backend', self.default_backend)
+        self.delay = kwargs.get('delay', 0.1)
         self.connect()
 
-        self.write('*RST')
-        self.set_delay(kwargs.get('delay', 0.1))
-        self.set_voltage_range(kwargs.get('voltage_range', 200))
-        self.set_current_range(kwargs.get('current_range', 100e-3))
-        self.set_source(self.source)
-        self.set_meter(self.meter)
-        self.set_nplc(self.nplc)
+        # Set up instrument
+        self.fast_voltages = None  # Used for fast IV sweeps
+
+        self.reset()
+        self.set_source(kwargs.get('source', 'voltage'))
+        self.set_meter(kwargs.get('meter', 'current'))
+        self.set_voltage_range(kwargs.get('voltage_range', 40))
+        self.set_current_range(kwargs.get('current_range', 5))
+        self.set_nplc(kwargs.get('nplc'))
         self.set_output('ON')
-        self.knob_values[self.source] = 0
+
 
     def set_source(self, variable):
 
@@ -300,13 +302,16 @@ class Keithley2400(Instrument):
 
 class Keithley2651A(Instrument):
 
+    supported_backends = ['visa', 'linux-gpib', 'me-api']
+    default_backend = ['visa']
+
     """
     Keithley 2651A High Power Sourcemeter, a 200 W power supply and microammeter
     """
 
     name = 'Keithley2651A'
 
-    # Tuple of available knobs; for every knob there should be a set_knob method below
+    # Available knobs
     knobs = (
         'voltage',
         'fast voltages',
@@ -317,40 +322,32 @@ class Keithley2651A(Instrument):
         'output'
     )
 
-    # Tuple of available meters; for every meter there should be a measure_meter method below
+    # Available meters
     meters = (
         'voltage',
         'current',
         'fast currents'
     )
 
-    def __init__(self, address, current_range = 5, voltage_range = 40, delay = 0.1, backend = 'visa', source='voltage', meter='current', nplc = 0.1):
+    def __init__(self, address, **kwargs):
 
+        self.knob_values = {knob: None for knob in Keithley2651A.knobs}
+
+        # Set up communication
         self.address = address
-        self.backend = backend
-
-        self.delay = delay
-
-        self.knob_values = {knob: None for knob in Keithley2400.knobs}
-
-        self.source = source
-        self.meter = meter
-
-        self.fast_voltages = None  # Used for fast IV sweeps
-
-        self.voltage_range = voltage_range
-        self.current_range = current_range
-
-        self.nplc = nplc
-
+        self.backend = kwargs.get('backend', self.default_backend)
+        self.delay = kwargs.get('delay', 0.1)
         self.connect()
 
+        # Set up instrument
+        self.fast_voltages = None  # Used for fast IV sweeps
+
         self.reset()
-        self.set_nplc(nplc)
-        self.set_voltage_range(voltage_range)
-        self.set_current_range(current_range)
-        self.set_source(source)
-        self.set_meter(meter)
+        self.set_source(kwargs.get('source', 'voltage'))
+        self.set_meter(kwargs.get('meter', 'current'))
+        self.set_voltage_range(kwargs.get('voltage_range', 40))
+        self.set_current_range(kwargs.get('current_range', 5))
+        self.set_nplc(kwargs.get('nplc'))
         self.set_output('ON')
 
     def set_source(self, variable):
