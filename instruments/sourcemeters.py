@@ -53,7 +53,7 @@ class Keithley2400(Instrument):
 
         self.set_voltage_range(kwargs.get('voltage_range', 200))
         self.set_current_range(kwargs.get('current_range', 100e-3))
-        self.set_nplc(kwargs.get('nplc'))
+        self.set_nplc(kwargs.get('nplc', 1))
         self.set_source(kwargs.get('source', 'voltage'))
         self.set_meter(kwargs.get('meter', 'current'))
         self.set_output('ON')
@@ -348,7 +348,7 @@ class Keithley2651A(Instrument):
 
         self.set_voltage_range(kwargs.get('voltage_range', 40))
         self.set_current_range(kwargs.get('current_range', 5))
-        self.set_nplc(kwargs.get('nplc'))
+        self.set_nplc(kwargs.get('nplc', 1))
         self.set_source(kwargs.get('source', 'voltage'))
         self.set_meter(kwargs.get('meter', 'current'))
         self.set_output('ON')
