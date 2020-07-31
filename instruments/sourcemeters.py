@@ -51,8 +51,8 @@ class Keithley2400(Instrument):
         self.meter = 'current'  # default
         self.fast_voltages = None  # Used for fast IV sweeps
 
-        self.set_voltage_range(kwargs.get('voltage_range', 40))
-        self.set_current_range(kwargs.get('current_range', 5))
+        self.set_voltage_range(kwargs.get('voltage_range', 200))
+        self.set_current_range(kwargs.get('current_range', 100e-3))
         self.set_nplc(kwargs.get('nplc'))
         self.set_source(kwargs.get('source', 'voltage'))
         self.set_meter(kwargs.get('meter', 'current'))
@@ -168,7 +168,7 @@ class Keithley2400(Instrument):
             try:
                 nearest = np.argwhere( voltage_range <= np.array(allowed_voltage_ranges[:-1]) ).flatten()[0]
             except IndexError:
-                nearest = -1
+                nearest = -2
 
             self.knob_values['voltage range'] = allowed_voltage_ranges[nearest]
 
@@ -191,7 +191,10 @@ class Keithley2400(Instrument):
 
         if current_range not in allowed_current_ranges:
             # Find nearest encapsulating current range
-            nearest = np.argwhere( current_range <= np.array(allowed_current_ranges[:-1]) ).flatten()[0]
+            try:
+                nearest = np.argwhere( current_range <= np.array(allowed_current_ranges[:-1]) ).flatten()[0]
+            except IndexError:
+                nearest = -2
 
             self.knob_values['current range'] = allowed_current_ranges[nearest]
 
