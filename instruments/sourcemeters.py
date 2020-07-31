@@ -49,20 +49,20 @@ class Keithley2400(Instrument):
         # Set up instrument
         self.fast_voltages = None  # Used for fast IV sweeps
 
-        self.set_source(kwargs.get('source', 'voltage'))
-        self.set_meter(kwargs.get('meter', 'current'))
         self.set_voltage_range(kwargs.get('voltage_range', 40))
         self.set_current_range(kwargs.get('current_range', 5))
         self.set_nplc(kwargs.get('nplc'))
+        self.set_source(kwargs.get('source', 'voltage'))
+        self.set_meter(kwargs.get('meter', 'current'))
         self.set_output('ON')
 
 
     def set_source(self, variable):
 
-        if variable in ['voltage','current']:
+        if variable in ['voltage', 'current']:
             self.source = variable
         else:
-            raise SetError('source must be either "current" or "voltage"')
+            raise SetError('Source must be either "current" or "voltage"')
 
         if variable == 'voltage':
 
@@ -341,11 +341,11 @@ class Keithley2651A(Instrument):
         # Set up instrument
         self.fast_voltages = None  # Used for fast IV sweeps
 
-        self.set_source(kwargs.get('source', 'voltage'))
-        self.set_meter(kwargs.get('meter', 'current'))
         self.set_voltage_range(kwargs.get('voltage_range', 40))
         self.set_current_range(kwargs.get('current_range', 5))
         self.set_nplc(kwargs.get('nplc'))
+        self.set_source(kwargs.get('source', 'voltage'))
+        self.set_meter(kwargs.get('meter', 'current'))
         self.set_output('ON')
 
     def set_source(self, variable):
@@ -358,14 +358,14 @@ class Keithley2651A(Instrument):
         if variable == 'voltage':
 
             self.write('smua.source.func =  smua.OUTPUT_DCVOLTS')
-            self.set_voltage_range(self.voltage_range)
+            self.set_voltage_range(self.knob_values['voltage range'])
 
             self.knob_values['current'] = None
 
         if variable == 'current':
 
             self.write('smua.source.func = smua.OUTPUT_DCAMPS')
-            self.set_current_range(self.current_range)
+            self.set_current_range(self.knob_values['current range'])
 
             self.knob_values['voltage'] = None
 
