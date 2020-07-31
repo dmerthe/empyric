@@ -47,6 +47,8 @@ class Keithley2400(Instrument):
         self.connect()
 
         # Set up instrument
+        self.source = 'voltage'  # default
+        self.meter = 'current'  # default
         self.fast_voltages = None  # Used for fast IV sweeps
 
         self.set_voltage_range(kwargs.get('voltage_range', 40))
