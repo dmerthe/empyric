@@ -210,7 +210,10 @@ class Instrument(object):
 
     def disconnect(self):
 
-        self.connection.close()
+        try:
+            self.connection.close()
+        except AttributeError:
+            self.connection.disconnnect()
 
     def write(self, message):
 
