@@ -49,7 +49,6 @@ class Keithley2400(Instrument):
         # Set up instrument
         self.fast_voltages = None  # Used for fast IV sweeps
 
-        self.reset()
         self.set_source(kwargs.get('source', 'voltage'))
         self.set_meter(kwargs.get('meter', 'current'))
         self.set_voltage_range(kwargs.get('voltage_range', 40))
@@ -342,7 +341,6 @@ class Keithley2651A(Instrument):
         # Set up instrument
         self.fast_voltages = None  # Used for fast IV sweeps
 
-        self.reset()
         self.set_source(kwargs.get('source', 'voltage'))
         self.set_meter(kwargs.get('meter', 'current'))
         self.set_voltage_range(kwargs.get('voltage_range', 40))
