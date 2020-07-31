@@ -116,8 +116,7 @@ class Instrument(object):
 
                 try:
                     api_module = importlib.import_module(api)
-                except ModuleNotFoundError as error:
-                    print(f'Attempted tp import {api} and got Error: {error}')
+                except ModuleNotFoundError:
                     continue
 
                 if self.name in api_module.__dict__:
