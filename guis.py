@@ -427,7 +427,7 @@ class Plotter:
                 if np.max(file_data[c].values) > 60:
                     units = 'minutes'
                     file_data[c] = file_data[c] / 60
-                    if np.max(file_data.values) > 60:
+                    if np.max(file_data[c].values) > 60:
                         units = 'hours'
                         file_data[c] = file_data[c] / 60
 
