@@ -475,7 +475,7 @@ class Experiment:
             columns=['Total Time', 'Schedule Time'] + list(self.instruments.mapped_variables)
         )  # Will contain history of knob settings and meter readings for the experiment.
 
-        self.status = 'Not Started'
+        self.status = 'Starting...'
         self.followup = self.settings.get('follow-up', [])  # list of followup experiments or actions
 
         if isinstance(self.followup, str):  # In the runcard, a followup can be indicated by a single string
@@ -654,7 +654,7 @@ class Experiment:
 
     def __next__(self):
 
-        if 'Not Started' in self.status:
+        if 'Starting' in self.status:
             self.initialize()
 
         if 'Finished' in self.status:

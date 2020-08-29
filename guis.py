@@ -2,7 +2,7 @@ import matplotlib
 matplotlib.use('TkAgg')
 
 import os
-import time
+import threading
 import numpy as np
 import pandas as pd
 import tkinter as tk
@@ -92,7 +92,7 @@ class ExperimentController:
     def step(self):
 
         try:
-            step = next(self.experiment)
+            step = next(self.experiment)  # old way of iterating through experiment
         except StopIteration:
             self.root.quit()
             self.root.destroy()
