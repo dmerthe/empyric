@@ -57,7 +57,7 @@ class InstrumentSet:
     Set of instruments to be used in an experiment, including presets, knob and meter specs and alarm protocols
     """
 
-    def __init__(self, specs=None, variables=None, feedback=None, alarms=None, presets=None, postsets=None):
+    def __init__(self, specs=None, variables=None, alarms=None, presets=None, postsets=None):
 
         self.instruments = {}  # Will contain a list of instrument instances from the instrumentation submodule
 
@@ -67,11 +67,6 @@ class InstrumentSet:
         self.mapped_variables = {}
         if variables:
             self.map_variables(variables)
-
-        if feedback:
-            self.feedback = feedback
-        else:
-            self.feedback = {}
 
         if alarms:
             self.alarms = { name: {**alarm, 'triggered': False} for name, alarm in alarms.items() }
@@ -186,20 +181,6 @@ class InstrumentSet:
 
         return readings
 
-    def apply_feedback(self, readings):
-        """
-        Uses information from meters to apply feedback to knobs
-
-        :param readings: (dict) dictionary of readings
-        :return: None
-        """
-
-        for loop, config in self.feedback.items():
-
-            meter, knob, target = config['meter'], config['knob'], config['target']
-
-            # do something that encourages meter to go to target
-
     def check_alarms(self, readings):
         """
         Checks alarms, as specified by the alarms attribute.
@@ -230,6 +211,7 @@ class Routine:
     def __init__(self, **kwargs):
 
         self.times = np.array([kwargs['times']]).flatten()
+
         self.start_time = -np.inf
         self.stop_time = np.inf
         self.interval = 0
@@ -246,41 +228,6 @@ class Routine:
             self.interval = tiempo.convert_time(self.times[2])
 
         self.values = np.array([kwargs['values']]).flatten()
-
-        # Sweep and Transit subclasses iterate through values
-        if isinstance(self, Sweep) or isinstance(self, Transit):
-            self.values_iter = iter(self.values)
-
-        # PIDControl subclass requires an input and gain settings
-        if isinstance(self, PIDControl):
-            if 'input' not in kwargs:
-                raise AttributeError('PIDControl routine requires an input (meter)!')
-            self.input = kwargs['input']
-
-            simple_pid = importlib.import_module('simple_pid')
-            self.controller = simple_pid.PID(setpoint=self.values[0])
-
-            if 'Kp' not in kwargs:
-                raise AttributeError('PIDControl routine requires at least a proportional gain!')
-
-            self.controller.tunings = (
-                kwargs['Kp'], 0, 0
-            )
-
-            if 'Ki' in kwargs:  # use given integral gain
-                self.controller.Ki = kwargs['Ki']
-            elif 'Ti' in kwargs:  # or use integral time constant
-                self.controller.Ki = kwargs['Kp'] / kwargs['Ti']
-
-            if 'Kd' in kwargs:  # use given derivative gain
-                self.controller.Kd = kwargs['Kd']
-            elif 'Td' in kwargs:  # or use given derivative time constant
-                self.controller.Kd = kwargs['Kp'] / kwargs['Td']
-
-            if self.interval > 0:  # Ideally, the PID controller is operated at a fixed time interval
-                self.controller.sample_time = self.interval
-
-            self.model = kwargs.get('model', None)
 
         if 'clock' in kwargs:
             self.clock = kwargs['clock']
@@ -316,9 +263,11 @@ class Ramp(Routine):
         start_time, end_time = self.start_time, self.stop_time
 
         now = self.clock.time()
-        if start_time <= now < end_time and now >= self.last_call + self.interval:
+        if start_time <= now <= end_time and now >= self.last_call + self.interval:
             self.last_call = now
             return start_value + (end_value - start_value)*(now - start_time) / (end_time - start_time)
+        elif end_time < now <= end_time + self.interval:  # Make sure it sets the end value
+            return end_value
 
 
 class Transit(Routine):
@@ -326,12 +275,17 @@ class Transit(Routine):
     Sequentially and immediately passes a value once through the 'values' list argument, cutting it off at the single value of the 'times' argument.
     """
 
+    def __init__(self):
+        Routine.__init__(self, **kwargs)
+
+        self.values_iter = iter(self.values)
+
     def __next__(self):
 
         now = self.clock.time()
         if now < self.stop_time:
-            return next(self.values_iter, None)
             self.last_call = now
+            return next(self.values_iter, None)
 
 
 class Sweep(Routine):
@@ -339,23 +293,63 @@ class Sweep(Routine):
     Sequentially and cyclically sweeps a value through the 'values' list argument, starting at the first time in 'times' and ending at the last.
     """
 
+    def __init__(self, **kwargs):
+
+        Routine.__init__(self, **kwargs)
+
+        self.values_iter = iter(self.values)
+
     def __next__(self):
 
         now = self.clock.time()
         if self.start_time <= now < self.stop_time and now >= self.last_call + self.interval:
+            self.last_call = now
+
             try:
                 return next(self.values_iter)
             except StopIteration:
                 self.values_iter = iter(self.values)  # restart the sweep
                 return next(self.values_iter)
 
-            self.last_call = now
-
 
 class PIDControl(Routine):
     """
     Provides basic a PID feedback loop, with the input attribute giving the error signal
     """
+
+    def __init__(self, **kwargs):
+
+        Routine.__init__(self, **kwargs)
+
+        if 'input' not in kwargs:
+            raise AttributeError('PIDControl routine requires an input (meter)!')
+
+        self.input = kwargs['input']
+
+        simple_pid = importlib.import_module('simple_pid')
+        self.controller = simple_pid.PID(setpoint=self.values[0])
+
+        if 'Kp' not in kwargs:
+            raise AttributeError('PIDControl routine requires at least a proportional gain!')
+
+        self.controller.tunings = (
+            kwargs['Kp'], 0, 0
+        )
+
+        if 'Ki' in kwargs:  # use given integral gain
+            self.controller.Ki = kwargs['Ki']
+        elif 'Ti' in kwargs:  # or use integral time constant
+            self.controller.Ki = kwargs['Kp'] / kwargs['Ti']
+
+        if 'Kd' in kwargs:  # use given derivative gain
+            self.controller.Kd = kwargs['Kd']
+        elif 'Td' in kwargs:  # or use given derivative time constant
+            self.controller.Kd = kwargs['Kp'] / kwargs['Td']
+
+        if self.interval > 0:  # Ideally, the PID controller is operated at a fixed time interval
+            self.controller.sample_time = self.interval
+
+        self.model = kwargs.get('model', None)
 
     def __next__(self):
 
@@ -467,7 +461,6 @@ class Experiment:
         self.instruments = InstrumentSet(
             specs=runcard['Instruments'],  # Required
             variables=runcard['Variables'],  # Required
-            feedback=runcard.get('Feeback', None),  # Optional
             alarms=runcard.get('Alarms', None),  # Optional
             presets=runcard.get('Presets', None),  # Optional
             postsets=runcard.get('Postsets', None)  # Optional
@@ -494,7 +487,7 @@ class Experiment:
 
     def initialize(self):
         """
-        Called on first step of experiment. Starts the clocks, update status and get a timestamp.
+        Called on first step of experiment. Starts the clocks, updates status and gets a timestamp.
 
         :return: None
         """
@@ -516,6 +509,7 @@ class Experiment:
         elif remaining_time == np.inf:
             self.status = f"Running indefinitely"
         else:
+            # Show a countdown
             units = 'seconds'
             if remaining_time > 60:
                 remaining_time = remaining_time / 60
@@ -531,8 +525,9 @@ class Experiment:
 
         :return: None
         """
+
         if self.clock.time() < self.last_step + tiempo.convert_time(self.settings['step interval']):
-            return self.state  # Only apply settings at frequency limited by 'step interval' setting
+            return self.state  # Only apply settings at frequency limited by 'step interval' experiment setting
 
         self.last_step = self.clock.time()
 
@@ -540,16 +535,16 @@ class Experiment:
 
         configuration = next(self.schedule)  # Get the next step from the schedule
 
-        # Get previously set knob values if no corresponding routines are running
+        # Get previously set knob values if no corresponding routines are running for any knobs
         for name, variable in self.instruments.mapped_variables.items():
             if variable.knob and name not in configuration:
                 configuration[name] = variable.get()
 
         state.update(configuration)
 
-        self.instruments.apply(configuration)  # apply settings to knobs
+        self.instruments.apply(configuration)  # apply settings to instrument knobs
         readings = self.instruments.read()  # checking meter readings
-        state.update(readings)  # will contain knob values + meter readings + time values
+        state.update(readings)  # now contains time values + knob values + meter readings
 
         self.state = pd.Series(state, name=datetime.datetime.now())
         self.data.loc[self.state.name] = self.state
@@ -591,7 +586,7 @@ class Experiment:
                     alarm_followups.append(protocol)
                     self.status = f"Finished: {name} alarm triggered! Executing {protocol}..."
                 elif 'check' in protocol.lower():
-                    # Check an indicator (meter) to decide what to do
+                    # Check an indicator (meter, typically of the human variety) to decide what to do
                     decider_name = protocol.split(' ')[1:]
                     decider = self.instruments.mapped_variables[decider_name]
                     self.status = f"Paused: {name} alarm triggered! Checking with {decider_name}..."
