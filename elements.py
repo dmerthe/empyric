@@ -485,6 +485,25 @@ class Experiment:
             else:
                 self.followup = [self.followup]
 
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+
+        if 'Starting' in self.status:
+            self.initialize()
+
+        if 'Finished' in self.status:
+            self.finalize()
+            raise StopIteration
+
+        self.next_step()
+        self.check_time()
+        self.check_alarms()
+        self.update_status()
+
+        return self.state
+
     def initialize(self):
         """
         Called on first step of experiment. Starts the clocks, updates status and gets a timestamp.
@@ -517,6 +536,7 @@ class Experiment:
                 if remaining_time > 60:
                     remaining_time = remaining_time / 60
                     units = 'hours'
+
             self.status = f"Running: {np.round(remaining_time, 2)} {units} remaining"
 
     def next_step(self):
@@ -648,22 +668,3 @@ class Experiment:
         """
         self.save('now')
         self.instruments.disconnect()
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-
-        if 'Starting' in self.status:
-            self.initialize()
-
-        if 'Finished' in self.status:
-            self.finalize()
-            raise StopIteration
-
-        self.next_step()
-        self.check_time()
-        self.check_alarms()
-        self.update_status()
-
-        return self.state
