@@ -534,6 +534,8 @@ class Keithley2651A(Instrument):
             raw_response = self.query(f'printbuffer(1, {len(voltage_list)}, smua.nvbuffer1)').strip()
             current_list += [float(current_str) for current_str in raw_response.split(',')]
 
+            self.set_voltage(voltage_list[-1])  # hold last voltage until next sub-sweep
+
         self.connection.timeout = 1000  # put it back
 
         self.write('display.screen = display.SMUA')
