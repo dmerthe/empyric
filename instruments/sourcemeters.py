@@ -353,6 +353,9 @@ class Keithley2651A(Instrument):
         self.set_meter(kwargs.get('meter', 'current'))
         self.set_output('ON')
 
+        self.write('display.screen = display.SMUA')
+        self.write('display.smua.measure.func = display.MEASURE_DCAMPS')
+
     def set_source(self, variable):
 
         if variable in ['voltage','current']:
@@ -493,10 +496,6 @@ class Keithley2651A(Instrument):
 
         self.fast_voltages = np.round(fast_voltage_data['Voltage'].values, 2)
 
-        voltage_string = ', '.join([f'{voltage}' for voltage in self.fast_voltages])
-
-        self.write('vlist = {%s}' % voltage_string)
-
         os.chdir(working_subdir)  # return to the current working directory
 
     def measure_fast_currents(self):
@@ -511,12 +510,29 @@ class Keithley2651A(Instrument):
 
         path = self.name+'-fast_iv_measurement.csv'
 
-        #self.connection.timeout = float('inf')
-        self.connection.timeout = 60*1000  # give it up to a minute to do sweep
+        voltage_lists = []
+        current_list = []
 
-        self.write(f'SweepVListMeasureI(smua, vlist, 0.01, {len(self.fast_voltages)})')
-        raw_response = self.query(f'printbuffer(1, {len(self.fast_voltages)}, smua.nvbuffer1)').strip()
-        current_list = [float(current_str) for current_str in raw_response.split(',')]
+        list_length = 50  # maximum number of voltages to sweep at a time
+
+        for i in range(len(self.fast_voltages) // list_length):
+            voltage_lists.append(self.fast_voltages[i*list_length:(i+1)*list_length])
+
+        remainder = len(self.fast_voltages) % list_length
+        if remainder:
+            voltage_lists.append(self.fast_voltages[-remainder:])
+
+        # self.connection.timeout = float('inf')
+        self.connection.timeout = 60 * 1000  # give it up to a minute to do sweep
+
+        for voltage_list in voltage_lists:
+
+            voltage_string = ', '.join([f'{voltage}' for voltage in voltage_list])
+
+            self.write('vlist = {%s}' % voltage_string)
+            self.write(f'SweepVListMeasureI(smua, vlist, 0.01, {len(voltage_list)})')
+            raw_response = self.query(f'printbuffer(1, {len(voltage_list)}, smua.nvbuffer1)').strip()
+            current_list += [float(current_str) for current_str in raw_response.split(',')]
 
         self.connection.timeout = 1000  # put it back
 
