@@ -212,7 +212,7 @@ class Instrument(object):
         try:
             self.connection.close()
         except AttributeError:
-            self.connection.disconnnect()
+            self.connection.disconnect()
 
     def write(self, message):
 
