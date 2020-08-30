@@ -116,7 +116,7 @@ class Instrument(object):
 
                 try:
                     api_module = importlib.import_module(api)
-                except ModuleNotFoundError:
+                except BaseException:  # if anything goes wrong, skip it
                     continue
 
                 if self.name in api_module.__dict__:

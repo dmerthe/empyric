@@ -310,7 +310,7 @@ class Keithley2651A(Instrument):
     default_backend = ['visa']
 
     """
-    Keithley 2651A High Power Sourcemeter, a 200 W power supply and microammeter
+    Keithley 2651A High Power (200 W) Sourcemeter
     """
 
     name = 'Keithley2651A'
@@ -493,6 +493,10 @@ class Keithley2651A(Instrument):
 
         self.fast_voltages = np.round(fast_voltage_data['Voltage'].values, 2)
 
+        voltage_string = ', '.join([f'{voltage}' for voltage in self.fast_voltages])
+
+        self.write('vlist = {%s}' % voltage_string)
+
         os.chdir(working_subdir)  # return to the current working directory
 
     def measure_fast_currents(self):
@@ -507,16 +511,17 @@ class Keithley2651A(Instrument):
 
         path = self.name+'-fast_iv_measurement.csv'
 
-        voltage_string = ', '.join([f'{voltage}' for voltage in self.fast_voltages])
+        #self.connection.timeout = float('inf')
+        self.connection.timeout = 60*1000  # give it up to a minute to do sweep
 
-        self.connection.timeout = float('inf')  # give it up to a minute to do sweep
-
-        self.write('vlist = {%s}' % voltage_string)
         self.write(f'SweepVListMeasureI(smua, vlist, 0.01, {len(self.fast_voltages)})')
         raw_response = self.query(f'printbuffer(1, {len(self.fast_voltages)}, smua.nvbuffer1)').strip()
         current_list = [float(current_str) for current_str in raw_response.split(',')]
 
         self.connection.timeout = 1000  # put it back
+
+        self.write('display.screen = display.SMUA')
+        self.write('display.smua.measure.func = display.MEASURE_DCAMPS')
 
         # Save fast IV data
         new_iv_data = pd.DataFrame({
