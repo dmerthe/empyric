@@ -26,7 +26,8 @@ class Keithley2400(Instrument):
         'current range',
         'nplc',
         'delay',
-        'output'
+        'output',
+        'source delay'
     )
 
     # Available meters
@@ -303,6 +304,11 @@ class Keithley2400(Instrument):
 
         return path
 
+    def set_source_delay(self, delay):
+
+        self.knob_values['source delay'] = delay
+        self.write(':SOUR:DEL %.4E' % delay)
+
 
 class Keithley2651A(Instrument):
 
@@ -323,7 +329,8 @@ class Keithley2651A(Instrument):
         'voltage range',
         'current range',
         'nplc',
-        'output'
+        'output',
+        'source delay'
     )
 
     # Available meters
@@ -556,3 +563,8 @@ class Keithley2651A(Instrument):
         fast_iv_data.to_csv(path)
 
         return path
+
+    def set_source_delay(self,delay):
+
+        self.knob_values['source delay'] = delay
+        self.write(f'smua.source.delay = {delay}')
