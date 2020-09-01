@@ -520,7 +520,7 @@ class Keithley2651A(Instrument):
         voltage_lists = []
         current_list = []
 
-        list_length = 50  # maximum number of voltages to sweep at a time
+        list_length = 100  # maximum number of voltages to sweep at a time
 
         for i in range(len(self.fast_voltages) // list_length):
             voltage_lists.append(self.fast_voltages[i*list_length:(i+1)*list_length])
