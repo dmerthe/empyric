@@ -543,7 +543,7 @@ class Schedule:
                 'Sweep': Sweep,
                 'Transit': Transit,
                 'PIDControl': PIDControl
-            }[kind](**spec)
+            }[kind](clock=self.clock, **spec)
 
             if routine.stop_time > self.stop_time:
                 self.stop_time = routine.stop_time

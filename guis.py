@@ -113,7 +113,7 @@ class ExperimentController:
             while self.status_gui.paused:
                 self.status_gui.update(step)
                 plt.pause(0.01)
-            self.experiment.schedule.clock.resume()
+            self.experiment.schedule.resume()
 
         plt.pause(0.01)
 
