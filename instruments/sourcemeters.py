@@ -359,8 +359,8 @@ class Keithley2460(Instrument):
         self.meter = 'current'  # default
         self.fast_voltages = None  # Used for fast IV sweeps
 
-        self.set_voltage_range(kwargs.get('voltage_range', 200))
-        self.set_current_range(kwargs.get('current_range', 100e-3))
+        self.set_voltage_range(kwargs.get('voltage_range', 100))
+        self.set_current_range(kwargs.get('current_range', 1))
         self.set_nplc(kwargs.get('nplc', 1))
         self.set_source(kwargs.get('source', 'voltage'))
         self.set_meter(kwargs.get('meter', 'current'))
@@ -377,14 +377,14 @@ class Keithley2460(Instrument):
 
         if variable == 'voltage':
 
-            self.write('SOUR:FUNC VOLT')
+            self.write(':SOUR:FUNC VOLT')
             self.set_voltage_range(self.knob_values['voltage range'])
 
             self.knob_values['current'] = None
 
         if variable == 'current':
 
-            self.write('SOUR:FUNC CURR')
+            self.write(':SOUR:FUNC CURR')
             self.set_current_range(self.knob_values['current range'])
 
             self.knob_values['voltage'] = None
@@ -409,11 +409,11 @@ class Keithley2460(Instrument):
 
     def output_on(self):
 
-        self.write(':OUTP ON')
+        self.write('OUTP ON')
 
     def output_off(self):
 
-        self.write(':OUTP OFF')
+        self.write('OUTP OFF')
 
     def set_output(self, output):
 
@@ -620,9 +620,9 @@ class Keithley2460(Instrument):
         self.knob_values['source delay'] = delay
 
         if self.source == 'voltage':
-            self.write('SOUR:VOLT:DEL %.4e' % delay)
+            self.write(':SOUR:VOLT:DEL %.4e' % delay)
         else:
-            self.write('SOUR:CURR:DEL %.4e' % delay)
+            self.write(':SOUR:CURR:DEL %.4e' % delay)
 
 
 class Keithley2651A(Instrument):
