@@ -7,6 +7,15 @@ from mercury import instrumentation
 from mercury.utilities import tiempo
 from mercury.utilities import alarms
 
+available_routines = {
+    'Repeat': Repeat,
+    'Ramp': Ramp,
+    'Sweep': Sweep,
+    'Transit': Transit,
+    'PIDControl': PIDControl,
+    'Minimize': Minimize,
+    'Maximize': Maximize
+}
 
 class MappedVariable:
     """
@@ -238,9 +247,9 @@ class Routine:
         return self
 
 
-class Idle(Routine):
+class Repeat(Routine):
     """
-    Holds a value, given by the 'values' argument (1-element list or number), from the first time in 'times' to the second.
+    Repeats a value, given by the 'values' argument (1-element list or number), from the first time in 'times' to the second.
 
     """
 
@@ -273,6 +282,7 @@ class Ramp(Routine):
 class Transit(Routine):
     """
     Sequentially and immediately passes a value once through the 'values' list argument, cutting it off at the single value of the 'times' argument.
+    This routine can be thought of as a generalization of the Ramp routine.
     """
 
     def __init__(self):
@@ -540,17 +550,13 @@ class Schedule:
         for name, spec in routines.items():
             kind, variable = spec.pop('routine'), spec.pop('variable')
 
-            if 'input' in spec:
+            if 'input' in spec:  # some routines require an input
                 # transform variable name to variable
                 spec['input'] = self.instrument_set.mapped_variables['input']
 
-            routine = {
-                'Idle': Idle,
-                'Ramp': Ramp,
-                'Sweep': Sweep,
-                'Transit': Transit,
-                'PIDControl': PIDControl
-            }[kind](clock=self.clock, **spec)
+            spec['clock'] = self.clock  # synchronize routine clock with schedule clock
+
+            routine = available_routines[kind](**spec)
 
             if routine.stop_time > self.stop_time:
                 self.stop_time = routine.stop_time
