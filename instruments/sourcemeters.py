@@ -57,6 +57,7 @@ class Keithley2400(Instrument):
         self.set_nplc(kwargs.get('nplc', 1))
         self.set_source(kwargs.get('source', 'voltage'))
         self.set_meter(kwargs.get('meter', 'current'))
+        self.set_source_delay(0)
         self.set_output('ON')
 
 
@@ -89,12 +90,14 @@ class Keithley2400(Instrument):
 
             self.write(':SENS:FUNC "VOLT"')
             self.write(':SENS:VOLT:RANG %.2E' % self.knob_values['voltage range'])
+            self.write(':SENS:VOLT:PROT %.2E' % self.knob_values['voltage range'])
             self.write(':FORM:ELEM VOLT')
 
         if variable == 'current':
 
             self.write(':SENS:FUNC "CURR"')
             self.write(':SENS:CURR:RANG %.2E' % self.knob_values['current range'])
+            self.write(':SENS:CURR:PROT %.2E' % self.knob_values['current range'])
             self.write(':FORM:ELEM CURR')
 
     def output_on(self):
@@ -310,6 +313,318 @@ class Keithley2400(Instrument):
         self.write(':SOUR:DEL %.4E' % delay)
 
 
+class Keithley2460(Instrument):
+
+    supported_backends = ['visa', 'linux-gpib', 'me-api']
+    default_backend = ['visa']
+
+    """
+    Keithley 2460 Sourcemeter, a 100 W power supply and picoammeter
+    """
+
+    name = 'Keithley2460'
+
+    # Available knobs
+    knobs = (
+        'voltage',
+        'fast voltages',
+        'current',
+        'voltage range',
+        'current range',
+        'nplc',
+        'delay',
+        'output',
+        'source delay'
+    )
+
+    # Available meters
+    meters = (
+        'voltage',
+        'current',
+        'fast currents'
+    )
+
+    def __init__(self, address, **kwargs):
+
+        self.knob_values = {knob: None for knob in Keithley2400.knobs}
+
+        # Set up communication
+        self.address = address
+        self.backend = kwargs.get('backend', self.default_backend)
+        self.delay = kwargs.get('delay', 0.1)
+        self.connect()
+
+        # Set up instrument
+        self.source = 'voltage'  # default
+        self.meter = 'current'  # default
+        self.fast_voltages = None  # Used for fast IV sweeps
+
+        self.set_voltage_range(kwargs.get('voltage_range', 200))
+        self.set_current_range(kwargs.get('current_range', 100e-3))
+        self.set_nplc(kwargs.get('nplc', 1))
+        self.set_source(kwargs.get('source', 'voltage'))
+        self.set_meter(kwargs.get('meter', 'current'))
+        self.set_source_delay(0)
+        self.set_output('ON')
+
+
+    def set_source(self, variable):
+
+        if variable in ['voltage', 'current']:
+            self.source = variable
+        else:
+            raise SetError('Source must be either "current" or "voltage"')
+
+        if variable == 'voltage':
+
+            self.write('SOUR:FUNC VOLT')
+            self.set_voltage_range(self.knob_values['voltage range'])
+
+            self.knob_values['current'] = None
+
+        if variable == 'current':
+
+            self.write('SOUR:FUNC CURR')
+            self.set_current_range(self.knob_values['current range'])
+
+            self.knob_values['voltage'] = None
+
+    def set_meter(self, variable):
+
+        self.meter = variable
+
+        if variable == 'voltage':
+
+            self.write(':SENS:FUNC "VOLT"')
+            self.write(':SENS:VOLT:RANG %.2e' % self.knob_values['voltage range'])
+            self.write(':SOUR:CURR:VLIM %.2e' % self.knob_values['voltage range'])
+            self.write(':DISP:VOLT:DIG 5')
+
+        if variable == 'current':
+
+            self.write(':SENS:FUNC "CURR"')
+            self.write(':SENS:CURR:RANG %.2e' % self.knob_values['current range'])
+            self.write(':SOUR:VOLT:ILIM %.2e' % self.knob_values['current range'])
+            self.write(':DISP:CURR:DIG 5')
+
+    def output_on(self):
+
+        self.write(':OUTP ON')
+
+    def output_off(self):
+
+        self.write(':OUTP OFF')
+
+    def set_output(self, output):
+
+        if output in [0, None, 'OFF', 'off']:
+            self.output_off()
+            self.knob_values['output'] = 'OFF'
+        elif output in [1, 'ON', 'on']:
+            self.set_source(self.source)
+            self.set_meter(self.meter)
+            self.output_on()
+            self.knob_values['output'] = 'ON'
+        else:
+            raise SetError(f'Ouput setting {output} not recognized!')
+
+    def measure_voltage(self):
+
+        if self.meter != 'voltage':
+            self.set_meter('voltage')
+
+        if self.knob_values['output'] == 'ON':
+            return float(self.query(':READ?').strip())
+        else:
+            return np.nan
+
+    def measure_current(self):
+
+        if self.meter != 'current':
+            self.set_meter('current')
+
+        if self.knob_values['output'] == 'ON':
+            return float(self.query(':READ?').strip())
+        else:
+            return 0
+
+    def set_voltage(self, voltage):
+
+        if self.source != 'voltage':
+            Warning(f'Switching sourcing mode!')
+            self.set_source('voltage')
+            self.output_on()  # output if automatically shut off when the source mode is changed
+
+        self.write(':SOUR:VOLT:LEV %.4E' % voltage)
+
+        self.knob_values['voltage'] = voltage
+
+    def set_current(self, current):
+
+        if self.source != 'current':
+            Warning(f'Switching sourcing mode!')
+            self.set_source('current')
+            self.output_on()  # output if automatically shut off when the source mode is changed
+
+        self.write(':SOUR:CURR:LEV %.4E' % current)
+
+        self.knob_values['current'] = current
+
+    def set_voltage_range(self, voltage_range):
+
+        allowed_voltage_ranges = (0.2, 2, 20, 200, 'AUTO') # allowable voltage ranges
+
+        if voltage_range not in allowed_voltage_ranges:
+            # Find nearest encapsulating voltage range
+            try:
+                nearest = np.argwhere( voltage_range <= np.array(allowed_voltage_ranges[:-1]) ).flatten()[0]
+            except IndexError:
+                nearest = -2
+
+            self.knob_values['voltage range'] = allowed_voltage_ranges[nearest]
+
+            Warning(f'Given voltage range not an option, setting to {allowed_voltage_ranges[nearest]} V instead')
+
+        else:
+            self.knob_values['voltage range'] = voltage_range
+
+        if self.source == 'voltage':
+            self.write(':SOUR:VOLT:RANG %.2e' % self.knob_values['voltage range'])
+        else:
+            self.write(':SOUR:CURR:VLIM %.2e' % self.knob_values['voltage range'])
+            self.write(':SENS:VOLT:RANG %.2e' % self.knob_values['voltage range'])
+
+        self.knob_values['voltage range'] = voltage_range
+
+    def set_current_range(self, current_range):
+
+        allowed_current_ranges = (1e-6, 10e-6, 100e-6, 1e-3, 10e-3, 100e-3, 1, 'AUTO')
+
+        if current_range not in allowed_current_ranges:
+            # Find nearest encapsulating current range
+            try:
+                nearest = np.argwhere( current_range <= np.array(allowed_current_ranges[:-1]) ).flatten()[0]
+            except IndexError:
+                nearest = -2
+
+            self.knob_values['current range'] = allowed_current_ranges[nearest]
+
+            Warning(f'Given current range not an option, setting to {allowed_current_ranges[nearest]} A instead')
+
+        else:
+            self.knob_values['current range'] = current_range
+
+        if self.source == 'current':
+            self.write(':SOUR:CURR:RANG %.2E' % self.knob_values['current range'])
+        else:
+            self.write(':SOUR:VOLT:ILIM %.2e' % self.knob_values['current range'])
+            self.write(':SENS:CURR:RANG %.2E' % self.knob_values['current range'])
+
+        self.knob_values['current range'] = current_range
+
+    def set_nplc(self, nplc):
+
+        if self.meter == 'current':
+            self.write('CURR:NPLC %.2E' % nplc)
+        elif self.meter == 'voltage':
+            self.write('VOLT:NPLC %.2E' % nplc)
+
+        self.knob_values['nplc'] = nplc
+
+    def set_delay(self, delay):
+
+        self.delay = delay
+        self.knob_values['delay'] = delay
+
+    def set_fast_voltages(self, *args):
+
+        self.set_source('voltage')
+
+        if len(args) == 0:
+            filedialog = importlib.import_module('tkinter.filedialog')
+            path = filedialog.askopenfilename(title="Select CSV File with Fast IV Voltages")
+        else:
+            path = args[0]
+
+        self.knob_values['fast voltages'] = path
+
+        working_subdir = os.getcwd()
+        os.chdir('..')
+
+        fast_voltage_data = pd.read_csv(path)
+        self.fast_voltages = fast_voltage_data['Voltage'].values
+
+        os.chdir(working_subdir)
+
+    def measure_fast_currents(self):
+
+        try:
+            self.fast_voltages
+        except AttributeError:
+            raise MeasurementError('Fast IV sweep voltages have not been set!')
+
+        if len(self.fast_voltages) == 0:
+            raise MeasurementError('Fast IV sweep voltages have not been set!')
+
+        self.write(':SOUR:VOLT:MODE LIST')
+
+        path = self.name+'-fast_iv_measurement.csv'
+
+        list_length = len(self.fast_voltages)
+
+        if list_length >= 100:
+            sub_lists = [self.fast_voltages[i*100:(i+1)*100] for i in range(list_length // 100)]
+        else:
+            sub_lists = []
+
+        if list_length % 100 > 0:
+            sub_lists.append(self.fast_voltages[-(list_length % 100):])
+
+        current_list = []
+
+        self.connection.timeout = float('inf')  # the response times can be long
+
+        for voltage_list in sub_lists:
+
+            voltage_str = ', '.join(['%.4E' % voltage for voltage in voltage_list])
+            self.write(':SOUR:LIST:VOLT ' + voltage_str)
+            self.write('SOUR:SWE:VOLT:LIST 1, %.2e' % self.knob_values['source delay'])
+            self.write('INIT')
+            self.write('*WAI')
+            raw_response = self.query('TRAC:DATA? 1, %d, "defbuffer1", SOUR, READ' % len(voltage_list)).strip()
+            current_list += [float(current_str) for current_str in raw_response.split(',')[1::2]]
+
+        self.connection.timeout = 1000  # put it back
+
+        # Save fast Iv data
+        new_iv_data = pd.DataFrame({
+            self.mapped_variables['fast voltages']: self.fast_voltages,
+            self.mapped_variables['fast currents']: current_list}
+                                   , index=pd.date_range(start=datetime.datetime.now(), end=datetime.datetime.now(), periods=len(current_list)))
+
+        if os.path.isfile(path):
+            fast_iv_data = pd.read_csv(path, index_col=0)
+        else:
+            fast_iv_data = pd.DataFrame({self.mapped_variables['fast voltages']:[], self.mapped_variables['fast currents']:[]})
+
+        fast_iv_data = fast_iv_data.append(new_iv_data, sort=False)
+        fast_iv_data.to_csv(path)
+
+        self.set_source(self.knob_values['source'])
+        self.set_meter(self.knob_values['meter'])
+
+        return path
+
+    def set_source_delay(self, delay):
+
+        self.knob_values['source delay'] = delay
+
+        if self.source == 'voltage':
+            self.write('SOUR:VOLT:DEL %.4e' % delay)
+        else:
+            self.write('SOUR:CURR:DEL %.4e' % delay)
+
+
 class Keithley2651A(Instrument):
 
     supported_backends = ['visa', 'linux-gpib', 'me-api']
@@ -358,6 +673,7 @@ class Keithley2651A(Instrument):
         self.set_nplc(kwargs.get('nplc', 1))
         self.set_source(kwargs.get('source', 'voltage'))
         self.set_meter(kwargs.get('meter', 'current'))
+        self.set_source_delay(0)
         self.set_output('ON')
 
         self.write('display.screen = display.SMUA')
