@@ -7,16 +7,6 @@ from mercury import instrumentation
 from mercury.utilities import tiempo
 from mercury.utilities import alarms
 
-available_routines = {
-    'Repeat': Repeat,
-    'Ramp': Ramp,
-    'Sweep': Sweep,
-    'Transit': Transit,
-    'PIDControl': PIDControl,
-    'Minimize': Minimize,
-    'Maximize': Maximize
-}
-
 class MappedVariable:
     """
     A variable directly associated with a knob or meter of a connected instrument
@@ -514,8 +504,15 @@ class Maximize(Routine):
         if self.cool_mode == 'immediate':
             self.T = 0
 
-
-
+available_routines = {
+    'Repeat': Repeat,
+    'Ramp': Ramp,
+    'Sweep': Sweep,
+    'Transit': Transit,
+    'PIDControl': PIDControl,
+    'Minimize': Minimize,
+    'Maximize': Maximize
+}
 
 class Schedule:
     """
@@ -551,12 +548,12 @@ class Schedule:
             kind, variable = spec.pop('routine'), spec.pop('variable')
 
             if 'input' in spec:  # some routines require an input
-                # transform variable name to variable
-                spec['input'] = self.instrument_set.mapped_variables['input']
+                input = self.instrument_set.mapped_variables[spec['input']]
+                routine = available_routines[kind](clock=self.clock, input=input, **spec)
+            else:
+                routine = available_routines[kind](clock=self.clock, **spec)
 
-            spec['clock'] = self.clock  # synchronize routine clock with schedule clock
-
-            routine = available_routines[kind](**spec)
+            routine = available_routines[kind](clock=self.clock, **spec)
 
             if routine.stop_time > self.stop_time:
                 self.stop_time = routine.stop_time
