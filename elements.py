@@ -512,7 +512,7 @@ class Schedule:
     Schedule of settings to be applied to knobs, implemented as an iterable to allow for flexibility in combining different kinds of routines
     """
 
-    def __init__(self, routines=None):
+    def __init__(self, instrument_set=None, routines=None):
         """
 
         :param routines: (dict) dictionary of routine specifications (following the runcard yaml format).
@@ -521,6 +521,9 @@ class Schedule:
         self.clock = tiempo.Clock()
 
         self.stop_time = 0
+
+        if instrument_set:
+            self.instrument_set = instrument_set
 
         self.routines = {}
         if routines:
@@ -536,6 +539,10 @@ class Schedule:
 
         for name, spec in routines.items():
             kind, variable = spec.pop('routine'), spec.pop('variable')
+
+            if 'input' in spec:
+                # transform variable name to variable
+                spec['input'] = self.instrument_set.mapped_variables['input']
 
             routine = {
                 'Idle': Idle,
@@ -611,7 +618,7 @@ class Experiment:
 
         self.settings = runcard.get('Settings', self.default_settings)  # Optional; if not given, use default settings above
         self.plotting = runcard.get('Plotting', None)  # Optional
-        self.schedule = Schedule(runcard['Schedule'])  # Required
+        self.schedule = Schedule(instrument_set=self.instruments, routines=runcard['Schedule'])  # Required
 
         # Prepare for data collection
         self.data = pd.DataFrame(
