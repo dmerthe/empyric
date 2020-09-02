@@ -566,8 +566,6 @@ class Keithley2460(Instrument):
         if len(self.fast_voltages) == 0:
             raise MeasurementError('Fast IV sweep voltages have not been set!')
 
-        self.write(':SOUR:VOLT:MODE LIST')
-
         path = self.name+'-fast_iv_measurement.csv'
 
         list_length = len(self.fast_voltages)
