@@ -1,3 +1,4 @@
+import copy
 import datetime
 import importlib
 import numpy as np
@@ -49,6 +50,31 @@ class MappedVariable:
         value = self.instrument.measure(self.meter, sample_number=sample_number)
 
         return value
+
+
+class DerivedVariable:
+    """
+    A variable that is calculated from other variables
+    """
+
+    def __init__(self, expression, parents):
+        """
+
+        :param expression: (str) expression of the derived variable in terms of the parent variables
+        :param parents: (dict) dictionary of parent variables of the form, 'name': mapped_variable
+        """
+
+        self.expression = expression
+        self.parents = parents
+
+    def measure(self):
+
+        expression = copy.copy(self.expression)
+
+        for name, variable in self.parents.items():
+            expression.replace(name, str(variable.measure()))
+
+        return eval(expression)
 
 
 class InstrumentSet:
@@ -114,12 +140,18 @@ class InstrumentSet:
 
         for name, mapping in variables.items():
 
-            instrument, knob, meter = mapping['instrument'], mapping.get('knob', 'none'), mapping.get('meter', 'none')
-            self.mapped_variables.update({name: MappedVariable(self.instruments[instrument], knob=knob, meter=meter)})
-            if knob:
-                self.instruments[instrument].mapped_variables[knob] = name
-            if meter:
-                self.instruments[instrument].mapped_variables[meter] = name
+            if 'instrument' in mapping:  # for mapped variables
+                instrument, knob, meter = mapping['instrument'], mapping.get('knob', 'none'), mapping.get('meter', 'none')
+                self.mapped_variables.update({name: MappedVariable(self.instruments[instrument], knob=knob, meter=meter)})
+                if knob:
+                    self.instruments[instrument].mapped_variables[knob] = name
+                if meter:
+                    self.instruments[instrument].mapped_variables[meter] = name
+            elif 'expression' in mapping:  # for derived variables
+                expression = mapping.pop('expression')
+                parents = {short_name: self.mapped_variables[full_name] for short_name, full_name in mapping.items()}
+                self.mapped_variables[name] = DerivedVariable(expression, parents)
+
 
     def disconnect(self):
         """
