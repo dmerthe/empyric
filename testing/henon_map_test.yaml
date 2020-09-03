@@ -59,12 +59,12 @@ Plotting:
 
 Schedule:
  Set Parameter a:
-  routine: Idle
+  routine: Repeat
   variable: Parameter a
   times: [0, 2 minutes]
   values: 1.4
  Set Parameter b:
-  routine: Idle
+  routine: Repeat
   variable: Parameter b
   times: [0, 2 minutes]
   values: 0.3

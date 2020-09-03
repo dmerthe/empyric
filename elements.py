@@ -504,6 +504,7 @@ class Maximize(Routine):
         if self.cool_mode == 'immediate':
             self.T = 0
 
+
 available_routines = {
     'Repeat': Repeat,
     'Ramp': Ramp,
@@ -513,6 +514,7 @@ available_routines = {
     'Minimize': Minimize,
     'Maximize': Maximize
 }
+
 
 class Schedule:
     """
