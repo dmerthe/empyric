@@ -377,14 +377,14 @@ class Keithley2460(Instrument):
 
         if variable == 'voltage':
 
-            self.write(':SOUR:FUNC VOLT')
+            self.write('SOUR:FUNC VOLT')
             self.set_voltage_range(self.knob_values['voltage range'])
 
             self.knob_values['current'] = None
 
         if variable == 'current':
 
-            self.write(':SOUR:FUNC CURR')
+            self.write('SOUR:FUNC CURR')
             self.set_current_range(self.knob_values['current range'])
 
             self.knob_values['voltage'] = None
@@ -395,17 +395,17 @@ class Keithley2460(Instrument):
 
         if variable == 'voltage':
 
-            self.write(':SENS:FUNC "VOLT"')
-            self.write(':SENS:VOLT:RANG %.2e' % self.knob_values['voltage range'])
-            self.write(':SOUR:CURR:VLIM %.2e' % self.knob_values['voltage range'])
-            self.write(':DISP:VOLT:DIG 5')
+            self.write('SENS:FUNC "VOLT"')
+            self.write('SENS:VOLT:RANG %.2e' % self.knob_values['voltage range'])
+            self.write('SOUR:CURR:VLIM %.2e' % self.knob_values['voltage range'])
+            self.write('DISP:VOLT:DIG 5')
 
         if variable == 'current':
 
-            self.write(':SENS:FUNC "CURR"')
-            self.write(':SENS:CURR:RANG %.2e' % self.knob_values['current range'])
-            self.write(':SOUR:VOLT:ILIM %.2e' % self.knob_values['current range'])
-            self.write(':DISP:CURR:DIG 5')
+            self.write('SENS:FUNC "CURR"')
+            self.write('SENS:CURR:RANG %.2e' % self.knob_values['current range'])
+            self.write('SOUR:VOLT:ILIM %.2e' % self.knob_values['current range'])
+            self.write('DISP:CURR:DIG 5')
 
     def output_on(self):
 
@@ -434,7 +434,7 @@ class Keithley2460(Instrument):
             self.set_meter('voltage')
 
         if self.knob_values['output'] == 'ON':
-            return float(self.query(':READ?').strip())
+            return float(self.query('READ?').strip())
         else:
             return np.nan
 
@@ -444,7 +444,7 @@ class Keithley2460(Instrument):
             self.set_meter('current')
 
         if self.knob_values['output'] == 'ON':
-            return float(self.query(':READ?').strip())
+            return float(self.query('READ?').strip())
         else:
             return 0
 
@@ -455,7 +455,7 @@ class Keithley2460(Instrument):
             self.set_source('voltage')
             self.output_on()  # output if automatically shut off when the source mode is changed
 
-        self.write(':SOUR:VOLT:LEV %.4E' % voltage)
+        self.write('SOUR:VOLT:LEV %.4E' % voltage)
 
         self.knob_values['voltage'] = voltage
 
@@ -466,7 +466,7 @@ class Keithley2460(Instrument):
             self.set_source('current')
             self.output_on()  # output if automatically shut off when the source mode is changed
 
-        self.write(':SOUR:CURR:LEV %.4E' % current)
+        self.write('SOUR:CURR:LEV %.4E' % current)
 
         self.knob_values['current'] = current
 
@@ -489,10 +489,10 @@ class Keithley2460(Instrument):
             self.knob_values['voltage range'] = voltage_range
 
         if self.source == 'voltage':
-            self.write(':SOUR:VOLT:RANG %.2e' % self.knob_values['voltage range'])
+            self.write('SOUR:VOLT:RANG %.2e' % self.knob_values['voltage range'])
         else:
-            self.write(':SOUR:CURR:VLIM %.2e' % self.knob_values['voltage range'])
-            self.write(':SENS:VOLT:RANG %.2e' % self.knob_values['voltage range'])
+            self.write('SOUR:CURR:VLIM %.2e' % self.knob_values['voltage range'])
+            self.write('SENS:VOLT:RANG %.2e' % self.knob_values['voltage range'])
 
         self.knob_values['voltage range'] = voltage_range
 
@@ -515,10 +515,10 @@ class Keithley2460(Instrument):
             self.knob_values['current range'] = current_range
 
         if self.source == 'current':
-            self.write(':SOUR:CURR:RANG %.2E' % self.knob_values['current range'])
+            self.write('SOUR:CURR:RANG %.2E' % self.knob_values['current range'])
         else:
-            self.write(':SOUR:VOLT:ILIM %.2e' % self.knob_values['current range'])
-            self.write(':SENS:CURR:RANG %.2E' % self.knob_values['current range'])
+            self.write('SOUR:VOLT:ILIM %.2e' % self.knob_values['current range'])
+            self.write('SENS:CURR:RANG %.2E' % self.knob_values['current range'])
 
         self.knob_values['current range'] = current_range
 
@@ -585,7 +585,7 @@ class Keithley2460(Instrument):
         for voltage_list in sub_lists:
 
             voltage_str = ', '.join(['%.4E' % voltage for voltage in voltage_list])
-            self.write(':SOUR:LIST:VOLT ' + voltage_str)
+            self.write('SOUR:LIST:VOLT ' + voltage_str)
             self.write('SOUR:SWE:VOLT:LIST 1, %.2e' % self.knob_values['source delay'])
             self.write('INIT')
             self.write('*WAI')
@@ -618,9 +618,9 @@ class Keithley2460(Instrument):
         self.knob_values['source delay'] = delay
 
         if self.source == 'voltage':
-            self.write(':SOUR:VOLT:DEL %.4e' % delay)
+            self.write('SOUR:VOLT:DEL %.4e' % delay)
         else:
-            self.write(':SOUR:CURR:DEL %.4e' % delay)
+            self.write('SOUR:CURR:DEL %.4e' % delay)
 
 
 class Keithley2651A(Instrument):
