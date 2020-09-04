@@ -608,8 +608,8 @@ class Keithley2460(Instrument):
         fast_iv_data = fast_iv_data.append(new_iv_data, sort=False)
         fast_iv_data.to_csv(path)
 
-        self.set_source(self.knob_values['source'])
-        self.set_meter(self.knob_values['meter'])
+        self.set_source(self.source)
+        self.set_meter(self.meter)
 
         return path
 
