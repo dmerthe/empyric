@@ -423,79 +423,8 @@ class PIDControl(Routine):
 
             return output
 
-class Minimize(Routine):
-    # under construction
-    """
-    Minimize a variable (meter) by simulated annealing
-    """
-
-    cool_modes = ['immediate', 'linear']
-
-    def __init__(self, **kwargs):
-
-        Routine.__init__(self, **kwargs)
-
-        if 'input' not in kwargs:
-            raise AttributeError('PIDControl routine requires an input (meter)!')
-
-        self.input = kwargs['input']
-
-        self.cool_mode = kwargs.get('cooling_mode', 'linear')
-        if self.cool_mode not in self.cool_modes:
-            raise AttributeError("Cooling mode not recognized! Must be 'immediate', 'linear' or 'exponential'")
-
-        self.T0 = kwargs.get('initial_temperature', 1)
-        self.T = kwargs.get('initial_temperature', 1)
-
-        self.prior_setting = self.values[0]
-        self.setting = self.values[0]
-        self.scale = self.values[1]
-        self.reading = self.input.measure()
-
-    def __next__(self):
-
-        now = self.clock.time()
-        if self.start_time <= now < self.stop_time and now >= self.last_call + self.interval:
-            self.cool()
-
-            new_reading = self.input.measure()  # response to last knob setting
-            is_better = self.is_better(new_reading)
-            self.reading = new_reading
-
-            if is_better:
-                # record better setting and move on to next setting
-                self.prior_setting = self.setting
-                self.setting = self.setting + self.scale*(2*np.random.rand() - 1)
-            else:
-                # return to previous setting
-                self.setting = self.prior_setting
-
-            return self.setting
-
-
-    def is_better(self, value):
-
-        if value < self.reading:
-            return True
-        else:
-            return np.exp(-(value - self.reading) / self.T) > np.random.rand()
-
-    def cool(self):
-
-        mode = self.cool_mode
-        now = self.clock.time()
-
-        start_time = self.start_time
-        end_time = self.stop_time
-
-        if self.cool_mode == 'linear':
-            self.T = self.T0*(1 - (now - start_time) / (end_time - start_time))
-        if self.cool_mode == 'immediate':
-            self.T = 0
-
 
 class Maximize(Routine):
-    # under construction
     """
     Minimize a variable (meter) by simulated annealing
     """
@@ -510,6 +439,8 @@ class Maximize(Routine):
             raise AttributeError('PIDControl routine requires an input (meter)!')
 
         self.input = kwargs['input']
+        self.scale = kwargs.get('scale', 0.01)
+        self.bounds = kwargs.get('bounds', [-np.inf, np.inf])
 
         self.cool_mode = kwargs.get('cooling_mode', 'linear')
         if self.cool_mode not in self.cool_modes:
@@ -518,9 +449,8 @@ class Maximize(Routine):
         self.T0 = kwargs.get('initial_temperature', 1)
         self.T = kwargs.get('initial_temperature', 1)
 
-        self.prior_setting = self.values[0]
         self.setting = self.values[0]
-        self.scale = self.values[1]
+        self.prior_setting = self.values[0]
         self.reading = self.input.measure()
 
     def __next__(self):
@@ -538,6 +468,11 @@ class Maximize(Routine):
                 # record better setting and move on to next setting
                 self.prior_setting = self.setting
                 self.setting = self.setting + self.scale * (2 * np.random.rand() - 1)
+
+                # impose limits
+                self.setting = np.max([self.setting, self.bounds[0]])
+                self.setting = np.min([self.setting, self.bounds[1]])
+
             else:
                 # return to previous setting
                 self.setting = self.prior_setting
@@ -563,6 +498,20 @@ class Maximize(Routine):
             self.T = self.T0 * (1 - (now - start_time) / (end_time - start_time))
         if self.cool_mode == 'immediate':
             self.T = 0
+
+
+class Minimize(Maximize):
+    """
+    Minimize a variable (meter) by simulated annealing.
+    This is essentially the same as Maximize, but with a different is_better method to qualify minimization
+    """
+
+    def is_better(self, value):
+
+        if value < self.reading:
+            return True
+        else:
+            return np.exp(-(value - self.reading) / self.T) > np.random.rand()
 
 
 available_routines = {
