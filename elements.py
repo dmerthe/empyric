@@ -69,7 +69,13 @@ class DerivedVariable:
         expression = copy.copy(self.expression)
 
         for name, variable in self.parents.items():
-            expression = expression.replace(name, str(variable.measure()))
+
+            measured_value = variable.measure()
+
+            if isinstance(measured_value, str):  # is the measured data a csv file?
+                measured_value = pd.read_csv(measured_value)
+
+            expression = expression.replace(name, str(measured_value))
 
         return eval(expression)
 
