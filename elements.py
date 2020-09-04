@@ -19,14 +19,8 @@ class MappedVariable:
             raise TypeError('Need either a knob or meter specification!')
 
         self.instrument = instrument
-
         self.knob = knob
-        if knob.lower() == 'none':
-            self.knob = None
-
         self.meter = meter
-        if meter.lower() == 'none':
-            self.meter = None
 
     def set(self, value):
 
@@ -138,19 +132,33 @@ class InstrumentSet:
 
     def map_variables(self, variables):
 
-        for name, mapping in variables.items():
+        variables_to_map = copy.copy(variables)
 
-            if 'instrument' in mapping:  # for mapped variables
-                instrument, knob, meter = mapping['instrument'], mapping.get('knob', 'none'), mapping.get('meter', 'none')
-                self.mapped_variables.update({name: MappedVariable(self.instruments[instrument], knob=knob, meter=meter)})
+        # Map variables directly measured through an instrument
+        for name, mapping in variables_to_map.items():
+            if 'instrument' in mapping:
+                instrument, knob, meter = mapping['instrument'], mapping.get('knob', None), mapping.get('meter', None)
+                self.mapped_variables.update(
+                    {name: MappedVariable(self.instruments[instrument], knob=knob, meter=meter)})
                 if knob:
                     self.instruments[instrument].mapped_variables[knob] = name
                 if meter:
                     self.instruments[instrument].mapped_variables[meter] = name
-            elif 'expression' in mapping:  # for derived variables
-                expression = mapping.pop('expression')
-                parents = {short_name: self.mapped_variables[full_name] for short_name, full_name in mapping.items()}
-                self.mapped_variables[name] = DerivedVariable(expression, parents)
+
+                variables_to_map.pop(name)
+
+        # Remaining variables are derived variables. Iterate until all variables have been mapped.
+        # If there are multilayer dependencies, this could take more than one iteration
+        while len(variables_to_map) > 0:
+            for name, mapping in variables_to_map.items():
+                mapping_copy = copy.copy(mapping)
+                try:
+                    expression = mapping_copy.pop('expression')
+                    parents = {short_name: self.mapped_variables[full_name] for short_name, full_name in mapping_copy.items()}
+                    self.mapped_variables[name] = DerivedVariable(expression, parents)
+                    variables_to_map.pop(name)
+                except KeyError:  # if this variable refers to a variable that has not been mapped yet
+                    pass
 
 
     def disconnect(self):
