@@ -33,6 +33,10 @@ Variables:
  Coordinate y:
   instrument: Henon Machine
   meter: y
+ Coordinate Sum:
+  expression: "x + y"
+  x: Coordinate x
+  y: Coordinate y
 
 Plotting:
  Step Plot:

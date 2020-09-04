@@ -61,12 +61,15 @@ class DerivedVariable:
         self.expression = expression
         self.parents = parents
 
+        self.knob = None  # for consistency
+        self.meter = self.expression
+
     def measure(self):
 
         expression = copy.copy(self.expression)
 
         for name, variable in self.parents.items():
-            expression.replace(name, str(variable.measure()))
+            expression = expression.replace(name, str(variable.measure()))
 
         return eval(expression)
 
@@ -132,10 +135,11 @@ class InstrumentSet:
 
     def map_variables(self, variables):
 
-        variables_to_map = copy.copy(variables)
+        remaining_variables = list(variables.keys())
 
+        # First loop is for directly measured variables
         # Map variables directly measured through an instrument
-        for name, mapping in variables_to_map.items():
+        for name, mapping in variables.items():
             if 'instrument' in mapping:
                 instrument, knob, meter = mapping['instrument'], mapping.get('knob', None), mapping.get('meter', None)
                 self.mapped_variables.update(
@@ -145,20 +149,30 @@ class InstrumentSet:
                 if meter:
                     self.instruments[instrument].mapped_variables[meter] = name
 
-                variables_to_map.pop(name)
+                remaining_variables.remove(name)
 
         # Remaining variables are derived variables. Iterate until all variables have been mapped.
         # If there are multilayer dependencies, this could take more than one iteration
-        while len(variables_to_map) > 0:
-            for name, mapping in variables_to_map.items():
+        while len(remaining_variables) > 0:
+
+            for name, mapping in variables.items():
+
+                if name not in remaining_variables:
+                    continue
+
                 mapping_copy = copy.copy(mapping)
+
                 try:
                     expression = mapping_copy.pop('expression')
-                    parents = {short_name: self.mapped_variables[full_name] for short_name, full_name in mapping_copy.items()}
+                    parents = {
+                        short_name: self.mapped_variables[full_name]
+                        for short_name, full_name in mapping_copy.items()
+                    }
+
                     self.mapped_variables[name] = DerivedVariable(expression, parents)
-                    variables_to_map.pop(name)
-                except KeyError:  # if this variable refers to a variable that has not been mapped yet
-                    pass
+                    remaining_variables.remove(name)
+                except KeyError as key:  # if this variable refers to a variable that has not been mapped yet
+                   raise KeyError(f'No variable named {key}!')
 
 
     def disconnect(self):
