@@ -559,12 +559,11 @@ class Schedule:
             kind, variable = spec.pop('routine'), spec.pop('variable')
 
             if 'input' in spec:  # some routines require an input
-                input = self.instrument_set.mapped_variables[spec['input']]
-                routine = available_routines[kind](clock=self.clock, input=input, **spec)
+                spec_copy = copy.copy(spec)  # spec (as part of routine) gets saved into a runcard later, so preserve it
+                spec_copy['input'] = self.instrument_set.mapped_variables[spec['input']]
+                routine = available_routines[kind](clock=self.clock, **spec_copy)
             else:
                 routine = available_routines[kind](clock=self.clock, **spec)
-
-            routine = available_routines[kind](clock=self.clock, **spec)
 
             if routine.stop_time > self.stop_time:
                 self.stop_time = routine.stop_time
