@@ -269,6 +269,7 @@ class HenonMachine(Instrument):
     """
 
     supported_backends = ['chaos']
+    default_backend = 'chaos'
 
     name = 'Henon Machine'
 
@@ -364,245 +365,42 @@ class HenonMachine(Instrument):
         return int(0.5*self.step) % 10
 
 
-# class GPIBDevice:
-#     """
-#     Generic base class for handling communication with GPIB instruments.
-#
-#     """
-#     supported_backends = ['visa', 'linux-gpib', 'me-api']
-#     # Default GPIB communication settings
-#     delay = 0.1
-#     default_backend = 'visa'
-#
-#     def connect(self, **kwargs):
-#         """
-#         Connect through the GPIB interface. Child class should have address and backend attributes upon calling this method.
-#
-#         :return: None
-#         """
-#
-#         try:
-#             address = self.address
-#         except(AttributeError):
-#             raise (ConnectionError('Device address has not been specified!'))
-#
-#         if self.backend not in self.supported_backends:
-#             raise ConnectionError(f'Backend {self.backend} is not supported!')
-#
-#         if self.backend == 'visa':
-#             visa = importlib.import_module('visa')
-#             resource_manager = visa.ResourceManager()
-#             self.connection = resource_manager.open_resource(address)
-#             self.name = self.name+f"-GPIB{address.split('::')[1]}"
-#         elif self.backend == 'linux-gpib':
-#             linux = importlib.import_module('linux')
-#             self.connection = linux.Gpib(name=0, pad=address)
-#             self.name = self.name + f"-GPIB{address.split('/')[-1]}"
-#
-#     def disconnect(self):
-#         self.connection.close()
-#
-#     def write(self, command):
-#         self.connection.write(command)
-#
-#     def read(self):
-#         self.connection.read()
-#
-#     def query(self, question, delay = None):
-#         if delay:
-#             return self.connection.query(question, delay=delay)
-#         else:
-#             return self.connection.query(question, delay=self.delay)
-#
-#     def identify(self):
-#         return self.connection.query('*IDN?')
-#
-#     def reset(self):
-#         self.connection.write('*RST')
-#
-#
-# class SerialDevice:
-#     """
-#     Generic base class for handling communication with instruments with the serial (pyserial) backend
-#     This includes devices that are connected by USB or Serial cable
-#     """
-#
-#     # Default serial communication parameters
-#     supported_backends = ['serial', 'visa']
-#     baudrate = 9600
-#     timeout = 1.0
-#     delay = 0.1
-#     default_backend = 'visa'
-#
-#     def connect(self):
-#
-#         try:
-#             address = self.address
-#         except(AttributeError):
-#             raise (ConnectionError('Device address has not been specified!'))
-#
-#         if self.backend not in self.supported_backends:
-#             raise ConnectionError(f'Backend {self.backend} is not supported!')
-#
-#         if self.backend == 'visa':
-#             visa = importlib.import_module('visa')
-#             resource_manager = visa.ResourceManager()
-#             self.connection = resource_manager.open_resource(address, baud_rate=self.baudrate)
-#             self.name = self.name + f"-{address}"
-#         elif self.backend == 'serial':
-#             serial = importlib.import_module('serial')
-#             self.connection = serial.Serial(port=address, baudrate=self.baudrate, timeout=self.delay)
-#             self.name = self.name + f"-{address}"
-#
-#     def disconnect(self):
-#
-#         self.connection.close()
-#
-#     def write(self, command):
-#
-#         if self.backend == 'serial':
-#             padded_command = '\r%s\r\n' % command
-#             self.connection.write(padded_command.encode())
-#         if self.backend == 'visa':
-#             self.connection.write(command)
-#
-#     def read(self):
-#
-#         if self.backend == 'serial':
-#             return self.connection.read(100).decode().strip()
-#         if self.backend == 'visa':
-#             return self.connection.read()
-#
-#     def query(self, question):
-#
-#         self.write(question)
-#         tiempo.sleep(self.delay)
-#         result = self.read()
-#         return result
-#
-#     def identify(self):
-#
-#         return self.query('*IDN?')
-#
-#     def reset(self):
-#
-#         self.write('*RST')
-#
-#
-# class USBDevice:
-#     """
-#     Generic base class for pure USB devices
-#     """
-#
-#
-#     pass
-#
-#
-# class PhidgetDevice:
-#
-#     supported_backends = ['phidget']
-#     default_backend = 'phidget'
-#
-#     def connect(self, kind=None):
-#
-#         try:
-#             address = self.address
-#         except AttributeError:
-#             raise(ConnectionError('Device address has not been specified!'))
-#
-#         if self.backend not in self.supported_backends:
-#             raise ConnectionError(f'Backend {self.backend} is not supported!')
-#
-#         address_parts = address.split('-')
-#
-#         serial_number = int(address_parts[0])
-#         port_numbers = [int(value) for value in address_parts[1:]]
-#
-#         try:
-#             device_class = self.device_class
-#         except AttributeError:
-#             raise (ConnectionError('Phidget device class has not been specified!'))
-#
-#         if len(port_numbers) == 1: # TC reader connected directly by USB to PC
-#             self.connection = device_class()
-#             self.connection.setDeviceSerialNumber(serial_number)
-#             self.connection.setChannel(port_numbers[0])
-#             self.connection.openWaitForAttachment(5000)
-#             self.name = self.name + f"-{address}"
-#
-#         elif len(port_numbers) == 2: # TC reader connected to PC via VINT hub
-#             self.connection = device_class()
-#             self.connection.setDeviceSerialNumber(serial_number)
-#             self.connection.setHubPort(port_numbers[0])
-#             self.connection.setChannel(port_numbers[1])
-#             self.connection.openWaitForAttachment(5000)
-#             self.name = self.name + f"-{address}"
-#
-#         else: # It's possible to daisy-chain hubs and other Phidget devices, but is not implemented here
-#             raise ConnectionError('Support for daisy-chained Phidget devices not supported!')
-#
-#     def disconnect(self):
-#
-#         self.connection.close()
-#
-#
-# class TwilioDevice:
-#
-#     supported_backends = ['twilio']
-#     default_backend = 'twilio'
-#
-#     def connect(self, **kwargs):
-#
-#         try:
-#             phone_number = self.phone_number
-#         except AttributeError:
-#             raise(ConnectionError('Device address has not been specified!'))
-#
-#         Client = importlib.import_module('twilio.rest').Client
-#
-#         with open(askopenfilename(title='Select Twilio Credentials'),'rb') as credentials_file:
-#             credentials = yaml.load(credentials_file)
-#             account_sid = credentials['sid']
-#             auth_token = credentials['token']
-#             self.from_number = credentials['number']
-#
-#         self.to_number = phone_number
-#
-#         self.client = Client(account_sid, auth_token)
-#
-#     def write(self, message):
-#
-#         self.client.messages.create(
-#             to=self.to_number,
-#             from_=self.from_number,
-#             body=message
-#         )
-#
-#     def read(self):
-#         incoming_messages = self.client.messages.list(from_=self.to_number, to=self.from_number, limit=1)
-#
-#         if len(incoming_messages) > 0:
-#             return incoming_messages[-1].body, incoming_messages[-1].date_sent
-#         else:
-#             return '', datetime.datetime.fromtimestamp(0)
-#
-#     def disconnect(self):
-#         return
-#
-#
-# class MEDevice(Instrument):
-#
-#     supported_backends = ['me_api']
-#     default_backend = 'me_api'
-#
-#     def __init__(self, address, **kwargs):
-#
-#         try:
-#             self.name = kwargs.pop('kind')
-#         except KeyError:
-#             raise ConnectionError(f"Instrument class not specified!")
-#
-#         self.address = kwargs.pop('address')
-#         self.backend = self.default_backend
-#
-#         self.connect(**kwargs)
+class NoiseGenerator(Instrument):
+    """
+    Artificial instrument for testing; contains 2 meters (X in, Y in) and 4 knobs (X out, Y out, sigma X, sigma Y)
+    Meter X (X = 1 or 2) return the value of knob X with gaussian noise of standard deviation sigma X
+    """
+
+    supported_backends = ['noise']
+    default_backend = 'noise'
+
+    name = 'Noise Generator'
+
+    knobs = ('X in', 'Y in', 'sigma X', 'sigma Y')
+
+    meters = ('X out', 'Y out')
+
+    def __init__(self, address=None, backend=None):
+
+        self.knob_values = {'X in': 0, 'Y in': 0, 'sigma X': 0.1, 'sigma Y': 0.1}
+
+    def set_X_in(self, X):
+        self.knob_values['X in'] = X
+
+    def set_Y_in(self, Y):
+        self.knob_values['Y in'] = Y
+
+    def set_sigma_X(self, sigma):
+        self.knob_values['sigma X'] = sigma
+
+    def set_sigma_Y(self, sigma):
+        self.knob_values['sigma Y'] = sigma
+
+    def measure_X_out(self):
+        return self.knob_values['X in'] + self.knob_values['sigma X']*np.random.randn()
+
+    def measure_Y_out(self):
+        return self.knob_values['Y in'] + self.knob_values['sigma Y']*np.random.randn()
+
+    def disconnect(self):
+        return

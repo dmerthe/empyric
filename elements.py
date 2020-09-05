@@ -177,8 +177,8 @@ class InstrumentSet:
 
                     self.mapped_variables[name] = DerivedVariable(expression, parents)
                     remaining_variables.remove(name)
-                except KeyError as key:  # if this variable refers to a variable that has not been mapped yet
-                   raise KeyError(f'No variable named {key}!')
+                except KeyError:  # if this variable refers to a variable that has not been mapped yet
+                   continue
 
 
     def disconnect(self):
@@ -211,7 +211,7 @@ class InstrumentSet:
             if type(knob_name) is str:  # for mapped variables
                 self.mapped_variables[knob_name].set(value)
             else:  # for unmapped variables
-                instrument_name, knob_name = knob_name
+                instrument_name, knob_name = knob_name  # knob can be specified by (instrument, knob) tuple
                 instrument = self.instruments[instrument_name]
                 instrument.set(knob_name, value)
 
@@ -331,8 +331,8 @@ class Ramp(Routine):
 
 class Transit(Routine):
     """
-    Sequentially and immediately passes a value once through the 'values' list argument, cutting it off at the single value of the 'times' argument.
-    This routine can be thought of as a generalization of the Ramp routine.
+    Generalization of the Ramp routine.
+    Sequentially iterates once through a given list of values
     """
 
     def __init__(self):
@@ -350,7 +350,8 @@ class Transit(Routine):
 
 class Sweep(Routine):
     """
-    Sequentially and cyclically sweeps a value through the 'values' list argument, starting at the first time in 'times' and ending at the last.
+    Sequentially and cyclically sweeps a value through the 'values' list argument,
+    starting at the first time in 'times' and ending at the last.
     """
 
     def __init__(self, **kwargs):
