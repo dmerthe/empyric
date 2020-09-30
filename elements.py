@@ -68,12 +68,17 @@ class DerivedVariable:
 
         expression = copy.copy(self.expression)
 
+        # bring in common numpy functions
+        mean = np.mean
+        var = np.var
+        std = np.std
+
         for name, variable in self.parents.items():
 
             measured_value = variable.measure()
 
-            if isinstance(measured_value, str):  # is the measured data a csv file?
-                measured_value = pd.read_csv(measured_value)
+            if isinstance(measured_value, str):  # is the measured data a csv file path?
+                measured_value = pd.read_csv(measured_value)  # measurement is a dataframe
 
             expression = expression.replace(name, str(measured_value))
 
