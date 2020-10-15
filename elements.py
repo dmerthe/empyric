@@ -12,13 +12,21 @@ class Instrument:
 
     self.knob_values = {}
 
-    def __init__(self, **kwargs):
+    def __init__(self, address, adapter, **kwargs):
 
+        # Connect to instrument
+        self.address = address
+        self.adapter = adapter
+
+        self.adapter.connect(self.address)
+
+        # Apply presets
         self.presets = kwargs.get('presets', [])
 
         for knob, value in self.presets:
             self.set(knob, value)
 
+        # Get postsets
         self.postsets = kwargs.get('postsets', [])
 
     def set(self, knob, value):
