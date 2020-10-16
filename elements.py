@@ -7,18 +7,15 @@ class Instrument:
 
     name = 'Instrument'
 
-    self.knobs = tuple()
-    self.meters = tuple()
+    knobs = tuple()
+    meters = tuple()
 
-    self.knob_values = {}
+    knob_values = dict()
 
-    def __init__(self, address, adapter, **kwargs):
+    def __init__(self, adapter, **kwargs):
 
         # Connect to instrument
-        self.address = address
         self.adapter = adapter
-
-        self.adapter.connect(self.address)
 
         # Apply presets
         self.presets = kwargs.get('presets', [])
@@ -28,6 +25,15 @@ class Instrument:
 
         # Get postsets
         self.postsets = kwargs.get('postsets', [])
+
+    def write(self, message):
+        return self.adapter.write(message)
+
+    def read(self):
+        return self.adapter.read()
+
+    def query(self, question):
+        return self.adapter.query(question)
 
     def set(self, knob, value):
         """
@@ -71,7 +77,6 @@ class Instrument:
             self.set(knob, value)
 
         self.adapter.disconnect()
-
 
 
 class Knob:
