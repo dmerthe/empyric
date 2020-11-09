@@ -204,8 +204,6 @@ class VISAAdapter(Adapter):
         self.connected = False
 
 
-
-
 class LinuxGPIBAdapter(Adapter):
     """
     Adapter handling communications with GPIB instruments using the Linux GPIB backend

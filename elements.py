@@ -1,4 +1,8 @@
-
+# Some basic stuff
+import time
+import datetime
+import numpy as np
+import pandas as pd
 
 class Instrument:
     """
@@ -79,69 +83,140 @@ class Instrument:
         self.adapter.disconnect()
 
 
-class Knob:
+class Variable:
     """
-    Representation of an experiment variable that can be set directly
+    Basic representation of an experimental variable; comes in 3 kinds: knob, meter and dependent
+
+    Knobs can only be set; meters and dependents can only be measured
     """
 
-    def __init__(self, instrument, label):
+    def __init__(self, *args, **kwargs):
 
-        self.instrument = instrument
-        self.label = label
+        if 'type' not in kwargs:
+            raise AttributeError("Variable type not defined!")
+
+        self.type = kwargs['type']
         self._value = None
+
+        if self.type in ['knob', 'meter']:
+            self.instrument = args[0]
+            self.label = args[1]
+
+        elif self.type == 'dependent':
+            self.expression = args[0]
+            self.parents = args[1]
 
     @property
     def value(self):
-        self._value = self.instrument.knob_values[self.label]
+        if self.type == 'knob':
+            self._value = self.instrument.knob_values[self.label]
+        elif self.type == 'meter':
+            self._value = self.instrument.measure(self.label)
+        elif self.type == 'dependent':
+            expression = self.expression
+
+            for symbol, parent in parents.items():
+                expression = expression.replace(symbol, str(parent._value))
+
+            self._value = eval(expression)
+
         return self._value
 
     @value.setter
     def value(self, value):
-        self.instrument.set(knob, value)
-        self._value = self.instrument.knob_values[self.label]
+        if self.type == 'knob':
+            self.instrument.set(knob, value)
+            self._value = self.instrument.knob_values[self.label]
 
 
-class Meter:
+class Alarm:
     """
-    Representation of an experiment variable that can be measured directly
+    Monitors a variable a raises an alarm if a condition is met
     """
 
-    def __init__(self, instrument, label):
+    def __init__(self, variable, condition, protocol):
 
-        self.instrument = instrument
-        self.label = label
-        self._value = None
+        self.variable = variable
+        self.condition = condition
+        self.protocol = protocol
 
     @property
-    def value(self):
-        self._value = self.instrument.measure(self.label)
-        return self._value
+    def signal(self):
+        value = self.variable.value
+        if eval('value'+condition):
+            return self.protocol
+        else:
+            return None
 
 
-class Dependent:
+class Clock:
     """
-    Representation of a experimental variable that depends on other experiment variables
+    Clock object for tracking elapsed time.
     """
 
-    def __init__(self, expression, parents):
-        """
+    def __init__(self):
 
-        :param expression: (str) mathematical expression of the variable in terms of the parent variables
-        :param parents: (dict) dictionary of the form {..., variable symbol, knob/meter/dependent object, ....}
-        """
+        self.start_time = time.time()
+        self.stop_time = time.time()  # clock is initially stopped
+        self.stoppage = 0
 
-        self.expression = expression
-        self.parents = parents
-        self._value = None
+    def start(self):
+        if self.stop_time:
+            self.stoppage += time.time() - self.stop_time
+            self.stop_time = False
+
+    def stop(self):
+        if not self.stop_time:
+            self.stop_time = time.time()
+
+    def reset(self):
+        self.__init__()
 
     @property
-    def value(self):
+    def time(self):
+        if self.stop_time:
+            elapsed_time = self.stop_time - self.start_time - self.stoppage
+        else:
+            elapsed_time = time.time() - self.start_time - self.stoppage
 
-        expression = self.expression
+        return elapsed_time
 
-        for symbol, parent in parents.items():
-            expression = expression.replace(symbol, str(parent._value))
 
-        self._value = eval(expression)
+class Schedule:
 
-        return self._value
+    def __init__(self):
+
+        self.clock = Clock()
+
+    def __next__(self):
+        pass
+
+
+class Experiment:
+
+    def __init__(self, variables, schedule):
+
+        self.variables = variables  # dict of the form [..., name: variable, ...]
+        self.schedule = schedule  # Schedule object
+
+        self.data = pd.DataFrame(columns = ['time'] + list(variables.keys()))
+
+    def __next__(self):
+
+        state = pd.Series({'time': self.schedule.clock.time}, name=datetime.datetime.now())
+
+        # Apply new settings to knobs
+        settings = next(self.schedule)
+
+        for name, value in settings.items():
+            self.variables[name].value = value
+            state[name] = value
+
+        # Read meters and calculate dependents
+        for name, variable in self.variables.items():
+            if variable.type in ['meter', 'dependent']:
+                state[name] = variable.value
+
+        self.data.loc[state.name] = state
+
+        return state
