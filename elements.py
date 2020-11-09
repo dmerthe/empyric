@@ -188,13 +188,14 @@ class Schedule:
 
         self.clock = Clock()
 
+
     def __next__(self):
         pass
 
 
 class Experiment:
 
-    def __init__(self, variables, schedule):
+    def __init__(self, variables, schedule=None):
 
         self.variables = variables  # dict of the form [..., name: variable, ...]
         self.schedule = schedule  # Schedule object
@@ -205,12 +206,13 @@ class Experiment:
 
         state = pd.Series({'time': self.schedule.clock.time}, name=datetime.datetime.now())
 
-        # Apply new settings to knobs
-        settings = next(self.schedule)
+        # Apply new settings to knobs as determined by the schedule, if there is one
+        if self.schedule:
+            settings = next(self.schedule)
 
-        for name, value in settings.items():
-            self.variables[name].value = value
-            state[name] = value
+            for name, value in settings.items():
+                self.variables[name].value = value
+                state[name] = value
 
         # Read meters and calculate dependents
         for name, variable in self.variables.items():
@@ -220,3 +222,25 @@ class Experiment:
         self.data.loc[state.name] = state
 
         return state
+
+    def stop(self):
+        self.schedule.clock.stop()
+
+    def start(self):
+        self.schedule.clock.start()
+
+
+class Runcard:
+    """
+    Runcard encodes all the parameters of the experiment, as described by the user in the corresponding YAML document
+    """
+    def __init__(self, path):
+        pass
+
+
+class Controller:
+    """
+    Runs experiments and handles alarms
+    """
+    def __init__(self, runcard):
+        pass
