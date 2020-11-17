@@ -1,7 +1,6 @@
 # Some basic stuff
 import time
 import datetime
-import numpy as np
 import pandas as pd
 
 class Instrument:
@@ -51,7 +50,7 @@ class Instrument:
         try:
             set_method = self.__getattribute__('set_ ' +knob.replace(' ' ,'_'))
         except AttributeError:
-            raise SetError(f"'{knob}' cannot be set on {self.name}")
+            raise AttributeError(f"'{knob}' cannot be set on {self.name}")
 
         if value is None:  # A None value passed into this function indicates that no change in setting is to be made
             return
@@ -69,7 +68,7 @@ class Instrument:
         try:
             measurement_method = self.__getattribute__('measure_ ' +meter.replace(' ' ,'_'))
         except AttributeError:
-            raise MeasurementError(f"'{meter}' cannot be measured on {self.name}")
+            raise AttributeError(f"'{meter}' cannot be measured on {self.name}")
 
         measurement = measurement_method()
 
@@ -85,9 +84,15 @@ class Instrument:
 
 class Variable:
     """
-    Basic representation of an experimental variable; comes in 3 kinds: knob, meter and dependent
+    Basic representation of an experimental variable; comes in 3 kinds: knob, meter and dependent.
+    Knobs can only be set; meters and dependents can only be measured.
 
-    Knobs can only be set; meters and dependents can only be measured
+    A knob is a variable corresponding to something on an instrument that can be controlled, e.g. the voltage of a power supply.
+
+    A meter is a variable that is measured, such as temperature. Some meters can be controlled directly or indirectly through an associated knob, but a meter can not be set.
+
+    A dependent is a variable that is not directly measured, but is calculated based on other variables of the experiment.
+    An example would be power output from a power supply, where voltage is a knob and current is a meter: power = voltage * current
     """
 
     def __init__(self, *args, **kwargs):
@@ -96,7 +101,7 @@ class Variable:
             raise AttributeError("Variable type not defined!")
 
         self.type = kwargs['type']
-        self._value = None
+        self._value = None  # This is the last known value of this variable
 
         if self.type in ['knob', 'meter']:
             self.instrument = args[0]
@@ -115,7 +120,7 @@ class Variable:
         elif self.type == 'dependent':
             expression = self.expression
 
-            for symbol, parent in parents.items():
+            for symbol, parent in self.parents.items():
                 expression = expression.replace(symbol, str(parent._value))
 
             self._value = eval(expression)
@@ -123,8 +128,9 @@ class Variable:
         return self._value
 
     @value.setter
-    def value(self, value):
+    def value(self, value):  # value property can only be set if variable is a knob
         if self.type == 'knob':
+            knob = self.label
             self.instrument.set(knob, value)
             self._value = self.instrument.knob_values[self.label]
 
@@ -136,14 +142,14 @@ class Alarm:
 
     def __init__(self, variable, condition, protocol):
 
-        self.variable = variable
-        self.condition = condition
-        self.protocol = protocol
+        self.variable = variable  # variable being monitored
+        self.condition = condition  # condition which triggers the alarm
+        self.protocol = protocol  # what to do when the alarm is triggered
 
     @property
     def signal(self):
         value = self.variable.value
-        if eval('value'+condition):
+        if eval('value' + self.condition):
             return self.protocol
         else:
             return None
@@ -151,7 +157,7 @@ class Alarm:
 
 class Clock:
     """
-    Clock object for tracking elapsed time.
+    Clock object for tracking elapsed time
     """
 
     def __init__(self):
@@ -182,52 +188,86 @@ class Clock:
         return elapsed_time
 
 
-class Schedule:
+class Routine:
 
-    def __init__(self):
+    def __init__(self, variable, values, start_time='-inf', stop_time='inf', interval=0, feedback=None):
 
-        self.clock = Clock()
+        self.variables = variable
+        self.values = values
 
+        self.start_time = float(start_time)
+        self.stop_time = float(stop_time)
+        self.interval = interval
+
+        self.feedback = feedback  # variable
+
+    def __iter__(self):
+        pass
 
     def __next__(self):
         pass
 
 
+
+
+
+# class Schedule:
+#     """
+#     Represents an experiment schedule with predefined routines for knobs
+#     """
+#
+#     def __init__(self):
+#
+#         self.clock = Clock()
+#
+#
+#     def __next__(self):
+#         pass
+#
+#     def __iter__(self):
+#         return self
+
+
 class Experiment:
 
-    def __init__(self, variables, schedule=None):
+    def __init__(self, variables, routines=None):
 
         self.variables = variables  # dict of the form [..., name: variable, ...]
-        self.schedule = schedule  # Schedule object
+        self.routines = routines  # Schedule object
+
+        self.clock = Clock()
 
         self.data = pd.DataFrame(columns = ['time'] + list(variables.keys()))
 
     def __next__(self):
 
-        state = pd.Series({'time': self.schedule.clock.time}, name=datetime.datetime.now())
+        state = pd.Series({'time': self.clock.time}, name=datetime.datetime.now())
 
         # Apply new settings to knobs as determined by the schedule, if there is one
-        if self.schedule:
+        for routine in self.routines:
+
+
             settings = next(self.schedule)
 
             for name, value in settings.items():
                 self.variables[name].value = value
-                state[name] = value
 
         # Read meters and calculate dependents
         for name, variable in self.variables.items():
-            if variable.type in ['meter', 'dependent']:
-                state[name] = variable.value
+            state[name] = variable.value
 
         self.data.loc[state.name] = state
 
         return state
 
+    def __iter__(self):
+        return self
+
     def stop(self):
-        self.schedule.clock.stop()
+        self.clock.stop()
 
     def start(self):
-        self.schedule.clock.start()
+        self.clock.start()
 
 
 class Runcard:
@@ -242,5 +282,5 @@ class Controller:
     """
     Runs experiments and handles alarms
     """
-    def __init__(self, runcard):
+    def __init__(self, runcard, gui=None):
         pass
