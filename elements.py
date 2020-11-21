@@ -1,7 +1,9 @@
 # Some basic stuff
 import time
+from scipy.interpolate import interp1d
 import datetime
 import pandas as pd
+
 
 class Instrument:
     """
@@ -190,42 +192,40 @@ class Clock:
 
 class Routine:
 
-    def __init__(self, variable, values, start_time='-inf', stop_time='inf', interval=0, feedback=None):
+    def __init__(self, variable, times, values, name=None, feedback=False, indicator=None, controller=None):
 
-        self.variables = variable
+        self.name = name
+        self.variables = variable  # knob
+        self.times = times
         self.values = values
 
-        self.start_time = float(start_time)
-        self.stop_time = float(stop_time)
-        self.interval = interval
+        self.interpolator = interp1d(times, values)
 
-        self.feedback = feedback  # variable
+        self.feedback = feedback
+
+        if feedback:
+
+            if not indicator:
+                raise AttributeError('Feedback requires an indicator!')
+            if not controller:
+                raise AttributeError('Feedback requires a controller!')
+
+            self.indicator = indicator  # input variable for feedback
+            self.controller = controller  # object that handles feedback
 
     def __iter__(self):
         pass
 
-    def __next__(self):
-        pass
+    def __call__(self, _time):
 
+        new_value = float(self.interpolator(_time))
 
+        if self.feedback:
+            self.controller.setpoint(new_value)
+            _input = self.indicator.value
+            new_value = self.controller(_input)
 
-
-
-# class Schedule:
-#     """
-#     Represents an experiment schedule with predefined routines for knobs
-#     """
-#
-#     def __init__(self):
-#
-#         self.clock = Clock()
-#
-#
-#     def __next__(self):
-#         pass
-#
-#     def __iter__(self):
-#         return self
+        return new_value
 
 
 class Experiment:
@@ -233,32 +233,35 @@ class Experiment:
     def __init__(self, variables, routines=None):
 
         self.variables = variables  # dict of the form [..., name: variable, ...]
-        self.routines = routines  # Schedule object
+
+        if routines:
+            self.routines = routines  # dictionary of routines for the experiment to go through, {..., variable_name: routine, ...}
+        else:
+            self.routines = []
 
         self.clock = Clock()
 
-        self.data = pd.DataFrame(columns = ['time'] + list(variables.keys()))
+        self.data = pd.DataFrame(columns=['time'] + list(variables.keys()))
 
     def __next__(self):
 
-        state = pd.Series({'time': self.clock.time}, name=datetime.datetime.now())
+        _time = self.clock.time
+        timestamp = datetime.datetime.now()
+        
+        self.state = pd.Series({'time': _time}, name=timestamp)
 
         # Apply new settings to knobs as determined by the schedule, if there is one
-        for routine in self.routines:
-
-
-            settings = next(self.schedule)
-
-            for name, value in settings.items():
-                self.variables[name].value = value
+        for name, routine in self.routines:
+            new_value = routine(_time)
+            self.variables[name].value = new_value
 
         # Read meters and calculate dependents
         for name, variable in self.variables.items():
-            state[name] = variable.value
+            self.state[name] = variable.value
 
-        self.data.loc[state.name] = state
+        self.data.loc[timestamp] = self.state
 
-        return state
+        return self.state
 
     def __iter__(self):
         return self
