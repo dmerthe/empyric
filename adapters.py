@@ -33,8 +33,7 @@ class Adapter:
     @staticmethod
     def chaperone(operation):  # wraps write, read and query methods and deals with communication issues
 
-        @functools.wraps(operation)
-        def wrapping_function(self, *args, **kwargs):
+        def wrapped_operation(self, *args, **kwargs):
 
             if not self.connected:
                 raise ConnectionError(f'Adapter is not connected for instrument at address {self.address}')
@@ -54,7 +53,7 @@ class Adapter:
                                       + err.__name__
                                       + f' during communication with {self.type} instrument at address {self.address}')
                         self.repeats += 1
-                        return wrapping_function(self, *args, **kwargs)
+                        return wrapped_operation(self, *args, **kwargs)
                 else:
                     self.disconnect()
                     time.sleep(self.delay)
@@ -62,11 +61,11 @@ class Adapter:
 
                     self.repeats = 0
                     self.reconnects += 1
-                    return wrapping_function(self, *args, **kwargs)
+                    return wrapped_operation(self, *args, **kwargs)
             else:
                 raise ConnectionError(f'Unable to communicate with instrument at address f{self.address}!')
 
-        return wrapping_function
+        return wrapped_operation
 
     @chaperone
     def write(self, message):
@@ -204,51 +203,7 @@ class Linux(Backend):
 class USBTMC(Backend):
     pass
 
-# class USBAdapter(Adapter):
-#     """
-#     Adapter handling USB communcations (distinct from serial-usb adapters)
-#     """
-#
-#     available_backends = ['visa', 'usbtmc']
-#
-#     def connect(self):
-#         pass
-#
-#
-# class GPIBAdapter(Adapter):
-#     """
-#     Representation of a GPIB adapter; implemented using either NI-VISA (Windows/MacOS) or the linux module (Linux)
-#     """
-#
-#     available_backends = ['visa', 'linux-gpib']
-#
-#     def connect(self):
-#
-#         if sys.platform in ('win32', 'darwin'):
-#             try:
-#                 self.interface = VISAInterface(self)
-#                 self.interface.connect()
-#                 self.backend = 'visa'
-#             except ImportError:
-#                 raise ConnectionError('pyvisa with NI-VISA backend is required for using GPIB adapters with Windows or MacOS')
-#         elif sys.platform is 'linux':
-#             try:
-#                 self.interface = LinuxGPIBInterface(self)
-#                 self.interface.connect()
-#                 self.backend = 'linux'
-#             except ImportError:
-#                 raise ConnectionError('linux module is required for using GPIB adapters with Linux')
-#         else:
-#             raise SystemError(f'{sys.platform} operating system type is not supported!')
-#
-#
-#
-#
-#
-# class SerialBackend(Backend):
-#     pass
-#
-#
+
 # class VISABackend(Backend):
 #
 #     def connect(self):
@@ -296,66 +251,4 @@ class USBTMC(Backend):
 #         self.interface.clear()
 #         self.interface.close()
 #         self.connected = False
-#
-#
-#
-# class VISAAdapter(Adapter):
-#     """
-#     Adapter handling communications with NI-VISA compatible instruments
-#     """
-#
-#     backend = 'visa'
-#
-#     def connect(self):
-#
-#         visa = importlib.import_module('visa')
-#         manager = visa.ResourceManager()
-#
-#         if 'ASRL' in self.address:  # for serial connections
-#             self.interface = manager.open_resource(self.address,
-#                                                    open_timeout=self.timeout,
-#                                                    baud_rate=self.baud_rate,
-#                                                    delay=self.delay)
-#         else:
-#             self.interface = manager.open_resource(self.address,
-#                                                    open_timeout=self.timeout,
-#                                                    delay=self.delay)
-#
-#         self.interface.timeout = self.timeout
-#
-#         self.connected = True
-#
-#     @Adapter.chaperone
-#     def write(self, message):
-#         self.interface.write(message)
-#
-#     @Adapter.chaperone
-#     def read(self, response_form=None):
-#         response = self.interface.read()
-#
-#
-#
-#         if response is '':
-#             return 'invalid'
-#         else:
-#             return response
-#
-#     def query(self, question, response_form=None):
-#         self.write(question)
-#         return self.read(response_form=response_form)
-#
-#     def disconnect(self):
-#
-#         self.interface.clear()
-#         self.interface.close()
-#         self.connected = False
-#
-#
-# class LinuxGPIBAdapter(Adapter):
-#     """
-#     Adapter handling communications with GPIB instruments using the Linux GPIB backend
-#     """
-#
-#     def connect(self):
-#         pass
 #
