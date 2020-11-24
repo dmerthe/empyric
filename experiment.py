@@ -7,6 +7,7 @@ import pandas as pd
 from ruamel.yaml import YAML
 yaml = YAML()
 
+
 class Instrument:
     """
     Basic representation of an instrument
@@ -132,16 +133,16 @@ class Variable:
         self._value = None  # This is the last known value of this variable
 
         if self.type == 'meter':
-            self.instrument = args[0]
-            self.meter = args[1]
+            self.instrument = arg1
+            self.meter = arg2
 
         if self.type == 'knob':
-            self.instrument = args[0]
-            self.knob = args[1]
+            self.instrument = arg1
+            self.knob = arg2
 
         elif self.type == 'dependent':
-            self.expression = args[0]
-            self.parents = args[1]
+            self.expression = arg1
+            self.parents = arg2
 
     @property
     def value(self):
@@ -244,7 +245,7 @@ class Experiment:
 
         # Update time
         self.state['time'] = self.clock.time
-        self.name = datetime.datetime.now()
+        self.state.name = datetime.datetime.now()
 
         # Apply new settings to knobs according to the routines (if there are any)
         for name, routine in self.routines:
@@ -255,7 +256,7 @@ class Experiment:
             self.state[name] = variable.value
 
         # Append new state to experiment data set
-        self.data.loc[timestamp] = self.state
+        self.data.loc[self.state.name] = self.state
 
         return self.state
 
