@@ -89,14 +89,20 @@ class SerialAdapter(Adapter):
     Adapter handling communications with serial instruments
     """
 
-    available_backends = ['serial']
+    available_backends = ['serial', 'visa']
 
     def connect(self):
 
         try:
             self.backend = Serial(self)
+            return
         except ImportError:
-            raise ImportError('pyserial is required form using serial adapters!')
+            pass
+
+        try:
+            self.backend = VISA(self)
+        except ImportError:
+            raise ImportError('either pyserial or pyvisa is required for using serial adapters!')
 
 
 class GPIBAdapter(Adapter):
@@ -112,7 +118,8 @@ class GPIBAdapter(Adapter):
             try:
                 self.backend = VISA(self)
             except ImportError:
-                raise ImportError('pyvisa with NI-VISA backend is required for using GPIB adapters on Windows or MacOS platforms!')
+                raise ImportError(
+                    'the pyvisa module is required for using GPIB adapters on Windows or MacOS platforms!')
         elif sys.platform is 'linux':
             try:
                 self.backend = Linux(self)
@@ -133,7 +140,8 @@ class USBAdapter(Adapter):
             try:
                 self.backend = VISA(self)
             except ImportError:
-                raise ImportError('pyvisa with NI-VISA backend is required for using USB adapters on Windows or MacOS platforms!')
+                raise ImportError(
+                    'pyvisa with NI-VISA backend is required for using USB adapters on Windows or MacOS platforms!')
         elif sys.platform is 'linux':
             try:
                 self.backend = USBTMC(self)
@@ -149,7 +157,6 @@ class Backend:
     """
 
     def __init__(self, adapter):
-
         self.adapter = adapter
 
 
@@ -157,7 +164,7 @@ class Serial(Backend):
 
     def __init__(self, adapter):
 
-        self.address = adapter.address
+        self.address = 'COM' + adapter.address
         self.baud_rate = adapter.baud_rate
         self.timeout = adapter.timeout
         self.delay = adapter.delay
@@ -193,7 +200,63 @@ class Serial(Backend):
 
 
 class VISA(Backend):
-    pass
+
+    def __init__(self, adapter):
+
+        self.timeout = adapter.timeout
+        self.delay = adapter.delay
+
+        visa = importlib.import_module('pyvisa')
+        manager = visa.ResourceManager()
+
+        if isinstance(adapter, SerialAdapter):
+            self.address = f"ASRL{adapter.address}::INSTR"
+            self.backend = manager.open_resource(self.address,
+                                                 open_timeout=self.timeout,
+                                                 baud_rate=self.baud_rate,
+                                                 delay=self.delay)
+
+        if isinstance(adapter, GPIBAdapter):
+            self.address = f"GPIB::{adapter.address}::INSTR"
+            self.backend = manager.open_resource(self.address,
+                                                 open_timeout=self.timeout,
+                                                 delay=self.delay)
+
+        if isinstance(adapter, USBAdapter):
+            serial_no = adapter.address
+
+            for address in manager.list_resources():
+                if serial_no in address:
+                    self.address = address
+                    self.backend = manager.open_resource(self.address,
+                                                         open_timeout=self.timeout,
+                                                         delay=self.delay)
+                    return
+
+            raise ConnectionError(f'device with serial number {serial_no} is not connected!')
+
+    def write(self, message):
+        self.backend.write(message)
+
+    def read(self, response_form=None):
+        response = self.backend.read()
+
+        if response_form:
+            if not re.match(response_form, response):
+                return 'invalid'
+
+        if response is '':
+            return 'invalid'
+        else:
+            return response
+
+    def query(self, question, response_form=None):
+        self.write(question)
+        return self.read(response_form=response_form)
+
+    def disconnect(self):
+        self.interface.clear()
+        self.interface.close()
 
 
 class Linux(Backend):
@@ -202,53 +265,3 @@ class Linux(Backend):
 
 class USBTMC(Backend):
     pass
-
-
-# class VISABackend(Backend):
-#
-#     def connect(self):
-#
-#         self.adapter.write = self.write
-#         self.adapter.read = self.read
-#         self.adapter.query = self.query
-#
-#         visa = importlib.import_module('visa')
-#         manager = visa.ResourceManager()
-#
-#         if 'ASRL' in self.address:  # for serial connections
-#             self.backend = manager.open_resource(self.address,
-#                                                    open_timeout=self.timeout,
-#                                                    baud_rate=self.baud_rate,
-#                                                    delay=self.delay)
-#         else:
-#             self.backend = manager.open_resource(self.address,
-#                                                    open_timeout=self.timeout,
-#                                                    delay=self.delay)
-#
-#         self.backend.timeout = self.timeout
-#
-#         self.connected = True
-#
-#     @Adapter.chaperone
-#     def write(self, message):
-#         self.interface.write(message)
-#
-#     @Adapter.chaperone
-#     def read(self, response_form=None):
-#         response = self.interface.read()
-#
-#         if response is '':
-#             return 'invalid'
-#         else:
-#             return response
-#
-#     def query(self, question, response_form=None):
-#         self.write(question)
-#         return self.read(response_form=response_form)
-#
-#     def disconnect(self):
-#
-#         self.interface.clear()
-#         self.interface.close()
-#         self.connected = False
-#
