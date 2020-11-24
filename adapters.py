@@ -11,15 +11,15 @@ class Adapter:
     max_failures = 3
     max_reconnects = 2
 
-    def __init__(self, address, **kwargs):
+    def __init__(self, address, delay=0.1, timeout=0.1, baud_rate=9600, **kwargs):
 
         # general parameters
         self.address = address
-        self.delay = kwargs.get('delay', 0.1)
-        self.timeout = kwargs.get('timeout', 0.1)
+        self.delay = delay
+        self.timeout = timeout
 
         # for serial comms
-        self.baud_rate = kwargs.get('baud_rate', 9600)
+        self.baud_rate = baud_rate
 
         self.connected = False
         self.failures = 0
@@ -39,9 +39,9 @@ class Adapter:
                 if self.failures < self.max_failures:
                     try:
                         result = operation(self, *args, **kwargs)
-                        self.failures = 0
 
                         if result is not 'invalid':
+                            self.failures = 0
                             return result
                     except BaseException as err:
                         warnings.warn('Encountered '
@@ -61,10 +61,6 @@ class Adapter:
 
         return wrapping_function
 
-    def query(self, message):
-        self.write(message)
-        return self.read()
-
     # Some dummy methods below for testing; should be overwritten by children classes
     def connect(self):
         self.connected = True
@@ -82,6 +78,10 @@ class Adapter:
             return self.buffer
         except AttributeError:
             return ''
+
+    def query(self, message):
+        self.write(message)
+        return self.read()
 
 
 class SerialAdapter(Adapter):
@@ -124,7 +124,7 @@ class SerialAdapter(Adapter):
 
 class GPIBAdapter(Adapter):
     """
-    Representation of a GPIB adapter; implemented using either NI-VISA (Windows/Mac) or the linux module (Linux)
+    Representation of a GPIB adapter; implemented using either NI-VISA (Windows/MacOS) or the linux module (Linux)
     """
 
     def connect(self):
@@ -135,7 +135,7 @@ class GPIBAdapter(Adapter):
                 self.interface.connect()
                 self.backend = 'visa'
             except ImportError:
-                raise ConnectionError('pyvisa with NI-VISA backend is required for using GPIB adapters with Windows')
+                raise ConnectionError('pyvisa with NI-VISA backend is required for using GPIB adapters with Windows or MacOS')
         elif sys.platform is 'linux':
             try:
                 self.interface = LinuxGPIBInterface(self)
@@ -151,8 +151,57 @@ class Interface:
 
     def __init__(self, adapter):
 
-        adapter.write = self.write
-        adapter.read = self.read
+        self.adapter = adapter
+
+
+class VISAInterface(Interface):
+
+    def connect(self):
+
+        self.adapter.write = self.write
+        self.adapter.read = self.read
+        self.adapter.query = self.query
+
+        visa = importlib.import_module('visa')
+        manager = visa.ResourceManager()
+
+        if 'ASRL' in self.address:  # for serial connections
+            self.backend = manager.open_resource(self.address,
+                                                   open_timeout=self.timeout,
+                                                   baud_rate=self.baud_rate,
+                                                   delay=self.delay)
+        else:
+            self.backend = manager.open_resource(self.address,
+                                                   open_timeout=self.timeout,
+                                                   delay=self.delay)
+
+        self.backend.timeout = self.timeout
+
+        self.connected = True
+
+    @Adapter.chaperone
+    def write(self, message):
+        self.interface.write(message)
+
+    @Adapter.chaperone
+    def read(self, response_form=None):
+        response = self.interface.read()
+
+        if response is '':
+            return 'invalid'
+        else:
+            return response
+
+    def query(self, question, response_form=None):
+        self.write(question)
+        return self.read(response_form=response_form)
+
+    def disconnect(self):
+
+        self.interface.clear()
+        self.interface.close()
+        self.connected = False
+
 
 class VISAAdapter(Adapter):
     """
