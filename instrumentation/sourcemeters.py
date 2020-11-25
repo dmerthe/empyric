@@ -1,16 +1,11 @@
 import os
 import datetime
+import numpy as np
 import pandas as pd
 
-from mercury.instruments.basics import *
-from mercury.utilities import *
-
+from mercury.elements import Instrument
 
 class Keithley2400(Instrument):
-
-    supported_backends = ['visa', 'linux-gpib', 'me-api']
-    default_backend = ['visa']
-
     """
     Keithley 2400 Sourcemeter, a 20 W power supply and picoammeter
     """
@@ -27,8 +22,25 @@ class Keithley2400(Instrument):
         'nplc',
         'delay',
         'output',
+        'source',
+        'meter',
         'source delay'
     )
+
+    presets = {
+        # 'voltage range': 200,
+        # 'current range': 100e-3,
+        'nplc': 1,
+        'source': 'voltage',
+        'meter': 'current',
+        'source_delay': 0,
+        'output': 'ON'
+    }
+
+    postsets = {
+        'voltage': 0,
+        'output': 'OFF'
+    }
 
     # Available meters
     meters = (
@@ -37,36 +49,14 @@ class Keithley2400(Instrument):
         'fast currents'
     )
 
-    def __init__(self, address, **kwargs):
-
-        self.knob_values = {knob: None for knob in Keithley2400.knobs}
-
-        # Set up communication
-        self.address = address
-        self.backend = kwargs.get('backend', self.default_backend)
-        self.delay = kwargs.get('delay', 0.1)
-        self.connect()
-
-        # Set up instrument
-        self.source = 'voltage'  # default
-        self.meter = 'current'  # default
-        self.fast_voltages = None  # Used for fast IV sweeps
-
-        self.set_voltage_range(kwargs.get('voltage_range', 200))
-        self.set_current_range(kwargs.get('current_range', 100e-3))
-        self.set_nplc(kwargs.get('nplc', 1))
-        self.set_source(kwargs.get('source', 'voltage'))
-        self.set_meter(kwargs.get('meter', 'current'))
-        self.set_source_delay(0)
-        self.set_output('ON')
-
+    fast_voltages = None
 
     def set_source(self, variable):
 
-        if variable in ['voltage', 'current']:
-            self.source = variable
-        else:
-            raise SetError('Source must be either "current" or "voltage"')
+        if variable not in ['voltage', 'current']:
+            raise ValueError('Source must be either "current" or "voltage"')
+
+        self.set_output('OFF')
 
         if variable == 'voltage':
 
@@ -75,6 +65,7 @@ class Keithley2400(Instrument):
 
             self.knob_values['current'] = None
 
+
         if variable == 'current':
 
             self.write(':SOUR:FUNC CURR')
@@ -82,30 +73,29 @@ class Keithley2400(Instrument):
 
             self.knob_values['voltage'] = None
 
+        self.knob_values['source'] = variable
+
+        self.set_output('ON')
+
     def set_meter(self, variable):
 
-        self.meter = variable
+        if variable not in ['voltage', 'current']:
+            raise ValueError('Source must be either "current" or "voltage"')
 
         if variable == 'voltage':
-
             self.write(':SENS:FUNC "VOLT"')
-            self.write(':SENS:VOLT:RANG %.2E' % self.knob_values['voltage range'])
-            self.write(':SENS:VOLT:PROT %.2E' % self.knob_values['voltage range'])
             self.write(':FORM:ELEM VOLT')
 
         if variable == 'current':
-
             self.write(':SENS:FUNC "CURR"')
-            self.write(':SENS:CURR:RANG %.2E' % self.knob_values['current range'])
-            self.write(':SENS:CURR:PROT %.2E' % self.knob_values['current range'])
             self.write(':FORM:ELEM CURR')
 
-    def output_on(self):
+        self.knob_values['meter'] = variable
 
+    def output_on(self):
         self.write(':OUTP ON')
 
     def output_off(self):
-
         self.write(':OUTP OFF')
 
     def set_output(self, output):
@@ -114,16 +104,14 @@ class Keithley2400(Instrument):
             self.output_off()
             self.knob_values['output'] = 'OFF'
         elif output in [1, 'ON', 'on']:
-            self.set_source(self.source)
-            self.set_meter(self.meter)
             self.output_on()
             self.knob_values['output'] = 'ON'
         else:
-            raise SetError(f'Ouput setting {output} not recognized!')
+            raise ValueError(f'Ouput setting {output} not recognized!')
 
     def measure_voltage(self):
 
-        if self.meter != 'voltage':
+        if self.knob_values['meter'] != 'voltage':
             self.set_meter('voltage')
 
         if self.knob_values['output'] == 'ON':
@@ -133,7 +121,7 @@ class Keithley2400(Instrument):
 
     def measure_current(self):
 
-        if self.meter != 'current':
+        if self.knob_values['meter'] != 'current':
             self.set_meter('current')
 
         if self.knob_values['output'] == 'ON':
@@ -143,7 +131,7 @@ class Keithley2400(Instrument):
 
     def set_voltage(self, voltage):
 
-        if self.source != 'voltage':
+        if self.knob_values['source'] != 'voltage':
             Warning(f'Switching sourcing mode!')
             self.set_source('voltage')
             self.output_on()  # output if automatically shut off when the source mode is changed
@@ -154,7 +142,7 @@ class Keithley2400(Instrument):
 
     def set_current(self, current):
 
-        if self.source != 'current':
+        if self.knob_values['source'] != 'current':
             Warning(f'Switching sourcing mode!')
             self.set_source('current')
             self.output_on()  # output if automatically shut off when the source mode is changed
@@ -165,9 +153,25 @@ class Keithley2400(Instrument):
 
     def set_voltage_range(self, voltage_range):
 
-        allowed_voltage_ranges = (0.2, 2, 20, 200, 'AUTO') # allowable voltage ranges
+        allowed_voltage_ranges = (0.2, 2, 20, 200) # allowable voltage ranges
 
-        if voltage_range not in allowed_voltage_ranges:
+        if voltage_range in [None, 'AUTO']:
+
+            if self.knob_values['source'] == 'voltage':
+                self.write(':SOUR:VOLT:RANG AUTO')
+            else:
+                self.write(':SENS:VOLT:PROT 200')
+                self.write(':SENS:VOLT:RANG AUTO')
+
+            self.knob_values['voltage range'] = 'AUTO'
+
+            return
+
+        elif voltage_range not in allowed_voltage_ranges:
+
+            if voltage_range == None:
+                self.knob_values['voltage range'] = 'AUTO'
+
             # Find nearest encapsulating voltage range
             try:
                 nearest = np.argwhere( voltage_range <= np.array(allowed_voltage_ranges[:-1]) ).flatten()[0]
@@ -181,7 +185,7 @@ class Keithley2400(Instrument):
         else:
             self.knob_values['voltage range'] = voltage_range
 
-        if self.source == 'voltage':
+        if self.knob_values['source'] == 'voltage':
             self.write(':SOUR:VOLT:RANG %.2E' % self.knob_values['voltage range'])
         else:
             self.write(':SENS:VOLT:PROT %.2E' % self.knob_values['voltage range'])
@@ -191,9 +195,22 @@ class Keithley2400(Instrument):
 
     def set_current_range(self, current_range):
 
-        allowed_current_ranges = (1e-6, 10e-6, 100e-6, 1e-3, 10e-3, 100e-3, 1, 'AUTO')
+        allowed_current_ranges = (1e-6, 10e-6, 100e-6, 1e-3, 10e-3, 100e-3, 1)
 
-        if current_range not in allowed_current_ranges:
+        if current_range in [None, 'AUTO']:
+
+            if self.knob_values['source'] == 'current':
+                self.write(':SOUR:CURR:RANG AUTO')
+            else:
+                self.write(':SENS:CURR:PROT 1')
+                self.write(':SENS:CURR:RANG AUTO')
+
+            self.knob_values['current range'] = 'AUTO'
+
+            return
+
+        elif current_range not in allowed_current_ranges:
+
             # Find nearest encapsulating current range
             try:
                 nearest = np.argwhere( current_range <= np.array(allowed_current_ranges[:-1]) ).flatten()[0]
@@ -207,7 +224,7 @@ class Keithley2400(Instrument):
         else:
             self.knob_values['current range'] = current_range
 
-        if self.source == 'current':
+        if self.knob_values['source'] == 'current':
             self.write(':SOUR:CURR:RANG %.2E' % self.knob_values['current range'])
         else:
             self.write(':SENS:CURR:PROT %.2E' % self.knob_values['current range'])
@@ -217,9 +234,9 @@ class Keithley2400(Instrument):
 
     def set_nplc(self, nplc):
 
-        if self.meter == 'current':
+        if self.knob_values['meter'] == 'current':
             self.write(':SENS:CURR:NPLC %.2E' % nplc)
-        elif self.meter == 'voltage':
+        elif self.knob_values['meter'] == 'voltage':
             self.write(':SENS:VOLT:NPLC %.2E' % nplc)
 
         self.knob_values['nplc'] = nplc
@@ -254,10 +271,10 @@ class Keithley2400(Instrument):
         try:
             self.fast_voltages
         except AttributeError:
-            raise MeasurementError('Fast IV sweep voltages have not been set!')
+            raise ValueError('Fast IV sweep voltages have not been set!')
 
         if len(self.fast_voltages) == 0:
-            raise MeasurementError('Fast IV sweep voltages have not been set!')
+            raise ValueError('Fast IV sweep voltages have not been set!')
 
         self.write(':SOUR:VOLT:MODE LIST')
 
@@ -314,10 +331,6 @@ class Keithley2400(Instrument):
 
 
 class Keithley2460(Instrument):
-
-    supported_backends = ['visa', 'linux-gpib', 'me-api']
-    default_backend = ['visa']
-
     """
     Keithley 2460 Sourcemeter, a 100 W power supply and picoammeter
     """
@@ -334,8 +347,25 @@ class Keithley2460(Instrument):
         'nplc',
         'delay',
         'output',
+        'source',
+        'meter',
         'source delay'
     )
+
+    presets = {
+        'voltage range': 100,
+        'current range': 1,
+        'nplc': 1,
+        'source': 'voltage',
+        'meter': 'current',
+        'source_delay': 0,
+        'output': 'ON'
+    }
+
+    postsets = {
+        'voltage': 0,
+        'output': 'OFF'
+    }
 
     # Available meters
     meters = (
@@ -344,36 +374,14 @@ class Keithley2460(Instrument):
         'fast currents'
     )
 
-    def __init__(self, address, **kwargs):
-
-        self.knob_values = {knob: None for knob in Keithley2400.knobs}
-
-        # Set up communication
-        self.address = address
-        self.backend = kwargs.get('backend', self.default_backend)
-        self.delay = kwargs.get('delay', 0.1)
-        self.connect()
-
-        # Set up instrument
-        self.source = 'voltage'  # default
-        self.meter = 'current'  # default
-        self.fast_voltages = None  # Used for fast IV sweeps
-
-        self.set_voltage_range(kwargs.get('voltage_range', 100))
-        self.set_current_range(kwargs.get('current_range', 1))
-        self.set_nplc(kwargs.get('nplc', 1))
-        self.set_source(kwargs.get('source', 'voltage'))
-        self.set_meter(kwargs.get('meter', 'current'))
-        self.set_source_delay(0)
-        self.set_output('ON')
-
+    fast_voltages = None
 
     def set_source(self, variable):
 
         if variable in ['voltage', 'current']:
-            self.source = variable
+            self.knob_values['source'] = variable
         else:
-            raise SetError('Source must be either "current" or "voltage"')
+            raise ValueError('Source must be either "current" or "voltage"')
 
         if variable == 'voltage':
 
@@ -391,7 +399,7 @@ class Keithley2460(Instrument):
 
     def set_meter(self, variable):
 
-        self.meter = variable
+        self.knob_values['meter'] = variable
 
         if variable == 'voltage':
 
@@ -421,16 +429,16 @@ class Keithley2460(Instrument):
             self.output_off()
             self.knob_values['output'] = 'OFF'
         elif output in [1, 'ON', 'on']:
-            self.set_source(self.source)
-            self.set_meter(self.meter)
+            self.set_source(self.knob_values['source'])
+            self.set_meter(self.knob_values['meter'])
             self.output_on()
             self.knob_values['output'] = 'ON'
         else:
-            raise SetError(f'Ouput setting {output} not recognized!')
+            raise ValueError(f'Ouput setting {output} not recognized!')
 
     def measure_voltage(self):
 
-        if self.meter != 'voltage':
+        if self.knob_values['meter'] != 'voltage':
             self.set_meter('voltage')
 
         if self.knob_values['output'] == 'ON':
@@ -440,7 +448,7 @@ class Keithley2460(Instrument):
 
     def measure_current(self):
 
-        if self.meter != 'current':
+        if self.knob_values['meter'] != 'current':
             self.set_meter('current')
 
         if self.knob_values['output'] == 'ON':
@@ -450,7 +458,7 @@ class Keithley2460(Instrument):
 
     def set_voltage(self, voltage):
 
-        if self.source != 'voltage':
+        if self.knob_values['source'] != 'voltage':
             Warning(f'Switching sourcing mode!')
             self.set_source('voltage')
             self.output_on()  # output if automatically shut off when the source mode is changed
@@ -461,7 +469,7 @@ class Keithley2460(Instrument):
 
     def set_current(self, current):
 
-        if self.source != 'current':
+        if self.knob_values['source'] != 'current':
             Warning(f'Switching sourcing mode!')
             self.set_source('current')
             self.output_on()  # output if automatically shut off when the source mode is changed
@@ -488,7 +496,7 @@ class Keithley2460(Instrument):
         else:
             self.knob_values['voltage range'] = voltage_range
 
-        if self.source == 'voltage':
+        if self.knob_values['source'] == 'voltage':
             self.write('SOUR:VOLT:RANG %.2e' % self.knob_values['voltage range'])
         else:
             self.write('SOUR:CURR:VLIM %.2e' % self.knob_values['voltage range'])
@@ -514,7 +522,7 @@ class Keithley2460(Instrument):
         else:
             self.knob_values['current range'] = current_range
 
-        if self.source == 'current':
+        if self.knob_values['source'] == 'current':
             self.write('SOUR:CURR:RANG %.2E' % self.knob_values['current range'])
         else:
             self.write('SOUR:VOLT:ILIM %.2e' % self.knob_values['current range'])
@@ -524,9 +532,9 @@ class Keithley2460(Instrument):
 
     def set_nplc(self, nplc):
 
-        if self.meter == 'current':
+        if self.knob_values['meter'] == 'current':
             self.write('CURR:NPLC %.2E' % nplc)
-        elif self.meter == 'voltage':
+        elif self.knob_values['meter'] == 'voltage':
             self.write('VOLT:NPLC %.2E' % nplc)
 
         self.knob_values['nplc'] = nplc
@@ -561,10 +569,10 @@ class Keithley2460(Instrument):
         try:
             self.fast_voltages
         except AttributeError:
-            raise MeasurementError('Fast IV sweep voltages have not been set!')
+            raise ValueError('Fast IV sweep voltages have not been set!')
 
         if len(self.fast_voltages) == 0:
-            raise MeasurementError('Fast IV sweep voltages have not been set!')
+            raise ValueError('Fast IV sweep voltages have not been set!')
 
         path = self.name+'-fast_iv_measurement.csv'
 
@@ -608,8 +616,8 @@ class Keithley2460(Instrument):
         fast_iv_data = fast_iv_data.append(new_iv_data, sort=False)
         fast_iv_data.to_csv(path)
 
-        self.set_source(self.source)
-        self.set_meter(self.meter)
+        self.set_source(self.knob_values['source'])
+        self.set_meter(self.knob_values['meter'])
 
         return path
 
@@ -617,17 +625,13 @@ class Keithley2460(Instrument):
 
         self.knob_values['source delay'] = delay
 
-        if self.source == 'voltage':
+        if self.knob_values['source'] == 'voltage':
             self.write('SOUR:VOLT:DEL %.4e' % delay)
         else:
             self.write('SOUR:CURR:DEL %.4e' % delay)
 
 
 class Keithley2651A(Instrument):
-
-    supported_backends = ['visa', 'linux-gpib', 'me-api']
-    default_backend = ['visa']
-
     """
     Keithley 2651A High Power (200 W) Sourcemeter
     """
@@ -643,8 +647,25 @@ class Keithley2651A(Instrument):
         'current range',
         'nplc',
         'output',
+        'source',
+        'meter',
         'source delay'
     )
+
+    presets = {
+        'voltage range': 40,
+        'current range': 5,
+        'nplc': 1,
+        'source': 'voltage',
+        'meter': 'current',
+        'source_delay': 0,
+        'output': 'ON'
+    }
+
+    postsets = {
+        'voltage': 0,
+        'output': 'OFF'
+    }
 
     # Available meters
     meters = (
@@ -653,36 +674,14 @@ class Keithley2651A(Instrument):
         'fast currents'
     )
 
-    def __init__(self, address, **kwargs):
-
-        self.knob_values = {knob: None for knob in Keithley2651A.knobs}
-
-        # Set up communication
-        self.address = address
-        self.backend = kwargs.get('backend', self.default_backend)
-        self.delay = kwargs.get('delay', 0.1)
-        self.connect()
-
-        # Set up instrument
-        self.fast_voltages = None  # Used for fast IV sweeps
-
-        self.set_voltage_range(kwargs.get('voltage_range', 40))
-        self.set_current_range(kwargs.get('current_range', 5))
-        self.set_nplc(kwargs.get('nplc', 1))
-        self.set_source(kwargs.get('source', 'voltage'))
-        self.set_meter(kwargs.get('meter', 'current'))
-        self.set_source_delay(0)
-        self.set_output('ON')
-
-        self.write('display.screen = display.SMUA')
-        self.write('display.smua.measure.func = display.MEASURE_DCAMPS')
+    fast_voltages = None
 
     def set_source(self, variable):
 
         if variable in ['voltage','current']:
-            self.source = variable
+            self.knob_values['source'] = variable
         else:
-            raise SetError('source must be either "current" or "voltage"')
+            raise ValueError('source must be either "current" or "voltage"')
 
         if variable == 'voltage':
 
@@ -700,12 +699,14 @@ class Keithley2651A(Instrument):
 
     def set_meter(self,variable):
 
-        self.meter = variable
+        self.knob_values['meter'] = variable
 
         if variable == 'current':
+            self.write('display.screen = display.SMUA')
             self.write('display.smua.measure.func = display.MEASURE_DCAMPS')
 
         if variable == 'voltage':
+            self.write('display.screen = display.SMUA')
             self.write('display.smua.measure.func = display.MEASURE_DCVOLTS')
 
         # This sourcemeter does not require specifying the meter before taking a measurement
@@ -727,11 +728,11 @@ class Keithley2651A(Instrument):
             self.output_on()
             self.knob_values['output'] = 'ON'
         else:
-            raise SetError(f'Ouput setting {output} not recognized!')
+            raise ValueError(f'Ouput setting {output} not recognized!')
 
     def measure_voltage(self):
 
-        if self.meter != 'voltage':
+        if self.knob_values['meter'] != 'voltage':
             self.set_meter('voltage')
 
         if self.knob_values['output'] == 'ON':
@@ -741,7 +742,7 @@ class Keithley2651A(Instrument):
 
     def measure_current(self):
 
-        if self.meter != 'current':
+        if self.knob_values['meter'] != 'current':
             self.set_meter('current')
 
         if self.knob_values['output'] == 'ON':
@@ -751,7 +752,7 @@ class Keithley2651A(Instrument):
 
     def set_voltage(self, voltage):
 
-        if self.source != 'voltage':
+        if self.knob_values['source'] != 'voltage':
             Warning(f'Switching sourcing mode!')
             self.set_source('voltage')
             self.output_on()  # output if automatically shut off when the source mode is changed
@@ -762,7 +763,7 @@ class Keithley2651A(Instrument):
 
     def set_current(self, current):
 
-        if self.source != 'current':
+        if self.knob_values['source'] != 'current':
             Warning(f'Switching sourcing mode!')
             self.set_source('current')
             self.output_on()  # output if automatically shut off when the source mode is changed
@@ -824,10 +825,10 @@ class Keithley2651A(Instrument):
         try:
             self.fast_voltages
         except AttributeError:
-            raise MeasurementError('Fast IV sweep voltages have not been set!')
+            raise ValueError('Fast IV sweep voltages have not been set!')
 
         if len(self.fast_voltages) == 0:
-            raise MeasurementError('Fast IV sweep voltages have not been set!')
+            raise ValueError('Fast IV sweep voltages have not been set!')
 
         path = self.name+'-fast_iv_measurement.csv'
 

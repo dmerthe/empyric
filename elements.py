@@ -1,4 +1,5 @@
-# Some basic stuff
+# This submodule defines the basic behavior of the key objects in the mercury package
+
 import time
 from scipy.interpolate import interp1d
 import datetime
@@ -8,9 +9,126 @@ from ruamel.yaml import YAML
 yaml = YAML()
 
 
+class Clock:
+    """
+    Clock object for tracking elapsed time
+    """
+
+    def __init__(self):
+
+        self.start_time = time.time()
+        self.stop_time = time.time()  # clock is initially stopped
+        self.stoppage = 0
+
+    def start(self):
+        if self.stop_time:
+            self.stoppage += time.time() - self.stop_time
+            self.stop_time = False
+
+    def stop(self):
+        if not self.stop_time:
+            self.stop_time = time.time()
+
+    def reset(self):
+        self.__init__()
+
+    @property
+    def time(self):
+        if self.stop_time:
+            elapsed_time = self.stop_time - self.start_time - self.stoppage
+        else:
+            elapsed_time = time.time() - self.start_time - self.stoppage
+
+        return elapsed_time
+
+
+def chaperone(method):
+    """
+    Utility function that wraps the write, read and query methods of adapters and deals with communication issues
+
+    :param method: (callable) write, read or query method to be wrapped
+    :return: (callable) wrapped method
+    """
+
+    def wrapped_method(self, *args, **kwargs):
+
+        if not self.connected:
+            raise ConnectionError(f'Adapter is not connected for instrument at address {self.address}')
+
+        # Catch communication errors and either try to repeat communication or reset the connection
+        if self.reconnects < self.max_reconnects:
+            if self.repeats < self.max_repeats:
+                try:
+                    result = method(self, *args, **kwargs)
+
+                    if result != 'invalid':
+                        self.repeats = 0
+                        self.reconnects = 0
+                        return result
+                except BaseException as err:
+                    warnings.warn(f'Encountered {err} during communication with {self} at address {self.address}')
+                    self.repeats += 1
+                    return wrapped_method(self, *args, **kwargs)
+            else:
+                self.disconnect()
+                time.sleep(self.delay)
+                self.connect()
+
+                self.repeats = 0
+                self.reconnects += 1
+                return wrapped_method(self, *args, **kwargs)
+        else:
+            raise ConnectionError(f'Unable to communicate with instrument at address f{self.address}!')
+
+    return wrapped_method
+
+
+class Adapter:
+    """
+    Adapters connect instruments defined in an experiment to the appropriate communication backends.
+    """
+
+    max_repeats = 3
+    max_reconnects = 1
+
+    def __init__(self, address, delay=0.1, timeout=0.1, baud_rate=9600, **kwargs):
+        # general parameters
+        self.address = address
+        self.delay = delay
+        self.timeout = timeout
+
+        # for serial communications
+        self.baud_rate = baud_rate
+
+        self.connected = False
+        self.repeats = 0
+        self.reconnects = 0
+
+        self.connect()
+
+    def connect(self):  # should be overwritten in children class definitions
+        self.connected = True
+
+    @chaperone
+    def write(self, message):
+        return self.backend.write(message)
+
+    @chaperone
+    def read(self, response_form=None):
+        return self.backend.read(response_form=response_form)
+
+    @chaperone
+    def query(self, message, response_form=None):
+        return self.backend.query(message, response_form=response_form)
+
+    def disconnect(self):
+        self.connected = False
+        return self.backend.disconnect()
+
+
 class Instrument:
     """
-    Basic representation of an instrument
+    Basic representation of an instrument, essentially a set of knobs and meters
     """
 
     name = 'Instrument'
@@ -18,33 +136,34 @@ class Instrument:
     knobs = tuple()
     meters = tuple()
 
-    knob_values = dict()
+    presets = {}  # values knobs should be when instrument is connected
+    postsets = {}  # values knobs should be when instrument is disconnected
 
     def __init__(self, adapter, presets=None, postsets=None):
         """
 
-        :param adapter: (Adapter) handles communcations with the instrument
+        :param adapter: (Adapter) handles communcations with the instrument via the appropriate backend
         :param presets: (dict) dictionary of instrument presets of the form {..., knob: value, ...} to apply upon initialization
         :param presets: (dict) dictionary of instrument postsets of the form {..., knob: value, ...} to apply upon disconnection
         """
 
-        # Connect to instrument with an adapter
         self.adapter = adapter
 
-        # Get and apply presets
-        if presets:
-            self.presets = presets
-        else:
-            self.presets = {}
+        self.knob_values = {knob: None for knob in self.knobs}
 
-        for knob, value in self.presets:
+        # Apply presets
+        if presets:
+            self.presets.update(presets)
+
+        for knob, value in self.presets.items():
             self.set(knob, value)
 
         # Get postsets
         if postsets:
-            self.postsets = postsets
-        else:
-            self.postsets = {}
+            self.postsets.update(postsets)
+
+    def __repr__(self):
+        return self.name + '-' + str(self.adapter.address)
 
     def write(self, message):
         return self.adapter.write(message)
@@ -65,7 +184,7 @@ class Instrument:
         """
 
         try:
-            set_method = self.__getattribute__('set_ ' +knob.replace(' ' ,'_'))
+            set_method = self.__getattribute__('set_' + knob.replace(' ' ,'_'))
         except AttributeError:
             raise AttributeError(f"{knob} cannot be set on {self.name}")
 
@@ -80,7 +199,7 @@ class Instrument:
         """
 
         try:
-            measure_method = self.__getattribute__('measure_ ' +meter.replace(' ' ,'_'))
+            measure_method = self.__getattribute__('measure_' + meter.replace(' ' ,'_'))
         except AttributeError:
             raise AttributeError(f"{meter} cannot be measured on {self.name}")
 
@@ -88,17 +207,16 @@ class Instrument:
 
         return measurement
 
+    def disconnect(self):
+
+        if self.adapter.connected:
+            for knob, value in self.postsets.items():
+                self.set(knob, value)
+
+            self.adapter.disconnect()
+
     def __del__(self):
-        """
-        Make sure instrument communication is properly closed upon instrument deletion
-
-        :return: None
-        """
-
-        for knob, value in self.postsets.items():
-            self.set(knob, value)
-
-        self.adapter.disconnect()
+        self.disconnect()
 
 
 class Variable:
@@ -168,59 +286,6 @@ class Variable:
             self._value = self.instrument.knob_values[self.label]
 
 
-class Alarm:
-    """
-    Monitors a variable a raises an alarm if a condition is met
-    """
-
-    def __init__(self, variable, condition, protocol):
-
-        self.variable = variable  # variable being monitored
-        self.condition = condition  # condition which triggers the alarm
-        self.protocol = protocol  # what to do when the alarm is triggered
-
-    @property
-    def signal(self):
-        value = self.variable.value
-        if eval('value' + self.condition):
-            return self.protocol
-        else:
-            return None
-
-
-class Clock:
-    """
-    Clock object for tracking elapsed time
-    """
-
-    def __init__(self):
-
-        self.start_time = time.time()
-        self.stop_time = time.time()  # clock is initially stopped
-        self.stoppage = 0
-
-    def start(self):
-        if self.stop_time:
-            self.stoppage += time.time() - self.stop_time
-            self.stop_time = False
-
-    def stop(self):
-        if not self.stop_time:
-            self.stop_time = time.time()
-
-    def reset(self):
-        self.__init__()
-
-    @property
-    def time(self):
-        if self.stop_time:
-            elapsed_time = self.stop_time - self.start_time - self.stoppage
-        else:
-            elapsed_time = time.time() - self.start_time - self.stoppage
-
-        return elapsed_time
-
-
 class Experiment:
 
     def __init__(self, variables, routines=None):
@@ -268,3 +333,23 @@ class Experiment:
 
     def start(self):
         self.clock.start()
+
+
+class Alarm:
+    """
+    Monitors a variable a raises an alarm if a condition is met
+    """
+
+    def __init__(self, variable, condition, protocol):
+
+        self.variable = variable  # variable being monitored
+        self.condition = condition  # condition which triggers the alarm
+        self.protocol = protocol  # what to do when the alarm is triggered
+
+    @property
+    def signal(self):
+        value = self.variable.value
+        if eval('value' + self.condition):
+            return self.protocol
+        else:
+            return None
