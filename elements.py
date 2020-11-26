@@ -5,6 +5,7 @@ from scipy.interpolate import interp1d
 import datetime
 import pandas as pd
 
+import warnings
 from ruamel.yaml import YAML
 yaml = YAML()
 
@@ -107,6 +108,7 @@ class Adapter:
         self.connect()
 
     def connect(self):  # should be overwritten in children class definitions
+        self.backend = None
         self.connected = True
 
     @chaperone
@@ -283,7 +285,7 @@ class Variable:
         # value property can only be set if variable is a knob
         if self.type == 'knob' and value is not None:
             self.instrument.set(self.knob, value)
-            self._value = self.instrument.knob_values[self.label]
+            self._value = self.instrument.knob_values[self.knob]
 
 
 class Experiment:
