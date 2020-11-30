@@ -225,25 +225,24 @@ class VISA(Backend):
             self.address = f"ASRL{adapter.address}::INSTR"
             self.backend = manager.open_resource(self.address,
                                                  open_timeout=self.timeout,
-                                                 baud_rate=self.baud_rate,
-                                                 delay=self.delay)
+                                                 baud_rate=self.baud_rate)
+            self.backend.timeout = self.timeout
 
-        elif isinstance(adapter, GPIBAdapter):
+        elif isinstance(adapter, GPIB):
             self.address = f"GPIB::{adapter.address}::INSTR"
             self.backend = manager.open_resource(self.address,
-                                                 open_timeout=self.timeout,
-                                                 delay=self.delay)
+                                                 open_timeout=self.timeout)
+            self.backend.timeout = self.timeout
 
-        elif isinstance(adapter, USBAdapter):
+        elif isinstance(adapter, USB):
             serial_no = adapter.address
 
             for address in manager.list_resources():
                 if serial_no in address:
                     self.address = address
                     self.backend = manager.open_resource(self.address,
-                                                         open_timeout=self.timeout,
-                                                         delay=self.delay)
-                    return
+                                                         open_timeout=self.timeout)
+                    self.backend.timeout = self.timeout
 
             raise ConnectionError(f'device with serial number {serial_no} is not connected!')
         else:
@@ -268,6 +267,7 @@ class VISA(Backend):
 
     def query(self, question, response_form=None):
         self.write(question)
+        time.sleep(self.delay)
         return self.read(response_form=response_form)
 
     def disconnect(self):
