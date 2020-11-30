@@ -4,7 +4,26 @@ from importlib import import_module
 
 ## Routines ##
 
-class Hold:
+class Routine:
+
+    def __init__(self, values, times=None, variable=None, **kwargs):
+
+        if hasattr(values, '__len__'):
+            self.values = values
+        else:
+            self.values = [values]
+
+        if hasattr(times, '__len__'):
+            self.times = times
+        else:
+            times = [times]
+
+        self.variable = variable
+
+        for key, value in kwargs.items():
+            self.__setattr__(key, value)
+
+class Hold(Routine):
     """
     Holds a single value indefinitely
     """
@@ -34,8 +53,16 @@ class Hold:
         if self.feedback:
             feedback_value = state[self.feedback]
             new_setting = self.controller(feedback_value)
+
+            if self.variable:
+                self.variable.value = new_setting
+
             return new_setting
         else:
+
+            if self.variable:
+                self.variable.value = self.value
+
             return self.value
 
 
@@ -69,8 +96,16 @@ class Timecourse:
             self.controller.setpoint = new_value
             feedback_value = state[self.indicator]
             new_setting = self.controller(feedback_value)
+
+            if self.variable:
+                self.variable.value = new_setting
+
             return new_setting
         else:
+
+            if self.variable:
+                self.variable.value = self.value
+
             return new_value
 
 
@@ -90,6 +125,9 @@ class Sequence:
             next_value = next(self.values_iter)
         except StopIteration:
             return None
+
+        if self.variable:
+            self.variable.value = next_value
 
         return next_value
         

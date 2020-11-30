@@ -3,7 +3,8 @@ import datetime
 import numpy as np
 import pandas as pd
 
-from mercury.elements import Instrument
+from mercury.adapters import GPIB
+from mercury.instrumentation.instrument import Instrument
 
 class Keithley2400(Instrument):
     """
@@ -11,6 +12,9 @@ class Keithley2400(Instrument):
     """
 
     name = 'Keithley2400'
+
+    default_adapter = GPIB
+    default_adapter_settings = {}
 
     # Available knobs
     knobs = (
@@ -337,6 +341,9 @@ class Keithley2460(Instrument):
 
     name = 'Keithley2460'
 
+    default_adapter = GPIB
+    default_adapter_settings = {}
+
     # Available knobs
     knobs = (
         'voltage',
@@ -637,6 +644,9 @@ class Keithley2651A(Instrument):
     """
 
     name = 'Keithley2651A'
+
+    default_adapter = GPIB
+    default_adapter_settings = {}
 
     # Available knobs
     knobs = (

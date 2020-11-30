@@ -5,12 +5,95 @@ import warnings
 import sys
 import re
 
-from mercury.elements import Adapter
-
 supported_adapters = ['serial', 'gpib', 'usb']
 
 
+def chaperone(method):
+    """
+    Utility function that wraps the write, read and query methods of adapters and deals with communication issues
+
+    :param method: (callable) write, read or query method to be wrapped
+    :return: (callable) wrapped method
+    """
+
+    def wrapped_method(self, *args, **kwargs):
+
+        if not self.connected:
+            raise ConnectionError(f'Adapter is not connected for instrument at address {self.address}')
+
+        # Catch communication errors and either try to repeat communication or reset the connection
+        if self.reconnects < self.max_reconnects:
+            if self.repeats < self.max_repeats:
+                try:
+                    result = method(self, *args, **kwargs)
+
+                    if result != 'invalid':
+                        self.repeats = 0
+                        self.reconnects = 0
+                        return result
+                except BaseException as err:
+                    warnings.warn(f'Encountered {err} during communication with {self} at address {self.address}')
+                    self.repeats += 1
+                    return wrapped_method(self, *args, **kwargs)
+            else:
+                self.disconnect()
+                time.sleep(self.delay)
+                self.connect()
+
+                self.repeats = 0
+                self.reconnects += 1
+                return wrapped_method(self, *args, **kwargs)
+        else:
+            raise ConnectionError(f'Unable to communicate with instrument at address f{self.address}!')
+
+    return wrapped_method
+
+
 ## Adapters ##
+
+class Adapter:
+    """
+    Adapters connect instruments defined in an experiment to the appropriate communication backends.
+    """
+
+    max_repeats = 3
+    max_reconnects = 1
+
+    def __init__(self, address, delay=0.1, timeout=0.2, baud_rate=9600):
+        # general parameters
+        self.address = address
+        self.delay = delay
+        self.timeout = timeout
+
+        # for serial communications
+        self.baud_rate = baud_rate
+
+        self.connected = False
+        self.repeats = 0
+        self.reconnects = 0
+
+        self.connect()
+
+    def connect(self):  # should be overwritten in children class definitions
+        self.backend = None
+        self.connected = True
+
+    @chaperone
+    def write(self, message):
+        return self.backend.write(message)
+
+    @chaperone
+    def read(self, response_form=None):
+        return self.backend.read(response_form=response_form)
+
+    @chaperone
+    def query(self, message, response_form=None):
+        return self.backend.query(message, response_form=response_form)
+
+    def disconnect(self):
+        self.connected = False
+        return self.backend.disconnect()
+
 class SerialAdapter(Adapter):
     """
     Adapter handling communications with serial instruments
@@ -32,7 +115,7 @@ class SerialAdapter(Adapter):
             raise ImportError('either pyserial or pyvisa is required for using serial adapters!')
 
 
-class GPIBAdapter(Adapter):
+class GPIB(Adapter):
     """
     Adapter handling communications with GPIB instruments
     """
@@ -56,7 +139,7 @@ class GPIBAdapter(Adapter):
             raise SystemError(f'{sys.platform} operating system type is not supported!')
 
 
-class USBAdapter(Adapter):
+class USB(Adapter):
     """
     Adapter handling communications with USB (distinct from serial-to-usb) instruments
     """
