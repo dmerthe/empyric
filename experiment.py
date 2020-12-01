@@ -1,4 +1,6 @@
-# This submodule defines the basic behavior of the key objects in the mercury package
+# This submodule defines the basic behavior of the key features in the mercury package
+
+import os
 import time
 import datetime
 import pandas as pd
@@ -6,9 +8,13 @@ import warnings
 import threading
 import queue
 from ruamel.yaml import YAML
+
 yaml = YAML()
 
-from mercury import instruments, adapters, routines, graphics
+from mercury import instruments as _instruments
+from mercury import routines as _routines
+from mercury import adapters, graphics
+
 
 class Clock:
     """
@@ -77,7 +83,7 @@ class Variable:
         self.type = _type
         self._value = None  # This is the last known value of this variable
 
-        if self.type in ['knob','meter']:
+        if self.type in ['knob', 'meter']:
 
             if not instrument:
                 raise AttributeError(f'{_type} variable definition requires an associated instrument!')
@@ -145,13 +151,13 @@ class Alarm:
         self.condition = condition  # condition which triggers the alarm
         self.protocol = protocol  # what to do when the alarm is triggered
 
+        self._signal = False
+
     @property
     def signal(self):
         value = self.variable.value
-        if eval('value' + self.condition):
-            return self.protocol
-        else:
-            return None
+        self._signal = eval('value' + self.condition)
+        return self._signal
 
 
 class Experiment:
@@ -172,6 +178,8 @@ class Experiment:
         self.clock = Clock()
         self.clock.start()
 
+        self.timestamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
+
         self.data = pd.DataFrame(columns=['time'] + list(variables.keys()))
 
         self.state = pd.Series({column: None for column in self.data.columns})
@@ -188,7 +196,7 @@ class Experiment:
         self.state.name = datetime.datetime.now()
 
         # Apply new settings to knobs according to the routines (if there are any and the experiment is running)
-        if experiment.status is 'Running':
+        if self.status is Experiment.RUNNING:
             for name, routine in self.routines:
                 self.variables[name].value = routine(self.state)
 
@@ -204,16 +212,22 @@ class Experiment:
     def __iter__(self):
         return self
 
+    def save(self):
+
+        self.data.to_csv(
+            f"data_{self.timestamp}.csv"
+        )
+
     def stop(self):
-        self.status = 'Stopped'
+        self.status = Experiment.STOPPED
         self.clock.stop()
 
     def start(self):
-        self.status = 'Running'
+        self.status = Experiment.RUNNING
         self.clock.start()
 
     def terminate(self):
-        self.status = 'Terminated'
+        self.status = Experiment.TERMINATED
 
 
 class Manager:
@@ -225,7 +239,7 @@ class Manager:
 
         # Get the runcard
         if isinstance(runcard, str):  # runcard argument can be a path string
-            with open(path, 'rb') as runcard_file:
+            with open(runcard, 'rb') as runcard_file:
                 self.runcard = yaml.load(runcard_file)  # load runcard in dictionary form
         elif isinstance(runcard, dict):
             self.runcard = runcard
@@ -234,14 +248,15 @@ class Manager:
 
         self.settings = runcard.get('Settings', None)  # global settings
 
+        self.step_period = self.settings.get('step period', 0)
+        self.plot_period = self.settings.get('plot period', 10)
+        self.save_period = self.settings.get('save period', 60)
+
+        self.last_step = self.last_plot = self.last_save = float('-inf')
+
         self.followup = self.settings.get('follow-up', None)
 
-        self.experiment = build_experiment(self.runcard)  # use the runcard to build the experiment
-
-        if 'Plots' in self.runcard:
-            self.plotter = graphics.Plotter(self.experiment.data, settings=self.runcard['Plots'])
-        else:
-            self.plotter = None
+        self.experiment = self.build_experiment(self.runcard)  # use the runcard to build the experiment
 
         if 'Alarms' in self.runcard:
             self.alarms = {
@@ -252,7 +267,12 @@ class Manager:
         else:
             self.alarms = {}
 
-        self.gui = graphics.GUI(self.experiment, title=self.runcard['Description']['name'])  # GUI for user interaction
+        if 'Plots' in self.runcard:
+            self.plotter = graphics.Plotter(self.experiment.data, settings=self.runcard['Plots'])
+        else:
+            self.plotter = None
+
+        self.gui = graphics.GUI(self.experiment, alarms=self.alarms, title=self.runcard['Description']['name'])  # GUI for user interaction
         self.gui_thread = threading.Thread(target=self.gui.run)
         self.gui_thread.start()  # run the GUI in a separate thread
 
@@ -261,22 +281,23 @@ class Manager:
     @staticmethod
     def build_experiment(runcard):
 
-        instruments = {}
+        instruments = {}  # instruments to be used in this experiment
         for name, specs in runcard['Instruments']:
-            instrument_type = instruments.__dict__[specs.pop('type')]
+            instrument_type = _instruments.__dict__[specs.pop('type')]
             address = specs.pop('address')
-            instrument_set[name] = instrument_type(address, presets=specs)
+            instruments[name] = instrument_type(address=address, presets=specs)
 
         variables = {}
         for name, specs in runcard['Variables']:
             if 'meter' in specs:
-                variables[name] = Variable('meter', instruments[spec['instrument']], specs['meter'])
+                variables[name] = Variable('meter', instruments[specs['instrument']], specs['meter'])
             elif 'knob' in specs:
-                variables[name] = Variable('knob', instruments[spec['instrument']], specs['knob'])
+                variables[name] = Variable('knob', instruments[specs['instrument']], specs['knob'])
             elif 'dependent' in specs:
-                variables[name] = Variable('dependent',
-                    expression=specs['expression'], parents={symbol: variables[var_name] for symbol, var_name in specs['parents'].items()},
-                )
+                variables[name] = Variable('dependent', expression=specs['expression'],
+                                            parents={symbol: variables[var_name]
+                                                     for symbol, var_name in specs['parents'].items()}
+                                            )
 
         if 'Routines' in runcard:
             for name, specs in runcard['Routines']:
@@ -289,7 +310,7 @@ class Manager:
                     specs['feedback'] = variables[specs['feedback']]
 
                 routines = {
-                    name: routines.__dict__[_type](values, variable=variable, **specs)
+                    name: _routines.__dict__[_type](values, variable=variable, **specs)
                 }
         else:
             routines = {}
@@ -298,19 +319,54 @@ class Manager:
 
     def run(self):
 
+        # Create a new directory and store a copy of executed runcard there
+        name = self.runcard['Description'].get('name', 'experiment')
+        timestamp = self.experiment.timestamp
+        current_dir = os.getcwd()
+        working_dir = os.path.join(current_dir, name + '-' + timestamp)
+        os.mkdir(working_dir)
+        os.chdir(working_dir)
+
+        with open(f"{name}_{self.experiment.timestamp}.yaml", 'w') as runcard_file:
+            yaml.dump(self.runcard, runcard_file)  # save executed runcard for record keeping
+
+        # Run the experiment
+        alarms_waiting = []  # list of alarms waiting to be untriggered
         for state in self.experiment:
 
-            for name, alarm in self.alarms:
-                if alarm.signal:
-                    break
+            if time.time() >= self.last_plot + self.plot_period:
+                plotting_thread = threading.Thread(target=self.plotter.plot)
+                plotting_thread.start()
+                self.last_plot = time.time()
 
-            if alarm.signal:  # double check alarm signal
-                self.experiment.terminate()
-                self.followup = alarm_protocol
-                break
+            if time.time() >= self.last_save + self.save_period:
+                self.experiment.save()
+
+            alarms_triggered = [alarm for name, alarm in self.alarms if alarm.signal is not None]
+
+            if len(alarms_triggered) > 0:
+
+                alarm = alarms_triggered[0]
+
+                if 'yaml' in alarm.protocol:
+                    self.experiment.terminate()
+                    self.followup = alarm.protocol
+                    break
+                elif 'wait' in alarm.protocol and alarm not in alarms_waiting:
+                    alarms_waiting.append(alarm)
+                    self.experiment.stop()
+
+            elif len(alarms_waiting) > 0:  #
+                alarms_waiting = []  # if no alarms are triggered, empty the waiting list
+                self.experiment.start()  # and restart the experiment
+
 
             if self.experiment.status is Experiment.TERMINATED:
                 break
 
+            time.sleep(self.step_period)
+
+        os.chdir('..')
+
         if self.followup:
-            self.__init__(self.runcard['Settings'][''])
+            self.__init__(self.followup)

@@ -59,7 +59,7 @@ class Plotter:
             elif style == 'order':
                 new_plots[name] = self._plot_order(name)
             else:
-                raise PlotError(f"Plotting style '{style}' not recognized!")
+                raise AttributeError(f"Plotting style '{style}' not recognized!")
 
         return new_plots
 
@@ -315,13 +315,18 @@ class GUI:
     When paused, the user can also directly interact with instruments through the "Check" button.
     """
 
-    def __init__(self, experiment, title=None):
+    def __init__(self, experiment, alarms=None, title=None):
 
         self.experiment = experiment
 
         self.paused = False
 
         self.variables = experiment.variables
+
+        if alarms is None:
+            self.alarms = {}
+        else:
+            self.alarms = alarms
 
         self.root = tk.Toplevel(self.parent)
         self.root.attributes("-topmost", True)
@@ -351,6 +356,20 @@ class GUI:
 
         tk.Label(self.root, text='', font=("Arial", 14, 'bold')).grid(row=i, column=0, sticky=tk.E)
 
+        if len(alarms) > 0:
+            self.alarm_status_labels = {}
+
+            for alarm in self.alarms:
+                tk.Label(self.root, text=alarm, width=len(alarm), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
+
+                self.alarm_status_labels[alarm] = tk.Label(self.root, text='', relief=tk.SUNKEN, width=40)
+                self.alarm_status_labels[alarm].grid(row=i, column=1, columnspan=2, sticky=tk.W)
+
+                i += 1
+
+            tk.Label(self.root, text='', font=("Arial", 14, 'bold')).grid(row=i, column=0, sticky=tk.E)
+
+
         self.dash_button = tk.Button(self.root, text='Dashboard...', font=("Arial", 14, 'bold'), command=self.open_dashboard, width=22, state=tk.DISABLED)
         self.dash_button.grid(row=i + 1, column=2)
 
@@ -361,6 +380,8 @@ class GUI:
         self.stop_button.grid(row=i + 1, column=0)
 
     def update(self):
+
+        # Check the state of the experiment
         state = self.experiment.state
         for name, label in self.variable_status_labels.items():
 
@@ -370,6 +391,20 @@ class GUI:
                 label.config(text=str(state[name]))
 
         self.status_label.config(text=self.experiment.status)
+
+        if self.alarms:
+            for name, label in self.alarm_status_labels.items():
+                label.config(text=str(self.alarms[name]._signal))
+
+        # Check if experiment is paused and update pause/resume button
+        if self.experiment.status == self.experiment.PAUSED:
+            self.paused = True
+            self.pause_button.config(text='Resume')
+            self.dash_button.config(state=tk.NORMAL)
+        elif self.experiment.status == self.experiment.RUNNING:
+            self.paused = False
+            self.pause_button.config(text='Pause')
+            self.dash_button.config(state=tk.DISABLED)
 
         #self.root.lift()
         self.root.after(100, self.update)
