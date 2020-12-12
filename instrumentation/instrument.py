@@ -93,6 +93,8 @@ class Instrument:
                 self.set(knob, value)
 
             self.adapter.disconnect()
+        else:
+            raise ConnectionError(f"adapter for {self.name} is not connected!")
 
     def __del__(self):
         self.disconnect()

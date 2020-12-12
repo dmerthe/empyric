@@ -4,6 +4,9 @@ import queue
 import numpy as np
 import datetime
 import tkinter as tk
+
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 
 class Plotter:

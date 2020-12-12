@@ -23,8 +23,7 @@ class Clock:
 
     def __init__(self):
 
-        self.start_time = time.time()
-        self.stop_time = time.time()  # clock is initially stopped
+        self.start_time = self.stop_time = time.time() # clock is initially stopped
         self.stoppage = 0
 
     def start(self):
@@ -54,9 +53,9 @@ class Variable:
     Basic representation of an experimental variable; comes in 3 kinds: knob, meter and dependent.
     Knobs can only be set; meters and dependents can only be measured.
 
-    A knob is a variable corresponding to something on an instrument that can be directly controlled, e.g. the voltage of a power supply.
+    A knob is a variable that can be directly controlled by an instrument, e.g. the voltage of a power supply.
 
-    A meter is a variable that is measured, such as temperature. Some meters can be controlled directly or indirectly through an associated knob, but a meter can not be set.
+    A meter is a variable that is only measured, such as temperature. Some meters can be controlled directly or indirectly through an associated (but distinct) knob.
 
     A dependent is a variable that is not directly measured, but is calculated based on other variables of the experiment.
     An example of a dependent is the output power of a power supply, where voltage is a knob and current is a meter: power = voltage * current.
@@ -71,7 +70,7 @@ class Variable:
 
         :param label: (str) label of the knob or meter on the instrument; only used if type is 'knob' or 'meter'
 
-        :param expression: (str) expression for the dependent variable in terms of the parents; only used if type is 'dependent'
+        :param expression: (str) expression for the dependent variable in terms of its parents; only used if type is 'dependent'
 
         :param parents: (dict) dictionary of the form {..., symbol: variable, ...} mapping the symbols in the expression to the parent variable objects; only used if type is 'dependent'
 
@@ -163,7 +162,7 @@ class Alarm:
 class Experiment:
 
     RUNNING = 'Running'
-    STOPPED = 'Stopper'
+    STOPPED = 'Stopped'
     TERMINATED = 'Terminated'
 
     def __init__(self, variables, routines=None):

@@ -170,6 +170,19 @@ class Backend:
     def __init__(self, adapter):
         self.adapter = adapter
 
+    # The 4 methods below should be overwritten in Backend child class definitions
+    def write(self, message):
+        pass
+
+    def read(self):
+        pass
+
+    def query(self, question, response_form=None):
+        pass
+
+    def disconnect(self):
+        pass
+
 
 class Serial(Backend):
 
