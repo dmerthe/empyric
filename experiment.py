@@ -13,7 +13,7 @@ yaml = YAML()
 
 from mercury import instruments as _instruments
 from mercury import routines as _routines
-from mercury import adapters, graphics
+from mercury import adapters, graphics, control
 
 
 class Clock:
@@ -129,14 +129,15 @@ class Variable:
 
     @value.setter
     def value(self, value):
-        # value property can only be set if variable is a knob
+        # value property can only be set if variable is a knob; None value indicates no setting should be applied
         if self.type == 'knob' and value is not None:
             self.instrument.set(self.knob, value)
             self._value = self.instrument.knob_values[self.knob]
 
     def __del__(self):
-        if self.postset:
-            self.value = self.postset
+        if self.type == 'knob':
+            if self.postset:
+                self.value = self.postset
 
 
 class Alarm:
@@ -150,17 +151,19 @@ class Alarm:
         self.condition = condition  # condition which triggers the alarm
         self.protocol = protocol  # what to do when the alarm is triggered
 
-        self._signal = False
+        self._triggered = False
 
     @property
-    def signal(self):
-        value = self.variable.value
-        self._signal = eval('value' + self.condition)
-        return self._signal
+    def triggered(self):
+        value = self.variable._value
+        self._triggered = eval('value' + self.condition)
+        return self._triggered
 
 
 class Experiment:
 
+    # Possible statuses of an experiment
+    READY = 'Ready'
     RUNNING = 'Running'
     STOPPED = 'Stopped'
     TERMINATED = 'Terminated'
@@ -170,9 +173,15 @@ class Experiment:
         self.variables = variables  # dict of the form {..., name: variable, ...}
 
         if routines:
-            self.routines = routines  # dictionary of experimental routines of the form {..., name: routine, ...}
+            self.routines = routines  # dictionary of experimental routines of the form {..., name: (variable_name, routine), ...}
+
+            if len(routines) > 0:
+                self.end = np.max([routine.end for _, routine in self.routines.values()])
+            else:
+                self.end = float('inf')  # in case an empty dictionary is passed
         else:
             self.routines = {}
+            self.end = float('inf')
 
         self.clock = Clock()
         self.clock.start()
@@ -182,12 +191,16 @@ class Experiment:
         self.data = pd.DataFrame(columns=['time'] + list(variables.keys()))
 
         self.state = pd.Series({column: None for column in self.data.columns})
-        self.status = 'Ready'
+        self.status = Experiment.READY
 
     def __next__(self):
 
+        if self.status is Experiment.TERMINATED or self.clock.time > self.end:
+            raise StopIteration
+
         # Start the clock
         if self.state.name is None:  # indicates that this is the first step of the experiment
+            self.status = Experiment.RUNNING
             self.clock.start()
 
         # Update time
@@ -196,7 +209,7 @@ class Experiment:
 
         # Apply new settings to knobs according to the routines (if there are any and the experiment is running)
         if self.status is Experiment.RUNNING:
-            for name, routine in self.routines:
+            for name, routine in self.routines.values():
                 self.variables[name].value = routine(self.state)
 
         # Get all variable values
@@ -226,6 +239,8 @@ class Experiment:
         self.clock.start()
 
     def terminate(self):
+        self.stop()
+        self.save()
         self.status = Experiment.TERMINATED
 
 
@@ -245,18 +260,21 @@ class Manager:
         else:
             raise ValueError('runcard not recognized!')
 
-        self.settings = runcard.get('Settings', None)  # global settings
+        # Register settings
+        self.settings = runcard.get('Settings', {})  # global settings
 
-        self.step_period = self.settings.get('step period', 0)
-        self.plot_period = self.settings.get('plot period', 10)
-        self.save_period = self.settings.get('save period', 60)
+        self.step_period = self.settings.get('step interval', 0)
+        self.plot_period = self.settings.get('plot interval', 10)
+        self.save_period = self.settings.get('save interval', 60)
 
         self.last_step = self.last_plot = self.last_save = float('-inf')
 
         self.followup = self.settings.get('follow-up', None)
 
+        # Build the experiment
         self.experiment = self.build_experiment(self.runcard)  # use the runcard to build the experiment
 
+        # Set up any alarms
         if 'Alarms' in self.runcard:
             self.alarms = {
                 name: Alarm(
@@ -266,28 +284,31 @@ class Manager:
         else:
             self.alarms = {}
 
+        # Set up any plots
         if 'Plots' in self.runcard:
-            self.plotter = graphics.Plotter(self.experiment.data, settings=self.runcard['Plots'])
+            self.plotter = graphics.Plotter(self.experiment, settings=self.runcard['Plots'])
         else:
             self.plotter = None
 
-        self.gui = graphics.GUI(self.experiment, alarms=self.alarms, title=self.runcard['Description']['name'])  # GUI for user interaction
-        self.gui_thread = threading.Thread(target=self.gui.run)
-        self.gui_thread.start()  # run the GUI in a separate thread
+        # Run the experiment, in a separate thread
+        self.experiment_thread = threading.Thread(target=self.run)
+        self.experiment_thread.start()  # run the GUI in a separate thread
 
-        self.run()
+        # Set up the GUI for user interaction
+        self.gui = graphics.GUI(self.experiment, alarms=self.alarms, title=self.runcard['Description'].get('name', 'Experiment'))
+        self.gui.run()
 
     @staticmethod
     def build_experiment(runcard):
 
         instruments = {}  # instruments to be used in this experiment
-        for name, specs in runcard['Instruments']:
+        for name, specs in runcard['Instruments'].items():
             instrument_type = _instruments.__dict__[specs.pop('type')]
             address = specs.pop('address')
             instruments[name] = instrument_type(address=address, presets=specs)
 
         variables = {}
-        for name, specs in runcard['Variables']:
+        for name, specs in runcard['Variables'].items():
             if 'meter' in specs:
                 variables[name] = Variable('meter', instruments[specs['instrument']], specs['meter'])
             elif 'knob' in specs:
@@ -298,39 +319,37 @@ class Manager:
                                                      for symbol, var_name in specs['parents'].items()}
                                             )
 
+        routines = {}
         if 'Routines' in runcard:
-            for name, specs in runcard['Routines']:
+            for name, specs in runcard['Routines'].items():
 
                 _type = specs.pop('type')
-                values = specs.pop('values')
-                variable = variables[specs.pop('variable')]
+                variable_name = specs.pop('variable')
 
                 if 'feedback' in specs:
                     specs['feedback'] = variables[specs['feedback']]
 
-                routines = {
-                    name: _routines.__dict__[_type](values, variable=variable, **specs)
-                }
-        else:
-            routines = {}
+                    if 'controller' in specs:
+                        specs['controller'] = controllers.__dict__[specs['controller']]()
+
+                routines[name] = (variable_name, _routines.__dict__[_type](specs))
 
         return Experiment(variables, routines=routines)
 
     def run(self):
 
         # Create a new directory and store a copy of executed runcard there
-        name = self.runcard['Description'].get('name', 'experiment')
+        experiment_name = self.runcard['Description'].get('name', 'Experiment')
         timestamp = self.experiment.timestamp
-        current_dir = os.getcwd()
-        working_dir = os.path.join(current_dir, name + '-' + timestamp)
+        top_dir = os.getcwd()
+        working_dir = os.path.join(top_dir, experiment_name + '-' + timestamp)
         os.mkdir(working_dir)
         os.chdir(working_dir)
 
-        with open(f"{name}_{self.experiment.timestamp}.yaml", 'w') as runcard_file:
+        with open(f"{experiment_name}_{self.experiment.timestamp}.yaml", 'w') as runcard_file:
             yaml.dump(self.runcard, runcard_file)  # save executed runcard for record keeping
 
         # Run the experiment
-        alarms_waiting = []  # list of alarms waiting to be untriggered
         for state in self.experiment:
 
             if time.time() >= self.last_plot + self.plot_period:
@@ -341,31 +360,22 @@ class Manager:
             if time.time() >= self.last_save + self.save_period:
                 self.experiment.save()
 
-            alarms_triggered = [alarm for name, alarm in self.alarms if alarm.signal is not None]
-
+            alarms_triggered = [alarm for alarm in self.alarms.values() if alarm.triggered]
             if len(alarms_triggered) > 0:
 
-                alarm = alarms_triggered[0]
+                alarm = alarms_triggered[0]  # highest priority alarm goes first
 
                 if 'yaml' in alarm.protocol:
                     self.experiment.terminate()
                     self.followup = alarm.protocol
-                    break
-                elif 'wait' in alarm.protocol and alarm not in alarms_waiting:
-                    alarms_waiting.append(alarm)
-                    self.experiment.stop()
-
-            elif len(alarms_waiting) > 0:  #
-                alarms_waiting = []  # if no alarms are triggered, empty the waiting list
-                self.experiment.start()  # and restart the experiment
-
-
-            if self.experiment.status is Experiment.TERMINATED:
-                break
+                elif 'wait' in alarm.protocol:
+                    self.experiment.stop()  # pause the experiment if protocol is to wait
+            else:
+                self.experiment.start()  # resume the experiment if no alarms triggered
 
             time.sleep(self.step_period)
 
-        os.chdir('..')
+        os.chdir(top_dir)
 
         if self.followup:
             self.__init__(self.followup)

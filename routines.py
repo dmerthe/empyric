@@ -1,213 +1,115 @@
 import time
 import numpy as np
 from importlib import import_module
+from scipy.interpolate import interp1d
+
+from mercury.control import PIDController
 
 ## Routines ##
 
 class Routine:
 
-    def __init__(self, values, times=None, variable=None, **kwargs):
+    def __init__(self, **kwargs):
+        """
+        A preset program for the values that a variable takes during an experiment
 
-        if hasattr(values, '__len__'):
-            self.values = values
-        else:
-            self.values = [values]
-
-        if hasattr(times, '__len__'):
-            self.times = times
-        else:
-            times = [times]
-
-        self.variable = variable
+        :param kwargs: any attributes that the routine should have
+        """
 
         for key, value in kwargs.items():
             self.__setattr__(key, value)
 
+        # Make an interpolator if there are multiple times and values
+        if 'values' in kwargs and 'times' in kwargs:
+
+            if len(kwargs['times']) != len(kwargs['values']):
+                raise ValueError('Routine times keyword argument must match length of values keyword argument!')
+
+            self.interpolator = interp1d(kwargs['times'], kwargs['values'])
+
+        # Register the start and end of the routine
+        if not 'start' in kwargs:
+            if 'times' in kwargs:
+                self.start = kwargs['times'][0]
+            else:
+                self.start = -np.inf
+
+        if not 'end' in kwargs:
+            if 'times' in kwargs:
+                self.end = kwargs['times'][-1]
+            else:
+                self.end = np.inf
+
+        if 'feedback' in kwargs:
+            self.controller = kwargs.get('controller', PIDController())
+
+
+    def __call__(self, state):
+        """
+        When called, a routine returns a knob setting which depends on the state of the experiment using the routine.
+        This method should be overwritten by child classes
+
+        :param state: (pandas.Series) state of the experiment
+        :return: (float/str) value of new setting to be applied
+        """
+
+        pass
+
+
 class Hold(Routine):
     """
-    Holds a single value indefinitely
+    Holds a fixed value; most useful for maintaining fixed variables with feedback
     """
-
-    def __init__(self, *args, **kwargs):
-
-        self.times = args[0]
-
-        if isinstance(self.times, float):
-            # if only a single time is provided, assume it to be the start time
-            self.times = [self.times, float('inf')]
-
-        self.value = args[1]
-        self.feedback = kwargs.get('feedback', None)  # name of variable to be used as feedback input
-
-        if self.feedback:
-            if not 'controller' not in kwargs:
-                raise TypeError('Feedback requires a controller!')
-
-            self.controller = kwargs['controller']
 
     def __call__(self, state):
 
-        if state['time'] < self.times[0] or state['time'] > self.times[1]:
+        if state['time'] < self.start or state['time'] > self.end:
             return None
 
-        if self.feedback:
+        if hasattr(self, 'feedback'):
+            self.controller.setpoint = self.value
             feedback_value = state[self.feedback]
             new_setting = self.controller(feedback_value)
-
-            if self.variable:
-                self.variable.value = new_setting
-
             return new_setting
         else:
-
-            if self.variable:
-                self.variable.value = self.value
-
             return self.value
 
 
-class Timecourse:
+class Timecourse(Routine):
     """
     Ramps linearly through a series of values at given times
     """
-
-    def __init__(self, *args, **kwargs):
-
-        self.times = args[0]
-        self.values = args[1]
-        self.feedback = kwargs.get('feedback', None)
-
-        self.interpolator = interp1d(times, values)
-
-        if self.feedback:
-            if not 'controller' not in kwargs:
-                raise TypeError('Feedback requires a controller!')
-
-            self.controller = kwargs['controller']
 
     def __call__(self, state):
 
         try:
             new_value = float(self.interpolator(state['time']))
-        except ValueError:
+        except ValueError:  # happens when outside the routine times
             return None
 
-        if self.feedback:
+        if hasattr(self, 'feedback'):
             self.controller.setpoint = new_value
             feedback_value = state[self.indicator]
             new_setting = self.controller(feedback_value)
-
-            if self.variable:
-                self.variable.value = new_setting
-
             return new_setting
         else:
-
-            if self.variable:
-                self.variable.value = self.value
-
             return new_value
 
 
-class Sequence:
+class Sequence(Routine):
     """
     Passes through a series of values regardless of time
     """
 
-    def __init__(self, *args, **kwargs):
+    iteration = 0
 
-        self.values = values
-        self.values_iter = iter(values)
+    def __call__(self, state):
 
-    def __call__(self):
-
-        try:
-            next_value = next(self.values_iter)
-        except StopIteration:
+        if state['time'] < self.start or state['time'] > self.end:
             return None
 
-        if self.variable:
-            self.variable.value = next_value
+        next_value = self.values[self.iteration]
+
+        self.iteration = (self.iteration + 1) % len(self.values)
 
         return next_value
-        
-
-## Controller classes for feedback
-
-class Controller:
-
-    @property
-    def setpoint(self):
-        return self.controller.setpoint
-
-    @setpoint.setter
-    def setpoint(self, value):
-        self.controller.setpoint = value
-
-    def __call__(self, input):
-
-        output = self.controller(input)
-
-        if hasattr(self, history):
-            _time = time.time() - self.start_time
-            self.history = np.concatenate([self.history, np.array([_time, input, output])])
-
-        return output
-
-
-class PIDController(Controller):
-    """
-    Basic PID controller
-    """
-
-    def __init__(self, setpoint=0, sample_time=0.01, Kp=1, Ki=0, Kd=0):
-
-        simple_pid = import_module('simple_pid')
-        self.controller = simple_pid.PID(Kp, Ki, Kd, setpoint=setpoint, sample_time=sample_time)
-
-    def start(self):
-        self.controller.set_auto_mode(True)
-
-    def stop(self):
-        self.controller.set_auto_mode(False)
-
-    @property
-    def sample_time(self):
-        return self.controller.sample_time
-
-    @sample_time.setter
-    def sample_time(self, value):
-        self.controller.sample_time = value
-
-    @property
-    def Kp(self):
-        return self.controller.Kp
-
-    @Kp.setter
-    def Kp(self, value):
-        self.controller.Kp = value
-
-    @property
-    def Ki(self):
-        return self.controller.Ki
-
-    @Kp.setter
-    def Ki(self, value):
-        self.controller.Ki = value
-
-    @property
-    def Kd(self):
-        return self.controller.Kd
-
-    @Kd.setter
-    def Kd(self, value):
-        self.controller.Kd = value
-
-
-class LinearPredictiveController(Controller):
-    """
-    Uses a linear predictive method to determine optimal settings based on past responses
-    """
-
-    def __init__(self, setpoint, lookback=60):
-        pass

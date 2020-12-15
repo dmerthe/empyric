@@ -1,20 +1,26 @@
+import matplotlib
+matplotlib.use('TkAgg')
+
 import time
 import threading
 import queue
 import numpy as np
 import datetime
 import tkinter as tk
+import numbers
+import pandas as pd
 
-import matplotlib
-matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
+from matplotlib.cm import ScalarMappable
+
+plt.ion()
 
 class Plotter:
     """
     Handler for plotting data based on the runcard plotting settings and data context
     """
 
-    def __init__(self, data, settings=None):
+    def __init__(self, experiment, settings=None):
         """
         PLot data based on settings
 
@@ -22,7 +28,7 @@ class Plotter:
         :param settings: (dict) dictionary of plot settings
         """
 
-        self.data = data
+        self.data = experiment.data
 
         if settings:
             self.settings = settings
@@ -33,7 +39,7 @@ class Plotter:
         for plot_name in settings:
             self.plots[plot_name] = plt.subplots()
 
-        self.timestamp = get_timestamp()
+        self.timestamp = experiment.timestamp
 
     def configure(self, settings=None, interval=None):
 
@@ -89,7 +95,7 @@ class Plotter:
 
         for var in y:
             if var not in self.data.columns:
-                raise PlotError(f'Specified variable {var} is not in data set. Check variable names in plot specification.')
+                raise AttributeError(f'Specified variable {var} is not in data set. Check variable names in plot specification.')
 
         # If data points to a file, then generate a parametric plot
         y_is_path = isinstance(self.data[y].to_numpy().flatten()[0], str)
@@ -318,7 +324,7 @@ class GUI:
     When paused, the user can also directly interact with instruments through the "Check" button.
     """
 
-    def __init__(self, experiment, alarms=None, title=None):
+    def __init__(self, experiment, alarms=None, title=None, plots=None):
 
         self.experiment = experiment
 
@@ -331,7 +337,10 @@ class GUI:
         else:
             self.alarms = alarms
 
-        self.root = tk.Toplevel(self.parent)
+        if plots:
+            self.plotter = Plotter(experiment, plots)
+
+        self.root = tk.Tk()
         self.root.attributes("-topmost", True)
 
         if title:
@@ -339,16 +348,26 @@ class GUI:
         else:
             self.root.title('Experiment')
 
+        # Status field shows current experiment status
         tk.Label(self.root, text='Status:').grid(row=0, column=0, sticky=tk.E)
 
         self.status_label = tk.Label(self.root, text='', width=40, relief=tk.SUNKEN)
         self.status_label.grid(row=0, column=1, columnspan=2, sticky=tk.W)
 
-        tk.Label(self.root, text='', font=("Arial", 14, 'bold')).grid(row=1, column=0, sticky=tk.E)
-
+        # Table of variables shows most recently measured/set variable values
         self.variable_status_labels = {}
 
-        i = 1
+        i = 2
+
+        tk.Label(self.root, text='Run Time', width=len('Run Time'), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
+
+        self.variable_status_labels['time'] = tk.Label(self.root, text='', relief=tk.SUNKEN, width=40)
+        self.variable_status_labels['time'].grid(row=i, column=1, columnspan=2, sticky=tk.W)
+
+        i += 1
+        tk.Label(self.root, text='', font=("Arial", 14, 'bold')).grid(row=i, column=0, sticky=tk.E)
+
+        i += 1
         for variable in self.variables:
             tk.Label(self.root, text=variable, width=len(variable), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
 
@@ -359,13 +378,15 @@ class GUI:
 
         tk.Label(self.root, text='', font=("Arial", 14, 'bold')).grid(row=i, column=0, sticky=tk.E)
 
-        if len(alarms) > 0:
-            self.alarm_status_labels = {}
+        # Table of alarm indicators shows the status of any alarms being monitored
+        self.alarm_status_labels = {}
 
+        if len(alarms) > 0:
+            i += 1
             for alarm in self.alarms:
                 tk.Label(self.root, text=alarm, width=len(alarm), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
 
-                self.alarm_status_labels[alarm] = tk.Label(self.root, text='', relief=tk.SUNKEN, width=40)
+                self.alarm_status_labels[alarm] = tk.Label(self.root, text='Clear', relief=tk.SUNKEN, width=40)
                 self.alarm_status_labels[alarm].grid(row=i, column=1, columnspan=2, sticky=tk.W)
 
                 i += 1
@@ -379,8 +400,9 @@ class GUI:
         self.pause_button = tk.Button(self.root, text='Pause', font=("Arial", 14, 'bold'), command=self.toggle_pause, width=10)
         self.pause_button.grid(row=i + 1, column=1)
 
-        self.stop_button = tk.Button(self.root, text='Stop', font=("Arial", 14, 'bold'), command=self.user_stop, width=10)
-        self.stop_button.grid(row=i + 1, column=0)
+        self.terminate_button = tk.Button(self.root, text='Terminate', font=("Arial", 14, 'bold'), command=self.terminate, width=10)
+
+        self.terminate_button.grid(row=i + 1, column=0)
 
     def update(self):
 
@@ -395,12 +417,15 @@ class GUI:
 
         self.status_label.config(text=self.experiment.status)
 
-        if self.alarms:
-            for name, label in self.alarm_status_labels.items():
-                label.config(text=str(self.alarms[name]._signal))
+        # Check alarms
+        for name, label in self.alarm_status_labels.items():
+            if self.alarms[name].triggered:
+                label.config(text="TRIGGERED")
+            else:
+                label.config(text="Clear")
 
         # Check if experiment is paused and update pause/resume button
-        if self.experiment.status == self.experiment.PAUSED:
+        if self.experiment.status == self.experiment.STOPPED:
             self.paused = True
             self.pause_button.config(text='Resume')
             self.dash_button.config(state=tk.NORMAL)
@@ -408,6 +433,11 @@ class GUI:
             self.paused = False
             self.pause_button.config(text='Pause')
             self.dash_button.config(state=tk.DISABLED)
+        elif self.experiment.status == self.experiment.TERMINATED:
+            self.root.quit()
+            self.root.destroy()
+
+        self.plotter.plot()
 
         #self.root.lift()
         self.root.after(100, self.update)
@@ -429,12 +459,9 @@ class GUI:
 
         self.paused = not self.paused
 
-    def user_stop(self):
-
+    def terminate(self):
         self.experiment.terminate()
-        self.root.after(3000, self.root.destroy)
 
     def run(self):
-
         self.update()
         self.root.mainloop()

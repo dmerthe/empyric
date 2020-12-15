@@ -75,7 +75,7 @@ class Adapter:
         self.connect()
 
     def connect(self):  # should be overwritten in children class definitions
-        self.backend = None
+        self.backend = Backend(self)
         self.connected = True
 
     @chaperone

@@ -1,3 +1,5 @@
+import numpy as np
+from mercury.adapters import Adapter
 
 class Instrument:
     """
@@ -6,7 +8,13 @@ class Instrument:
 
     name = 'Instrument'
 
+    default_adapter = Adapter
+    default_adapter_settings = {}
+
     knobs = tuple()
+    presets = {}
+    postsets = {}
+
     meters = tuple()
 
     presets = {}  # values knobs should be when instrument is connected
@@ -16,15 +24,15 @@ class Instrument:
         """
 
         :param adapter: (Adapter) handles communcations with the instrument via the appropriate backend
-        :param address: (str/int) the default adapter of the instrument can be set up with default settings from the address
+        :param address: (str/int) the default adapter of the instrument can be set up with default settings based on an address
         :param presets: (dict) dictionary of instrument presets of the form {..., knob: value, ...} to apply upon initialization
         :param presets: (dict) dictionary of instrument postsets of the form {..., knob: value, ...} to apply upon disconnection
         """
 
         if adapter:
-            self.adapter = adapter()
+            self.adapter = adapter
         elif address:
-            self.adapter = self.default_adapter(address, **self.default_adapter_settings)
+            self.adapter = self.default_adapter(address=address, **self.default_adapter_settings)
         else:
             ConnectionError('instrument definition requires either an adapter or an address!')
 
@@ -98,3 +106,85 @@ class Instrument:
 
     def __del__(self):
         self.disconnect()
+
+
+class Henon(Instrument):
+    """
+    Simulation of an instrument based on the behavior of a 2D Henon Machine
+    It has two knobs and two meters, useful for testing in the absence of real instruments.
+    """
+
+    name = 'Henon'
+
+    knobs = ('a','b')
+    presets = {'a': 1.4, 'b': 0.3}
+
+    meters = ('x', 'y', 'pseudostep')
+
+    def set_a(self, value):
+        if self.knob_values['a'] == value:
+            return
+
+        a = value
+        self.knob_values['a'] = a
+        b  = self.knob_values['b']
+        if b is None:
+            b = 0.3
+
+        x, y = 2*np.random.rand() - 1, 0.5*np.random.rand() - 0.25
+        self.step = 0
+
+        self.x_values = [x]
+        self.y_values = [y]
+        N = int(1e3)
+        for i in range(N):
+            x_new = 1 - a * x ** 2 + y
+            y_new = b * x
+            x = x_new
+            y = y_new
+            self.x_values.append(x)
+            self.y_values.append(y)
+
+    def set_b(self, value):
+        if self.knob_values['b'] == value:
+            return
+
+        a = self.knob_values['a']
+        if a is None:
+            a = 1.4
+        b = value
+        self.knob_values['b'] = b
+
+        x, y = 2 * np.random.rand() - 1, 0.5 * np.random.rand() - 0.25
+        self.step = 0
+
+        self.x_values = [x]
+        self.y_values = [y]
+        N = int(1e3)
+        for i in range(N):
+            x_new = 1 - a * x ** 2 + y
+            y_new = b * x
+            x = x_new
+            y = y_new
+            self.x_values.append(x)
+            self.y_values.append(y)
+
+    def measure_x(self):
+
+        x = self.x_values[int(0.5*self.step)]
+
+        self.step += 1
+
+        return x
+
+    def measure_y(self):
+
+        y = self.y_values[int(0.5*self.step)]
+
+        self.step += 1
+
+        return y
+
+    def measure_pseudostep(self):
+
+        return int(0.5*self.step) % 10
