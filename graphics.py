@@ -175,9 +175,9 @@ class Plotter:
 
         x = self.settings[name]['x']
         y = np.array([self.settings[name]['y']]).flatten()[0]
-        c = self.settings[name].get('parameter', 'Time')
+        c = self.settings[name].get('parameter', 'time')
 
-        if c not in self.data.columns and c != 'Time':
+        if c not in self.data.columns:
             raise PlotError(f'Parameter {c} not in data!')
 
         # Handle simple numeric data
@@ -185,18 +185,12 @@ class Plotter:
 
         if y_is_numeric:
 
-            if c == 'Time':
-                indices = self.data.index
-                first_datetime = pd.date_range(start=indices[0], end=indices[0],
-                                               periods=len(indices))
-                self.data[c] = (self.data.index - first_datetime).total_seconds()
-
             x_data = self.data[x].values
             y_data = self.data[y].values
             c_data = self.data[c].values
 
             # Rescale time if needed
-            if c == 'Time':
+            if c == 'time':
                 units = 'seconds'
                 if np.max(self.data[c].values) > 60:
                     units = 'minutes'
@@ -214,7 +208,7 @@ class Plotter:
             file_data = pd.read_csv(data_file, index_col=0)
             file_data.index = pd.to_datetime(file_data.index, infer_datetime_format=True)  # convert to pandas DateTime index
 
-            if c == 'Time':
+            if c == 'time':
                 first_datetime = pd.date_range(start=file_data.index[0], end=file_data.index[0], periods=len(file_data.index))
                 file_data[c] = (file_data.index - first_datetime).total_seconds()
 
@@ -256,7 +250,7 @@ class Plotter:
             fig.cbar = plt.colorbar(fig.scalarmappable, ax=ax)
             fig.has_colorbar = True
 
-        if c == 'Time':
+        if c == 'time':
             fig.cbar.ax.set_ylabel('Time ' + f" ({units})")
         else:
             fig.cbar.ax.set_ylabel(self.settings[name].get('clabel', c))
@@ -340,6 +334,9 @@ class GUI:
         if plots:
             self.plotter = Plotter(experiment, plots)
 
+        self.plot_interval = 0  # grows if plotting takes longer
+        self.last_plot = float('-inf')
+
         self.root = tk.Tk()
         self.root.attributes("-topmost", True)
 
@@ -349,7 +346,7 @@ class GUI:
             self.root.title('Experiment')
 
         # Status field shows current experiment status
-        tk.Label(self.root, text='Status:').grid(row=0, column=0, sticky=tk.E)
+        tk.Label(self.root, text='Status', width=len('Status'), anchor=tk.E).grid(row=0, column=0, sticky=tk.E)
 
         self.status_label = tk.Label(self.root, text='', width=40, relief=tk.SUNKEN)
         self.status_label.grid(row=0, column=1, columnspan=2, sticky=tk.W)
@@ -358,16 +355,18 @@ class GUI:
         self.variable_status_labels = {}
 
         i = 2
-
         tk.Label(self.root, text='Run Time', width=len('Run Time'), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
 
         self.variable_status_labels['time'] = tk.Label(self.root, text='', relief=tk.SUNKEN, width=40)
         self.variable_status_labels['time'].grid(row=i, column=1, columnspan=2, sticky=tk.W)
 
-        i += 1
+        i+=1
         tk.Label(self.root, text='', font=("Arial", 14, 'bold')).grid(row=i, column=0, sticky=tk.E)
 
-        i += 1
+        i+=1
+        tk.Label(self.root, text='Variables', font=("Arial", 14, 'bold'), width=40).grid(row=i, column=1)
+
+        i+=1
         for variable in self.variables:
             tk.Label(self.root, text=variable, width=len(variable), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
 
@@ -382,6 +381,10 @@ class GUI:
         self.alarm_status_labels = {}
 
         if len(alarms) > 0:
+
+            i += 1
+            tk.Label(self.root, text='Alarms', font=("Arial", 14, 'bold'), width=40).grid(row=i, column=1)
+
             i += 1
             for alarm in self.alarms:
                 tk.Label(self.root, text=alarm, width=len(alarm), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
@@ -420,15 +423,17 @@ class GUI:
         # Check alarms
         for name, label in self.alarm_status_labels.items():
             if self.alarms[name].triggered:
-                label.config(text="TRIGGERED")
+                label.config(text="TRIGGERED", bg='red')
             else:
-                label.config(text="Clear")
+                label.config(text="CLEAR", bg='green')
 
         # Check if experiment is paused and update pause/resume button
         if self.experiment.status == self.experiment.STOPPED:
-            self.paused = True
+            if self.paused == 'user':
+                self.dash_button.config(state=tk.NORMAL)  # enable access to dashboard when user pauses experiment
+            else:
+                self.paused = True
             self.pause_button.config(text='Resume')
-            self.dash_button.config(state=tk.NORMAL)
         elif self.experiment.status == self.experiment.RUNNING:
             self.paused = False
             self.pause_button.config(text='Pause')
@@ -437,14 +442,30 @@ class GUI:
             self.root.quit()
             self.root.destroy()
 
-        self.plotter.plot()
+        if time.time() > self.last_plot + self.plot_interval:
+
+            start_plot = time.perf_counter()
+            self.plotter.plot()
+            end_plot =  time.perf_counter()
+
+            self.plot_interval = int(5*(end_plot - start_plot))
+            self.last_plot = time.time()
 
         #self.root.lift()
         self.root.after(100, self.update)
 
     def open_dashboard(self):
         # Opens a window which allows the user to change variable values when the experiment is paused
-        pass
+
+        instruments = {}
+
+        for variable in self.experiment.variables.values():
+            instrument = variable.instrument
+            if instrument.name not in instruments:
+                instruments[instrument.name] = instrument
+
+        dashboard = Dashboard(self.root, instruments)
+
 
     def toggle_pause(self):
 
@@ -452,12 +473,12 @@ class GUI:
             self.experiment.start()
             self.pause_button.config(text='Pause')
             self.dash_button.config(state=tk.DISABLED)
+            self.paused = False
         else:
             self.experiment.stop()
             self.pause_button.config(text='Resume')
             self.dash_button.config(state=tk.NORMAL)
-
-        self.paused = not self.paused
+            self.paused = 'user'
 
     def terminate(self):
         self.experiment.terminate()
@@ -465,3 +486,205 @@ class GUI:
     def run(self):
         self.update()
         self.root.mainloop()
+
+
+class BasicDialog(tk.Toplevel):
+    """
+    General purpose dialog window
+
+    """
+
+    def __init__(self, parent, title=None):
+
+        tk.Toplevel.__init__(self, parent)
+        self.transient(parent)
+
+        if title:
+            self.title(title)
+
+        self.parent = parent
+
+        self.result = None
+
+        body = tk.Frame(self)
+        self.initial_focus = self.body(body)
+        body.pack(padx=5, pady=5)
+
+        self.buttonbox()
+
+        self.grab_set()
+
+        if not self.initial_focus:
+            self.initial_focus = self
+
+        self.protocol("WM_DELETE_WINDOW", self.ok)
+
+        self.geometry("+%d+%d" % (parent.winfo_rootx() + 50,
+                                  parent.winfo_rooty() + 50))
+
+        self.initial_focus.focus_set()
+
+        self.wait_window(self)
+
+    # construction hooks
+
+    def body(self, master):
+        # create dialog body.  return widget that should have
+        # initial focus.  this method should be overridden
+
+        pass
+
+    def buttonbox(self):
+        # add standard button box. override if you don't want the
+        # standard buttons
+
+        box = tk.Frame(self)
+
+        w = tk.Button(box, text="OK", width=10, command=self.ok, default=tk.ACTIVE)
+        w.pack(side=tk.LEFT, padx=5, pady=5)
+
+        self.bind("<Return>", self.ok)
+
+        box.pack()
+
+    # standard button semantics
+
+    def ok(self, event=None):
+
+        if not self.validate():
+            self.initial_focus.focus_set()  # put focus back
+            return
+
+        self.withdraw()
+        self.update_idletasks()
+
+        self.parent.focus_set()
+        self.destroy()
+
+    def validate(self):
+
+        return 1  # override
+
+
+class Dashboard(BasicDialog):
+    """
+    Once the instruments are selected, this window allows the user to configure and test instruments before setting up an experiment
+    """
+
+    def __init__(self, parent, instruments):
+
+        self.instruments = instruments
+
+        BasicDialog.__init__(self, parent, title='Dashboard')
+
+    def body(self, master):
+
+        tk.Label(master, text='Instruments:', font=('Arial', 14), justify=tk.LEFT).grid(row=0, column=0, sticky=tk.W)
+
+        i = 1
+
+        self.instrument_labels = {}
+        self.config_buttons = {}
+
+        for name, instrument in self.instruments.items():
+
+            instrument_label = tk.Label(master, text=name)
+            instrument_label.grid(row=i, column=0)
+
+            self.instrument_labels[name] = instrument_label
+
+            config_button = tk.Button(master, text = 'Config/Test', command = lambda instr = instrument: self.config(instr))
+            config_button.grid(row=i,column=1)
+
+            self.config_buttons[name] = config_button
+
+            i+=1
+
+    def config(self, instrument):
+
+        dialog = ConfigTestDialog(self, instrument)
+
+
+class ConfigTestDialog(BasicDialog):
+    """
+    Dialog box for setting knobs and checking meters.
+    Allows the user to quickly access basic instrument functionality as well as configure instrument for an experiment
+
+    """
+
+    def __init__(self, parent, instrument):
+
+        self.instrument = instrument
+        BasicDialog.__init__(self, parent, title='Config/Test: '+instrument.name)
+
+    def apply_knob_entry(self, knob):
+        value = self.knob_entries[knob].get()
+        try:
+            self.instrument.set(knob, float(value))
+        except ValueError:
+            self.instrument.set(knob, value)
+
+    def update_meter_entry(self, meter):
+        value = str(self.instrument.measure(meter))
+        self.meter_entries[meter].config(state=tk.NORMAL)
+        self.meter_entries[meter].delete(0, tk.END)
+        self.meter_entries[meter].insert(0, value)
+        self.meter_entries[meter].config(state='readonly')
+
+    def body(self, master):
+
+        tk.Label(master, text = 'Instrument Name:').grid(row=0, column=0, sticky=tk.E)
+
+        self.name_entry = tk.Entry(master, state="readonly")
+        self.name_entry.grid(row=0, column = 1,sticky=tk.W)
+        self.name_entry.insert(0, self.instrument.name)
+
+        knobs = self.instrument.knobs
+        knob_values = self.instrument.knob_values
+        self.knob_entries = {}
+
+        meters = self.instrument.meters
+        self.meter_entries = {}
+
+        label = tk.Label(master, text='Knobs', font = ("Arial", 14, 'bold'))
+        label.grid(row=1, column=0, sticky=tk.W)
+
+        label = tk.Label(master, text='Meters', font = ("Arial", 14, 'bold'))
+        label.grid(row=1, column=3, sticky=tk.W)
+
+        self.set_buttons = {}
+        i = 2
+        for knob in knobs:
+
+            formatted_name = ' '.join([word[0].upper()+word[1:] for word in knob.split(' ')])
+
+            label = tk.Label(master, text = formatted_name)
+            label.grid(row = i, column = 0, sticky=tk.W)
+
+            self.knob_entries[knob] = tk.Entry(master)
+            self.knob_entries[knob].grid(row = i, column = 1)
+            self.knob_entries[knob].insert(0, str(knob_values[knob]))
+
+            self.set_buttons[knob] = tk.Button(master, text='Set', command = lambda knob = knob : self.apply_knob_entry(knob))
+            self.set_buttons[knob].grid(row=i, column=2)
+
+            i += 1
+
+        self.measure_buttons = {}
+        i = 2
+        for meter in meters:
+
+            formatted_name = ' '.join([word[0].upper() + word[1:] for word in meter.split(' ')])
+
+            label = tk.Label(master, text=formatted_name)
+            label.grid(row=i, column=3, sticky=tk.W)
+
+            self.meter_entries[meter] = tk.Entry(master)
+            self.meter_entries[meter].grid(row=i, column=4)
+            self.meter_entries[meter].insert(0, '???')
+            self.meter_entries[meter].config(state='readonly')
+
+            self.measure_buttons[meter] =  tk.Button(master, text='Measure', command = lambda meter = meter: self.update_meter_entry(meter))
+            self.measure_buttons[meter].grid(row=i, column=5)
+
+            i += 1

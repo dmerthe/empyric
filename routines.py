@@ -1,9 +1,41 @@
 import time
+import numbers
 import numpy as np
 from importlib import import_module
 from scipy.interpolate import interp1d
 
 from mercury.control import PIDController
+
+def convert_time(time_value):
+    """
+    Converts a time of the form "number units" (e.g. "3.5 hours") to the time in seconds.
+
+    :param time_value: (str/float) time value, possibly including units such as 'hours'
+    :return: (int) time in seconds
+    """
+
+    if hasattr(time_value, '__len__') and not isinstance(time_value, str):
+        return [convert_time(t) for t in time_value]
+
+    if isinstance(time_value, numbers.Number):
+        return time_value
+    elif isinstance(time_value, str):
+        # times can be specified in the runcard with units, such as minutes, hours or days, e.g.  "6 hours"
+        time_parts = time_value.split(' ')
+
+        if len(time_parts) == 1:
+            return float(time_parts[0])
+        elif len(time_parts) == 2:
+            value, unit = time_parts
+            value = float(value)
+            return value * {
+                'seconds': 1, 'second':1,
+                'minutes': 60, 'minute': 60,
+                'hours': 3600, 'hour': 3600,
+                'days': 86400, 'day':86400
+            }[unit]
+        else:
+            raise ValueError(f'Unrecognized time format for {time_value}!')
 
 ## Routines ##
 
@@ -15,6 +47,10 @@ class Routine:
 
         :param kwargs: any attributes that the routine should have
         """
+
+        for time_kwarg in ['times', 'start', 'end']:
+            if time_kwarg in kwargs:
+                kwargs[time_kwarg] = convert_time(kwargs[time_kwarg])
 
         for key, value in kwargs.items():
             self.__setattr__(key, value)

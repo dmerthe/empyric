@@ -145,7 +145,7 @@ class Alarm:
     Monitors a variable, raises an alarm if a condition is met and signals the response protocol
     """
 
-    def __init__(self, variable, condition, protocol):
+    def __init__(self, variable, condition, protocol=None):
 
         self.variable = variable  # variable being monitored
         self.condition = condition  # condition which triggers the alarm
@@ -163,10 +163,12 @@ class Alarm:
 class Experiment:
 
     # Possible statuses of an experiment
-    READY = 'Ready'
-    RUNNING = 'Running'
-    STOPPED = 'Stopped'
-    TERMINATED = 'Terminated'
+    READY = 'Ready'  # Experiment initialized but not yet started
+    RUNNING = 'Running'  # Experiment running
+    HOLDING = 'Holding'  # Routines are stopped, but measurements are ongoing
+    STOPPED = 'Stopped'  # Both routines and measurements are stopped
+    TERMINATED = 'Terminated'  # Experiment has either finished or has been terminated by the user
+
 
     def __init__(self, variables, routines=None):
 
@@ -176,7 +178,7 @@ class Experiment:
             self.routines = routines  # dictionary of experimental routines of the form {..., name: (variable_name, routine), ...}
 
             if len(routines) > 0:
-                self.end = np.max([routine.end for _, routine in self.routines.values()])
+                self.end = max([routine.end for _, routine in self.routines.values()])
             else:
                 self.end = float('inf')  # in case an empty dictionary is passed
         else:
@@ -195,8 +197,11 @@ class Experiment:
 
     def __next__(self):
 
-        if self.status is Experiment.TERMINATED or self.clock.time > self.end:
-            raise StopIteration
+        if self.status == Experiment.STOPPED:
+            return self.state
+
+        if self.clock.time > self.end:
+            self.terminate()
 
         # Start the clock
         if self.state.name is None:  # indicates that this is the first step of the experiment
@@ -219,29 +224,83 @@ class Experiment:
         # Append new state to experiment data set
         self.data.loc[self.state.name] = self.state
 
+        if self.status is Experiment.TERMINATED:
+            raise StopIteration
+
         return self.state
 
     def __iter__(self):
         return self
 
     def save(self):
+        self.data.to_csv(f"data_{self.timestamp}.csv")
 
-        self.data.to_csv(
-            f"data_{self.timestamp}.csv"
-        )
-
-    def stop(self):
-        self.status = Experiment.STOPPED
+    def hold(self):  # stops routines
         self.clock.stop()
+        self.status = Experiment.HOLDING
+
+    def stop(self):  # stops routines and measurements
+        self.clock.stop()
+        self.status = Experiment.STOPPED
 
     def start(self):
-        self.status = Experiment.RUNNING
         self.clock.start()
+        self.status = Experiment.RUNNING
 
     def terminate(self):
         self.stop()
         self.save()
         self.status = Experiment.TERMINATED
+
+
+def build_experiment(runcard):
+    """
+    Build an Experiment object based on a runcard, in the form of a .yaml file or a dictionary
+
+    :param runcard: (str/dict) the description of the experiment in the runcard format
+    :return: (Experiment) the experiment described by the runcard
+    """
+
+    instruments = {}  # instruments to be used in this experiment
+    for name, specs in runcard['Instruments'].items():
+
+        specs = specs.copy()  # do not modify the runcard
+
+        instrument_type = _instruments.__dict__[specs.pop('type')]
+        address = specs.pop('address')
+        presets = specs  # remaining dictionary contains instrument presets
+        instruments[name] = instrument_type(address=address, presets=presets)
+
+    variables = {}  # experiment variables, associated with the instruments above
+    for name, specs in runcard['Variables'].items():
+        if 'meter' in specs:
+            variables[name] = Variable('meter', instruments[specs['instrument']], specs['meter'])
+        elif 'knob' in specs:
+            variables[name] = Variable('knob', instruments[specs['instrument']], specs['knob'])
+        elif 'dependent' in specs:
+            variables[name] = Variable('dependent', expression=specs['expression'],
+                                        parents={symbol: variables[var_name]
+                                                 for symbol, var_name in specs['parents'].items()}
+                                        )
+
+    routines = {}
+    if 'Routines' in runcard:
+        for name, specs in runcard['Routines'].items():
+
+            specs = specs.copy()  # do not modify the runcard
+
+            _type = specs.pop('type')
+            variable_name = specs.pop('variable')
+
+            if 'feedback' in specs:
+                specs['feedback'] = variables[specs['feedback']]
+
+                if 'controller' in specs:
+                    specs['controller'] = controllers.__dict__[specs['controller']]()
+
+            routines[name] = (variable_name, _routines.__dict__[_type](**specs))
+
+    return Experiment(variables, routines=routines)
 
 
 class Manager:
@@ -261,82 +320,39 @@ class Manager:
             raise ValueError('runcard not recognized!')
 
         # Register settings
-        self.settings = runcard.get('Settings', {})  # global settings
+        self.settings = self.runcard.get('Settings', {})  # global settings
 
-        self.step_period = self.settings.get('step interval', 0)
-        self.plot_period = self.settings.get('plot interval', 10)
+        self.step_period = self.settings.get('step interval', 0.1)
         self.save_period = self.settings.get('save interval', 60)
 
-        self.last_step = self.last_plot = self.last_save = float('-inf')
+        self.last_step = self.last_save = float('-inf')
 
         self.followup = self.settings.get('follow-up', None)
 
-        # Build the experiment
-        self.experiment = self.build_experiment(self.runcard)  # use the runcard to build the experiment
+        self.experiment = build_experiment(self.runcard)  # use the runcard to build the experiment
 
         # Set up any alarms
         if 'Alarms' in self.runcard:
             self.alarms = {
                 name: Alarm(
-                    self.experiment.variables[specs['variable']], specs['condition'], specs['protocol']
+                    self.experiment.variables[specs['variable']], specs['condition'], protocol=specs.get('protocol', None)
                 ) for name, specs in self.runcard['Alarms'].items()
             }
         else:
             self.alarms = {}
 
-        # Set up any plots
-        if 'Plots' in self.runcard:
-            self.plotter = graphics.Plotter(self.experiment, settings=self.runcard['Plots'])
-        else:
-            self.plotter = None
-
         # Run the experiment, in a separate thread
-        self.experiment_thread = threading.Thread(target=self.run)
+        self.experiment_thread = threading.Thread(target=self.run_experiment)
         self.experiment_thread.start()  # run the GUI in a separate thread
 
         # Set up the GUI for user interaction
-        self.gui = graphics.GUI(self.experiment, alarms=self.alarms, title=self.runcard['Description'].get('name', 'Experiment'))
+        self.gui = graphics.GUI(self.experiment,
+                                alarms=self.alarms,
+                                title=self.runcard['Description'].get('name', 'Experiment'),
+                                plots=self.runcard.get('Plots', None))
         self.gui.run()
 
-    @staticmethod
-    def build_experiment(runcard):
-
-        instruments = {}  # instruments to be used in this experiment
-        for name, specs in runcard['Instruments'].items():
-            instrument_type = _instruments.__dict__[specs.pop('type')]
-            address = specs.pop('address')
-            instruments[name] = instrument_type(address=address, presets=specs)
-
-        variables = {}
-        for name, specs in runcard['Variables'].items():
-            if 'meter' in specs:
-                variables[name] = Variable('meter', instruments[specs['instrument']], specs['meter'])
-            elif 'knob' in specs:
-                variables[name] = Variable('knob', instruments[specs['instrument']], specs['knob'])
-            elif 'dependent' in specs:
-                variables[name] = Variable('dependent', expression=specs['expression'],
-                                            parents={symbol: variables[var_name]
-                                                     for symbol, var_name in specs['parents'].items()}
-                                            )
-
-        routines = {}
-        if 'Routines' in runcard:
-            for name, specs in runcard['Routines'].items():
-
-                _type = specs.pop('type')
-                variable_name = specs.pop('variable')
-
-                if 'feedback' in specs:
-                    specs['feedback'] = variables[specs['feedback']]
-
-                    if 'controller' in specs:
-                        specs['controller'] = controllers.__dict__[specs['controller']]()
-
-                routines[name] = (variable_name, _routines.__dict__[_type](specs))
-
-        return Experiment(variables, routines=routines)
-
-    def run(self):
+    def run_experiment(self):
 
         # Create a new directory and store a copy of executed runcard there
         experiment_name = self.runcard['Description'].get('name', 'Experiment')
@@ -352,11 +368,6 @@ class Manager:
         # Run the experiment
         for state in self.experiment:
 
-            if time.time() >= self.last_plot + self.plot_period:
-                plotting_thread = threading.Thread(target=self.plotter.plot)
-                plotting_thread.start()
-                self.last_plot = time.time()
-
             if time.time() >= self.last_save + self.save_period:
                 self.experiment.save()
 
@@ -365,17 +376,19 @@ class Manager:
 
                 alarm = alarms_triggered[0]  # highest priority alarm goes first
 
-                if 'yaml' in alarm.protocol:
-                    self.experiment.terminate()
-                    self.followup = alarm.protocol
-                elif 'wait' in alarm.protocol:
-                    self.experiment.stop()  # pause the experiment if protocol is to wait
-            else:
-                self.experiment.start()  # resume the experiment if no alarms triggered
+                if alarm.protocol:
+                    if 'yaml' in alarm.protocol:
+                        self.experiment.terminate()
+                        self.followup = alarm.protocol
+                    elif 'wait' in alarm.protocol:
+                        self.experiment.hold()  # pause the experiment if protocol is to wait
+
+            elif self.experiment.status == Experiment.HOLDING and self.gui.paused != 'user':
+                self.experiment.start()  # resume the experiment if alarms no longer triggered after waiting
 
             time.sleep(self.step_period)
 
         os.chdir(top_dir)
 
-        if self.followup:
+        if self.followup not in [None, 'None']:
             self.__init__(self.followup)

@@ -36,6 +36,8 @@ class Instrument:
         else:
             ConnectionError('instrument definition requires either an adapter or an address!')
 
+        self.name = self.name + '-' + str(self.adapter.address)
+
         self.knob_values = {knob: None for knob in self.knobs}
 
         # Apply presets
