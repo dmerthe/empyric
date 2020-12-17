@@ -5,12 +5,10 @@ import warnings
 import sys
 import re
 
-supported_adapters = ['serial', 'gpib', 'usb']
-
 
 def chaperone(method):
     """
-    Utility function that wraps the write, read and query methods of adapters and deals with communication issues
+    Utility function that wraps the read methods of adapters to monitor and handle communication issues
 
     :param method: (callable) write, read or query method to be wrapped
     :return: (callable) wrapped method
@@ -59,14 +57,13 @@ class Adapter:
     max_repeats = 3
     max_reconnects = 1
 
-    def __init__(self, address, delay=0.1, timeout=0.2, baud_rate=9600):
+    def __init__(self, address, **kwargs):
+
         # general parameters
         self.address = address
-        self.delay = delay
-        self.timeout = timeout
 
-        # for serial communications
-        self.baud_rate = baud_rate
+        for key, value in kwargs:
+            self.__setattr__(key, value)
 
         self.connected = False
         self.repeats = 0
@@ -74,132 +71,37 @@ class Adapter:
 
         self.connect()
 
-    def connect(self):  # should be overwritten in children class definitions
-        self.backend = Backend(self)
+    # All methods below should be overwritten in children class definitions
+    def connect(self):
         self.connected = True
 
-    @chaperone
     def write(self, message):
-        return self.backend.write(message)
+        pass
 
     @chaperone
     def read(self, response_form=None):
-        return self.backend.read(response_form=response_form)
+        pass
 
-    @chaperone
     def query(self, message, response_form=None):
-        return self.backend.query(message, response_form=response_form)
+        pass
 
     def disconnect(self):
         self.connected = False
-        return self.backend.disconnect()
 
-class SerialAdapter(Adapter):
+class Serial(Adapter):
     """
-    Adapter handling communications with serial instruments
-    """
-
-    available_backends = ['serial', 'visa']
-
-    def connect(self):
-
-        try:
-            self.backend = Serial(self)
-            return
-        except ImportError:
-            pass
-
-        try:
-            self.backend = VISA(self)
-        except ImportError:
-            raise ImportError('either pyserial or pyvisa is required for using serial adapters!')
-
-
-class GPIB(Adapter):
-    """
-    Adapter handling communications with GPIB instruments
-    """
-
-    available_backends = ['visa', 'linux']
-
-    def connect(self):
-
-        if sys.platform in ('win32', 'darwin'):
-            try:
-                self.backend = VISA(self)
-            except ImportError:
-                raise ImportError(
-                    'the pyvisa module is required for using GPIB adapters on Windows or MacOS platforms!')
-        elif sys.platform == 'linux':
-            try:
-                self.backend = LinuxGPIB(self)
-            except ImportError:
-                raise ImportError('the linux module is required for using GPIB adapters on Linux platforms!')
-        else:
-            raise SystemError(f'{sys.platform} operating system type is not supported!')
-
-
-class USB(Adapter):
-    """
-    Adapter handling communications with USB (distinct from serial-to-usb) instruments
+    Handles communications with serial instruments through the PySerial module
     """
 
     def connect(self):
-
-        if sys.platform in ('win32', 'darwin'):
-            try:
-                self.backend = VISA(self)
-            except ImportError:
-                raise ImportError(
-                    'pyvisa with NI-VISA backend is required for using USB adapters on Windows or MacOS platforms!')
-        elif sys.platform == 'linux':
-            try:
-                self.backend = USBTMC(self)
-            except ImportError:
-                raise ImportError('the usbtmc module is required for using USB adapters on Linux platforms!')
-        else:
-            raise SystemError(f'{sys.platform} operating system type is not supported!')
-
-
-## Backends ##
-class Backend:
-    """
-    Backends facilitate communication between the computer and instruments, through combinations of drivers and APIs.
-    """
-
-    def __init__(self, adapter):
-        self.adapter = adapter
-
-    # The 4 methods below should be overwritten in Backend child class definitions
-    def write(self, message):
-        pass
-
-    def read(self):
-        pass
-
-    def query(self, question, response_form=None):
-        pass
-
-    def disconnect(self):
-        pass
-
-
-class Serial(Backend):
-
-    def __init__(self, adapter):
-
-        self.address = 'COM' + adapter.address
-        self.baud_rate = adapter.baud_rate
-        self.timeout = adapter.timeout
-        self.delay = adapter.delay
 
         serial = importlib.import_module('serial')
-        self.backend = serial.Serial(port=self.address, baudrate=self.baud_rate, timeout=self.timeout)
-        adapter.connected = True
+        self.backend = serial.Serial(port='COM' + self.address, baudrate=self.baud_rate, timeout=self.timeout)
 
     def write(self, message):
         self.backend.write(message)
 
+    @chaperone
     def read(self, response_form=None):
         response = self.backend.read()
 
@@ -224,48 +126,24 @@ class Serial(Backend):
         self.backend.close()
 
 
-class VISA(Backend):
+class VISASerial(Adapter):
+    """
+    Handles communications with serial instruments through the PyVISA module
+    """
 
-    def __init__(self, adapter):
-
-        self.timeout = adapter.timeout
-        self.delay = adapter.delay
+    def connect(self):
 
         visa = importlib.import_module('pyvisa')
         manager = visa.ResourceManager()
 
-        if isinstance(adapter, SerialAdapter):
-            self.address = f"ASRL{adapter.address}::INSTR"
-            self.backend = manager.open_resource(self.address,
-                                                 open_timeout=self.timeout,
-                                                 baud_rate=self.baud_rate)
-            self.backend.timeout = self.timeout
-
-        elif isinstance(adapter, GPIB):
-            self.address = f"GPIB::{adapter.address}::INSTR"
-            self.backend = manager.open_resource(self.address,
-                                                 open_timeout=self.timeout)
-            self.backend.timeout = self.timeout
-
-        elif isinstance(adapter, USB):
-            serial_no = adapter.address
-
-            for address in manager.list_resources():
-                if serial_no in address:
-                    self.address = address
-                    self.backend = manager.open_resource(self.address,
-                                                         open_timeout=self.timeout)
-                    self.backend.timeout = self.timeout
-
-            raise ConnectionError(f'device with serial number {serial_no} is not connected!')
-        else:
-            raise ConnectionError(f'unsupported adapter {adapter} for VISA backend!')
-
-        adapter.connected = True
+        self.backend = manager.open_resource(f"ASRL{self.address}::INSTR",
+                                             open_timeout=self.timeout,
+                                             baud_rate=self.baud_rate)
 
     def write(self, message):
         self.backend.write(message)
 
+    @chaperone
     def read(self, response_form=None):
         response = self.backend.read()
 
@@ -284,11 +162,89 @@ class VISA(Backend):
         return self.read(response_form=response_form)
 
     def disconnect(self):
-        self.interface.clear()
-        self.interface.close()
+        self.backend.clear()
+        self.backend.close()
 
 
-class LinuxGPIB(Backend):
+class VISAGPIB(Adapter):
+
+    def connect(self):
+
+        visa = importlib.import_module('pyvisa')
+        manager = visa.ResourceManager()
+        self.backend = manager.open_resource(f"GPIB0::{self.address}::INSTR",
+                                             open_timeout=self.timeout)
+
+    def write(self, message):
+        self.backend.write(message)
+
+    @chaperone
+    def read(self, response_form=None):
+        response = self.backend.read()
+
+        if response_form:
+            if not re.match(response_form, response):
+                return 'invalid'
+
+        if response == '':
+            return 'invalid'
+        else:
+            return response
+
+    def query(self, question, response_form=None):
+        self.write(question)
+        time.sleep(self.delay)
+        return self.read(response_form=response_form)
+
+    def disconnect(self):
+        self.backend.clear()
+        self.backend.close()
+
+
+class VISAUSB(Adapter):
+
+
+    def connect(self):
+
+        visa = importlib.import_module('pyvisa')
+        manager = visa.ResourceManager()
+
+        serial_number = self.address
+
+        for address in manager.list_resources():
+            if serial_number in address:
+                self.address = address
+                self.backend = manager.open_resource(self.address,
+                                                     open_timeout=self.timeout)
+                self.backend.timeout = self.timeout
+
+    def write(self, message):
+        self.backend.write(message)
+
+    @chaperone
+    def read(self, response_form=None):
+        response = self.backend.read()
+
+        if response_form:
+            if not re.match(response_form, response):
+                return 'invalid'
+
+        if response == '':
+            return 'invalid'
+        else:
+            return response
+
+    def query(self, question, response_form=None):
+        self.write(question)
+        time.sleep(self.delay)
+        return self.read(response_form=response_form)
+
+    def disconnect(self):
+        self.backend.clear()
+        self.backend.close()
+
+
+class LinuxGPIB(Adapter):
 
     # Timeout values (in seconds) allowed by the Linux-GPIB backend; I don't know why
     timeouts = {
@@ -312,28 +268,24 @@ class LinuxGPIB(Backend):
         17: 1000
     }
 
-    def __init__(self, adapter):
-
-        self.address = adapter.address
-        self.delay = adapter.delay
+    def connect(self):
 
         # Match specified timeout to an allowable timeout of at least as long
-        for key, timeout in self.timeouts.items():
-            if adapter.timeout is None:
-                self.timeout = 0
+        for index, timeout in self.timeouts.items():
+            if self.timeout is None:
+                self.timeout_index = 0
                 break
             elif timeout is None:
                 continue
-            elif timeout >= adapter.timeout:
-                self.timeout = key
+            elif timeout >= self.timeout:
+                self.timeout_index = index
                 break
 
         self.backend = importlib.import_module('gpib')
 
-        self.descr = self.backend.dev(0, self.address, 0, self.timeout, 1, 0)  # integer corresponding to the device descriptor
+        self.descr = self.backend.dev(0, self.address, 0, self.timeout_index, 1, 0)  # integer corresponding to the device descriptor
 
-        adapter.connected = True
-
+        self.connected = True
 
     def write(self, message):
         self.backend.write(self.descr, message)
@@ -359,5 +311,8 @@ class LinuxGPIB(Backend):
         self.backend.clear(self.descr)
         self.backend.close(self.descr)
 
-class USBTMC(Backend):
+class USBTMC(Adapter):
+    pass
+
+class Modbus(Adapter):
     pass

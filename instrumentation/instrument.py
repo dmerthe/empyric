@@ -1,5 +1,5 @@
 import numpy as np
-from mercury.adapters import Adapter
+from mercury.adapters import *
 
 class Instrument:
     """
@@ -8,8 +8,8 @@ class Instrument:
 
     name = 'Instrument'
 
-    default_adapter = Adapter
-    default_adapter_settings = {}
+    supported_adapters = [Adapter]
+    adapter_settings = {}
 
     knobs = tuple()
     presets = {}
@@ -32,7 +32,21 @@ class Instrument:
         if adapter:
             self.adapter = adapter
         elif address:
-            self.adapter = self.default_adapter(address=address, **self.default_adapter_settings)
+            adapter_connected = False
+            errors = []
+            for _adapter in self.supported_adapters:
+                try:
+                    self.adapter = _adapter(address, **self.adapter_settings)
+                    adapter_connected = True
+                except BaseException as error:
+                    errors.append(type(error).__name__ +': '+ str(error))
+
+            if not adapter_connected:
+                message = f'unable to connect an adapter to instrument {self.name} at address {address}:\n'
+                for error in errors:
+                    message.append(f"{error}\n")
+                raise ConnectionError(message)
+
         else:
             ConnectionError('instrument definition requires either an adapter or an address!')
 

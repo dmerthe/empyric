@@ -135,6 +135,7 @@ class Variable:
             self._value = self.instrument.knob_values[self.knob]
 
     def __del__(self):
+        # Make sure that variable is set to a safe value upon deletion
         if self.type == 'knob':
             if self.postset:
                 self.value = self.postset
@@ -142,7 +143,7 @@ class Variable:
 
 class Alarm:
     """
-    Monitors a variable, raises an alarm if a condition is met and signals the response protocol
+    Monitors a variable, triggers if a condition is met and indicates the response protocol
     """
 
     def __init__(self, variable, condition, protocol=None):
@@ -163,8 +164,8 @@ class Alarm:
 class Experiment:
 
     # Possible statuses of an experiment
-    READY = 'Ready'  # Experiment initialized but not yet started
-    RUNNING = 'Running'  # Experiment running
+    READY = 'Ready'  # Experiment is initialized but not yet started
+    RUNNING = 'Running'  # Experiment is running
     HOLDING = 'Holding'  # Routines are stopped, but measurements are ongoing
     STOPPED = 'Stopped'  # Both routines and measurements are stopped
     TERMINATED = 'Terminated'  # Experiment has either finished or has been terminated by the user
@@ -176,11 +177,7 @@ class Experiment:
 
         if routines:
             self.routines = routines  # dictionary of experimental routines of the form {..., name: (variable_name, routine), ...}
-
-            if len(routines) > 0:
-                self.end = max([routine.end for _, routine in self.routines.values()])
-            else:
-                self.end = float('inf')  # in case an empty dictionary is passed
+            self.end = max([routine.end for _, routine in routines.values()])  # time at which all routines are exhausted
         else:
             self.routines = {}
             self.end = float('inf')
@@ -200,6 +197,7 @@ class Experiment:
         if self.status == Experiment.STOPPED:
             return self.state
 
+        # End the experiment, if the
         if self.clock.time > self.end:
             self.terminate()
 
@@ -232,8 +230,14 @@ class Experiment:
     def __iter__(self):
         return self
 
-    def save(self):
-        self.data.to_csv(f"data_{self.timestamp}.csv")
+    def save(self, directory=None):
+
+        path = f"data_{self.timestamp}.csv"
+
+        if directory:
+            path = os.path.join(directory, path)
+
+        self.data.to_csv(path)
 
     def hold(self):  # stops routines
         self.clock.stop()
@@ -264,7 +268,7 @@ def build_experiment(runcard):
     instruments = {}  # instruments to be used in this experiment
     for name, specs in runcard['Instruments'].items():
 
-        specs = specs.copy()  # do not modify the runcard
+        specs = specs.copy()  # avoids modifying the runcard
 
         instrument_type = _instruments.__dict__[specs.pop('type')]
         address = specs.pop('address')
@@ -287,7 +291,7 @@ def build_experiment(runcard):
     if 'Routines' in runcard:
         for name, specs in runcard['Routines'].items():
 
-            specs = specs.copy()  # do not modify the runcard
+            specs = specs.copy()  # avoids modifying the runcard
 
             _type = specs.pop('type')
             variable_name = specs.pop('variable')
@@ -320,11 +324,10 @@ class Manager:
             raise ValueError('runcard not recognized!')
 
         # Register settings
-        self.settings = self.runcard.get('Settings', {})  # global settings
+        self.settings = self.runcard.get('Settings', {})
 
         self.step_period = self.settings.get('step interval', 0.1)
         self.save_period = self.settings.get('save interval', 60)
-
         self.last_step = self.last_save = float('-inf')
 
         self.followup = self.settings.get('follow-up', None)
@@ -354,7 +357,7 @@ class Manager:
 
     def run_experiment(self):
 
-        # Create a new directory and store a copy of executed runcard there
+        # Create a new directory for data storage
         experiment_name = self.runcard['Description'].get('name', 'Experiment')
         timestamp = self.experiment.timestamp
         top_dir = os.getcwd()
@@ -362,8 +365,9 @@ class Manager:
         os.mkdir(working_dir)
         os.chdir(working_dir)
 
+        # Save executed runcard alongside data for record keeping
         with open(f"{experiment_name}_{self.experiment.timestamp}.yaml", 'w') as runcard_file:
-            yaml.dump(self.runcard, runcard_file)  # save executed runcard for record keeping
+            yaml.dump(self.runcard, runcard_file)
 
         # Run the experiment
         for state in self.experiment:
@@ -384,7 +388,8 @@ class Manager:
                         self.experiment.hold()  # pause the experiment if protocol is to wait
 
             elif self.experiment.status == Experiment.HOLDING and self.gui.paused != 'user':
-                self.experiment.start()  # resume the experiment if alarms no longer triggered after waiting
+                # If no alarms are triggered, experiment is on hold and is not paused by the user, resume the experiment
+                self.experiment.start()
 
             time.sleep(self.step_period)
 
