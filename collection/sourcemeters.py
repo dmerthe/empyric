@@ -2,9 +2,10 @@ import os
 import datetime
 import numpy as np
 import pandas as pd
+import numbers
 
 from mercury.adapters import *
-from mercury.instrumentation.instrument import Instrument
+from mercury.collection.instrument import Instrument
 
 class Keithley2400(Instrument):
     """
@@ -13,7 +14,11 @@ class Keithley2400(Instrument):
 
     name = 'Keithley2400'
 
-    supported_adapters = [VISAGPIB, LinuxGPIB]
+    supported_adapters = (
+        (VISAGPIB, {}),
+        (LinuxGPIB, {}),
+        (PrologixGPIB, {})
+    )
 
     # Available knobs
     knobs = (
@@ -31,11 +36,11 @@ class Keithley2400(Instrument):
     )
 
     presets = {
-        # 'voltage range': 200,
-        # 'current range': 100e-3,
-        'nplc': 1,
         'source': 'voltage',
         'meter': 'current',
+        'voltage range': 200,
+        'current range': 100e-3,
+        'nplc': 1,
         'source_delay': 0,
         'output': 'ON'
     }
@@ -64,7 +69,9 @@ class Keithley2400(Instrument):
         if variable == 'voltage':
 
             self.write(':SOUR:FUNC VOLT')
-            self.set_voltage_range(self.knob_values['voltage range'])
+            self.knob_values['source'] = 'voltage'
+
+            self.set_voltage_range(self.knob_values.get('voltage range', None))
 
             self.knob_values['current'] = None
 
@@ -72,13 +79,11 @@ class Keithley2400(Instrument):
         if variable == 'current':
 
             self.write(':SOUR:FUNC CURR')
+            self.knob_values['source'] = 'current'
+
             self.set_current_range(self.knob_values['current range'])
 
             self.knob_values['voltage'] = None
-
-        self.knob_values['source'] = variable
-
-        self.set_output('ON')
 
     def set_meter(self, variable):
 
@@ -95,19 +100,13 @@ class Keithley2400(Instrument):
 
         self.knob_values['meter'] = variable
 
-    def output_on(self):
-        self.write(':OUTP ON')
-
-    def output_off(self):
-        self.write(':OUTP OFF')
-
     def set_output(self, output):
 
         if output in [0, None, 'OFF', 'off']:
-            self.output_off()
+            self.write(':OUTP OFF')
             self.knob_values['output'] = 'OFF'
         elif output in [1, 'ON', 'on']:
-            self.output_on()
+            self.write(':OUTP ON')
             self.knob_values['output'] = 'ON'
         else:
             raise ValueError(f'Ouput setting {output} not recognized!')
@@ -117,27 +116,26 @@ class Keithley2400(Instrument):
         if self.knob_values['meter'] != 'voltage':
             self.set_meter('voltage')
 
-        if self.knob_values['output'] == 'ON':
-            return float(self.query(':READ?').strip())
-        else:
-            return np.nan
+        self.set_output('ON')
+
+        return float(self.query(':READ?').strip())
 
     def measure_current(self):
 
         if self.knob_values['meter'] != 'current':
             self.set_meter('current')
 
-        if self.knob_values['output'] == 'ON':
-            return float(self.query(':READ?').strip())
-        else:
-            return 0
+        self.set_output('ON')
+
+        return float(self.query(':READ?').strip())
 
     def set_voltage(self, voltage):
 
         if self.knob_values['source'] != 'voltage':
             Warning(f'Switching sourcing mode!')
             self.set_source('voltage')
-            self.output_on()  # output if automatically shut off when the source mode is changed
+
+        self.set_output('ON')
 
         self.write(':SOUR:VOLT:LEV %.2E' % voltage)
 
@@ -148,7 +146,8 @@ class Keithley2400(Instrument):
         if self.knob_values['source'] != 'current':
             Warning(f'Switching sourcing mode!')
             self.set_source('current')
-            self.output_on()  # output if automatically shut off when the source mode is changed
+
+        self.set_output('ON')
 
         self.write(':SOUR:CURR:LEV %.2E' % current)
 
@@ -158,82 +157,73 @@ class Keithley2400(Instrument):
 
         allowed_voltage_ranges = (0.2, 2, 20, 200) # allowable voltage ranges
 
-        if voltage_range in [None, 'AUTO']:
+        if voltage_range in allowed_voltage_ranges:
 
             if self.knob_values['source'] == 'voltage':
-                self.write(':SOUR:VOLT:RANG AUTO')
+                # self.write(':SOUR:VOLT:RANG %.2E' % voltage_range)
+                pass
             else:
-                self.write(':SENS:VOLT:PROT 200')
-                self.write(':SENS:VOLT:RANG AUTO')
+                self.write(':SENS:VOLT:PROT %.2E' % voltage_range)
+                self.write(':SENS:VOLT:RANG %.2E' % voltage_range)
 
-            self.knob_values['voltage range'] = 'AUTO'
+            self.knob_values['voltage range'] = voltage_range
 
-            return
-
-        elif voltage_range not in allowed_voltage_ranges:
-
-            if voltage_range == None:
-                self.knob_values['voltage range'] = 'AUTO'
+        elif isinstance(voltage_range, numbers.Number):
 
             # Find nearest encapsulating voltage range
             try:
-                nearest = np.argwhere( voltage_range <= np.array(allowed_voltage_ranges[:-1]) ).flatten()[0]
+                nearest = np.argwhere( voltage_range <= np.array(allowed_voltage_ranges) ).flatten()[0]
             except IndexError:
-                nearest = -2
+                nearest = -1
 
-            self.knob_values['voltage range'] = allowed_voltage_ranges[nearest]
-
-            Warning(f'Given voltage range not an option, setting to {allowed_voltage_ranges[nearest]} V instead')
+            self.set_voltage_range(allowed_voltage_ranges[nearest])
 
         else:
-            self.knob_values['voltage range'] = voltage_range
+            if self.knob_values['source'] == 'voltage':
+                self.write(':SOUR:VOLT:RANG:AUTO 1')
+            else:
+                self.write(':SENS:VOLT:PROT MAX')
+                self.write(':SENS:VOLT:RANG:AUTO 1')
 
-        if self.knob_values['source'] == 'voltage':
-            self.write(':SOUR:VOLT:RANG %.2E' % self.knob_values['voltage range'])
-        else:
-            self.write(':SENS:VOLT:PROT %.2E' % self.knob_values['voltage range'])
-            self.write(':SENS:VOLT:RANG %.2E' % self.knob_values['voltage range'])
+            self.knob_values['voltage range'] = 'AUTO'
 
-        self.knob_values['voltage range'] = voltage_range
+            Warning('given voltage range is not permitted; set to auto-range.')
 
     def set_current_range(self, current_range):
 
         allowed_current_ranges = (1e-6, 10e-6, 100e-6, 1e-3, 10e-3, 100e-3, 1)
 
-        if current_range in [None, 'AUTO']:
+        if current_range in allowed_current_ranges:
 
             if self.knob_values['source'] == 'current':
-                self.write(':SOUR:CURR:RANG AUTO')
+                self.write(':SOUR:CURR:RANG %.2E' % current_range)
             else:
-                self.write(':SENS:CURR:PROT 1')
-                self.write(':SENS:CURR:RANG AUTO')
+                self.write(':SENS:CURR:PROT %.2E' % current_range)
+                self.write(':SENS:CURR:RANG %.2E' % current_range)
 
-            self.knob_values['current range'] = 'AUTO'
+            self.knob_values['current range'] = current_range
 
-            return
-
-        elif current_range not in allowed_current_ranges:
+        elif isinstance(current_range, numbers.Number):
 
             # Find nearest encapsulating current range
             try:
-                nearest = np.argwhere( current_range <= np.array(allowed_current_ranges[:-1]) ).flatten()[0]
+                nearest = np.argwhere( current_range <= np.array(allowed_current_ranges) ).flatten()[0]
             except IndexError:
-                nearest = -2
-
-            self.knob_values['current range'] = allowed_current_ranges[nearest]
+                nearest = -1
 
             Warning(f'Given current range not an option, setting to {allowed_current_ranges[nearest]} A instead')
+            self.set_current_range(allowed_current_ranges[nearest])
 
         else:
-            self.knob_values['current range'] = current_range
 
-        if self.knob_values['source'] == 'current':
-            self.write(':SOUR:CURR:RANG %.2E' % self.knob_values['current range'])
-        else:
-            self.write(':SENS:CURR:PROT %.2E' % self.knob_values['current range'])
-            self.write(':SENS:CURR:RANG %.2E' % self.knob_values['current range'])
+            if self.knob_values['source'] == 'current':
+                self.write(':SOUR:CURR:RANG:AUTO 1')
+            else:
+                self.write(':SENS:CURR:PROT MAX')
+                self.write(':SENS:CURR:RANG:AUTO 1')
 
-        self.knob_values['current range'] = current_range
+            Warning('given current range is not permitted; set to auto-range.')
+            self.knob_values['current range'] = 'AUTO'
 
     def set_nplc(self, nplc):
 
@@ -270,6 +260,8 @@ class Keithley2400(Instrument):
         os.chdir(working_subdir)
 
     def measure_fast_currents(self):
+
+        self.set_output('ON')
 
         try:
             self.fast_voltages
@@ -323,7 +315,6 @@ class Keithley2400(Instrument):
         fast_iv_data.to_csv(path)
 
         self.write(':SOUR:VOLT:MODE FIX')
-        #self.write(':TRIG:COUN 1')
 
         return path
 
@@ -340,7 +331,7 @@ class Keithley2460(Instrument):
 
     name = 'Keithley2460'
 
-    supported_adapters = [VISAGPIB, LinuxGPIB]
+    supported_adapters = [VISAGPIB, LinuxGPIB, PrologixGPIB]
 
     # Available knobs
     knobs = (
@@ -358,11 +349,11 @@ class Keithley2460(Instrument):
     )
 
     presets = {
+        'source': 'voltage',
+        'meter': 'current',
         'voltage range': 100,
         'current range': 1,
         'nplc': 1,
-        'source': 'voltage',
-        'meter': 'current',
         'source_delay': 0,
         'output': 'ON'
     }

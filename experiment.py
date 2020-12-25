@@ -257,11 +257,12 @@ class Experiment:
         self.status = Experiment.TERMINATED
 
 
-def build_experiment(runcard):
+def build_experiment(runcard, instruments=None):
     """
     Build an Experiment object based on a runcard, in the form of a .yaml file or a dictionary
 
     :param runcard: (str/dict) the description of the experiment in the runcard format
+    :param instruments: (None) variable pointing to instruments, if needed
     :return: (Experiment) the experiment described by the runcard
     """
 
@@ -273,7 +274,7 @@ def build_experiment(runcard):
         instrument_type = _instruments.__dict__[specs.pop('type')]
         address = specs.pop('address')
         presets = specs  # remaining dictionary contains instrument presets
-        instruments[name] = instrument_type(address=address, presets=presets)
+        instruments[name] = instrument_type(address, presets=presets)
 
     variables = {}  # experiment variables, associated with the instruments above
     for name, specs in runcard['Variables'].items():
@@ -332,7 +333,8 @@ class Manager:
 
         self.followup = self.settings.get('follow-up', None)
 
-        self.experiment = build_experiment(self.runcard)  # use the runcard to build the experiment
+        self.instruments = None
+        self.experiment = build_experiment(self.runcard, instruments=self.instruments)  # use the runcard to build the experiment
 
         # Set up any alarms
         if 'Alarms' in self.runcard:
@@ -351,6 +353,7 @@ class Manager:
         # Set up the GUI for user interaction
         self.gui = graphics.GUI(self.experiment,
                                 alarms=self.alarms,
+                                instruments=self.instruments,
                                 title=self.runcard['Description'].get('name', 'Experiment'),
                                 plots=self.runcard.get('Plots', None))
         self.gui.run()

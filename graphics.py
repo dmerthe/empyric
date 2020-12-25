@@ -318,7 +318,7 @@ class GUI:
     When paused, the user can also directly interact with instruments through the "Check" button.
     """
 
-    def __init__(self, experiment, alarms=None, title=None, plots=None):
+    def __init__(self, experiment, alarms=None, instruments=None, title=None, plots=None):
 
         self.experiment = experiment
 
@@ -330,6 +330,15 @@ class GUI:
             self.alarms = {}
         else:
             self.alarms = alarms
+
+        if instruments:
+            self.instruments = instruments
+        else:
+            self.instruments = {}
+            for variable in self.experiment.variables.values():
+                instrument = variable.instrument
+                if instrument.name not in self.instruments:
+                    self.instruments[instrument.name] = instrument
 
         if plots:
             self.plotter = Plotter(experiment, plots)
@@ -456,15 +465,7 @@ class GUI:
 
     def open_dashboard(self):
         # Opens a window which allows the user to change variable values when the experiment is paused
-
-        instruments = {}
-
-        for variable in self.experiment.variables.values():
-            instrument = variable.instrument
-            if instrument.name not in instruments:
-                instruments[instrument.name] = instrument
-
-        dashboard = Dashboard(self.root, instruments)
+        dashboard = Dashboard(self.root, self.instruments)
 
 
     def toggle_pause(self):

@@ -8,8 +8,7 @@ class Instrument:
 
     name = 'Instrument'
 
-    supported_adapters = [Adapter]
-    adapter_settings = {}
+    supported_adapters = tuple()
 
     knobs = tuple()
     presets = {}
@@ -20,26 +19,31 @@ class Instrument:
     presets = {}  # values knobs should be when instrument is connected
     postsets = {}  # values knobs should be when instrument is disconnected
 
-    def __init__(self, adapter=None, address=None, presets=None, postsets=None):
+    def __init__(self, address, adapter=None, presets=None, postsets=None, **kwargs):
         """
 
-        :param adapter: (Adapter) handles communcations with the instrument via the appropriate backend
         :param address: (str/int) the default adapter of the instrument can be set up with default settings based on an address
+        :param adapter: (Adapter) desired adapter to use for communications with the instrument
         :param presets: (dict) dictionary of instrument presets of the form {..., knob: value, ...} to apply upon initialization
         :param presets: (dict) dictionary of instrument postsets of the form {..., knob: value, ...} to apply upon disconnection
+        :param kwargs: (dict) any settings for the selected adapter
         """
 
+        self.address = address
+
+        adapter_connected = False
+
         if adapter:
-            self.adapter = adapter
-        elif address:
-            adapter_connected = False
+            self.adapter = adapter(self, **kwargs)
+        else:
             errors = []
-            for _adapter in self.supported_adapters:
+            for _adapter, settings in self.supported_adapters:
+                settings.update(kwargs)
                 try:
-                    self.adapter = _adapter(address, **self.adapter_settings)
+                    self.adapter = _adapter(self, **settings)
                     adapter_connected = True
                 except BaseException as error:
-                    errors.append(type(error).__name__ +': '+ str(error))
+                    errors.append('in trying '+_adapter.__name__+' got '+type(error).__name__ +': '+ str(error))
 
             if not adapter_connected:
                 message = f'unable to connect an adapter to instrument {self.name} at address {address}:\n'
@@ -47,10 +51,7 @@ class Instrument:
                     message.append(f"{error}\n")
                 raise ConnectionError(message)
 
-        else:
-            ConnectionError('instrument definition requires either an adapter or an address!')
-
-        self.name = self.name + '-' + str(self.adapter.address)
+        self.name = self.name + '-' + str(self.address)
 
         self.knob_values = {knob: None for knob in self.knobs}
 
@@ -121,16 +122,22 @@ class Instrument:
             raise ConnectionError(f"adapter for {self.name} is not connected!")
 
     def __del__(self):
-        self.disconnect()
+
+        if self.adapter.connected:
+            self.disconnect()
 
 
 class Henon(Instrument):
     """
-    Simulation of an instrument based on the behavior of a 2D Henon Machine
-    It has two knobs and two meters, useful for testing in the absence of real instruments.
+    Simulation of an instrument based on the behavior of a 2D Henon Map
+    It has two knobs and two meters, useful for testing in the absence of actual instruments.
     """
 
     name = 'Henon'
+
+    supported_adapters = (
+        (Adapter, {}),
+    )
 
     knobs = ('a','b')
     presets = {'a': 1.4, 'b': 0.3}
