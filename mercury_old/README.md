@@ -1,2 +1,0 @@
-# mercury
-Automated Experiment Management
