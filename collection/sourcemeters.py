@@ -331,7 +331,11 @@ class Keithley2460(Instrument):
 
     name = 'Keithley2460'
 
-    supported_adapters = [VISAGPIB, LinuxGPIB, PrologixGPIB]
+    supported_adapters = (
+        (VISAGPIB, {}),
+        (LinuxGPIB, {}),
+        (PrologixGPIB, {})
+    )
 
     # Available knobs
     knobs = (
@@ -411,23 +415,15 @@ class Keithley2460(Instrument):
             self.write('SOUR:VOLT:ILIM %.2e' % self.knob_values['current range'])
             self.write('DISP:CURR:DIG 5')
 
-    def output_on(self):
-
-        self.write('OUTP ON')
-
-    def output_off(self):
-
-        self.write('OUTP OFF')
-
     def set_output(self, output):
 
         if output in [0, None, 'OFF', 'off']:
-            self.output_off()
+            self.write('OUTP OFF')
             self.knob_values['output'] = 'OFF'
         elif output in [1, 'ON', 'on']:
             self.set_source(self.knob_values['source'])
             self.set_meter(self.knob_values['meter'])
-            self.output_on()
+            self.write('OUTP ON')
             self.knob_values['output'] = 'ON'
         else:
             raise ValueError(f'Ouput setting {output} not recognized!')
@@ -468,7 +464,7 @@ class Keithley2460(Instrument):
         if self.knob_values['source'] != 'current':
             Warning(f'Switching sourcing mode!')
             self.set_source('current')
-            self.output_on()  # output if automatically shut off when the source mode is changed
+            self.set_output('ON')  # output if automatically shut off when the source mode is changed
 
         self.write('SOUR:CURR:LEV %.4E' % current)
 
@@ -634,7 +630,11 @@ class Keithley2651A(Instrument):
 
     name = 'Keithley2651A'
 
-    supported_adapters = [VISAGPIB, LinuxGPIB]
+    supported_adapters = (
+        (VISAGPIB, {}),
+        (LinuxGPIB, {}),
+        (PrologixGPIB, {})
+    )
 
     # Available knobs
     knobs = (
@@ -709,21 +709,13 @@ class Keithley2651A(Instrument):
 
         # This sourcemeter does not require specifying the meter before taking a measurement
 
-    def output_on(self):
-
-        self.write('smua.source.output = smua.OUTPUT_ON')
-
-    def output_off(self):
-
-        self.write('smua.source.output = smua.OUTPUT_OFF')
-
     def set_output(self, output):
 
         if output in [0, None, 'OFF', 'off']:
-            self.output_off()
+            self.write('smua.source.output = smua.OUTPUT_OFF')
             self.knob_values['output'] = 'OFF'
         elif output in [1, 'ON', 'on']:
-            self.output_on()
+            self.write('smua.source.output = smua.OUTPUT_ON')
             self.knob_values['output'] = 'ON'
         else:
             raise ValueError(f'Ouput setting {output} not recognized!')
@@ -753,7 +745,7 @@ class Keithley2651A(Instrument):
         if self.knob_values['source'] != 'voltage':
             Warning(f'Switching sourcing mode!')
             self.set_source('voltage')
-            self.output_on()  # output if automatically shut off when the source mode is changed
+            self.set_output('ON')  # output if automatically shut off when the source mode is changed
 
         self.write(f'smua.source.levelv = {voltage}')
 
@@ -764,7 +756,7 @@ class Keithley2651A(Instrument):
         if self.knob_values['source'] != 'current':
             Warning(f'Switching sourcing mode!')
             self.set_source('current')
-            self.output_on()  # output if automatically shut off when the source mode is changed
+            self.set_output('ON')  # output if automatically shut off when the source mode is changed
 
         self.write(f'smua.source.leveli = {current}')
 
