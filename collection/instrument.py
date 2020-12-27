@@ -1,5 +1,5 @@
 import numpy as np
-from mercury.adapters import *
+from empyric.adapters import *
 
 class Instrument:
     """
@@ -53,7 +53,12 @@ class Instrument:
 
         self.name = self.name + '-' + str(self.address)
 
-        self.knob_values = {knob: None for knob in self.knobs}
+        # Get existing knob settings, if possible
+        for knob in self.knobs:
+            if hasattr(self, 'get_'+knob):
+                self.knob_value[knob] = self.__getattribute__('get_'+knob)()
+            else:
+                self.knob_value[knob] = None
 
         # Apply presets
         if presets:

@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import numbers
 
-from mercury.adapters import *
-from mercury.collection.instrument import Instrument
+from empyric.adapters import *
+from empyric.collection.instrument import Instrument
 
 class Keithley2400(Instrument):
     """

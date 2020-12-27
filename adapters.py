@@ -98,7 +98,9 @@ class Serial(Adapter):
     def connect(self):
 
         serial = importlib.import_module('serial')
-        self.backend = serial.Serial(port='COM' + self.instrument.address, baudrate=self.baud_rate, timeout=self.timeout)
+        self.backend = serial.Serial(port='COM' + self.instrument.address,
+                                     baudrate=self.baud_rate,
+                                     timeout=self.timeout)
 
         self.connected = True
 

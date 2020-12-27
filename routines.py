@@ -4,7 +4,7 @@ import numpy as np
 from importlib import import_module
 from scipy.interpolate import interp1d
 
-from mercury.control import PIDController
+from empyric.control import PIDController
 
 def convert_time(time_value):
     """

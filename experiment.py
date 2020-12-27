@@ -11,9 +11,9 @@ from ruamel.yaml import YAML
 
 yaml = YAML()
 
-from mercury import instruments as _instruments
-from mercury import routines as _routines
-from mercury import adapters, graphics, control
+from empyric import instruments as _instruments
+from empyric import routines as _routines
+from empyric import adapters, graphics, control
 
 
 class Clock:
