@@ -1,19 +1,23 @@
-from mercury.instruments.basics import *
+from empyric.adapters import *
+from empyric.collection.instrument import Instrument
 
 class Keithley2110(Instrument):
     """
     Keithley 2110 digital multimeter instrument
     """
 
-    supported_backends = ['visa', 'usb', 'me-api']
-    default_backend = ['visa']
-
     name = "Keithley2110"
+
+    supported_adapters = (
+        (VISAUSB, {})
+        (USBTMC, {})
+    )
 
     knobs = (
         'meter'
         'voltage range',
-        'current range'
+        'current range',
+        'temperature mode'
     )
 
     meters = (
@@ -21,29 +25,6 @@ class Keithley2110(Instrument):
         'current',
         'temperature'
     )
-
-    def __init__(self, address, **kwargs):
-
-        self.knob_values = {knob: None for knob in self.knob_values}
-
-        # Set up communication
-        self.address = address
-        self.backend = kwargs.get('backend', self.default_backend)
-        self.connect()
-
-        # Set up instrument
-        if 'meter' in kwargs:
-            self.set_meter(kwargs['meter'])
-
-        if 'voltage_range' in kwargs:
-            self.set_voltage_range(kwargs['voltage range'])
-        else:
-            self.set_voltage_range('AUTO')
-
-        if 'current range' in kwargs:
-            self.set_current_range(kwargs['current range'])
-        else:
-            self.set_current_range('AUTO')
 
     def set_voltage_range(self, voltage_range):
 
@@ -111,5 +92,4 @@ class Keithley2110(Instrument):
         return float(self.query('READ?'))
 
     def set_meter(self, meter):
-
         self.measure(meter)

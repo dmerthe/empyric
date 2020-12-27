@@ -283,10 +283,10 @@ def build_experiment(runcard, instruments=None):
         elif 'knob' in specs:
             variables[name] = Variable('knob', instruments[specs['instrument']], specs['knob'])
         elif 'dependent' in specs:
-            variables[name] = Variable('dependent', expression=specs['expression'],
-                                        parents={symbol: variables[var_name]
-                                                 for symbol, var_name in specs['parents'].items()}
-                                        )
+            variables[name] = Variable('dependent',
+                                       expression=specs['expression'],
+                                       parents={symbol: variables[var_name]
+                                                for symbol, var_name in specs['parents'].items()})
 
     routines = {}
     if 'Routines' in runcard:
