@@ -358,7 +358,7 @@ class GUI:
         tk.Label(self.root, text='Status', width=len('Status'), anchor=tk.E).grid(row=0, column=0, sticky=tk.E)
 
         self.status_label = tk.Label(self.root, text='', width=40, relief=tk.SUNKEN)
-        self.status_label.grid(row=0, column=1, columnspan=2, sticky=tk.W)
+        self.status_label.grid(row=0, column=1, sticky=tk.W)
 
         # Table of variables shows most recently measured/set variable values
         self.variable_status_labels = {}
@@ -367,20 +367,20 @@ class GUI:
         tk.Label(self.root, text='Run Time', width=len('Run Time'), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
 
         self.variable_status_labels['time'] = tk.Label(self.root, text='', relief=tk.SUNKEN, width=40)
-        self.variable_status_labels['time'].grid(row=i, column=1, columnspan=2, sticky=tk.W)
+        self.variable_status_labels['time'].grid(row=i, column=1, sticky=tk.W)
 
         i+=1
         tk.Label(self.root, text='', font=("Arial", 14, 'bold')).grid(row=i, column=0, sticky=tk.E)
 
         i+=1
-        tk.Label(self.root, text='Variables', font=("Arial", 14, 'bold'), width=40).grid(row=i, column=1)
+        tk.Label(self.root, text='Variables', font=("Arial", 14, 'bold')).grid(row=i, column=1)
 
         i+=1
         for variable in self.variables:
             tk.Label(self.root, text=variable, width=len(variable), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
 
             self.variable_status_labels[variable] = tk.Label(self.root, text='', relief=tk.SUNKEN, width=40)
-            self.variable_status_labels[variable].grid(row=i, column=1, columnspan=2, sticky=tk.W)
+            self.variable_status_labels[variable].grid(row=i, column=1, sticky=tk.W)
 
             i += 1
 
@@ -392,29 +392,31 @@ class GUI:
         if len(alarms) > 0:
 
             i += 1
-            tk.Label(self.root, text='Alarms', font=("Arial", 14, 'bold'), width=40).grid(row=i, column=1)
+            tk.Label(self.root, text='Alarms', font=("Arial", 14, 'bold')).grid(row=i, column=1)
 
             i += 1
             for alarm in self.alarms:
                 tk.Label(self.root, text=alarm, width=len(alarm), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
 
                 self.alarm_status_labels[alarm] = tk.Label(self.root, text='Clear', relief=tk.SUNKEN, width=40)
-                self.alarm_status_labels[alarm].grid(row=i, column=1, columnspan=2, sticky=tk.W)
+                self.alarm_status_labels[alarm].grid(row=i, column=1, sticky=tk.W)
 
                 i += 1
 
             tk.Label(self.root, text='', font=("Arial", 14, 'bold')).grid(row=i, column=0, sticky=tk.E)
 
 
-        self.dash_button = tk.Button(self.root, text='Dashboard...', font=("Arial", 14, 'bold'), command=self.open_dashboard, width=22, state=tk.DISABLED)
-        self.dash_button.grid(row=i + 1, column=2)
+        self.dash_button = tk.Button(self.root, text='Dashboard...', font=("Arial", 14, 'bold'),
+                                     command=self.open_dashboard, state=tk.DISABLED)
+        self.dash_button.grid(row=i + 1, column=0)
 
-        self.pause_button = tk.Button(self.root, text='Pause', font=("Arial", 14, 'bold'), command=self.toggle_pause, width=10)
-        self.pause_button.grid(row=i + 1, column=1)
+        self.pause_button = tk.Button(self.root, text='Pause', font=("Arial", 14, 'bold'),
+                                      command=self.toggle_pause)
+        self.pause_button.grid(row=i + 2, column=0, sticky=tk.W)
 
-        self.terminate_button = tk.Button(self.root, text='Terminate', font=("Arial", 14, 'bold'), command=self.terminate, width=10)
-
-        self.terminate_button.grid(row=i + 1, column=0)
+        self.terminate_button = tk.Button(self.root, text='Terminate', font=("Arial", 14, 'bold'),
+                                          command=self.terminate)
+        self.terminate_button.grid(row=i + 2, column=1, sticky=tk.E)
 
     def update(self):
 
