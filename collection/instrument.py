@@ -54,11 +54,12 @@ class Instrument:
         self.name = self.name + '-' + str(self.address)
 
         # Get existing knob settings, if possible
+        self.knob_values = {}
         for knob in self.knobs:
             if hasattr(self, 'get_'+knob):
-                self.knob_value[knob] = self.__getattribute__('get_'+knob)()
+                self.knob_values[knob] = self.__getattribute__('get_'+knob)()
             else:
-                self.knob_value[knob] = None
+                self.knob_values[knob] = None
 
         # Apply presets
         if presets:

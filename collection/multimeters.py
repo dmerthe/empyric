@@ -9,7 +9,7 @@ class Keithley2110(Instrument):
     name = "Keithley2110"
 
     supported_adapters = (
-        (VISAUSB, {})
+        (VISAUSB, {}),
         (USBTMC, {})
     )
 

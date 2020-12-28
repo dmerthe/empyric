@@ -584,4 +584,12 @@ class Phidget(Adapter):
         if hasattr(self, 'port'):
             self.connection.setHubPort(self.port)
 
-        self.connection.openWaitForAttachment(5000)
+        self.backend.openWaitForAttachment(5000)
+
+        # map instrument methods based on device class
+        for name, method in self.instrument.device_class.__dict__:
+            if '_' not in attr:
+                if 'get' in attr:
+                    self.instrument.__setattr__(name, chaperone(method))
+                else:
+                    self.instrument.__setattr__(name, method)

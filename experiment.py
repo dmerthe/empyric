@@ -271,10 +271,19 @@ def build_experiment(runcard, instruments=None):
 
         specs = specs.copy()  # avoids modifying the runcard
 
-        instrument_type = _instruments.__dict__[specs.pop('type')]
+        instrument_name = specs.pop('type')
         address = specs.pop('address')
-        presets = specs  # remaining dictionary contains instrument presets
-        instruments[name] = instrument_type(address, presets=presets)
+
+        # adapter keywords
+        adapter_kwargs = {}
+        if 'baud rate' in specs:
+            adapter_kwargs['baud_rate'] = specs.pop('baud rate')
+
+        # Any remaining contains instrument presets
+        presets = specs
+
+        instrument_class = _instruments.__dict__[instrument_name]
+        instruments[name] = instrument_class(address, presets=presets, **adapter_kwargs)
 
     variables = {}  # experiment variables, associated with the instruments above
     for name, specs in runcard['Variables'].items():

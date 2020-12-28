@@ -1,42 +1,33 @@
-from mercury.instruments.basics import *
+from empyric.adapters import *
+from empyric.collection.instrument import Instrument
 
-
-class BRAX3XXX(Instrument):
+class BRAX3000(Instrument):
     """
-    Keithley 2110 multimeter instrument
+    BRAX 3000 series pressure gauge controller and meter
     """
 
-    supported_backends = ['serial', 'me-api']
-    default_backend = 'serial'
+    name = "BRAX3000"
 
-    baudrate = 9600
-
-    name = "BRAX3XXX"
+    supported_adapters = (
+        (Serial, {'baud_rate': 19200}),
+        (VISASerial, {'baud_rate': 19200})
+    )
 
     knobs = (
         'ig state',
         'filament',
     )
 
+    presets = {
+        'filament': 1,
+        'ig_state': 'ON'
+    }
+
     meters = (
         'cg1 pressure',
         'cg2 pressure',
         'ig pressure',
-        'ig state'
     )
-
-    def __init__(self, address, **kwargs):
-
-        self.knob_values = {knob: None for knob in BRAX3XXX.knobs}
-
-        # Set up communication
-        self.address = address
-        self.backend = kwargs.get('backend', self.default_backend)
-        self.connect()
-
-        # Set up instrument
-        self.set_filament(kwargs.get('filament', 1))
-        self.set_ig_state(kwargs.get('ig_state', 1))
 
     def set_ig_state(self, state):
 
@@ -49,39 +40,18 @@ class BRAX3XXX(Instrument):
 
         self.read()  # discard the response
 
+    def get_ig_state(self):
+        return self.query('#IGS<CR>')
+
     def set_filament(self, number):
 
         self.knob_values['filament'] = number
 
-    def measure_ig_state(self):
-
-        response = self.query('#IGS<CR>')
-
-        if 'ON' in response:
-            return 1
-        else:
-            return 0
-
     def measure_cg1_pressure(self):
-
-        for i in range(3):
-            try:
-                return float(self.query('#RDCG1<CR>')[4:-4])
-            except ValueError:
-                pass
+        return float(self.query('#RDCG1<CR>')[4:-4])
 
     def measure_cg2_pressure(self):
-
-        for i in range(3):
-            try:
-                return float(self.query('#RDCG2<CR>')[4:-4])
-            except ValueError:
-                pass
+        return float(self.query('#RDCG2<CR>')[4:-4])
 
     def measure_ig_pressure(self):
-
-        for i in range(3):
-            try:
-                return float(self.query('#RDIG<CR>')[4:])
-            except ValueError:
-                pass
+        return float(self.query('#RDIG<CR>')[4:])

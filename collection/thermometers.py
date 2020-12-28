@@ -1,13 +1,20 @@
 import importlib
 import numpy as np
-from mercury.instruments.basics import *
 
-class TCReader(Instrument):
+from empyric.adapters import *
+from empyric.collection.instrument import Instrument
 
-    supported_backends = ['phidget']
-    default_backend = 'phidget'
+class Phidget1101(Instrument):
+    """
+    Phidgets 4x TC reader
+    Many instrumet methods (setX, getY, etc.) are mapped by the adapter from the Phidgets device class
+    """
 
-    name = 'TCReader1101'
+    name = 'Phidget1101'
+
+    supported_adapters = (
+        (Phidget, {})
+    )
 
     # Available knobs
     knobs = ('type',)
@@ -15,19 +22,7 @@ class TCReader(Instrument):
     # Available meters
     meters = ('temperature',)
 
-    def __init__(self, address, **kwargs):
-
-        self.knob_values = {'type': 'K'}
-
-        # Set up communication
-        ts = importlib.import_module('Phidget22.Devices.TemperatureSensor')
-        self.PhidgetException = importlib.import_module("Phidget22.PhidgetException").PhidgetException
-
-        self.device_class = ts.TemperatureSensor
-
-        self.address = address
-        self.backend = kwargs.get('backend', self.default_backend)
-        self.connect()
+    device_class = importlib.import_module('Phidget22.Devices.TemperatureSensor').TemperatureSensor
 
     def set_type(self, type_):
 
@@ -40,7 +35,7 @@ class TCReader(Instrument):
             'E': types.ThermocoupleType.THERMOCOUPLE_TYPE_E,
         }
 
-        self.connection.setThermocoupleType(type_dict[type_])
+        self.setThermocoupleType(type_dict[type_])
 
         self.knob_values['type'] = type_
 
@@ -49,16 +44,8 @@ class TCReader(Instrument):
 
         for i in range(attempts):
             try:
-                return self.connection.getTemperature()
-            except self.PhidgetException:
+                return self.getTemperature()
+            except self.adapter.PhidgetException:
                 tiempo.sleep(0.1)
 
-        return -273.15  # if measurement fails
-
-
-
-
-
-
-
-
+        return np.nan  # if measurement fails
