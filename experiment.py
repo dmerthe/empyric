@@ -365,6 +365,7 @@ class Manager:
                                 instruments=self.instruments,
                                 title=self.runcard['Description'].get('name', 'Experiment'),
                                 plots=self.runcard.get('Plots', None))
+
         self.gui.run()
 
     def run_experiment(self):
@@ -384,6 +385,11 @@ class Manager:
         # Run the experiment
         for state in self.experiment:
 
+            # Wait for user to resume the experiment if user has paused it
+            if hasattr(self, 'gui'):
+                if self.gui.paused == 'user':
+                    continue
+
             if time.time() >= self.last_save + self.save_period:
                 self.experiment.save()
 
@@ -397,9 +403,9 @@ class Manager:
                         self.experiment.terminate()
                         self.followup = alarm.protocol
                     elif 'wait' in alarm.protocol:
-                        self.experiment.hold()  # pause the experiment if protocol is to wait
+                        self.experiment.hold()  # pause the experiment if protocol is to wait and experiment is not already paused by the user
 
-            elif self.experiment.status == Experiment.HOLDING and self.gui.paused != 'user':
+            elif self.experiment.status == Experiment.HOLDING:
                 # If no alarms are triggered, experiment is on hold and is not paused by the user, resume the experiment
                 self.experiment.start()
 

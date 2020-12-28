@@ -408,7 +408,7 @@ class GUI:
 
         self.dash_button = tk.Button(self.root, text='Dashboard...', font=("Arial", 14, 'bold'),
                                      command=self.open_dashboard, state=tk.DISABLED)
-        self.dash_button.grid(row=i + 1, column=0)
+        self.dash_button.grid(row=i + 1, column=0, sticky=tk.W)
 
         self.pause_button = tk.Button(self.root, text='Pause', font=("Arial", 14, 'bold'),
                                       command=self.toggle_pause)
