@@ -311,7 +311,7 @@ class Plotter:
                 plt.close(fig)
 
 
-class GUI:
+class ExperimentGUI:
     """
     GUI showing experimental progress and values of all experiment variables.
     This GUI allows the user to stop or pause the experiment.
@@ -336,9 +336,10 @@ class GUI:
         else:
             self.instruments = {}
             for variable in self.experiment.variables.values():
-                instrument = variable.instrument
-                if instrument.name not in self.instruments:
-                    self.instruments[instrument.name] = instrument
+                if variable.type in ['meter', 'knob']:
+                    instrument = variable.instrument
+                    if instrument.name not in self.instruments:
+                        self.instruments[instrument.name] = instrument
 
         if plots:
             self.plotter = Plotter(experiment, plots)

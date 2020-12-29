@@ -148,72 +148,32 @@ class Henon(Instrument):
     knobs = ('a','b')
     presets = {'a': 1.4, 'b': 0.3}
 
-    meters = ('x', 'y', 'pseudostep')
+    meters = ('x', 'y')
+
+    a = 1.4
+    b = 0.3
+
+    x = np.random.rand()
+    y = np.random.rand()
+
+    measured = {'x': False, 'y': False}
 
     def set_a(self, value):
-        if self.knob_values['a'] == value:
-            return
-
-        a = value
-        self.knob_values['a'] = a
-        b  = self.knob_values['b']
-        if b is None:
-            b = 0.3
-
-        x, y = 2*np.random.rand() - 1, 0.5*np.random.rand() - 0.25
-        self.step = 0
-
-        self.x_values = [x]
-        self.y_values = [y]
-        N = int(1e3)
-        for i in range(N):
-            x_new = 1 - a * x ** 2 + y
-            y_new = b * x
-            x = x_new
-            y = y_new
-            self.x_values.append(x)
-            self.y_values.append(y)
+        self.a = self.knob_values['a'] = value
 
     def set_b(self, value):
-        if self.knob_values['b'] == value:
-            return
-
-        a = self.knob_values['a']
-        if a is None:
-            a = 1.4
-        b = value
-        self.knob_values['b'] = b
-
-        x, y = 2 * np.random.rand() - 1, 0.5 * np.random.rand() - 0.25
-        self.step = 0
-
-        self.x_values = [x]
-        self.y_values = [y]
-        N = int(1e3)
-        for i in range(N):
-            x_new = 1 - a * x ** 2 + y
-            y_new = b * x
-            x = x_new
-            y = y_new
-            self.x_values.append(x)
-            self.y_values.append(y)
+        self.b = self.knob_values['b'] = value
 
     def measure_x(self):
 
-        x = self.x_values[int(0.5*self.step)]
+        x_new = 1 - self.a * self.x ** 2 + self.y
+        y_new = self.b * self.x
 
-        self.step += 1
+        self.x = x_new
+        self.y = y_new
 
-        return x
+        return self.x
 
     def measure_y(self):
 
-        y = self.y_values[int(0.5*self.step)]
-
-        self.step += 1
-
-        return y
-
-    def measure_pseudostep(self):
-
-        return int(0.5*self.step) % 10
+        return self.y

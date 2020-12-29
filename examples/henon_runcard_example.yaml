@@ -30,15 +30,17 @@ Variables:
  Coordinate y:
   instrument: Henon Mapper
   meter: y
+ Distance r:
+  expression: 'sqrt(x^2 + y^2)'
+  definitions:
+   x: Coordinate x
+   y: Coordinate y
 
 Alarms:
- X > 1:
-  variable: Coordinate x
+ r > 1:
+  variable: Distance r
   condition: '>1'
   protocol: wait
- Y < 0:
-  variable: Coordinate y
-  condition: '<0'
 
 Plots:
  Henon Map:

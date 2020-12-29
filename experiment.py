@@ -1,6 +1,7 @@
 # This submodule defines the basic behavior of the key features in the mercury package
 
 import os
+from math import *
 import time
 import datetime
 import pandas as pd
@@ -57,24 +58,24 @@ class Variable:
 
     A meter is a variable that is only measured, such as temperature. Some meters can be controlled directly or indirectly through an associated (but distinct) knob.
 
-    A dependent is a variable that is not directly measured, but is calculated based on other variables of the experiment.
+    An expression is a variable that is not directly measured, but is calculated based on other variables of the experiment.
     An example of a dependent is the output power of a power supply, where voltage is a knob and current is a meter: power = voltage * current.
     """
 
-    def __init__(self, _type, instrument=None, label=None, expression=None, parents=None, preset=None, postset=None):
+    def __init__(self, _type, instrument=None, label=None, expression=None, definitions=None, preset=None, postset=None):
         """
 
-        :param _type: (str) type of variable; can be either 'knob', 'meter' or 'dependent'.
+        :param _type: (str) type of variable; can be either 'knob', 'meter' or 'expression'.
 
         :param instrument: (Instrument) instrument with the corresponding knob or meter; only used if type is 'knob' or 'meter'
 
         :param label: (str) label of the knob or meter on the instrument; only used if type is 'knob' or 'meter'
 
-        :param expression: (str) expression for the dependent variable in terms of its parents; only used if type is 'dependent'
+        :param expression: (str) expression for the variable in terms of other variables; only used if type is 'expression'
 
-        :param parents: (dict) dictionary of the form {..., symbol: variable, ...} mapping the symbols in the expression to the parent variable objects; only used if type is 'dependent'
+        :param definitions: (dict) dictionary of the form {..., symbol: variable, ...} mapping the symbols in the expression to other variable objects; only used if type is 'expression'
 
-        :param preset: (int/float/str) value variable should have upon definition
+        :param preset: (int/float/str) value variable should have upon instantiation
 
         :param postset: (int/float/str) value variable shoiuld have upon deletion
         """
@@ -101,15 +102,15 @@ class Variable:
 
                 self.postset = postset
 
-        elif self.type == 'dependent':
+        elif self.type == 'expression':
 
             if not expression:
-                raise AttributeError('dependent definition requires an expression!')
-            if not parents:
-                raise AttributeError('dependent definition requires parents!')
+                raise AttributeError('expression definition requires an expression!')
+            if not definitions:
+                raise AttributeError('expression definition requires definitions!')
 
             self.expression = expression
-            self.parents = parents
+            self.definitions = definitions
 
     @property
     def value(self):
@@ -117,11 +118,13 @@ class Variable:
             self._value = self.instrument.knob_values[self.knob]
         elif self.type == 'meter':
             self._value = self.instrument.measure(self.meter)
-        elif self.type == 'dependent':
+        elif self.type == 'expression':
             expression = self.expression
 
-            for symbol, parent in self.parents.items():
-                expression = expression.replace(symbol, str(parent._value))
+            expression = expression.replace('^', '**')
+
+            for symbol, variable in self.definitions.items():
+                expression = expression.replace(symbol, '('+str(variable._value)+')')
 
             self._value = eval(expression)
 
@@ -156,7 +159,10 @@ class Alarm:
 
     @property
     def triggered(self):
-        value = self.variable._value
+        value = self.variable._value  # get last know variable value
+        if value ==  None:
+            value = self.variable.value  # measure the value if needed
+
         self._triggered = eval('value' + self.condition)
         return self._triggered
 
@@ -291,11 +297,11 @@ def build_experiment(runcard, instruments=None):
             variables[name] = Variable('meter', instruments[specs['instrument']], specs['meter'])
         elif 'knob' in specs:
             variables[name] = Variable('knob', instruments[specs['instrument']], specs['knob'])
-        elif 'dependent' in specs:
-            variables[name] = Variable('dependent',
+        elif 'expression' in specs:
+            variables[name] = Variable('expression',
                                        expression=specs['expression'],
-                                       parents={symbol: variables[var_name]
-                                                for symbol, var_name in specs['parents'].items()})
+                                       definitions={symbol: variables[var_name]
+                                                for symbol, var_name in specs['definitions'].items()})
 
     routines = {}
     if 'Routines' in runcard:
@@ -307,10 +313,14 @@ def build_experiment(runcard, instruments=None):
             variable_name = specs.pop('variable')
 
             if 'feedback' in specs:
+                # Get the feedback variable
                 specs['feedback'] = variables[specs['feedback']]
 
                 if 'controller' in specs:
-                    specs['controller'] = controllers.__dict__[specs['controller']]()
+                    # Initialize a controller based on the controller specs
+                    contr_type = specs['controller'].pop('type')
+                    contr_kwargs = specs['controller']
+                    specs['controller'] = controllers.__dict__[contr_type](**contr_kwargs)
 
             routines[name] = (variable_name, _routines.__dict__[_type](**specs))
 
@@ -360,7 +370,7 @@ class Manager:
         self.experiment_thread.start()  # run the GUI in a separate thread
 
         # Set up the GUI for user interaction
-        self.gui = graphics.GUI(self.experiment,
+        self.gui = graphics.ExperimentGUI(self.experiment,
                                 alarms=self.alarms,
                                 instruments=self.instruments,
                                 title=self.runcard['Description'].get('name', 'Experiment'),
@@ -390,9 +400,11 @@ class Manager:
                 if self.gui.paused == 'user':
                     continue
 
+            # Save experimental data periodically
             if time.time() >= self.last_save + self.save_period:
                 self.experiment.save()
 
+            # Check if any alarms are triggered and handle them
             alarms_triggered = [alarm for alarm in self.alarms.values() if alarm.triggered]
             if len(alarms_triggered) > 0:
 
@@ -406,7 +418,7 @@ class Manager:
                         self.experiment.hold()  # pause the experiment if protocol is to wait and experiment is not already paused by the user
 
             elif self.experiment.status == Experiment.HOLDING:
-                # If no alarms are triggered, experiment is on hold and is not paused by the user, resume the experiment
+                # If no alarms are triggered, resume experiment if stopped
                 self.experiment.start()
 
             time.sleep(self.step_period)

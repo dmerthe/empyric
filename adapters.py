@@ -86,6 +86,7 @@ class Adapter:
     def disconnect(self):
         self.connected = False
 
+
 class Serial(Adapter):
     """
     Handles communications with serial instruments through the PySerial module

@@ -149,3 +149,16 @@ class Sequence(Routine):
         self.iteration = (self.iteration + 1) % len(self.values)
 
         return next_value
+
+
+class Set(Routine):
+    """
+    Sets a knob based on the value of another variable
+    """
+
+    def __call__(self, state):
+
+        if not hasattr(self,'input'):
+            raise AttributeError('Set routine must be given an input variable!')
+
+        return state[self.input]
