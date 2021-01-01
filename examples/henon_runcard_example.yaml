@@ -1,18 +1,18 @@
 ﻿Description:
- name: Henon Test
+ name: Henon Map Test
  operator: Mike
  platform: Test Stand 1
  comments: Who is Mike? There is no Test Stand 1
 
 Settings:
  follow-up: None
- step interval: 1
+ step interval: 0.25
  plot interval: 10
- save interval: 60
+ save interval: 10
 
 Instruments:
  Henon Mapper:
-  type: Henon
+  type: HenonMapper
   address: 1
 
 Variables:
@@ -52,8 +52,13 @@ Plots:
   marker: 'o'
 
 Routines:
- Sweep Parameter a:
+ Ramp Parameter a:
   type: Timecourse
   variable: Parameter a
-  times: [0, 10, 60]
-  values: [1.0, 1.4, 1.4]
+  times: [0, 5, 5.001, 30]
+  values: [0.0, 0.0, 1.4, 1.4]
+ Ramp Parameter b:
+  type: Timecourse
+  variable: Parameter b
+  times: [0, 5, 5.001, 30]
+  values: [0.0, 0.0, 0.3, 0.3]

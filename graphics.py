@@ -13,8 +13,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.cm import ScalarMappable
 
-plt.ion()
-
 class Plotter:
     """
     Handler for plotting data based on the runcard plotting settings and data context
@@ -70,6 +68,7 @@ class Plotter:
             else:
                 raise AttributeError(f"Plotting style '{style}' not recognized!")
 
+        plt.pause(0.01)
         return new_plots
 
     def save(self, plot_name=None, save_as=None):
@@ -77,13 +76,23 @@ class Plotter:
         if plot_name:
             fig, ax = self.plots[plot_name]
             if save_as:
-                fig.savefig(timestamp_path(save_as + '.png', timestamp=self.timestamp))
+                fig.savefig(save_as + '-' + self.timestamp + '.png')
             else:
-                fig.savefig(timestamp_path(plot_name + '.png', timestamp=self.timestamp))
+                fig.savefig(plot_name + '-' + self.timestamp + '.png')
         else:
             for name, plot in self.plots.items():
                 fig, ax = plot
-                fig.savefig(timestamp_path(name+'.png', timestamp=self.timestamp))
+                fig.savefig(name + '-' + self.timestamp + '.png')
+
+    def close(self, plot_name=None):
+
+        self.save()
+
+        if plot_name:
+            fig, _ = self.plots[plot_name]
+            plt.close(fig)
+        else:
+            plt.close('all')
 
     def _plot_all(self, name):
 
@@ -168,8 +177,7 @@ class Plotter:
         if marker.lower() == 'none':
             marker = None
 
-        # Color plot according to elapsed time
-        colormap = 'viridis'  # Determines colormap to use for plotting timeseries data
+        colormap = 'viridis'
         plt.rcParams['image.cmap'] = colormap
         cmap = plt.get_cmap('viridis')
 
@@ -181,13 +189,13 @@ class Plotter:
             raise PlotError(f'Parameter {c} not in data!')
 
         # Handle simple numeric data
-        y_is_numeric = isinstance(self.data[y].values[0], numbers.Number) or self.data[y].values[0] in [None, np.nan]
+        y_is_numeric = bool( sum([isinstance(y_value, numbers.Number) for y_value in self.data[y]]) )
 
         if y_is_numeric:
 
-            x_data = self.data[x].values
-            y_data = self.data[y].values
-            c_data = self.data[c].values
+            x_data = np.array(self.data[x].values, dtype=float)
+            y_data = np.array(self.data[y].values, dtype=float)
+            c_data = np.array(self.data[c].values, dtype=float)
 
             # Rescale time if needed
             if c == 'time':
@@ -200,7 +208,7 @@ class Plotter:
                         self.data[c] = self.data[c] / 60
 
         # Handle data stored in a file
-        y_is_path = isinstance(self.data[y].values[0], str)
+        y_is_path = bool( sum([ 'csv' in y_value for y_value in self.data[y] if isinstance(y_value, str)]))
 
         if y_is_path:
 
@@ -300,29 +308,22 @@ class Plotter:
 
         return fig, ax
 
-    def close(self, plot_name=None):
-
-        if plot_name:
-            fig, _ = self.plots[plot_name]
-            plt.close(fig)
-        else:
-            for plot in self.plots.values():
-                fig, _ = plot
-                plt.close(fig)
-
 
 class ExperimentGUI:
     """
-    GUI showing experimental progress and values of all experiment variables.
+    GUI showing experimental progress, values of all experiment variables and any alarms
+
     This GUI allows the user to stop or pause the experiment.
     When paused, the user can also directly interact with instruments through the "Check" button.
     """
 
-    def __init__(self, experiment, alarms=None, instruments=None, title=None, plots=None):
+    def __init__(self, experiment, alarms=None, instruments=None, title=None, plots=None, save_interval=None):
 
         self.experiment = experiment
 
-        self.paused = False
+        self.paused = False  # has experiment been paused through the GUI?
+        self.terminated = False  # has experiment been terminated through the GUI?
+        self.quitted = False  # has the GUI been closed?
 
         self.variables = experiment.variables
 
@@ -334,6 +335,7 @@ class ExperimentGUI:
         if instruments:
             self.instruments = instruments
         else:
+            # If instruments are not specified, get them from the experiment variables
             self.instruments = {}
             for variable in self.experiment.variables.values():
                 if variable.type in ['meter', 'knob']:
@@ -344,11 +346,20 @@ class ExperimentGUI:
         if plots:
             self.plotter = Plotter(experiment, plots)
 
-        self.plot_interval = 0  # grows if plotting takes longer
-        self.last_plot = float('-inf')
+            self.plot_interval = 0  # grows if plotting takes longer
+            self.last_plot = float('-inf')
+
+            # Set interval for saving plots
+            if save_interval:
+                self.save_interval = save_interval
+            else:
+                self.save_interval = 0
+            self.last_save = time.time()
 
         self.root = tk.Tk()
-        self.root.attributes("-topmost", True)
+        self.root.lift()
+        self.root.wm_attributes('-topmost', True)  # bring window to front
+        self.root.protocol("WM_DELETE_WINDOW", self.end)
 
         if title:
             self.root.title(f'Experiment: {title}')
@@ -370,13 +381,13 @@ class ExperimentGUI:
         self.variable_status_labels['time'] = tk.Label(self.root, text='', relief=tk.SUNKEN, width=40)
         self.variable_status_labels['time'].grid(row=i, column=1, sticky=tk.W)
 
-        i+=1
+        i += 1
         tk.Label(self.root, text='', font=("Arial", 14, 'bold')).grid(row=i, column=0, sticky=tk.E)
 
-        i+=1
+        i += 1
         tk.Label(self.root, text='Variables', font=("Arial", 14, 'bold')).grid(row=i, column=1)
 
-        i+=1
+        i += 1
         for variable in self.variables:
             tk.Label(self.root, text=variable, width=len(variable), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
 
@@ -415,20 +426,34 @@ class ExperimentGUI:
                                       command=self.toggle_pause)
         self.pause_button.grid(row=i + 2, column=0, sticky=tk.W)
 
-        self.terminate_button = tk.Button(self.root, text='Terminate', font=("Arial", 14, 'bold'),
-                                          command=self.terminate)
+        self.terminate_button = tk.Button(self.root, text='End', font=("Arial", 14, 'bold'),
+                                          command=self.end)
         self.terminate_button.grid(row=i + 2, column=1, sticky=tk.E)
 
+    def run(self):
+        self.update()
+        self.root.mainloop()
+
     def update(self):
+        # Updates the GUI based on the state of the experiment
+
+        if self.quitted:
+            return  # don't update GUI if it no longer exists
+
+        self.root.wm_attributes('-topmost', False)  # Allow window to fall back once things get started
 
         # Check the state of the experiment
         state = self.experiment.state
         for name, label in self.variable_status_labels.items():
-
-            if name.lower() == 'time':
-                label.config(text=str(datetime.timedelta(seconds=state[name])))
+            if state[name] == None:
+                label.config(text='none')
+            elif state[name] == np.nan:
+                label.config(text='nan')
             else:
-                label.config(text=str(state[name]))
+                if name.lower() == 'time':
+                    label.config(text=str(datetime.timedelta(seconds=state['time'])))
+                else:
+                    label.config(text=str(state[name]))
 
         self.status_label.config(text=self.experiment.status)
 
@@ -439,57 +464,89 @@ class ExperimentGUI:
             else:
                 label.config(text="CLEAR", bg='green')
 
-        # Check if experiment is paused and update pause/resume button
-        if self.experiment.status == self.experiment.STOPPED:
-            if self.paused == 'user':
-                self.dash_button.config(state=tk.NORMAL)  # enable access to dashboard when user pauses experiment
-            else:
-                self.paused = True
-            self.pause_button.config(text='Resume')
-        elif self.experiment.status == self.experiment.RUNNING:
-            self.paused = False
+        # Update pause/resume and dashboard buttons
+        if not self.paused:
             self.pause_button.config(text='Pause')
             self.dash_button.config(state=tk.DISABLED)
-        elif self.experiment.status == self.experiment.TERMINATED:
-            self.root.quit()
-            self.root.destroy()
+        elif self.paused:
+            self.dash_button.config(state=tk.NORMAL)  # enable access to dashboard only when user pauses experiment
+            self.pause_button.config(text='Resume')
 
-        if time.time() > self.last_plot + self.plot_interval:
+        # Quit if experiment has ended
+        if self.experiment.status == self.experiment.TERMINATED:
+            self.quit()
 
-            start_plot = time.perf_counter()
-            self.plotter.plot()
-            end_plot =  time.perf_counter()
+        # Plot data
+        if hasattr(self, 'plotter') and len(self.experiment.data) > 0:
+            if time.time() > self.last_plot + self.plot_interval:
 
-            self.plot_interval = int(5*(end_plot - start_plot))
-            self.last_plot = time.time()
+                start_plot = time.perf_counter()
+                self.plotter.plot()
+                end_plot = time.perf_counter()
 
-        #self.root.lift()
-        self.root.after(100, self.update)
+                self.plot_interval = int(5*(end_plot - start_plot))  # increase plot interval, if plotting slows down
+                self.last_plot = time.time()
+
+            # Save plots
+            if time.time() > self.last_save + self.save_interval and self.experiment.timestamp:
+
+                start_save = time.perf_counter()
+                self.plotter.save()
+                end_save = time.perf_counter()
+
+                self.save_interval = int(5*(end_save - start_save))
+                self.last_save = time.time()
+
+        if not self.quitted:
+            self.root.after(50, self.update)
 
     def open_dashboard(self):
-        # Opens a window which allows the user to change variable values when the experiment is paused
-        dashboard = Dashboard(self.root, self.instruments)
+        # Opens a window which allows the user to change variable values while the experiment is stopped
+        prior_status = self.experiment.status
 
+        self.experiment.stop()  # stop routines and measurements to avoid communication conflicts while dashboard is open
+
+        Dashboard(self.root, self.instruments)
+
+        # Return experiment to prior state
+        if prior_status == self.experiment.WAITING:
+            self.experiment.wait()
+        elif prior_status in [self.experiment.READY, self.experiment.RUNNING]:
+            self.experiment.start()
 
     def toggle_pause(self):
+        # User pauses/resumes the experiment
 
         if self.paused:
             self.experiment.start()
-            self.pause_button.config(text='Pause')
-            self.dash_button.config(state=tk.DISABLED)
             self.paused = False
         else:
-            self.experiment.stop()
-            self.pause_button.config(text='Resume')
-            self.dash_button.config(state=tk.NORMAL)
-            self.paused = 'user'
+            self.experiment.wait()
+            self.paused = True
 
-    def terminate(self):
-        self.experiment.terminate()
+    def end(self):
+        # User ends the experiment
 
-    def run(self):
-        self.update()
-        self.root.mainloop()
+        if self.experiment.status != self.experiment.TERMINATED:
+            self.experiment.terminate()
+
+        self.quit()
+        self.terminated = True
+
+    def quit(self):
+        # Closes the GUI and plots
+
+        if hasattr(self, 'plotter'):
+            self.plotter.close()
+
+        self.status_label.config(text=self.experiment.TERMINATED)
+
+        self.quitted = True
+        plt.pause(0.1)  # give GUI and plotter enough time to wrap up
+        self.root.update()
+
+        self.root.destroy()
+        self.root.quit()
 
 
 class BasicDialog(tk.Toplevel):

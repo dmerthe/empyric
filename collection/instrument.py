@@ -73,7 +73,7 @@ class Instrument:
             self.postsets.update(postsets)
 
     def __repr__(self):
-        return self.name + '-' + str(self.adapter.address)
+        return self.name
 
     def write(self, message):
         return self.adapter.write(message)
@@ -133,13 +133,13 @@ class Instrument:
             self.disconnect()
 
 
-class Henon(Instrument):
+class HenonMapper(Instrument):
     """
     Simulation of an instrument based on the behavior of a 2D Henon Map
     It has two knobs and two meters, useful for testing in the absence of actual instruments.
     """
 
-    name = 'Henon'
+    name = 'HenonMapper'
 
     supported_adapters = (
         (Adapter, {}),
@@ -153,8 +153,7 @@ class Henon(Instrument):
     a = 1.4
     b = 0.3
 
-    x = np.random.rand()
-    y = np.random.rand()
+    x, y = 2*np.random.rand() - 1, 0.5*np.random.rand() - 0.25
 
     measured = {'x': False, 'y': False}
 
