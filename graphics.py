@@ -241,7 +241,7 @@ class Plotter:
             y_data = file_data[y].values
             c_data = file_data[c].values
 
-        c_min, c_max = [np.min(c_data), np.max(c_data)]
+        c_min, c_max = np.min(c_data), np.max(c_data)
         norm = plt.Normalize(vmin=c_min, vmax=c_max)
 
         # Add the colorbar, if the figure doesn't already have one
@@ -249,12 +249,9 @@ class Plotter:
             fig.has_colorbar
             fig.scalarmappable.set_clim(vmin=c_min, vmax=c_max)
             fig.cbar.update_normal(fig.scalarmappable)
-
         except AttributeError:
-
             fig.scalarmappable = ScalarMappable(cmap=cmap, norm=norm)
             fig.scalarmappable.set_array(np.linspace(c_min, c_max, 1000))
-
             fig.cbar = plt.colorbar(fig.scalarmappable, ax=ax)
             fig.has_colorbar = True
 
