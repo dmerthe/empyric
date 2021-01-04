@@ -1,4 +1,4 @@
-# This submodule defines the basic behavior of the key features in the mercury package
+# This submodule defines the basic behavior of the key features of the empyric package
 
 import os
 from math import *
@@ -14,8 +14,8 @@ from tkinter.filedialog import askopenfilename
 
 yaml = YAML()
 
-from empyric import instruments as _instruments
-from empyric import routines as _routines
+from empyric import instruments as instr
+from empyric import routines as rout
 from empyric import adapters, graphics, control
 
 
@@ -27,7 +27,7 @@ class Clock:
     def __init__(self):
 
         self.start_time = self.stop_time = time.time()  # clock is initially stopped
-        self.stoppage = 0
+        self.stoppage = 0  # total time during which the clock has been stopped
 
     def start(self):
         if self.stop_time:
@@ -53,69 +53,57 @@ class Clock:
 
 class Variable:
     """
-    Basic representation of an experimental variable; comes in 3 kinds: knob, meter and dependent.
-    Knobs can only be set; meters and dependents can only be measured.
+    Basic representation of an experimental variable; comes in 3 kinds: knob, meter and expressions.
+    Knobs can be set, meters can be measured and expressions can be calculated.
 
     A knob is a variable that can be directly controlled by an instrument, e.g. the voltage of a power supply.
 
-    A meter is a variable that is only measured, such as temperature. Some meters can be controlled directly or indirectly through an associated (but distinct) knob.
+    A meter is a variable that is measured by an instrument, such as temperature. Some meters can be controlled directly or indirectly through an associated (but distinct) knob.
 
     An expression is a variable that is not directly measured, but is calculated based on other variables of the experiment.
-    An example of a dependent is the output power of a power supply, where voltage is a knob and current is a meter: power = voltage * current.
+    An example of an expression is the output power of a power supply, where voltage is a knob and current is a meter: power = voltage * current.
     """
 
-    def __init__(self, _type, instrument=None, label=None, expression=None, definitions=None):
+    def __init__(self, knob=None, meter=None, instrument=None, expression=None, definitions=None):
         """
+        One of either the knob, meter or expression keyword arguments must be supplied along with the respective instrument or definitions.
 
-        :param _type: (str) type of variable; can be either 'knob', 'meter' or 'expression'.
-
-        :param instrument: (Instrument) instrument with the corresponding knob or meter; only used if type is 'knob' or 'meter'
-
-        :param label: (str) label of the knob or meter on the instrument; only used if type is 'knob' or 'meter'
-
-        :param expression: (str) expression for the variable in terms of other variables; only used if type is 'expression'
-
+        :param knob: (str) instrument knob label, if variable is a knob
+        :param meter: (str) instrument meter label, if variable is a meter
+        :param instrument: (Instrument) instrument with the corresponding knob or meter
+        :param expression: (str) expression for the variable in terms of other variables, if variable is an expression
         :param definitions: (dict) dictionary of the form {..., symbol: variable, ...} mapping the symbols in the expression to other variable objects; only used if type is 'expression'
-
-        :param preset: (int/float/str) value variable should have upon instantiation
-
-        :param postset: (int/float/str) value variable shoiuld have upon deletion
         """
 
-        self.type = _type
-        self._value = None  # This is the last known value of this variable
+        if meter:
+            self.meter = meter
+        elif knob:
+            self.knob = knob
+        elif expression:
+            self.expression = expression
+        else:
+            raise ValueError('variable object must have a specified knob, meter or expression!')
 
-        if self.type in ['knob', 'meter']:
+        self._value = None  # last known value of this variable
 
+        if hasattr(self, 'knob') or hasattr(self, 'meter'):
             if not instrument:
-                raise AttributeError(f'{_type} variable definition requires an associated instrument!')
-
+                raise AttributeError(f'{_type} variable definition requires an instrument!')
             self.instrument = instrument
 
-            if not label:
-                raise AttributeError(f'{_type} variable definition requires an a label!')
-
-            self.__setattr__(_type, label)
-
-        elif self.type == 'expression':
-
-            if not expression:
-                raise AttributeError('expression definition requires an expression!')
+        elif hasattr(self, 'expression'):
             if not definitions:
                 raise AttributeError('expression definition requires definitions!')
-
-            self.expression = expression
             self.definitions = definitions
 
     @property
     def value(self):
-        if self.type == 'knob':
+        if hasattr(self, 'knob'):
             self._value = self.instrument.knob_values[self.knob]
-        elif self.type == 'meter':
+        elif hasattr(self, 'meter'):
             self._value = self.instrument.measure(self.meter)
-        elif self.type == 'expression':
+        elif hasattr(self, 'expression'):
             expression = self.expression
-
             expression = expression.replace('^', '**')
 
             for symbol, variable in self.definitions.items():
@@ -131,7 +119,7 @@ class Variable:
     @value.setter
     def value(self, value):
         # value property can only be set if variable is a knob; None value indicates no setting should be applied
-        if self.type == 'knob' and value is not None:
+        if hasattr(self, 'knob') and value is not None:
             self.instrument.set(self.knob, value)
             self._value = self.instrument.knob_values[self.knob]
 
@@ -291,18 +279,17 @@ def build_experiment(runcard, instruments=None):
         # Any remaining keywards are instrument presets
         presets = specs
 
-        instrument_class = _instruments.__dict__[instrument_name]
+        instrument_class = instr.__dict__[instrument_name]
         instruments[name] = instrument_class(address, presets=presets, **adapter_kwargs)
 
     variables = {}  # experiment variables, associated with the instruments above
     for name, specs in runcard['Variables'].items():
         if 'meter' in specs:
-            variables[name] = Variable('meter', instruments[specs['instrument']], specs['meter'])
+            variables[name] = Variable(meter=specs['meter'], instrument=instruments[specs['instrument']])
         elif 'knob' in specs:
-            variables[name] = Variable('knob', instruments[specs['instrument']], specs['knob'])
+            variables[name] = Variable(knob=specs['knob'], instrument=instruments[specs['instrument']])
         elif 'expression' in specs:
-            variables[name] = Variable('expression',
-                                       expression=specs['expression'],
+            variables[name] = Variable(expression=specs['expression'],
                                        definitions={symbol: variables[var_name]
                                                     for symbol, var_name in specs['definitions'].items()})
 
@@ -325,7 +312,7 @@ def build_experiment(runcard, instruments=None):
                     contr_kwargs = specs['controller']
                     specs['controller'] = controllers.__dict__[contr_type](**contr_kwargs)
 
-            routines[name] = (variable_name, _routines.__dict__[_type](**specs))
+            routines[name] = (variable_name, rout.__dict__[_type](**specs))
 
     return Experiment(variables, routines=routines)
 
