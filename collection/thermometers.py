@@ -1,4 +1,5 @@
 import importlib
+import time
 import numpy as np
 
 from empyric.adapters import *
@@ -13,7 +14,7 @@ class Phidget1101(Instrument):
     name = 'Phidget1101'
 
     supported_adapters = (
-        (Phidget, {})
+        (Phidget, {}),
     )
 
     # Available knobs
@@ -35,17 +36,10 @@ class Phidget1101(Instrument):
             'E': types.ThermocoupleType.THERMOCOUPLE_TYPE_E,
         }
 
-        self.setThermocoupleType(type_dict[type_])
+        self.adapter.set('ThermocoupleType', type_dict[type_])
 
         self.knob_values['type'] = type_
 
     def measure_temperature(self):
-        attempts = 5
 
-        for i in range(attempts):
-            try:
-                return self.getTemperature()
-            except self.adapter.PhidgetException:
-                tiempo.sleep(0.1)
-
-        return np.nan  # if measurement fails
+        return self.adapter.get('Temperature')

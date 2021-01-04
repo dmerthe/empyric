@@ -8,7 +8,9 @@ class Instrument:
 
     name = 'Instrument'
 
-    supported_adapters = tuple()
+    supported_adapters = (
+        (Adapter, {}),
+    )
 
     knobs = tuple()
     presets = {}
@@ -43,12 +45,12 @@ class Instrument:
                     self.adapter = _adapter(self, **settings)
                     adapter_connected = True
                 except BaseException as error:
-                    errors.append('in trying '+_adapter.__name__+' got '+type(error).__name__ +': '+ str(error))
+                    errors.append('in trying '+_adapter.__name__+' adapter, got '+type(error).__name__ +': '+ str(error))
 
             if not adapter_connected:
                 message = f'unable to connect an adapter to instrument {self.name} at address {address}:\n'
                 for error in errors:
-                    message.append(f"{error}\n")
+                    message = message + f"{error}\n"
                 raise ConnectionError(message)
 
         self.name = self.name + '-' + str(self.address)
@@ -75,14 +77,15 @@ class Instrument:
     def __repr__(self):
         return self.name
 
-    def write(self, message):
-        return self.adapter.write(message)
+    # map write, read and query methods to the adapter's
+    def write(self, *args, **kwargs):
+        return self.adapter.write(*args, **kwargs)
 
-    def read(self):
-        return self.adapter.read()
+    def read(self, *args, **kwargs):
+        return self.adapter.read(*args, **kwargs)
 
-    def query(self, question):
-        return self.adapter.query(question)
+    def query(self, *args, **kwargs):
+        return self.adapter.query(*args, **kwargs)
 
     def set(self, knob, value):
         """
@@ -121,16 +124,12 @@ class Instrument:
 
         if self.adapter.connected:
             for knob, value in self.postsets.items():
+                print(knob, value)
                 self.set(knob, value)
 
             self.adapter.disconnect()
         else:
             raise ConnectionError(f"adapter for {self.name} is not connected!")
-
-    def __del__(self):
-
-        if self.adapter.connected:
-            self.disconnect()
 
 
 class HenonMapper(Instrument):

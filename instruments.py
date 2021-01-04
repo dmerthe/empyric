@@ -1,6 +1,6 @@
-# This submodule pulls all supported instruments into the same namespace
-from empyric.collection.instrument import Instrument, HenonMapper
+# This module pulls all supported instruments into the same namespace
 
+from empyric.collection.instrument import *
 from empyric.collection.sourcemeters import *
 from empyric.collection.supplies import *
 from empyric.collection.barometers import *

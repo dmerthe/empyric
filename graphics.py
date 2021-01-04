@@ -53,9 +53,9 @@ class Plotter:
 
         for name, settings in self.settings.items():
 
-            style = settings.get('style', 'none')
+            style = settings.get('style', None)
 
-            if style == 'none' or style == 'all':
+            if style == None or style == 'none' or style == 'all':
                 new_plots[name] = self._plot_all(name)
             elif style == 'averaged':
                 new_plots[name] = self._plot_averaged(name)
@@ -114,7 +114,7 @@ class Plotter:
         plt_kwargs = self.settings[name].get('options', {})
 
         if x.lower() ==  'time':
-            self.data.plot(y=y,ax=ax, kind='line', **plt_kwargs)
+            self.data.plot(y=y,ax=ax, kind='line', **plt_kwargs)  # use index as time axis
         else:
             self.data.plot(y=y, x=x, ax=ax, kind='line', **plt_kwargs)
 
@@ -200,12 +200,12 @@ class Plotter:
             # Rescale time if needed
             if c == 'time':
                 units = 'seconds'
-                if np.max(self.data[c].values) > 60:
+                if np.max(c_data) > 60:
                     units = 'minutes'
-                    self.data[c] = self.data[c] / 60
-                    if np.max(self.data[c].values) > 60:
+                    c_data = c_data / 60
+                    if np.max(c_data) > 60:
                         units = 'hours'
-                        self.data[c] = self.data[c] / 60
+                        c_data = c_data / 60
 
         # Handle data stored in a file
         y_is_path = bool( sum([ 'csv' in y_value for y_value in self.data[y] if isinstance(y_value, str)]))

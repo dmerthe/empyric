@@ -64,8 +64,7 @@ class Variable:
     An example of a dependent is the output power of a power supply, where voltage is a knob and current is a meter: power = voltage * current.
     """
 
-    def __init__(self, _type, instrument=None, label=None, expression=None, definitions=None, preset=None,
-                 postset=None):
+    def __init__(self, _type, instrument=None, label=None, expression=None, definitions=None):
         """
 
         :param _type: (str) type of variable; can be either 'knob', 'meter' or 'expression'.
@@ -97,13 +96,6 @@ class Variable:
                 raise AttributeError(f'{_type} variable definition requires an a label!')
 
             self.__setattr__(_type, label)
-
-            if _type == 'knob':
-                self.preset = preset
-                if preset:
-                    self.value = preset
-
-                self.postset = postset
 
         elif self.type == 'expression':
 
@@ -143,12 +135,6 @@ class Variable:
             self.instrument.set(self.knob, value)
             self._value = self.instrument.knob_values[self.knob]
 
-    def __del__(self):
-        # Make sure that variable is set to a safe value upon deletion
-        if self.type == 'knob':
-            if self.postset:
-                self.value = self.postset
-
 
 class Alarm:
     """
@@ -165,10 +151,11 @@ class Alarm:
     @property
     def triggered(self):
         value = self.variable._value  # get last know variable value
-        if value == None:
-            value = self.variable.value  # measure the value if needed
+        if value == None or value == float('nan') or value == '':
+            self._triggered = False
+        else:
+            self._triggered = eval('value' + self.condition)
 
-        self._triggered = eval('value' + self.condition)
         return self._triggered
 
 
@@ -296,8 +283,12 @@ def build_experiment(runcard, instruments=None):
         adapter_kwargs = {}
         if 'baud rate' in specs:
             adapter_kwargs['baud_rate'] = specs.pop('baud rate')
+        if 'timeout' in specs:
+            adapter_kwargs['timeout'] = specs.pop('timeout')
+        if 'delay' in specs:
+            adapter_kwargs['delay'] = specs.pop('delay')
 
-        # Any remaining contains instrument presets
+        # Any remaining keywards are instrument presets
         presets = specs
 
         instrument_class = _instruments.__dict__[instrument_name]
@@ -432,6 +423,10 @@ class Manager:
         self.gui.run()
 
         experiment_thread.join()
+
+        # Disconnect instruments
+        for instrument in self.instruments.values():
+            instrument.disconnect()
 
         os.chdir(top_dir)  # return to the parent directory
 

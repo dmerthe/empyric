@@ -1,0 +1,49 @@
+﻿Description:
+ name: Keithley 2400 IV Sweep Test
+ operator: Mike
+ platform: Test Stand 1
+ comments: Who is Mike? There is no Test Stand 1
+
+Settings:
+ follow-up: None
+ step interval: 0.25
+ plot interval: 10
+ save interval: 10
+
+Instruments:
+ Sourcemeter:
+  type: Keithley2400
+  address: 1
+  voltage range: 20
+  current range: 1
+
+Variables:
+ Voltage:
+  instrument: Sourcemeter
+  knob: voltage
+ Current:
+  instrument: Sourcemeter
+  meter: current
+
+Alarms:
+ Voltage > 15 V:
+  variable: Voltage
+  condition: '>15'
+ Current > 1 mA:
+  variable: Current
+  condition: '>1e-3'
+
+Plots:
+ IV Curve:
+  x: Voltage
+  y: Current
+  xlabel: 'Voltage (V)'
+  ylabel: 'Current (A)'
+  style: parametric
+
+Routines:
+ Sweep Voltage:
+  type: Sequence
+  variable: Voltage
+  end: 2 minutes
+  values: 'keithley_2400_voltages.csv'

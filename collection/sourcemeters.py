@@ -1,4 +1,5 @@
 import os
+import re
 import datetime
 import numpy as np
 import pandas as pd
@@ -81,7 +82,7 @@ class Keithley2400(Instrument):
             self.write(':SOUR:FUNC CURR')
             self.knob_values['source'] = 'current'
 
-            self.set_current_range(self.knob_values['current range'])
+            self.set_current_range(self.knob_values.get('current range', None))
 
             self.knob_values['voltage'] = None
 
@@ -102,7 +103,7 @@ class Keithley2400(Instrument):
 
     def set_output(self, output):
 
-        if output in [0, None, 'OFF', 'off']:
+        if output in [0, 'OFF', 'off']:
             self.write(':OUTP OFF')
             self.knob_values['output'] = 'OFF'
         elif output in [1, 'ON', 'on']:
@@ -118,7 +119,11 @@ class Keithley2400(Instrument):
 
         self.set_output('ON')
 
-        return float(self.query(':READ?').strip())
+        def validator(response):
+            match = re.match('.\d\.\d+E.\d\d', response)
+            return bool(match)
+
+        return float(self.query(':READ?', validator=validator))
 
     def measure_current(self):
 
@@ -127,7 +132,11 @@ class Keithley2400(Instrument):
 
         self.set_output('ON')
 
-        return float(self.query(':READ?').strip())
+        def validator(response):
+            match = re.match('.\d\.\d+E.\d\d', response)
+            return bool(match)
+
+        return float(self.query(':READ?', validator=validator))
 
     def set_voltage(self, voltage):
 
@@ -287,7 +296,8 @@ class Keithley2400(Instrument):
 
         current_list = []
 
-        self.connection.timeout = float('inf')  # the response times can be long
+        normal_timeout = self.adapter.timeout
+        self.adapter.timeout = None  # the response times can be long
 
         for voltage_list in sub_lists:
 
@@ -298,7 +308,7 @@ class Keithley2400(Instrument):
             raw_response = self.query(':READ?').strip()
             current_list += [float(current_str) for current_str in raw_response.split(',')]
 
-        self.connection.timeout = 1000  # put it back
+        self.adapter.timeout = normal_timeout  # put it back
 
         # Save fast Iv data
         new_iv_data = pd.DataFrame({

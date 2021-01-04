@@ -1,0 +1,36 @@
+﻿Description:
+ name: Phidget Temperature Measurement Example
+ operator: Mike
+ platform: Test Stand 1
+ comments: Who is Mike? There is no Test Stand 1
+
+Settings:
+ follow-up: None
+ step interval: 0.25
+ plot interval: 10
+ save interval: 10
+
+Instruments:
+ TC Reader:
+  type: Phidget1101
+  address: 539886-0-1
+
+Variables:
+ TC Type:
+  instrument: TC Reader
+  knob: type
+ Temperature:
+  instrument: TC Reader
+  meter: temperature
+
+Alarms:
+ T > 30 C:
+  variable: Temperature
+  condition: '>30'
+
+Plots:
+ IV Curve:
+  x: Time
+  y: Temperature
+  xlabel: 'Time'
+  ylabel: 'Temperature (C)'

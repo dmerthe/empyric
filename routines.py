@@ -1,6 +1,7 @@
 import time
 import numbers
 import numpy as np
+import pandas as pd
 from importlib import import_module
 from scipy.interpolate import interp1d
 
@@ -55,8 +56,17 @@ class Routine:
         for key, value in kwargs.items():
             self.__setattr__(key, value)
 
+        if 'csv' in kwargs.get('values', ''):  # values can be specified in a CSV file
+            df = pd.read_csv(kwargs['values'])
+            values_column = [col for col in df.columns if col != 'times'][0]
+            self.values = df[values_column].values
+
+            times_column = [col for col in df.columns if col.lower() == 'times']
+            if times_column and 'times' not in kwargs:
+                self.times = df[times_column[0]].values
+
         # Make an interpolator if there are multiple times and values
-        if 'values' in kwargs and 'times' in kwargs:
+        if hasattr(self, 'values') and hasattr(self, 'times'):
 
             if len(kwargs['times']) != len(kwargs['values']):
                 raise ValueError('Routine times keyword argument must match length of values keyword argument!')
