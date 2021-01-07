@@ -65,6 +65,8 @@ class Keithley2400(Instrument):
         if variable not in ['voltage', 'current']:
             raise ValueError('Source must be either "current" or "voltage"')
 
+        self.write(':SOUR:CLE:AUTO OFF')  # disable auto output-off
+
         self.set_output('OFF')
 
         if variable == 'voltage':
@@ -75,7 +77,6 @@ class Keithley2400(Instrument):
             self.set_voltage_range(self.knob_values.get('voltage range', None))
 
             self.knob_values['current'] = None
-
 
         if variable == 'current':
 
@@ -105,6 +106,7 @@ class Keithley2400(Instrument):
 
         if output in [0, 'OFF', 'off']:
             self.write(':OUTP OFF')
+            self.query(':OUTP?')  # for some reason, this is needed to ensure output off
             self.knob_values['output'] = 'OFF'
         elif output in [1, 'ON', 'on']:
             self.write(':OUTP ON')
@@ -169,8 +171,7 @@ class Keithley2400(Instrument):
         if voltage_range in allowed_voltage_ranges:
 
             if self.knob_values['source'] == 'voltage':
-                # self.write(':SOUR:VOLT:RANG %.2E' % voltage_range)
-                pass
+                self.write(':SOUR:VOLT:RANG %.2E' % voltage_range)
             else:
                 self.write(':SENS:VOLT:PROT %.2E' % voltage_range)
                 self.write(':SENS:VOLT:RANG %.2E' % voltage_range)
@@ -248,15 +249,7 @@ class Keithley2400(Instrument):
         self.delay = delay
         self.knob_values['delay'] = delay
 
-    def set_fast_voltages(self, *args):
-
-        self.set_source('voltage')
-
-        if len(args) == 0:
-            filedialog = importlib.import_module('tkinter.filedialog')
-            path = filedialog.askopenfilename(title="Select CSV File with Fast IV Voltages")
-        else:
-            path = args[0]
+    def set_fast_voltages(self, path):
 
         self.knob_values['fast voltages'] = path
 
@@ -264,27 +257,32 @@ class Keithley2400(Instrument):
         os.chdir('..')
 
         fast_voltage_data = pd.read_csv(path)
-        self.fast_voltages = fast_voltage_data['Voltage'].values
+
+        try:
+            column_name = [col for col in fast_voltage_data if 'voltage' in col.lower()][0]
+        except IndexError:
+            raise IndexyError('unable to locate voltage data for fast IV sweep!')
+
+        self.fast_voltages = fast_voltage_data[column_name].values
 
         os.chdir(working_subdir)
 
     def measure_fast_currents(self):
 
+        if self.knob_values['source'] != 'voltage':
+            self.set_source('voltage')
+
         self.set_output('ON')
 
         try:
-            self.fast_voltages
+            if len(self.fast_voltages) == 0:
+                raise ValueError('Fast IV sweep voltages have not been set!')
         except AttributeError:
-            raise ValueError('Fast IV sweep voltages have not been set!')
-
-        if len(self.fast_voltages) == 0:
             raise ValueError('Fast IV sweep voltages have not been set!')
 
         self.write(':SOUR:VOLT:MODE LIST')
 
-        path = self.name+'-fast_iv_measurement.csv'
-
-        list_length = len(self.fast_voltages)
+        list_length = len(fast_voltages)
 
         if list_length >= 100:
             sub_lists = [self.fast_voltages[i*100:(i+1)*100] for i in range(list_length // 100)]
@@ -299,6 +297,7 @@ class Keithley2400(Instrument):
         normal_timeout = self.adapter.timeout
         self.adapter.timeout = None  # the response times can be long
 
+        start = datetime.datetime.now()
         for voltage_list in sub_lists:
 
             voltage_str = ', '.join(['%.4E' % voltage for voltage in voltage_list])
@@ -310,21 +309,18 @@ class Keithley2400(Instrument):
 
         self.adapter.timeout = normal_timeout  # put it back
 
-        # Save fast Iv data
-        new_iv_data = pd.DataFrame({
-            self.mapped_variables['fast voltages']: self.fast_voltages,
-            self.mapped_variables['fast currents']: current_list}
-                                   , index=pd.date_range(start=datetime.datetime.now(), end=datetime.datetime.now(), periods=len(current_list)))
-
-        if os.path.isfile(path):
-            fast_iv_data = pd.read_csv(path, index_col=0)
-        else:
-            fast_iv_data = pd.DataFrame({self.mapped_variables['fast voltages']:[], self.mapped_variables['fast currents']:[]})
-
-        fast_iv_data = fast_iv_data.append(new_iv_data, sort=False)
-        fast_iv_data.to_csv(path)
-
         self.write(':SOUR:VOLT:MODE FIX')
+
+        # Save current measurements to CSV file
+        now = datetime.datetime.now()
+        fast_iv_data = pd.DataFrame(
+            {'fast voltages': self.fast_voltages, 'fast currents': current_list},
+            index=pd.date_range(start=start, end=end, periods=len(current_list))
+        )
+
+        timestamp = now.strftime('%Y%m%d-%H%M%S')
+        path = self.name + '-fast_currents_measurement-' + timestamp + '.csv'
+        fast_iv_data.to_csv(path)
 
         return path
 
@@ -388,55 +384,46 @@ class Keithley2460(Instrument):
 
     def set_source(self, variable):
 
-        if variable in ['voltage', 'current']:
-            self.knob_values['source'] = variable
-        else:
+        if variable not in ['voltage', 'current']:
             raise ValueError('Source must be either "current" or "voltage"')
+
+        self.set_output('OFF')
 
         if variable == 'voltage':
 
             self.write('SOUR:FUNC VOLT')
-            self.set_voltage_range(self.knob_values['voltage range'])
-
+            self.knob_values['source'] = 'voltage'
             self.knob_values['current'] = None
 
         if variable == 'current':
 
             self.write('SOUR:FUNC CURR')
-            self.set_current_range(self.knob_values['current range'])
-
+            self.knob_values['source'] = 'current'
             self.knob_values['voltage'] = None
 
     def set_meter(self, variable):
 
-        self.knob_values['meter'] = variable
-
         if variable == 'voltage':
-
             self.write('SENS:FUNC "VOLT"')
-            self.write('SENS:VOLT:RANG %.2e' % self.knob_values['voltage range'])
-            self.write('SOUR:CURR:VLIM %.2e' % self.knob_values['voltage range'])
             self.write('DISP:VOLT:DIG 5')
-
-        if variable == 'current':
-
+        elif variable == 'current':
             self.write('SENS:FUNC "CURR"')
-            self.write('SENS:CURR:RANG %.2e' % self.knob_values['current range'])
-            self.write('SOUR:VOLT:ILIM %.2e' % self.knob_values['current range'])
             self.write('DISP:CURR:DIG 5')
+        else:
+            raise ValueError('Source must be either "current" or "voltage"')
+
+        self.knob_values['meter'] = variable
 
     def set_output(self, output):
 
-        if output in [0, None, 'OFF', 'off']:
-            self.write('OUTP OFF')
+        if output in [0, 'OFF', 'off']:
+            self.write(':OUTP OFF')
             self.knob_values['output'] = 'OFF'
         elif output in [1, 'ON', 'on']:
-            self.set_source(self.knob_values['source'])
-            self.set_meter(self.knob_values['meter'])
-            self.write('OUTP ON')
+            self.write(':OUTP ON')
             self.knob_values['output'] = 'ON'
         else:
-            raise ValueError(f'Ouput setting {output} not recognized!')
+            raise ValueError(f'Output setting {output} not recognized!')
 
     def measure_voltage(self):
 
@@ -461,9 +448,9 @@ class Keithley2460(Instrument):
     def set_voltage(self, voltage):
 
         if self.knob_values['source'] != 'voltage':
-            Warning(f'Switching sourcing mode!')
+            Warning(f'Switching sourcing mode to voltage!')
             self.set_source('voltage')
-            self.output_on()  # output if automatically shut off when the source mode is changed
+            self.set_output('ON')  # output if automatically shut off when the source mode is changed
 
         self.write('SOUR:VOLT:LEV %.4E' % voltage)
 
@@ -472,7 +459,7 @@ class Keithley2460(Instrument):
     def set_current(self, current):
 
         if self.knob_values['source'] != 'current':
-            Warning(f'Switching sourcing mode!')
+            Warning(f'Switching sourcing mode to current!')
             self.set_source('current')
             self.set_output('ON')  # output if automatically shut off when the source mode is changed
 
@@ -482,55 +469,76 @@ class Keithley2460(Instrument):
 
     def set_voltage_range(self, voltage_range):
 
-        allowed_voltage_ranges = (0.2, 2, 20, 200, 'AUTO') # allowable voltage ranges
+        allowed_voltage_ranges = (0.2, 2, 7, 10, 20, 100)
 
-        if voltage_range not in allowed_voltage_ranges:
-            # Find nearest encapsulating voltage range
-            try:
-                nearest = np.argwhere( voltage_range <= np.array(allowed_voltage_ranges[:-1]) ).flatten()[0]
-            except IndexError:
-                nearest = -2
+        if voltage_range in allowed_voltage_ranges:
 
-            self.knob_values['voltage range'] = allowed_voltage_ranges[nearest]
+            if self.knob_values['source'] == 'voltage':
+                self.write('SOUR:VOLT:RANG %.2e' % voltage_range)
+            else:
+                self.write('SOUR:CURR:VLIM %.2e' % voltage_range)
+                self.write('SENS:VOLT:RANG %.2e' % voltage_range)
 
-            Warning(f'Given voltage range not an option, setting to {allowed_voltage_ranges[nearest]} V instead')
-
-        else:
             self.knob_values['voltage range'] = voltage_range
 
-        if self.knob_values['source'] == 'voltage':
-            self.write('SOUR:VOLT:RANG %.2e' % self.knob_values['voltage range'])
-        else:
-            self.write('SOUR:CURR:VLIM %.2e' % self.knob_values['voltage range'])
-            self.write('SENS:VOLT:RANG %.2e' % self.knob_values['voltage range'])
+        elif isinstance(voltage_range, numbers.Number):
 
-        self.knob_values['voltage range'] = voltage_range
+            # Find nearest encapsulating voltage range
+            try:
+                nearest = np.argwhere( voltage_range <= np.array(allowed_voltage_ranges) ).flatten()[0]
+            except IndexError:
+                nearest = -1
+
+            self.set_voltage_range(allowed_voltage_ranges[nearest])
+
+        elif voltage_range == 'AUTO':
+
+            if self.knob_values['source'] == 'voltage':
+                self.write(':SOUR:VOLT:RANG:AUTO ON')
+            else:
+                self.write(':SOUR:CURR:VLIM MAX')
+                self.write(':SENS:VOLT:RANG:AUTO ON')
+
+            self.knob_values['voltage range'] = 'AUTO'
+        else:
+            Warning('given voltage range is not permitted; voltage range unchanged')
+
 
     def set_current_range(self, current_range):
 
-        allowed_current_ranges = (1e-6, 10e-6, 100e-6, 1e-3, 10e-3, 100e-3, 1, 'AUTO')
+        allowed_current_ranges = (1e-6, 10e-6, 100e-6, 1e-3, 10e-3, 100e-3, 1, 4, 5, 7)
 
-        if current_range not in allowed_current_ranges:
-            # Find nearest encapsulating current range
-            try:
-                nearest = np.argwhere( current_range <= np.array(allowed_current_ranges[:-1]) ).flatten()[0]
-            except IndexError:
-                nearest = -2
+        if current_range in allowed_current_ranges:
 
-            self.knob_values['current range'] = allowed_current_ranges[nearest]
+            if self.knob_values['source'] == 'current':
+                self.write('SOUR:CURR:RANG %.2E' % current_range)
+            else:
+                self.write('SOUR:VOLT:ILIM %.2e' % current_range)
+                self.write('SENS:CURR:RANG %.2E' % current_range)
 
-            Warning(f'Given current range not an option, setting to {allowed_current_ranges[nearest]} A instead')
-
-        else:
             self.knob_values['current range'] = current_range
 
-        if self.knob_values['source'] == 'current':
-            self.write('SOUR:CURR:RANG %.2E' % self.knob_values['current range'])
-        else:
-            self.write('SOUR:VOLT:ILIM %.2e' % self.knob_values['current range'])
-            self.write('SENS:CURR:RANG %.2E' % self.knob_values['current range'])
+        elif isinstance(current_range, numbers.Number):
 
-        self.knob_values['current range'] = current_range
+            # Find nearest encapsulating current range
+            try:
+                nearest = np.argwhere(current_range <= np.array(allowed_current_ranges)).flatten()[0]
+            except IndexError:
+                nearest = -1
+
+            self.set_current_range(allowed_current_ranges[nearest])
+
+        elif current_range == 'AUTO':
+
+            if self.knob_values['source'] == 'current':
+                self.write('SOUR:CURR:RANG:AUTO 1')
+            else:
+                self.write('SOUR:VOLT:ILIM MAX')
+                self.write('SENS:CURR:RANG:AUTO 1')
+
+            self.knob_values['current range'] = 'AUTO'
+        else:
+            Warning('given current range is not permitted; current range unchanged')
 
     def set_nplc(self, nplc):
 
@@ -546,15 +554,10 @@ class Keithley2460(Instrument):
         self.delay = delay
         self.knob_values['delay'] = delay
 
-    def set_fast_voltages(self, *args):
+    def set_fast_voltages(self, path):
 
-        self.set_source('voltage')
-
-        if len(args) == 0:
-            filedialog = importlib.import_module('tkinter.filedialog')
-            path = filedialog.askopenfilename(title="Select CSV File with Fast IV Voltages")
-        else:
-            path = args[0]
+        if self.knob_values['source'] != 'voltage':
+            self.set_source('voltage')
 
         self.knob_values['fast voltages'] = path
 
@@ -562,7 +565,13 @@ class Keithley2460(Instrument):
         os.chdir('..')
 
         fast_voltage_data = pd.read_csv(path)
-        self.fast_voltages = fast_voltage_data['Voltage'].values
+
+        try:
+            column_name = [col for col in fast_voltage_data if 'voltage' in col.lower()][0]
+        except IndexError:
+            raise IndexyError('unable to locate voltage data for fast IV sweep!')
+
+        self.fast_voltages = fast_voltage_data[column_name].values
 
         os.chdir(working_subdir)
 
@@ -590,8 +599,10 @@ class Keithley2460(Instrument):
 
         current_list = []
 
-        self.connection.timeout = float('inf')  # the response times can be long
+        normal_timeout = self.adapter.timeout
+        self.adapter.timeout = None  # the response times can be long
 
+        start = datetime.datetime.now()
         for voltage_list in sub_lists:
 
             voltage_str = ', '.join(['%.4E' % voltage for voltage in voltage_list])
@@ -602,20 +613,18 @@ class Keithley2460(Instrument):
             raw_response = self.query('TRAC:DATA? 1, %d, "defbuffer1", SOUR, READ' % len(voltage_list)).strip()
             current_list += [float(current_str) for current_str in raw_response.split(',')[1::2]]
 
-        self.connection.timeout = 1000  # put it back
+        self.adapter.timeout = normal_timeout  # put it back
+        end = datetime.datetime.now()
 
-        # Save fast Iv data
-        new_iv_data = pd.DataFrame({
-            self.mapped_variables['fast voltages']: self.fast_voltages,
-            self.mapped_variables['fast currents']: current_list}
-                                   , index=pd.date_range(start=datetime.datetime.now(), end=datetime.datetime.now(), periods=len(current_list)))
+        # Save current measurements to CSV file
+        now = datetime.datetime.now()
+        fast_iv_data = pd.DataFrame(
+            {'fast voltages': self.fast_voltages, 'fast currents': current_list},
+            index=pd.date_range(start=start, end=end, periods=len(current_list))
+        )
 
-        if os.path.isfile(path):
-            fast_iv_data = pd.read_csv(path, index_col=0)
-        else:
-            fast_iv_data = pd.DataFrame({self.mapped_variables['fast voltages']:[], self.mapped_variables['fast currents']:[]})
-
-        fast_iv_data = fast_iv_data.append(new_iv_data, sort=False)
+        timestamp = now.strftime('%Y%m%d-%H%M%S')
+        path = self.name + '-fast_IV_sweep-' + timestamp + '.csv'
         fast_iv_data.to_csv(path)
 
         self.set_source(self.knob_values['source'])
@@ -847,6 +856,7 @@ class Keithley2651A(Instrument):
         # self.connection.timeout = float('inf')
         self.connection.timeout = 60 * 1000  # give it up to a minute to do sweep
 
+        start = datetime.datetime.now()
         for voltage_list in voltage_lists:
 
             voltage_string = ', '.join([f'{voltage}' for voltage in voltage_list])
@@ -859,22 +869,20 @@ class Keithley2651A(Instrument):
             self.set_voltage(voltage_list[-1])  # hold last voltage until next sub-sweep
 
         self.connection.timeout = 1000  # put it back
+        end = datetime.datetime.now()
 
         self.write('display.screen = display.SMUA')
         self.write('display.smua.measure.func = display.MEASURE_DCAMPS')
 
-        # Save fast IV data
-        new_iv_data = pd.DataFrame({
-            self.mapped_variables['fast voltages']: self.fast_voltages,
-            self.mapped_variables['fast currents']: current_list}
-                                   , index=pd.date_range(start=datetime.datetime.now(), end=datetime.datetime.now(), periods=len(current_list)))
+        # Save current measurements to CSV file
+        now = datetime.datetime.now()
+        fast_iv_data = pd.DataFrame(
+            {'fast voltages': self.fast_voltages, 'fast currents': current_list},
+            index=pd.date_range(start=start, end=end, periods=len(current_list))
+        )
 
-        if os.path.isfile(path):
-            fast_iv_data = pd.read_csv(path, index_col=0)
-        else:
-            fast_iv_data = pd.DataFrame({self.mapped_variables['fast voltages']:[], self.mapped_variables['fast currents']:[]})
-
-        fast_iv_data = fast_iv_data.append(new_iv_data, sort=False)
+        timestamp = now.strftime('%Y%m%d-%H%M%S')
+        path = self.name + '-fast_IV_sweep-' + timestamp + '.csv'
         fast_iv_data.to_csv(path)
 
         return path

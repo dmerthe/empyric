@@ -77,10 +77,13 @@ class Variable:
 
         if meter:
             self.meter = meter
+            self.type = 'meter'
         elif knob:
             self.knob = knob
+            self.type = 'knob'
         elif expression:
             self.expression = expression
+            self.type = 'expression'
         else:
             raise ValueError('variable object must have a specified knob, meter or expression!')
 
@@ -189,14 +192,6 @@ class Experiment:
         if self.clock.time > self.end:
             self.terminate()
 
-        # If stopped, just return the existing state with meters and expression values nullified
-        if self.status == Experiment.STOPPED:
-            self.state.name = datetime.datetime.now()
-            for name, variable in self.variables.items():
-                if variable.type in ['meter', 'expression']:
-                    self.state[name] = None
-            return self.state
-
         # Update time
         self.state['time'] = self.clock.time
         self.state.name = datetime.datetime.now()
@@ -205,6 +200,11 @@ class Experiment:
         if self.status is Experiment.RUNNING:
             for name, routine in self.routines.values():
                 self.variables[name].value = routine(self.state)
+        elif self.status == Experiment.STOPPED:
+            for name, variable in self.variables.items():
+                if variable.type in ['meter', 'expression']:
+                    self.state[name] = None
+            return self.state
 
         # Get all variable values
         for name, variable in self.variables.items():

@@ -53,7 +53,7 @@ class Instrument:
                     message = message + f"{error}\n"
                 raise ConnectionError(message)
 
-        self.name = self.name + '-' + str(self.address)
+        self.name = self.name + '@' + str(self.address)
 
         # Get existing knob settings, if possible
         self.knob_values = {}
@@ -124,7 +124,6 @@ class Instrument:
 
         if self.adapter.connected:
             for knob, value in self.postsets.items():
-                print(knob, value)
                 self.set(knob, value)
 
             self.adapter.disconnect()

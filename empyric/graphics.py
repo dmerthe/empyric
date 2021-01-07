@@ -22,11 +22,12 @@ class Plotter:
         """
         PLot data based on settings
 
-        :param data: (DataFrame) Dataframe containing the data to be plotted.
+        :param experiment: (Experiment) Experiment containing the data to be plotted.
         :param settings: (dict) dictionary of plot settings
         """
 
         self.data = experiment.data
+        self.timestamp = experiment.timestamp
 
         if settings:
             self.settings = settings
@@ -37,14 +38,35 @@ class Plotter:
         for plot_name in settings:
             self.plots[plot_name] = plt.subplots()
 
-        self.timestamp = experiment.timestamp
-
     def configure(self, settings=None, interval=None):
 
         if settings:
             self.settings = settings
         if interval:
             self.interval = interval
+
+    def save(self, plot_name=None, save_as=None):
+
+        if plot_name:
+            fig, ax = self.plots[plot_name]
+            if save_as:
+                fig.savefig(save_as + '-' + self.timestamp + '.png')
+            else:
+                fig.savefig(plot_name + '-' + self.timestamp + '.png')
+        else:
+            for name, plot in self.plots.items():
+                fig, ax = plot
+                fig.savefig(name + '-' + self.timestamp + '.png')
+
+    def close(self, plot_name=None):
+
+        self.save()
+
+        if plot_name:
+            fig, _ = self.plots[plot_name]
+            plt.close(fig)
+        else:
+            plt.close('all')
 
     def plot(self):
 
@@ -71,58 +93,36 @@ class Plotter:
         plt.pause(0.01)
         return new_plots
 
-    def save(self, plot_name=None, save_as=None):
-
-        if plot_name:
-            fig, ax = self.plots[plot_name]
-            if save_as:
-                fig.savefig(save_as + '-' + self.timestamp + '.png')
-            else:
-                fig.savefig(plot_name + '-' + self.timestamp + '.png')
-        else:
-            for name, plot in self.plots.items():
-                fig, ax = plot
-                fig.savefig(name + '-' + self.timestamp + '.png')
-
-    def close(self, plot_name=None):
-
-        self.save()
-
-        if plot_name:
-            fig, _ = self.plots[plot_name]
-            plt.close(fig)
-        else:
-            plt.close('all')
-
     def _plot_all(self, name):
 
         fig, ax = self.plots[name]
         ax.clear()
 
         x = self.settings[name]['x']
-        y = np.array([self.settings[name]['y']]).flatten()
+        ys = np.array([self.settings[name]['y']]).flatten()
 
-        for var in y:
-            if var not in self.data.columns:
+        for y in ys:
+
+            if y not in self.data.columns:
                 raise AttributeError(f'Specified variable {var} is not in data set. Check variable names in plot specification.')
 
-        # If data points to a file, then generate a parametric plot
-        y_is_path = isinstance(self.data[y].to_numpy().flatten()[0], str)
-        if y_is_path:
-            return self._plot_parametric(name)
+            # If data points to a file, then generate a parametric plot
+            y_is_path = bool( sum([ 'csv' in y_value for y_value in self.data[y] if isinstance(y_value, str)]))
+            if y_is_path:
+                return self._plot_parametric(name)
+            else:
+                plt_kwargs = self.settings[name].get('options', {})
 
-        plt_kwargs = self.settings[name].get('options', {})
-
-        if x.lower() ==  'time':
-            self.data.plot(y=y,ax=ax, kind='line', **plt_kwargs)  # use index as time axis
-        else:
-            self.data.plot(y=y, x=x, ax=ax, kind='line', **plt_kwargs)
+                if x.lower() ==  'time':
+                    self.data.plot(y=y,ax=ax, kind='line', **plt_kwargs)  # use index as time axis
+                else:
+                    self.data.plot(y=y, x=x, ax=ax, kind='line', **plt_kwargs)
 
         ax.set_title(name)
         ax.grid()
         ax.ticklabel_format(axis='y', style='sci', scilimits=(-2, 4))
         ax.set_xlabel(self.settings[name].get('xlabel', x))
-        ax.set_ylabel(self.settings[name].get('ylabel', y[0]))
+        ax.set_ylabel(self.settings[name].get('ylabel', ys[0]))
 
         return fig, ax
 
@@ -212,34 +212,41 @@ class Plotter:
 
         if y_is_path:
 
-            data_file = self.data[y].values[-1]
-            file_data = pd.read_csv(data_file, index_col=0)
-            file_data.index = pd.to_datetime(file_data.index, infer_datetime_format=True)  # convert to pandas DateTime index
+            x_data = []
+            y_data = []
+            c_data = []
 
-            if c == 'time':
-                first_datetime = pd.date_range(start=file_data.index[0], end=file_data.index[0], periods=len(file_data.index))
-                file_data[c] = (file_data.index - first_datetime).total_seconds()
+            # Get column headers from variable attributes
+            x_col_label = self.experiment.variables[x].__getattr__(x_var.type)
+            y_col_label = self.experiment.variables[y].__getattr__(y_var.type)
 
-                # Rescale time if needed
-                units = 'seconds'
-                if np.max(file_data[c].values) > 60:
-                    units = 'minutes'
-                    file_data[c] = file_data[c] / 60
+            for i, path in zip(range(len(self.data)), self.data[y].values):
+
+                file_data = pd.read_csv(path)
+
+                if c == 'time':
+                    file_data.index = pd.to_datetime(file_data.index, infer_datetime_format=True)
+                    first_datetime = pd.date_range(start=self.data.index[0], end=self.data.index[0], periods=len(file_data))
+                    file_data[c] = (file_data.index - first_datetime).total_seconds()
+
+                    # Rescale time if values are large
+                    units = 'seconds'
                     if np.max(file_data[c].values) > 60:
-                        units = 'hours'
+                        units = 'minutes'
                         file_data[c] = file_data[c] / 60
+                        if np.max(file_data[c].values) > 60:
+                            units = 'hours'
+                            file_data[c] = file_data[c] / 60
+                else:
+                    file_data[c] = [self.data[c].values[i]] * len(file_data)
 
-            else:
-                file_indices = file_data.index  # timestamps for the referenced data file
-                data_indices = self.data.index  # timestamps for the main data set, can be slightly different from the file timestamps
-                unique_file_indices = np.unique(file_indices).sort()
-                index_map = {file_index: data_index for file_index, data_index in zip(unique_file_indices, data_indices)}
-                for index in file_indices:
-                    file_data[c][index] = self.data[c][index_map[index]]
+                x_data.append(file_data[x_instr_label].values)
+                y_data.append(file_data[y_instr_label].values)
+                c_data.append(file_data[c].values)
 
-            x_data = file_data[x].values
-            y_data = file_data[y].values
-            c_data = file_data[c].values
+            x_data = np.concatenate(x_data)
+            y_data = np.concatenate(y_data)
+            c_data = np.concatenate(c_data)
 
         c_min, c_max = np.min(c_data), np.max(c_data)
         norm = plt.Normalize(vmin=c_min, vmax=c_max)
@@ -260,16 +267,14 @@ class Plotter:
         else:
             fig.cbar.ax.set_ylabel(self.settings[name].get('clabel', c))
 
-
         # Draw the plot
         if marker:
             for i in range(x_data.shape[0]):
-                ax.plot([x_data[i]], [y_data[i]], marker=marker, markersize=3,
-                                   color=cmap(norm(np.mean(c_data[i]))))
+                ax.plot([x_data[i]], [y_data[i]], marker=marker, markersize=3, color=cmap(norm(np.mean(c_data[i]))))
         else:
             for i in range(x_data.shape[0] - 1):
-                ax.plot(x_data[i: i + 2], y_data[i: i + 2],
-                                   color=cmap(norm(np.mean(c_data[i: i + 2]))))
+                ax.plot(x_data[i: i + 2], y_data[i: i + 2], color=cmap(norm(np.mean(c_data[i: i + 2]))))
+
         ax.set_title(name)
         ax.grid(True)
         ax.ticklabel_format(axis='y', style='sci', scilimits=(-2, 4))
