@@ -253,19 +253,19 @@ class Keithley2400(Instrument):
 
         self.knob_values['fast voltages'] = path
 
-        working_subdir = os.getcwd()
-        os.chdir('..')
-
-        fast_voltage_data = pd.read_csv(path)
+        try:
+            fast_voltage_data = pd.read_csv(path)
+        except FileNotFoundError:
+            # probably in an experiment data directory; try going up a level
+            working_subdir = os.getcwd()
+            os.chdir('..')
+            fast_voltage_data = pd.read_csv(path)
+            os.chdir(working_subdir)
 
         try:
-            column_name = [col for col in fast_voltage_data if 'voltage' in col.lower()][0]
+            self.fast_voltages = fast_voltage_data['fast voltages'].values
         except IndexError:
-            raise IndexyError('unable to locate voltage data for fast IV sweep!')
-
-        self.fast_voltages = fast_voltage_data[column_name].values
-
-        os.chdir(working_subdir)
+            raise IndexError("unable to locate fast voltages for fast IV sweep! Must be under 'fast voltages' column in a CSV file within the working directory.")
 
     def measure_fast_currents(self):
 
@@ -282,9 +282,9 @@ class Keithley2400(Instrument):
 
         self.write(':SOUR:VOLT:MODE LIST')
 
-        list_length = len(fast_voltages)
+        list_length = len(self.fast_voltages)
 
-        if list_length >= 100:
+        if list_length >= 100:  # can only take 100 voltages at a time
             sub_lists = [self.fast_voltages[i*100:(i+1)*100] for i in range(list_length // 100)]
         else:
             sub_lists = []
@@ -306,6 +306,7 @@ class Keithley2400(Instrument):
 
             raw_response = self.query(':READ?').strip()
             current_list += [float(current_str) for current_str in raw_response.split(',')]
+        end = datetime.datetime.now()
 
         self.adapter.timeout = normal_timeout  # put it back
 
@@ -319,7 +320,7 @@ class Keithley2400(Instrument):
         )
 
         timestamp = now.strftime('%Y%m%d-%H%M%S')
-        path = self.name + '-fast_currents_measurement-' + timestamp + '.csv'
+        path = self.name + '-fast_IV_measurement-' + timestamp + '.csv'
         fast_iv_data.to_csv(path)
 
         return path
@@ -703,34 +704,30 @@ class Keithley2651A(Instrument):
         if variable == 'voltage':
 
             self.write('smua.source.func =  smua.OUTPUT_DCVOLTS')
-            self.set_voltage_range(self.knob_values['voltage range'])
-
             self.knob_values['current'] = None
 
         if variable == 'current':
 
             self.write('smua.source.func = smua.OUTPUT_DCAMPS')
-            self.set_current_range(self.knob_values['current range'])
-
             self.knob_values['voltage'] = None
 
     def set_meter(self,variable):
 
         self.knob_values['meter'] = variable
 
+        self.write('display.screen = display.SMUA')
+
         if variable == 'current':
-            self.write('display.screen = display.SMUA')
             self.write('display.smua.measure.func = display.MEASURE_DCAMPS')
 
         if variable == 'voltage':
-            self.write('display.screen = display.SMUA')
             self.write('display.smua.measure.func = display.MEASURE_DCVOLTS')
 
         # This sourcemeter does not require specifying the meter before taking a measurement
 
     def set_output(self, output):
 
-        if output in [0, None, 'OFF', 'off']:
+        if output in [0, 'OFF', 'off']:
             self.write('smua.source.output = smua.OUTPUT_OFF')
             self.knob_values['output'] = 'OFF'
         elif output in [1, 'ON', 'on']:
@@ -810,36 +807,31 @@ class Keithley2651A(Instrument):
         self.knob_values['nplc'] = nplc
         self.nplc = nplc
 
-    def set_fast_voltages(self, *args):
-
-        if len(args) == 0:
-            filedialog = importlib.import_module('tkinter.filedialog')
-            path = filedialog.askopenfilename(title="Select CSV File with Fast IV Voltages")
-        else:
-            path = args[0]
+    def set_fast_voltages(self, path):
 
         self.knob_values['fast voltages'] = path
 
-        working_subdir = os.getcwd()
-        os.chdir('..')  #  fast voltages should be in the parent working directory, along with the runcard
+        try:
+            fast_voltage_data = pd.read_csv(path)
+        except FileNotFoundError:
+            # probably in an experiment data directory; try going up a level
+            working_subdir = os.getcwd()
+            os.chdir('..')
+            fast_voltage_data = pd.read_csv(path)
+            os.chdir(working_subdir)
 
-        fast_voltage_data = pd.read_csv(path)
-
-        self.fast_voltages = np.round(fast_voltage_data['Voltage'].values, 2)
-
-        os.chdir(working_subdir)  # return to the current working directory
+        try:
+            self.fast_voltages = fast_voltage_data['fast voltages'].values
+        except IndexError:
+            raise IndexError("unable to locate fast voltages for fast IV sweep! Must be under 'fast voltages' column in a CSV file within the working directory.")
 
     def measure_fast_currents(self):
 
         try:
-            self.fast_voltages
+            if len(self.fast_voltages) == 0:
+                raise ValueError('Fast IV sweep voltages have not been set!')
         except AttributeError:
             raise ValueError('Fast IV sweep voltages have not been set!')
-
-        if len(self.fast_voltages) == 0:
-            raise ValueError('Fast IV sweep voltages have not been set!')
-
-        path = self.name+'-fast_iv_measurement.csv'
 
         voltage_lists = []
         current_list = []
@@ -853,8 +845,8 @@ class Keithley2651A(Instrument):
         if remainder:
             voltage_lists.append(self.fast_voltages[-remainder:])
 
-        # self.connection.timeout = float('inf')
-        self.connection.timeout = 60 * 1000  # give it up to a minute to do sweep
+        normal_timeout = self.backend.timeout
+        self.backend.timeout = 60  # give it up to a minute to do sweep
 
         start = datetime.datetime.now()
         for voltage_list in voltage_lists:
@@ -868,8 +860,9 @@ class Keithley2651A(Instrument):
 
             self.set_voltage(voltage_list[-1])  # hold last voltage until next sub-sweep
 
-        self.connection.timeout = 1000  # put it back
         end = datetime.datetime.now()
+
+        self.connection.timeout = normal_timeout  # put it back
 
         self.write('display.screen = display.SMUA')
         self.write('display.smua.measure.func = display.MEASURE_DCAMPS')
@@ -882,7 +875,7 @@ class Keithley2651A(Instrument):
         )
 
         timestamp = now.strftime('%Y%m%d-%H%M%S')
-        path = self.name + '-fast_IV_sweep-' + timestamp + '.csv'
+        path = self.name + '-fast_IV_measurement-' + timestamp + '.csv'
         fast_iv_data.to_csv(path)
 
         return path

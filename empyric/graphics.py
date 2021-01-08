@@ -28,6 +28,7 @@ class Plotter:
 
         self.data = experiment.data
         self.timestamp = experiment.timestamp
+        self.variables = experiment.variables
 
         if settings:
             self.settings = settings
@@ -217,32 +218,33 @@ class Plotter:
             c_data = []
 
             # Get column headers from variable attributes
-            x_col_label = self.experiment.variables[x].__getattr__(x_var.type)
-            y_col_label = self.experiment.variables[y].__getattr__(y_var.type)
+            x_col_label = getattr(self.variables[x], self.variables[x].type)  # meter/knob name, used in the file
+            y_col_label = getattr(self.variables[y], self.variables[y].type)
 
-            for i, path in zip(range(len(self.data)), self.data[y].values):
+            for i, x_path, y_path in zip(range(len(self.data)), self.data[x].values, self.data[y].values):
 
-                file_data = pd.read_csv(path)
+                x_file_data = pd.read_csv(x_path)
+                y_file_data = pd.read_csv(y_path, index_col=0)
 
                 if c == 'time':
-                    file_data.index = pd.to_datetime(file_data.index, infer_datetime_format=True)
-                    first_datetime = pd.date_range(start=self.data.index[0], end=self.data.index[0], periods=len(file_data))
-                    file_data[c] = (file_data.index - first_datetime).total_seconds()
+                    y_file_data.index = pd.to_datetime(y_file_data.index, infer_datetime_format=True)
+                    first_datetime = pd.date_range(start=self.data.index[0], end=self.data.index[0], periods=len(y_file_data))
+                    y_file_data[c] = (y_file_data.index - first_datetime).total_seconds()
 
                     # Rescale time if values are large
                     units = 'seconds'
-                    if np.max(file_data[c].values) > 60:
+                    if np.max(y_file_data[c].values) > 60:
                         units = 'minutes'
-                        file_data[c] = file_data[c] / 60
-                        if np.max(file_data[c].values) > 60:
+                        y_file_data[c] = y_file_data[c] / 60
+                        if np.max(y_file_data[c].values) > 60:
                             units = 'hours'
-                            file_data[c] = file_data[c] / 60
+                            y_file_data[c] = y_file_data[c] / 60
                 else:
-                    file_data[c] = [self.data[c].values[i]] * len(file_data)
+                    y_file_data[c] = [self.data[c].values[i]] * len(y_file_data)
 
-                x_data.append(file_data[x_instr_label].values)
-                y_data.append(file_data[y_instr_label].values)
-                c_data.append(file_data[c].values)
+                x_data.append(x_file_data[x_col_label].values)
+                y_data.append(y_file_data[y_col_label].values)
+                c_data.append(y_file_data[c].values)
 
             x_data = np.concatenate(x_data)
             y_data = np.concatenate(y_data)

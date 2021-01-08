@@ -76,12 +76,12 @@ class Adapter:
         # general parameters
         self.instrument = instrument
 
-        for key, value in kwargs:
-                self.__setattr__(key, value)
-
         self.connected = False
         self.repeats = 0
         self.reconnects = 0
+
+        for key, value in kwargs:
+                self.__setattr__(key, value)
 
         self.connect()
 
@@ -161,6 +161,18 @@ class Serial(Adapter):
 
 
 class VISA:
+
+    @property
+    def timeout(self):
+        if self.connected:
+            return self.backend.timeout
+        else:
+            return None
+
+    @timeout.setter
+    def timeout(self, timeout):
+        if self.connected:
+            self.backend.timeout = timeout
 
     def write(self, message):
         self.backend.write(message)
@@ -283,6 +295,19 @@ class LinuxGPIB(Adapter):
         17: 1000
     }
 
+    @property
+    def timeout(self):
+        return self._timeout
+
+    @timeout.setter
+    def timeout(self, timeout):
+
+        if self.connected:
+            self.set_timeout(timeout)
+            self._timeout = timeout
+        else:
+            self._timeout = None
+
 
     def __repr__(self):
         return 'LinuxGPIB'
@@ -304,6 +329,8 @@ class LinuxGPIB(Adapter):
                 if timeout >= new_timeout:
                     self.backend.timeout(self.descr, index)
                     break
+
+        self._timeout = new_timeout
 
     def write(self, message):
         self.backend.write(self.descr, message)
@@ -407,6 +434,18 @@ class PrologixGPIB(Adapter):
 
     def __repr__(self):
         return 'PrologixGPIB'
+
+    @property
+    def timeout(self):
+        if self.connected:
+            return self.backend.timeout
+        else:
+            return None
+
+    @timeout.setter
+    def timeout(self, timeout):
+        if self.connected:
+            self.backend.timeout = timeout
 
     def connect(self):
 

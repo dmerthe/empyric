@@ -374,7 +374,7 @@ class Manager:
             # Have user locate runcard file
             root = tk.Tk()
             root.withdraw()
-            runcard_path = askopenfilename(parent=root, title='Select Runcard')
+            runcard_path = askopenfilename(parent=root, title='Select Runcard',filetypes=[('YAML files','*.yaml')])
 
             with open(runcard_path, 'rb') as runcard_file:
                 self.runcard = yaml.load(runcard_file)
