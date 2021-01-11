@@ -38,8 +38,6 @@ class Phidget1101(Instrument):
 
         self.adapter.set('ThermocoupleType', type_dict[type_])
 
-        self.knob_values['type'] = type_
-
     def measure_temperature(self):
 
         return self.adapter.get('Temperature')

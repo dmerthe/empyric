@@ -1,6 +1,44 @@
 import numpy as np
 from empyric.adapters import *
 
+
+def setter(method):
+    """
+    Utility function which wraps all set_[knob] methods and records the new knob values
+
+    :param method: (callable) method to be wrapped
+    :return: wrapped method
+    """
+
+    knob = method.__name__.split('_')[1:]
+
+    def wrapped_method(self, *args, **kwargs):
+        method(self, *args, **kwargs)
+        self.__setattr__(knob, args[-1])
+
+    return wrapped_method
+
+
+def getter(method):
+    """
+    Utility function which wraps all get_[knob] methods and records the retrieved knob values
+
+    :param method: (callable) method to be wrapped
+    :return: wrapped method
+    """
+
+    knob = method.__name__.split('_')[1:]
+
+    def wrapped_method(self, *args, **kwargs):
+
+        value = method(self, *args, **kwargs)
+        self.__setattr__(knob, value)
+
+        return value
+
+    return wrapped_method
+
+
 class Instrument:
     """
     Basic representation of an instrument, essentially a set of knobs and meters
@@ -55,13 +93,19 @@ class Instrument:
 
         self.name = self.name + '@' + str(self.address)
 
+        # Wrap setting and getting functions
+        for name, method in self.__dict__.items():
+            if 'set_' in name:
+                self.__setattr__(name, setter(method))
+            if 'get_' in name:
+                self.__setattr__(name, getter(method))
+
         # Get existing knob settings, if possible
-        self.knob_values = {}
         for knob in self.knobs:
-            if hasattr(self, 'get_'+knob):
-                self.knob_values[knob] = self.__getattribute__('get_'+knob)()
+            if hasattr(self, 'get_'+knob.replace(' ','_')):
+                self.__getattribute__('get_'+knob.replace(' ','_'))()  # retrieves the knob value from the instrument and stores as instrument attribute
             else:
-                self.knob_values[knob] = None
+                self.__setattr__(knob.replace(' ','_'), None)  # knob value is unknown until it is set
 
         # Apply presets
         if presets:
@@ -102,6 +146,13 @@ class Instrument:
             raise AttributeError(f"{knob} cannot be set on {self.name}")
 
         set_method(value)
+
+    def get(self, knob):
+
+        if hasattr(self,'get_'+knob.replace(' ','_')):
+            return self.__getattribute__('get_'+knob.replace(' ','_'))()
+        else:
+            return self.__getattribute__(knob.replace(' ','_'))
 
     def measure(self, meter):
         """
@@ -156,10 +207,10 @@ class HenonMapper(Instrument):
     measured = {'x': False, 'y': False}
 
     def set_a(self, value):
-        self.a = self.knob_values['a'] = value
+        self.a = value  # actually, redundant because method wrapper by setter above
 
     def set_b(self, value):
-        self.b = self.knob_values['b'] = value
+        self.b = value  # actually, redundant because method wrapper by setter above
 
     def measure_x(self):
 

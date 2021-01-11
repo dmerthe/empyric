@@ -35,20 +35,16 @@ class Keithley2260B(Instrument):
 
     def set_max_voltage(self, voltage):
         self.write('APPL %.4f,%.4f' % (voltage, self.knob_values['max current']))
-        self.knob_values['max voltage'] = voltage
 
     def set_max_current(self, current):
         self.write('APPL %.4f,%.4f' % (self.knob_values['max voltage'], current))
-        self.knob_values['max current'] = current
 
     def set_output(self, output):
 
         if output == 'ON':
             self.write('OUTP:STAT:IMM ON')
-            self.knob_values['output'] = 'ON'
         elif output == 'OFF':
             self.write('OUTP:STAT:IMM OFF')
-            self.knob_values['output'] = 'OFF'
 
     def get_max_current(self):
         return float(self.query('CURR?'))
@@ -86,10 +82,8 @@ class BK9183B(Instrument):
 
         if output == 'ON':
             self.write('OUT ON')
-            self.knob_values['output'] = 'ON'
         elif output == 'OFF':
             self.write('OUT OFF')
-            self.knob_values['output'] = 'OFF'
 
     def measure_current(self):
         return [float(self.query('MEAS:CURR?')) for i in range(3)][-1] # sometimes the first measurement is lagged
@@ -99,11 +93,9 @@ class BK9183B(Instrument):
 
     def set_max_current(self, current):
         self.write('SOUR:CURR ' + str(current))
-        self.knob_values['max current'] = current
 
     def set_max_voltage(self, voltage):
         self.write('SOUR:VOLT ' + str(voltage))
-        self.knob_values['max voltage'] = voltage
 
     def get_max_current(self):
         return float(self.query('SOUR:CURR?'))

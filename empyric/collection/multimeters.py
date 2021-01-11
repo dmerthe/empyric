@@ -1,3 +1,4 @@
+import numbers
 from empyric.adapters import *
 from empyric.collection.instrument import Instrument
 
@@ -28,68 +29,76 @@ class Keithley2110(Instrument):
 
     def set_voltage_range(self, voltage_range):
 
-        allowed_voltage_ranges = (0.1, 1, 10, 100, 1000, 'AUTO')
+        allowed_voltage_ranges = (0.1, 1, 10, 100, 1000)
 
-        if voltage_range not in allowed_voltage_ranges:
+        if voltage_range in allowed_voltage_ranges:
+            self.write('VOLT:RANG %.2e' % voltage_range)
+        elif isinstance(voltage_range, numbers.Number):
+
             # Find nearest encapsulating voltage range
             try:
-                nearest = np.argwhere( voltage_range <= np.array(allowed_voltage_ranges[:-1]) ).flatten()[0]
+                nearest = np.argwhere( voltage_range <= np.array(allowed_voltage_ranges) ).flatten()[0]
             except IndexError:
                 nearest = -1
 
-            self.knob_values['voltage range'] = allowed_voltage_ranges[nearest]
+            self.set_voltage_range(allowed_voltage_ranges[nearest])
 
             Warning(f'Given voltage range not an option, setting to {allowed_voltage_ranges[nearest]} V instead')
-        else:
-            self.knob_values['voltage range'] = voltage_range
 
-        if self.knob_values['voltage range'] == 'AUTO':
+        elif voltage_range == 'AUTO':
             self.write('VOLT:RANG:AUTO')
         else:
-            self.write('VOLT:RANG %.2e' % self.knob_values['voltage range'])
+            raise ValueError(f'voltage range choice {voltage_range} not permitted!')
 
     def set_current_range(self, current_range):
 
-        allowed_current_ranges = (0.01, 0.1, 1, 3, 10, 'AUTO')
+        allowed_current_ranges = (0.01, 0.1, 1, 3, 10)
 
-        if current_range not in allowed_current_ranges:
+        if current_range in allowed_current_ranges:
+            self.write('CURR:RANG %.2e' % current_range)
+        elif isinstance(current_range, numbers.Number):
             # Find nearest encapsulating current range
-            nearest = np.argwhere( current_range <= np.array(allowed_current_ranges[:-1]) ).flatten()[0]
+            try:
+                nearest = np.argwhere(current_range <= np.array(allowed_current_ranges)).flatten()[0]
+            except IndexError:
+                nearest = -1
 
-            self.knob_values['current range'] = allowed_current_ranges[nearest]
+            self.set_current_range(allowed_current_ranges[nearest])
 
             Warning(f'Given current range not an option, setting to {allowed_current_ranges[nearest]} A instead')
-        else:
-            self.knob_values['current range'] = current_range
 
-        if self.knob_values['current range'] == 'AUTO':
+        elif current_range == 'AUTO':
             self.write('CURR:RANG:AUTO')
         else:
-            self.write('CURR:RANG %.2e' % self.knob_values['current range'])
+            raise ValueError(f'current range choice {current_range} not permitted!')
 
     def measure_voltage(self):
 
-        if self.knob_values['meter'] != 'voltage':
-            self.write('FUNC "VOLT"')
-            self.knob_values['meter'] = 'voltage'
+        if self.meter != 'voltage':
+            self.set_meter('voltage')
 
         return float(self.query('READ?'))
 
     def measure_current(self):
 
-        if self.knob_values['meter'] != 'current':
-            self.write('FUNC "CURR"')
-            self.knob_values['meter'] = 'current'
+        if self.meter != 'current':
+            self.set_meter('current')
 
         return float(self.query('READ?'))
 
     def measure_temperature(self):
 
-        if self.knob_values['meter'] != 'temperature':
-            self.write('FUNC "TCO"')
-            self.knob_values['meter'] = 'temperature'
+        if self.meter != 'temperature':
+            self.set_meter('temperature')
 
         return float(self.query('READ?'))
 
     def set_meter(self, meter):
-        self.measure(meter)
+
+        if meter == 'voltage':
+            self.write('FUNC "VOLT"')
+        if meter == 'current':
+            self.write('FUNC "CURR"')
+        if meter == 'temperature':
+            self.write('FUNC "TCO"')
+

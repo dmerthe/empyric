@@ -80,7 +80,9 @@ class Adapter:
         self.repeats = 0
         self.reconnects = 0
 
-        for key, value in kwargs:
+
+        print(kwargs)
+        for key, value in kwargs.items():
                 self.__setattr__(key, value)
 
         self.connect()
@@ -528,7 +530,7 @@ class Modbus(Adapter):
     def connect(self):
 
         # Save parameters
-        port, channel = self.instrument.address.split('-')
+        port, channel = self.instrument.address.split('::')
 
         if not hasattr(self, 'baud_rate'):
             self.baud_rate = 9600
@@ -555,14 +557,8 @@ class Modbus(Adapter):
         self.backend.serial.timeout = self.timeout
         return self.backend.read_register(register)
 
-    @chaperone
-    def query(self, register, question):
-        self.backend.write_register(register, question)
-        time.sleep(self.delay)
-        return self.backend.read_register(register)
-
     def disconnect(self):
-        self.backend.close()
+        self.backend.serial.close()
         self.connected = False
 
 
@@ -578,7 +574,7 @@ class Phidget(Adapter):
 
     def connect(self):
 
-        address_parts = self.instrument.address.split('-')
+        address_parts = self.instrument.address.split('::')
         address_parts = [int(part) for part in address_parts]
 
         serial_number = address_parts[0]

@@ -102,12 +102,12 @@ class Variable:
     @property
     def value(self):
         if hasattr(self, 'knob'):
-            self._value = self.instrument.knob_values[self.knob]
+            self._value = self.instrument.get(self.knob)
         elif hasattr(self, 'meter'):
             self._value = self.instrument.measure(self.meter)
         elif hasattr(self, 'expression'):
             expression = self.expression
-            expression = expression.replace('^', '**')
+            expression = expression.replace('^', '**')  # carets represent exponents to everyone except for Guido van Rossum
 
             for symbol, variable in self.definitions.items():
                 expression = expression.replace(symbol, '(' + str(variable._value) + ')')
@@ -124,7 +124,7 @@ class Variable:
         # value property can only be set if variable is a knob; None value indicates no setting should be applied
         if hasattr(self, 'knob') and value is not None:
             self.instrument.set(self.knob, value)
-            self._value = self.instrument.knob_values[self.knob]
+            self._value = self.instrument.__getattribute__(self.knob)
 
 
 class Alarm:
@@ -370,16 +370,17 @@ class Manager:
 
     def __init__(self, runcard=None):
 
-        if not runcard:
-            # Have user locate runcard file
+        if runcard:
+            self.runcard = runcard
+
+        else:
+            # Have user locate runcard
             root = tk.Tk()
             root.withdraw()
-            runcard_path = askopenfilename(parent=root, title='Select Runcard',filetypes=[('YAML files','*.yaml')])
+            runcard_path = askopenfilename(parent=root, title='Select Runcard', filetypes=[('YAML files', '*.yaml')])
 
             with open(runcard_path, 'rb') as runcard_file:
                 self.runcard = yaml.load(runcard_file)
-        else:
-            self.runcard = runcard
 
     def run(self):
 

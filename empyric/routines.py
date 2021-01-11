@@ -58,16 +58,15 @@ class Routine:
 
         if 'csv' in kwargs.get('values', ''):  # values can be specified in a CSV file
             df = pd.read_csv(kwargs['values'])
-            values_column = [col for col in df.columns if col != 'times'][0]
+            values_column = [col for col in df.columns if col.lower() != 'times'][0]
             self.values = df[values_column].values
 
-            times_column = [col for col in df.columns if col.lower() == 'times']
+            times_column = [col for col in df.columns if col.lower() == 'times'][0]
             if times_column and 'times' not in kwargs:
                 self.times = df[times_column[0]].values
 
         # Make an interpolator if there are multiple times and values
         if hasattr(self, 'values') and hasattr(self, 'times'):
-
             if len(kwargs['times']) != len(kwargs['values']):
                 raise ValueError('Routine times keyword argument must match length of values keyword argument!')
 
