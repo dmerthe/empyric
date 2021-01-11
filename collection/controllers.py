@@ -72,7 +72,7 @@ class RedLionPXU(Instrument):
     name = 'RedLionPXU'
 
     supported_adapters = (
-        (Modbus, {'buad_rate': 38400})
+        (Modbus, {'buad_rate': 38400}),
     )
 
     knobs = (
