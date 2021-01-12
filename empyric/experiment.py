@@ -91,7 +91,7 @@ class Variable:
 
         if hasattr(self, 'knob') or hasattr(self, 'meter'):
             if not instrument:
-                raise AttributeError(f'{_type} variable definition requires an instrument!')
+                raise AttributeError(f'{self.type} variable definition requires an instrument!')
             self.instrument = instrument
 
         elif hasattr(self, 'expression'):

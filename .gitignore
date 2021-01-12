@@ -7,7 +7,7 @@ __pycache__/
 .idea/
 
 # Mac BS
-.DS_Stores
+.DS_Store
 
 # C extensions
 *.so
