@@ -5,6 +5,8 @@ __pycache__/
 
 # Windows BS
 .idea/
+
+# Mac BS
 .DS_Store
 
 # C extensions
