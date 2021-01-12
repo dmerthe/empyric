@@ -1,8 +1,11 @@
+# Basic script that measures x and y values in a Henon Map, using the empyric library
+
 import time
+import os
 import threading
-from mercury.instruments import Henon
-from mercury.experiment import Variable, Alarm, Experiment
-from mercury.graphics import GUI, Plotter
+from empyric.instruments import HenonMapper
+from empyric.experiment import Variable, Alarm, Experiment
+from empyric.graphics import ExperimentGUI, Plotter
 
 import matplotlib
 matplotlib.use('TkAgg')
@@ -10,17 +13,19 @@ import matplotlib.pyplot as plt
 
 plt.ion()
 
-henon = Henon(address=1)
+os.chdir(os.path.join(os.environ["HOME"], "Desktop"))  # put example data on desktop
 
-x = Variable('meter', instrument=henon, label='x')
-y = Variable('meter', instrument=henon, label='y')
+henon = HenonMapper(1)
+
+x = Variable(instrument=henon, meter='x')
+y = Variable(instrument=henon, meter='y')
 
 alarm = Alarm(y, '>0', None)
 
-experiment = Experiment({'x':x,'y':y})
+experiment = Experiment({'x':x,'y':y})  # an experiment that simply measures the values of x and y over time
 
 plots = {'Henon Plot': {'x': 'x', 'y':'y', 'style':'parametric', 'marker':'o'}}
-gui = GUI(experiment, alarms={"Positive y Alarm": alarm}, title='Test', plots=plots)
+gui = ExperimentGUI(experiment, alarms={"y>0": alarm}, title='Test', plots=plots)
 
 def run_experiment():
     for state in experiment:

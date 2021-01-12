@@ -80,8 +80,6 @@ class Adapter:
         self.repeats = 0
         self.reconnects = 0
 
-
-        print(kwargs)
         for key, value in kwargs.items():
                 self.__setattr__(key, value)
 

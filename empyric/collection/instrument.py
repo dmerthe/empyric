@@ -10,7 +10,7 @@ def setter(method):
     :return: wrapped method
     """
 
-    knob = method.__name__.split('_')[1:]
+    knob = '_'.join(method.__name__.split('_')[1:])
 
     def wrapped_method(self, *args, **kwargs):
         method(self, *args, **kwargs)
@@ -27,7 +27,7 @@ def getter(method):
     :return: wrapped method
     """
 
-    knob = method.__name__.split('_')[1:]
+    knob = '_'.join(method.__name__.split('_')[1:])
 
     def wrapped_method(self, *args, **kwargs):
 
@@ -51,13 +51,10 @@ class Instrument:
     )
 
     knobs = tuple()
-    presets = {}
-    postsets = {}
-
-    meters = tuple()
-
     presets = {}  # values knobs should be when instrument is connected
     postsets = {}  # values knobs should be when instrument is disconnected
+
+    meters = tuple()
 
     def __init__(self, address, adapter=None, presets=None, postsets=None, **kwargs):
         """
@@ -72,7 +69,6 @@ class Instrument:
         self.address = address
 
         adapter_connected = False
-
         if adapter:
             self.adapter = adapter(self, **kwargs)
         else:
@@ -202,7 +198,7 @@ class HenonMapper(Instrument):
     a = 1.4
     b = 0.3
 
-    x, y = 2*np.random.rand() - 1, 0.5*np.random.rand() - 0.25
+    x,y = 0.63, 0.19
 
     measured = {'x': False, 'y': False}
 

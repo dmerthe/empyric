@@ -1,4 +1,6 @@
-﻿Description:
+﻿# Basic runcard descrbing and experiment that measures x and y values in a Henon Map, using the empyric library
+
+Description:
  name: Henon Map Test
  operator: Mike
  platform: Test Stand 1
