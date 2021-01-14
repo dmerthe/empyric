@@ -15,7 +15,7 @@ plt.ion()
 
 os.chdir(os.path.join(os.environ["HOME"], "Desktop"))  # put example data on desktop
 
-henon_mapper = HenonMapper(1)
+henon_mapper = HenonMapper()
 
 x = Variable(instrument=henon_mapper, meter='x')
 y = Variable(instrument=henon_mapper, meter='y')
