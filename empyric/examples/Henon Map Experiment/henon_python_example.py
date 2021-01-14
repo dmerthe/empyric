@@ -5,7 +5,7 @@ import os
 import threading
 from empyric.instruments import HenonMapper
 from empyric.experiment import Variable, Alarm, Experiment
-from empyric.graphics import ExperimentGUI, Plotter
+from empyric.graphics import ExperimentGUI
 
 import matplotlib
 matplotlib.use('TkAgg')
@@ -15,10 +15,10 @@ plt.ion()
 
 os.chdir(os.path.join(os.environ["HOME"], "Desktop"))  # put example data on desktop
 
-henon = HenonMapper(1)
+henon_mapper = HenonMapper(1)
 
-x = Variable(instrument=henon, meter='x')
-y = Variable(instrument=henon, meter='y')
+x = Variable(instrument=henon_mapper, meter='x')
+y = Variable(instrument=henon_mapper, meter='y')
 
 alarm = Alarm(y, '>0', None)
 

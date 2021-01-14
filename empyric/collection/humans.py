@@ -2,7 +2,7 @@
 import time
 
 from empyric.adapters import *
-from empyric.instruments import Instrument
+from empyric.instruments import *
 
 class ConsoleUser(Instrument):
 
