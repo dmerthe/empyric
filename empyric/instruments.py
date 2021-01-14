@@ -7,3 +7,4 @@ from empyric.collection.barometers import *
 from empyric.collection.thermometers import *
 from empyric.collection.multimeters import *
 from empyric.collection.controllers import *
+from empyric.collection.humans import *

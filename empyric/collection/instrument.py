@@ -1,4 +1,5 @@
 import numpy as np
+from functools import wraps
 from empyric.adapters import *
 
 
@@ -12,9 +13,12 @@ def setter(method):
 
     knob = '_'.join(method.__name__.split('_')[1:])
 
-    def wrapped_method(self, *args, **kwargs):
-        method(self, *args, **kwargs)
-        self.__setattr__(knob, args[-1])
+    @wraps(method)
+    def wrapped_method(*args, **kwargs):
+        self = args[0]
+        value = args[1]
+        self.__setattr__(knob, value)
+        method(*args, **kwargs)
 
     return wrapped_method
 
@@ -29,14 +33,35 @@ def getter(method):
 
     knob = '_'.join(method.__name__.split('_')[1:])
 
-    def wrapped_method(self, *args, **kwargs):
-
-        value = method(self, *args, **kwargs)
+    @wraps(method)
+    def wrapped_method(*args, **kwargs):
+        self = args[0]
+        value = method(*args, **kwargs)
         self.__setattr__(knob, value)
 
         return value
 
     return wrapped_method
+
+def measurer(method):
+    """
+    Utility function that wraps all measure_[meter] methods; right now does nothing
+
+    :param method: (callable) method to be wrapped
+    :return: wrapped method
+    """
+
+    meter = '_'.join(method.__name__.split('_')[1:])
+
+    @wraps(method)
+    def wrapped_method(*args, **kwargs):
+        self = args[0]
+        value = method(*args, **kwargs)
+        self.__setattr__('measured_'+meter, value)
+
+        return value
+
+    return method
 
 
 class Instrument:
@@ -56,7 +81,7 @@ class Instrument:
 
     meters = tuple()
 
-    def __init__(self, address, adapter=None, presets=None, postsets=None, **kwargs):
+    def __init__(self, address=None, adapter=None, presets=None, postsets=None, **kwargs):
         """
 
         :param address: (str/int) the default adapter of the instrument can be set up with default settings based on an address
@@ -66,7 +91,10 @@ class Instrument:
         :param kwargs: (dict) any settings for the selected adapter
         """
 
-        self.address = address
+        if address:
+            self.address = address
+        else:
+            self.address = 1
 
         adapter_connected = False
         if adapter:
@@ -89,12 +117,13 @@ class Instrument:
 
         self.name = self.name + '@' + str(self.address)
 
-        # Wrap setting and getting functions
-        for name, method in self.__dict__.items():
-            if 'set_' in name:
-                self.__setattr__(name, setter(method))
-            if 'get_' in name:
-                self.__setattr__(name, getter(method))
+        # # Wrap setting and getting functions
+        # for method_name in dir(self):
+        #     method = self.__getattribute__(method_name)
+        #     if 'set_' in method_name:
+        #         self.__setattr__(method_name, setter(method))
+        #     if 'get_' in method_name:
+        #         self.__setattr__(method_name, getter(method))
 
         # Get existing knob settings, if possible
         for knob in self.knobs:
@@ -137,7 +166,7 @@ class Instrument:
         """
 
         try:
-            set_method = self.__getattribute__('set_' + knob.replace(' ' ,'_'))
+            set_method = getattr(self, 'set_' + knob.replace(' ' ,'_'))
         except AttributeError:
             raise AttributeError(f"{knob} cannot be set on {self.name}")
 
@@ -146,9 +175,9 @@ class Instrument:
     def get(self, knob):
 
         if hasattr(self,'get_'+knob.replace(' ','_')):
-            return self.__getattribute__('get_'+knob.replace(' ','_'))()
+            return getattr(self, 'get_'+knob.replace(' ','_'))()
         else:
-            return self.__getattribute__(knob.replace(' ','_'))
+            return getattr(self, knob.replace(' ','_'))
 
     def measure(self, meter):
         """
@@ -180,8 +209,8 @@ class Instrument:
 
 class HenonMapper(Instrument):
     """
-    Simulation of an instrument based on the behavior of a 2D Henon Map
-    It has two knobs and two meters, useful for testing in the absence of actual instruments.
+    Virtual instrument based on the behavior of a 2D Henon Map
+    It has two virtual knobs and two virtual meters, useful for testing in the absence of actual instruments.
     """
 
     name = 'HenonMapper'
@@ -198,16 +227,17 @@ class HenonMapper(Instrument):
     a = 1.4
     b = 0.3
 
-    x,y = 0.63, 0.19
+    x, y = 0.63, 0.19  # near the unstable fixed point
 
-    measured = {'x': False, 'y': False}
-
+    @setter
     def set_a(self, value):
         self.a = value  # actually, redundant because method wrapper by setter above
 
+    @setter
     def set_b(self, value):
         self.b = value  # actually, redundant because method wrapper by setter above
 
+    @measurer
     def measure_x(self):
 
         x_new = 1 - self.a * self.x ** 2 + self.y
@@ -218,6 +248,7 @@ class HenonMapper(Instrument):
 
         return self.x
 
+    @measurer
     def measure_y(self):
 
         return self.y

@@ -46,4 +46,4 @@ Routines:
   type: Sequence
   variable: Voltage
   end: 2 minutes
-  values: 'keithley_2400_voltages.csv'
+  values: 'voltages.csv'

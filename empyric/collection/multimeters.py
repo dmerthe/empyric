@@ -1,6 +1,6 @@
 import numbers
 from empyric.adapters import *
-from empyric.collection.instrument import Instrument
+from empyric.collection.instrument import *
 
 class Keithley2110(Instrument):
     """
@@ -27,6 +27,7 @@ class Keithley2110(Instrument):
         'temperature'
     )
 
+    @setter
     def set_voltage_range(self, voltage_range):
 
         allowed_voltage_ranges = (0.1, 1, 10, 100, 1000)
@@ -50,6 +51,7 @@ class Keithley2110(Instrument):
         else:
             raise ValueError(f'voltage range choice {voltage_range} not permitted!')
 
+    @setter
     def set_current_range(self, current_range):
 
         allowed_current_ranges = (0.01, 0.1, 1, 3, 10)
@@ -72,6 +74,7 @@ class Keithley2110(Instrument):
         else:
             raise ValueError(f'current range choice {current_range} not permitted!')
 
+    @measurer
     def measure_voltage(self):
 
         if self.meter != 'voltage':
@@ -79,6 +82,7 @@ class Keithley2110(Instrument):
 
         return float(self.query('READ?'))
 
+    @measurer
     def measure_current(self):
 
         if self.meter != 'current':
@@ -86,6 +90,7 @@ class Keithley2110(Instrument):
 
         return float(self.query('READ?'))
 
+    @measurer
     def measure_temperature(self):
 
         if self.meter != 'temperature':
@@ -93,6 +98,7 @@ class Keithley2110(Instrument):
 
         return float(self.query('READ?'))
 
+    @setter
     def set_meter(self, meter):
 
         if meter == 'voltage':

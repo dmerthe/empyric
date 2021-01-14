@@ -58,19 +58,28 @@ class Routine:
 
         if 'csv' in kwargs.get('values', ''):  # values can be specified in a CSV file
             df = pd.read_csv(kwargs['values'])
-            values_column = [col for col in df.columns if col.lower() != 'times'][0]
-            self.values = df[values_column].values
+            self.values = df[df.columns[-1]].values
 
-            times_column = [col for col in df.columns if col.lower() == 'times'][0]
-            if times_column and 'times' not in kwargs:
-                self.times = df[times_column[0]].values
+            if len(df.columns) > 1 and 'times' not in kwargs:
+                try:
+                    times_column = [col for col in df.columns if col.lower() == 'times'][0]
+                    self.times = df[times_column].values
+                except IndexError:
+                    pass
 
         # Make an interpolator if there are multiple times and values
         if hasattr(self, 'values') and hasattr(self, 'times'):
             if len(kwargs['times']) != len(kwargs['values']):
                 raise ValueError('Routine times keyword argument must match length of values keyword argument!')
 
-            self.interpolator = interp1d(kwargs['times'], kwargs['values'])
+            if isinstance(kwargs['values'][0], numbers.Number):
+                self.interpolator = interp1d(kwargs['times'], kwargs['values'])
+            else:
+
+                def interpolator(_time):
+                    return kwargs['values'][np.argwhere(np.array(kwargs['times'])<_time).flatten()[-1]]
+
+                self.interpolator = interpolator
 
         # Register the start and end of the routine
         if not 'start' in kwargs:

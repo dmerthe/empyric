@@ -3,6 +3,4 @@ from empyric.experiment import Manager
 
 manager = Manager()
 
-os.chdir(os.path.join(os.environ["HOME"], "Desktop"))
-
-manager.run()
+manager.run(directory=os.path.join(os.environ["HOME"], "Desktop"))

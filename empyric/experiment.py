@@ -4,6 +4,7 @@ import os
 from math import *
 import time
 import datetime
+import numpy as np
 import pandas as pd
 import warnings
 import threading
@@ -199,7 +200,17 @@ class Experiment:
         # Apply new settings to knobs according to the routines (if there are any and the experiment is running)
         if self.status is Experiment.RUNNING:
             for name, routine in self.routines.values():
-                self.variables[name].value = routine(self.state)
+
+                new_value = routine(self.state)
+
+                # if new value is a path to a CSV file, read in data as numpy array
+                if type(new_value) == str:
+                    if 'csv' in new_value:
+                        dataframe = pd.read_csv(new_value)
+                        new_value = dataframe[name].values
+
+                self.variables[name].value = new_value
+
         elif self.status == Experiment.STOPPED:
             for name, variable in self.variables.items():
                 if variable.type in ['meter', 'expression']:
@@ -208,7 +219,16 @@ class Experiment:
 
         # Get all variable values
         for name, variable in self.variables.items():
-            self.state[name] = variable.value
+
+            value = variable.value
+
+            if isinstance(value, np.ndarray): # store array data as CSV files
+                dataframe = pd.DataFrame({name: value}, index=[self.state.name]*len(value))
+                path = name.replace(' ','_') +'_' + self.state.name.strftime('%Y%m%d-%H%M%S') + '.csv'
+                dataframe.to_csv(path)
+                self.state[name] = path
+            else:
+                self.state[name] = value
 
         # Append new state to experiment data set
         self.data.loc[self.state.name] = self.state
@@ -332,6 +352,8 @@ class Manager:
         if isinstance(runcard, str):  # runcard argument can be a path string
             with open(runcard, 'rb') as runcard_file:
                 self._runcard = yaml.load(runcard_file)
+
+            os.chdir(os.path.dirname(runcard))
         elif isinstance(runcard, dict):  # ... or a properly formatted dictionary
             self._runcard = runcard
         else:
@@ -372,19 +394,18 @@ class Manager:
 
         if runcard:
             self.runcard = runcard
-
         else:
             # Have user locate runcard
             root = tk.Tk()
             root.withdraw()
-            runcard_path = askopenfilename(parent=root, title='Select Runcard', filetypes=[('YAML files', '*.yaml')])
+            self.runcard = askopenfilename(parent=root, title='Select Runcard', filetypes=[('YAML files', '*.yaml')])
 
-            with open(runcard_path, 'rb') as runcard_file:
-                self.runcard = yaml.load(runcard_file)
-
-    def run(self):
+    def run(self, directory=None):
 
         # Create a new directory for data storage
+        if directory:
+            os.chdir(directory)
+
         experiment_name = self.runcard['Description'].get('name', 'Experiment')
         timestamp = self.experiment.timestamp
         top_dir = os.getcwd()

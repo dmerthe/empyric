@@ -9,29 +9,37 @@ class ConsoleUser(Instrument):
     name = 'ConsoleUser'
 
     supported_adapters = (
-        (Adapter, {})
+        (Adapter, {}),
     )
 
     knobs = ('prompt',  # message or query to send to user
              'cooldown')  # minimum time before sending repeat messages
+
+    presets = {'cooldown':0}
 
     meters = ('response',)
 
     last_message = ''
     last_sent = float('-inf')
 
+    @setter
     def set_prompt(self, prompt):
-        self.knob_values['prompt'] = prompt
+        self.prompt = prompt
 
+    @setter
     def set_cooldown(self, cooldown):
-        self.know_values['cooldown'] = cooldown
+        self.cooldown = cooldown
 
+    @measurer
     def measure_response(self):
 
-        new_message = (self.knob_values['prompt'] != self.last_message)
+        new_message = (self.prompt != self.last_message)
 
-        if time.time() >= self.last_sent + self.knob_values['cooldown'] or new_message:  # don't spam people
-            self.last_response = input(self.knob_values['prompt'] )
-            return self.last_response
-        else:
-            self.last_response
+        if time.time() >= self.last_sent + self.cooldown or new_message:  # don't spam user
+
+            self.last_response = input(self.prompt)
+
+            self.last_sent = time.time()
+            self.last_message = self.prompt
+
+        return self.last_response

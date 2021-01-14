@@ -1,5 +1,5 @@
 from empyric.adapters import *
-from empyric.collection.instrument import Instrument
+from empyric.collection.instrument import *
 
 class BRAX3000(Instrument):
     """
@@ -29,9 +29,10 @@ class BRAX3000(Instrument):
         'ig pressure',
     )
 
+    @setter
     def set_ig_state(self, state):
 
-        number = self.knob_values['filament']
+        number = self.filament
 
         if state == 'ON':
             self.write(f'#IG{number} ON<CR>')
@@ -40,18 +41,22 @@ class BRAX3000(Instrument):
 
         self.read()  # discard the response
 
+    @getter
     def get_ig_state(self):
         return self.query('#IGS<CR>')
 
+    @setter
     def set_filament(self, number):
+        pass
 
-        self.knob_values['filament'] = number
-
+    @measurer
     def measure_cg1_pressure(self):
         return float(self.query('#RDCG1<CR>')[4:-4])
 
+    @measurer
     def measure_cg2_pressure(self):
         return float(self.query('#RDCG2<CR>')[4:-4])
 
+    @measurer
     def measure_ig_pressure(self):
         return float(self.query('#RDIG<CR>')[4:])

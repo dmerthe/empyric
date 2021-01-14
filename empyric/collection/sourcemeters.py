@@ -6,7 +6,7 @@ import pandas as pd
 import numbers
 
 from empyric.adapters import *
-from empyric.collection.instrument import Instrument
+from empyric.collection.instrument import *
 
 class Keithley2400(Instrument):
     """
@@ -39,11 +39,12 @@ class Keithley2400(Instrument):
     presets = {
         'source': 'voltage',
         'meter': 'current',
+        'voltage':0,
+        'output': 'ON',
         'voltage range': 200,
         'current range': 100e-3,
         'nplc': 1,
         'source_delay': 0,
-        'output': 'ON'
     }
 
     postsets = {
@@ -60,6 +61,7 @@ class Keithley2400(Instrument):
 
     fast_voltages = None
 
+    @setter
     def set_source(self, variable):
 
         if variable not in ['voltage', 'current']:
@@ -79,6 +81,7 @@ class Keithley2400(Instrument):
             self.write(':SOUR:FUNC CURR')
             self.voltage = None
 
+    @setter
     def set_meter(self, variable):
 
         if variable not in ['voltage', 'current']:
@@ -92,6 +95,7 @@ class Keithley2400(Instrument):
             self.write(':SENS:FUNC "CURR"')
             self.write(':FORM:ELEM CURR')
 
+    @setter
     def set_output(self, output):
 
         if output in [0, 'OFF', 'off']:
@@ -102,6 +106,7 @@ class Keithley2400(Instrument):
         else:
             raise ValueError(f'Ouput setting {output} not recognized!')
 
+    @measurer
     def measure_voltage(self):
 
         if self.meter != 'voltage':
@@ -115,6 +120,7 @@ class Keithley2400(Instrument):
 
         return float(self.query(':READ?', validator=validator))
 
+    @measurer
     def measure_current(self):
 
         if self.meter != 'current':
@@ -128,6 +134,7 @@ class Keithley2400(Instrument):
 
         return float(self.query(':READ?', validator=validator))
 
+    @setter
     def set_voltage(self, voltage):
 
         if self.source != 'voltage':
@@ -138,6 +145,7 @@ class Keithley2400(Instrument):
 
         self.write(':SOUR:VOLT:LEV %.2E' % voltage)
 
+    @setter
     def set_current(self, current):
 
         if self.source != 'current':
@@ -148,6 +156,7 @@ class Keithley2400(Instrument):
 
         self.write(':SOUR:CURR:LEV %.2E' % current)
 
+    @setter
     def set_voltage_range(self, voltage_range):
 
         allowed_voltage_ranges = (0.2, 2, 20, 200) # allowable voltage ranges
@@ -155,9 +164,10 @@ class Keithley2400(Instrument):
         if voltage_range in allowed_voltage_ranges:
 
             if self.source == 'voltage':
-                self.write(':SOUR:VOLT:RANG %.2E' % voltage_range)
+                pass
+                # self.write(':SOUR:VOLT:PROT %.2E' % voltage_range)
+                # self.write(':SOUR:VOLT:RANG %.2E' % voltage_range)
             else:
-                self.write(':SENS:VOLT:PROT %.2E' % voltage_range)
                 self.write(':SENS:VOLT:RANG %.2E' % voltage_range)
 
         elif isinstance(voltage_range, numbers.Number):
@@ -179,6 +189,7 @@ class Keithley2400(Instrument):
 
             Warning('given voltage range is not permitted; set to auto-range.')
 
+    @setter
     def set_current_range(self, current_range):
 
         allowed_current_ranges = (1e-6, 10e-6, 100e-6, 1e-3, 10e-3, 100e-3, 1)
@@ -212,6 +223,7 @@ class Keithley2400(Instrument):
 
             Warning('given current range is not permitted; set to auto-range.')
 
+    @setter
     def set_nplc(self, nplc):
 
         if self.meter == 'current':
@@ -219,25 +231,29 @@ class Keithley2400(Instrument):
         elif self.meter == 'voltage':
             self.write(':SENS:VOLT:NPLC %.2E' % nplc)
 
+    @setter
     def set_delay(self, delay):
         self.adapter.delay = delay
 
-    def set_fast_voltages(self, path):
+    @setter
+    def set_fast_voltages(self, voltages):
+        self.fast_voltages = voltages
 
-        try:
-            fast_voltage_data = pd.read_csv(path)
-        except FileNotFoundError:
-            # probably in an experiment data directory; try going up a level
-            working_subdir = os.getcwd()
-            os.chdir('..')
-            fast_voltage_data = pd.read_csv(path)
-            os.chdir(working_subdir)
+        # import fast voltages, if specified as a path
+        if type(self.fast_voltages) == str:  # can be specified as a path
+            try:
+                fast_voltage_data = pd.read_csv(self.fast_voltages)
+            except FileNotFoundError:
+                # probably in an experiment data directory; try going up a level
+                working_subdir = os.getcwd()
+                os.chdir('..')
+                fast_voltage_data = pd.read_csv(self.fast_voltages)
+                os.chdir(working_subdir)
 
-        try:
-            self.fast_voltages = fast_voltage_data['fast voltages'].values
-        except IndexError:
-            raise IndexError("unable to locate fast voltages for fast IV sweep! Must be under 'fast voltages' column in a CSV file within the working directory.")
+            columns = fast_voltage_data.columns
+            self.fast_voltages = fast_voltage_data[columns[0]].astype(float).values
 
+    @measurer
     def measure_fast_currents(self):
 
         if self.source != 'voltage':
@@ -270,7 +286,6 @@ class Keithley2400(Instrument):
 
         start = datetime.datetime.now()
         for voltage_list in sub_lists:
-
             voltage_str = ', '.join(['%.4E' % voltage for voltage in voltage_list])
             self.write(':SOUR:LIST:VOLT ' + voltage_str)
             self.write(':TRIG:COUN %d' % len(voltage_list))
@@ -283,19 +298,9 @@ class Keithley2400(Instrument):
 
         self.write(':SOUR:VOLT:MODE FIX')
 
-        # Save current measurements to CSV file
-        now = datetime.datetime.now()
-        fast_iv_data = pd.DataFrame(
-            {'fast voltages': self.fast_voltages, 'fast currents': current_list},
-            index=pd.date_range(start=start, end=end, periods=len(current_list))
-        )
+        return np.array(current_list)
 
-        timestamp = now.strftime('%Y%m%d-%H%M%S')
-        path = self.name + '-fast_IV_measurement-' + timestamp + '.csv'
-        fast_iv_data.to_csv(path)
-
-        return path
-
+    @setter
     def set_source_delay(self, delay):
         self.write(':SOUR:DEL %.4E' % delay)
 
@@ -331,11 +336,12 @@ class Keithley2460(Instrument):
     presets = {
         'source': 'voltage',
         'meter': 'current',
+        'voltage':0,
+        'output': 'ON',
         'voltage range': 100,
         'current range': 1,
         'nplc': 1,
         'source_delay': 0,
-        'output': 'ON'
     }
 
     postsets = {
@@ -352,6 +358,7 @@ class Keithley2460(Instrument):
 
     fast_voltages = None
 
+    @setter
     def set_source(self, variable):
 
         if variable not in ['voltage', 'current']:
@@ -369,6 +376,7 @@ class Keithley2460(Instrument):
             self.write('SOUR:FUNC CURR')
             self.voltage = None
 
+    @setter
     def set_meter(self, variable):
 
         if variable == 'voltage':
@@ -380,6 +388,7 @@ class Keithley2460(Instrument):
         else:
             raise ValueError('Source must be either "current" or "voltage"')
 
+    @setter
     def set_output(self, output):
 
         if output in [0, 'OFF', 'off']:
@@ -389,6 +398,7 @@ class Keithley2460(Instrument):
         else:
             raise ValueError(f'Output setting {output} not recognized!')
 
+    @measurer
     def measure_voltage(self):
 
         if self.meter != 'voltage':
@@ -399,6 +409,7 @@ class Keithley2460(Instrument):
         else:
             return np.nan
 
+    @measurer
     def measure_current(self):
 
         if self.meter != 'current':
@@ -409,6 +420,7 @@ class Keithley2460(Instrument):
         else:
             return 0
 
+    @setter
     def set_voltage(self, voltage):
 
         if self.source != 'voltage':
@@ -418,6 +430,7 @@ class Keithley2460(Instrument):
 
         self.write('SOUR:VOLT:LEV %.4E' % voltage)
 
+    @setter
     def set_current(self, current):
 
         if self.source != 'current':
@@ -427,6 +440,7 @@ class Keithley2460(Instrument):
 
         self.write('SOUR:CURR:LEV %.4E' % current)
 
+    @setter
     def set_voltage_range(self, voltage_range):
 
         allowed_voltage_ranges = (0.2, 2, 7, 10, 20, 100)
@@ -460,7 +474,7 @@ class Keithley2460(Instrument):
         else:
             Warning('given voltage range is not permitted; voltage range unchanged')
 
-
+    @setter
     def set_current_range(self, current_range):
 
         allowed_current_ranges = (1e-6, 10e-6, 100e-6, 1e-3, 10e-3, 100e-3, 1, 4, 5, 7)
@@ -493,6 +507,7 @@ class Keithley2460(Instrument):
         else:
             Warning('given current range is not permitted; current range unchanged')
 
+    @setter
     def set_nplc(self, nplc):
 
         if self.meter == 'current':
@@ -500,28 +515,29 @@ class Keithley2460(Instrument):
         elif self.meter == 'voltage':
             self.write('VOLT:NPLC %.2E' % nplc)
 
+    @setter
     def set_delay(self, delay):
         self.adapter.delay = delay
 
-    def set_fast_voltages(self, path):
+    @setter
+    def set_fast_voltages(self, voltages):
+        self.fast_voltages = voltages
 
-        if self.source != 'voltage':
-            self.set_source('voltage')
+        # import fast voltages, if specified as a path
+        if type(self.fast_voltages) == str:  # can be specified as a path
+            try:
+                fast_voltage_data = pd.read_csv(self.fast_voltages)
+            except FileNotFoundError:
+                # probably in an experiment data directory; try going up a level
+                working_subdir = os.getcwd()
+                os.chdir('..')
+                fast_voltage_data = pd.read_csv(self.fast_voltages)
+                os.chdir(working_subdir)
 
-        working_subdir = os.getcwd()
-        os.chdir('..')
+            columns = fast_voltage_data.columns
+            self.fast_voltages = fast_voltage_data[columns[0]].astype(float).values
 
-        fast_voltage_data = pd.read_csv(path)
-
-        try:
-            column_name = [col for col in fast_voltage_data if 'voltage' in col.lower()][0]
-        except IndexError:
-            raise IndexyError('unable to locate voltage data for fast IV sweep!')
-
-        self.fast_voltages = fast_voltage_data[column_name].values
-
-        os.chdir(working_subdir)
-
+    @measurer
     def measure_fast_currents(self):
 
         try:
@@ -563,22 +579,9 @@ class Keithley2460(Instrument):
         self.adapter.timeout = normal_timeout  # put it back
         end = datetime.datetime.now()
 
-        # Save current measurements to CSV file
-        now = datetime.datetime.now()
-        fast_iv_data = pd.DataFrame(
-            {'fast voltages': self.fast_voltages, 'fast currents': current_list},
-            index=pd.date_range(start=start, end=end, periods=len(current_list))
-        )
+        return np.array(current_list)
 
-        timestamp = now.strftime('%Y%m%d-%H%M%S')
-        path = self.name + '-fast_IV_sweep-' + timestamp + '.csv'
-        fast_iv_data.to_csv(path)
-
-        self.set_source(self.source)
-        self.set_meter(self.meter)
-
-        return path
-
+    @setter
     def set_source_delay(self, delay):
 
         if self.source == 'voltage':
@@ -617,11 +620,12 @@ class Keithley2651A(Instrument):
     presets = {
         'voltage range': 40,
         'current range': 5,
+        'voltage':0,
+        'output': 'ON',
         'nplc': 1,
         'source': 'voltage',
         'meter': 'current',
-        'source_delay': 0,
-        'output': 'ON'
+        'source_delay': 0
     }
 
     postsets = {
@@ -638,6 +642,7 @@ class Keithley2651A(Instrument):
 
     fast_voltages = None
 
+    @setter
     def set_source(self, variable):
 
         if variable == 'voltage':
@@ -647,7 +652,7 @@ class Keithley2651A(Instrument):
         else:
             raise ValueError('source must be either "current" or "voltage"')
 
-
+    @setter
     def set_meter(self,variable):
 
         self.write('display.screen = display.SMUA')
@@ -660,6 +665,7 @@ class Keithley2651A(Instrument):
 
         # This sourcemeter does not require specifying the meter before taking a measurement
 
+    @setter
     def set_output(self, output):
 
         if output in [0, 'OFF', 'off']:
@@ -669,6 +675,7 @@ class Keithley2651A(Instrument):
         else:
             raise ValueError(f'Ouput setting {output} not recognized!')
 
+    @measurer
     def measure_voltage(self):
 
         if self.meter != 'voltage':
@@ -679,6 +686,7 @@ class Keithley2651A(Instrument):
         else:
             return np.nan
 
+    @measurer
     def measure_current(self):
 
         if self.meter != 'current':
@@ -689,6 +697,7 @@ class Keithley2651A(Instrument):
         else:
             return 0
 
+    @measurer
     def set_voltage(self, voltage):
 
         if self.source != 'voltage':
@@ -698,6 +707,7 @@ class Keithley2651A(Instrument):
 
         self.write(f'smua.source.levelv = {voltage}')
 
+    @setter
     def set_current(self, current):
 
         if self.source != 'current':
@@ -707,6 +717,7 @@ class Keithley2651A(Instrument):
 
         self.write(f'smua.source.leveli = {current}')
 
+    @setter
     def set_voltage_range(self, voltage_range):
 
         if voltage_range == 'auto':
@@ -715,6 +726,7 @@ class Keithley2651A(Instrument):
             self.write(f'smua.source.rangev = {voltage_range}')
             self.write(f'smua.source.limitv = {voltage_range}')
 
+    @setter
     def set_current_range(self, current_range):
 
         if current_range == 'auto':
@@ -723,25 +735,29 @@ class Keithley2651A(Instrument):
             self.write(f'smua.source.rangei = {current_range}')
             self.write(f'smua.source.limiti = {current_range}')
 
+    @setter
     def set_nplc(self, nplc):
         self.write(f'smua.measure.nplc = {nplc}')
 
-    def set_fast_voltages(self, path):
+    @setter
+    def set_fast_voltages(self, voltages):
+        self.fast_voltages = voltages
 
-        try:
-            fast_voltage_data = pd.read_csv(path)
-        except FileNotFoundError:
-            # probably in an experiment data directory; try going up a level
-            working_subdir = os.getcwd()
-            os.chdir('..')
-            fast_voltage_data = pd.read_csv(path)
-            os.chdir(working_subdir)
+        # import fast voltages, if specified as a path
+        if type(self.fast_voltages) == str:  # can be specified as a path
+            try:
+                fast_voltage_data = pd.read_csv(self.fast_voltages)
+            except FileNotFoundError:
+                # probably in an experiment data directory; try going up a level
+                working_subdir = os.getcwd()
+                os.chdir('..')
+                fast_voltage_data = pd.read_csv(self.fast_voltages)
+                os.chdir(working_subdir)
 
-        try:
-            self.fast_voltages = fast_voltage_data['fast voltages'].values
-        except IndexError:
-            raise IndexError("unable to locate fast voltages for fast IV sweep! Must be under 'fast voltages' column in a CSV file within the working directory.")
+            columns = fast_voltage_data.columns
+            self.fast_voltages = fast_voltage_data[columns[0]].astype(float).values
 
+    @measurer
     def measure_fast_currents(self):
 
         try:
@@ -784,18 +800,8 @@ class Keithley2651A(Instrument):
         self.write('display.screen = display.SMUA')
         self.write('display.smua.measure.func = display.MEASURE_DCAMPS')
 
-        # Save current measurements to CSV filefself.__setattr__(name, setter(method))
-        now = datetime.datetime.now()
-        fast_iv_data = pd.DataFrame(
-            {'fast voltages': self.fast_voltages, 'fast currents': current_list},
-            index=pd.date_range(start=start, end=end, periods=len(current_list))
-        )
+        return np.array(current_list)
 
-        timestamp = now.strftime('%Y%m%d-%H%M%S')
-        path = self.name + '-fast_IV_measurement-' + timestamp + '.csv'
-        fast_iv_data.to_csv(path)
-
-        return path
-
+    @setter
     def set_source_delay(self,delay):
         self.write(f'smua.source.delay = {delay}')

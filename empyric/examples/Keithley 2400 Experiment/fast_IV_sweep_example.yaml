@@ -16,7 +16,7 @@ Instruments:
   address: 1
   voltage range: 20
   current range: 1
-  fast voltages: 'fast voltages.csv'
+  fast voltages: 'voltages.csv'
 
 Variables:
  Fast Voltages:

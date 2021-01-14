@@ -217,13 +217,9 @@ class Plotter:
             y_data = []
             c_data = []
 
-            # Get column headers from variable attributes
-            x_col_label = getattr(self.variables[x], self.variables[x].type)  # meter/knob name, used in the file
-            y_col_label = getattr(self.variables[y], self.variables[y].type)
-
             for i, x_path, y_path in zip(range(len(self.data)), self.data[x].values, self.data[y].values):
 
-                x_file_data = pd.read_csv(x_path)
+                x_file_data = pd.read_csv(x_path, index_col=0)
                 y_file_data = pd.read_csv(y_path, index_col=0)
 
                 if c == 'time':
@@ -242,8 +238,8 @@ class Plotter:
                 else:
                     y_file_data[c] = [self.data[c].values[i]] * len(y_file_data)
 
-                x_data.append(x_file_data[x_col_label].values)
-                y_data.append(y_file_data[y_col_label].values)
+                x_data.append(x_file_data[x].values)
+                y_data.append(y_file_data[y].values)
                 c_data.append(y_file_data[c].values)
 
             x_data = np.concatenate(x_data)

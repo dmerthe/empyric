@@ -1,5 +1,5 @@
 from empyric.adapters import *
-from empyric.collection.instrument import Instrument
+from empyric.collection.instrument import *
 
 
 class Keithley2260B(Instrument):
@@ -27,18 +27,29 @@ class Keithley2260B(Instrument):
         'current'
     )
 
+    @measurer
     def measure_current(self):
         return [float(self.query('MEAS:CURR?')) for i in range(3)][-1] # sometimes the first measurement is lagged
 
+    @measurer
     def measure_voltage(self):
         return [float(self.query('MEAS:VOLT?')) for i in range(3)][-1] # sometimes the first measurement is lagged
 
+    @setter
     def set_max_voltage(self, voltage):
-        self.write('APPL %.4f,%.4f' % (voltage, self.knob_values['max current']))
+        if not self.max_current:
+            self.get_max_current()
 
+        self.write('APPL %.4f,%.4f' % (voltage, self.max_current))
+
+    @setter
     def set_max_current(self, current):
-        self.write('APPL %.4f,%.4f' % (self.knob_values['max voltage'], current))
+        if not self.max_voltage:
+            self.get_max_voltage()
 
+        self.write('APPL %.4f,%.4f' % (self.max_voltage, current))
+
+    @setter
     def set_output(self, output):
 
         if output == 'ON':
@@ -46,9 +57,11 @@ class Keithley2260B(Instrument):
         elif output == 'OFF':
             self.write('OUTP:STAT:IMM OFF')
 
+    @getter
     def get_max_current(self):
         return float(self.query('CURR?'))
 
+    @getter
     def get_max_voltage(self):
         return float(self.query('VOLT?'))
 
@@ -78,6 +91,7 @@ class BK9183B(Instrument):
         'current'
     )
 
+    @setter
     def set_output(self, output):
 
         if output == 'ON':
@@ -85,20 +99,26 @@ class BK9183B(Instrument):
         elif output == 'OFF':
             self.write('OUT OFF')
 
+    @measurer
     def measure_current(self):
         return [float(self.query('MEAS:CURR?')) for i in range(3)][-1] # sometimes the first measurement is lagged
 
+    @measurer
     def measure_voltage(self):
         return [float(self.query('MEAS:VOLT?')) for i in range(3)][-1] # sometimes the first measurement is lagged
 
+    @setter
     def set_max_current(self, current):
         self.write('SOUR:CURR ' + str(current))
 
+    @setter
     def set_max_voltage(self, voltage):
         self.write('SOUR:VOLT ' + str(voltage))
 
+    @getter
     def get_max_current(self):
         return float(self.query('SOUR:CURR?'))
 
+    @getter
     def get_max_voltage(self):
         return float(self.query('SOUR:VOLT?'))
