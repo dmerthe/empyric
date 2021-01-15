@@ -117,14 +117,6 @@ class Instrument:
 
         self.name = self.name + '@' + str(self.address)
 
-        # # Wrap setting and getting functions
-        # for method_name in dir(self):
-        #     method = self.__getattribute__(method_name)
-        #     if 'set_' in method_name:
-        #         self.__setattr__(method_name, setter(method))
-        #     if 'get_' in method_name:
-        #         self.__setattr__(method_name, getter(method))
-
         # Get existing knob settings, if possible
         for knob in self.knobs:
             if hasattr(self, 'get_'+knob.replace(' ','_')):
@@ -231,11 +223,11 @@ class HenonMapper(Instrument):
 
     @setter
     def set_a(self, value):
-        self.a = value  # actually, redundant because method wrapper by setter above
+        pass
 
     @setter
     def set_b(self, value):
-        self.b = value  # actually, redundant because method wrapper by setter above
+        pass
 
     @measurer
     def measure_x(self):

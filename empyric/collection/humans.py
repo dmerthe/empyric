@@ -24,11 +24,11 @@ class ConsoleUser(Instrument):
 
     @setter
     def set_prompt(self, prompt):
-        self.prompt = prompt
+        pass
 
     @setter
     def set_cooldown(self, cooldown):
-        self.cooldown = cooldown
+        pass
 
     @measurer
     def measure_response(self):

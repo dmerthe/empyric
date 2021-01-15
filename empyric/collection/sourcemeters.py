@@ -164,9 +164,8 @@ class Keithley2400(Instrument):
         if voltage_range in allowed_voltage_ranges:
 
             if self.source == 'voltage':
-                pass
-                # self.write(':SOUR:VOLT:PROT %.2E' % voltage_range)
-                # self.write(':SOUR:VOLT:RANG %.2E' % voltage_range)
+                self.write(':SOUR:VOLT:PROT %.2E' % voltage_range)
+                self.write(':SOUR:VOLT:RANG %.2E' % voltage_range)
             else:
                 self.write(':SENS:VOLT:RANG %.2E' % voltage_range)
 
