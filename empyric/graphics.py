@@ -39,13 +39,6 @@ class Plotter:
         for plot_name in settings:
             self.plots[plot_name] = plt.subplots()
 
-    def configure(self, settings=None, interval=None):
-
-        if settings:
-            self.settings = settings
-        if interval:
-            self.interval = interval
-
     def save(self, plot_name=None, save_as=None):
 
         if plot_name:
@@ -76,10 +69,10 @@ class Plotter:
 
         for name, settings in self.settings.items():
 
-            style = settings.get('style', None)
+            style = settings.get('style', 'basic')
 
-            if style == None or style == 'none' or style == 'all':
-                new_plots[name] = self._plot_all(name)
+            if style == 'basic':
+                new_plots[name] = self._plot_basic(name)
             elif style == 'averaged':
                 new_plots[name] = self._plot_averaged(name)
             elif style == 'errorbars':
@@ -94,7 +87,7 @@ class Plotter:
         plt.pause(0.01)
         return new_plots
 
-    def _plot_all(self, name):
+    def _plot_basic(self, name):
 
         fig, ax = self.plots[name]
         ax.clear()
@@ -311,10 +304,11 @@ class Plotter:
 
 class ExperimentGUI:
     """
-    GUI showing experimental progress, values of all experiment variables and any alarms
+    GUI showing experimental progress, values of all experiment variables, any alarms.
+    Also, manages plotting data via the Plotter class
 
-    This GUI allows the user to stop or pause the experiment.
-    When paused, the user can also directly interact with instruments through the "Check" button.
+    This GUI allows the user to pause or stop the experiment.
+    When paused, the user can also directly interact with instruments through the Dashboard button.
     """
 
     def __init__(self, experiment, alarms=None, instruments=None, title=None, plots=None, save_interval=None):
@@ -418,7 +412,7 @@ class ExperimentGUI:
             tk.Label(self.root, text='', font=("Arial", 14, 'bold')).grid(row=i, column=0, sticky=tk.E)
 
 
-        self.dash_button = tk.Button(self.root, text='Dashboard...', font=("Arial", 14, 'bold'),
+        self.dash_button = tk.Button(self.root, text='Dashboard', font=("Arial", 14, 'bold'),
                                      command=self.open_dashboard, state=tk.DISABLED)
         self.dash_button.grid(row=i + 1, column=0, sticky=tk.W)
 
