@@ -18,22 +18,20 @@ class Plotter:
     Handler for plotting data based on the runcard plotting settings and data context
     """
 
-    def __init__(self, experiment, settings=None):
+    def __init__(self, data, settings=None):
         """
         PLot data based on settings
 
-        :param experiment: (Experiment) Experiment containing the data to be plotted.
+        :param data: (pandas.Dataframe) data to be plotted.
         :param settings: (dict) dictionary of plot settings
         """
 
-        self.data = experiment.data
-        self.timestamp = experiment.timestamp
-        self.variables = experiment.variables
+        self.data = data
 
         if settings:
             self.settings = settings
         else:
-            self.settings = {}
+            self.settings = {'Plot': {x:'time', y: data.columns}}
 
         self.plots = {}
         for plot_name in settings:
@@ -44,13 +42,13 @@ class Plotter:
         if plot_name:
             fig, ax = self.plots[plot_name]
             if save_as:
-                fig.savefig(save_as + '-' + self.timestamp + '.png')
+                fig.savefig(save_as + '-' + '.png')
             else:
-                fig.savefig(plot_name + '-' + self.timestamp + '.png')
+                fig.savefig(plot_name + '-' + '.png')
         else:
             for name, plot in self.plots.items():
                 fig, ax = plot
-                fig.savefig(name + '-' + self.timestamp + '.png')
+                fig.savefig(name + '-' + '.png')
 
     def close(self, plot_name=None):
 
@@ -338,7 +336,7 @@ class ExperimentGUI:
                         self.instruments[instrument.name] = instrument
 
         if plots:
-            self.plotter = Plotter(experiment, plots)
+            self.plotter = Plotter(experiment.data, plots)
 
             self.plot_interval = 0  # grows if plotting takes longer
             self.last_plot = float('-inf')
