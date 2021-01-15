@@ -1,4 +1,4 @@
-﻿# Basic runcard descrbing and experiment that measures x and y values in a Henon Map, using the empyric library
+﻿# Basic runcard describing an experiment that measures the x and y values of a Henon Map, using the empyric library
 # To execute, run select_runcard.py in the examples directory, and then select this runcard from the file selection dialog
 
 Description:
