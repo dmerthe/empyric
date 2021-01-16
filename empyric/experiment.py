@@ -152,6 +152,11 @@ class Alarm:
 
 
 class Experiment:
+    """
+    An iterable class which represents an experiment; iterates through any assigned routines,
+    and retrieves and stores the values of all experiment variables.
+    """
+
     # Possible statuses of an experiment
     READY = 'Ready'  # Experiment is initialized but not yet started
     RUNNING = 'Running'  # Experiment is running
@@ -339,7 +344,7 @@ def build_experiment(runcard, instruments=None):
 
 class Manager:
     """
-    Manages the experiments
+    Utility class which sets up and manages the above experiments
     """
 
     @property
