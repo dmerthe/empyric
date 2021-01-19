@@ -126,7 +126,10 @@ class Variable:
         if hasattr(self, 'knob') and value is not None:
             self.instrument.set(self.knob, value)
             self._value = self.instrument.__getattribute__(self.knob)
-
+        elif value is None:
+            pass
+        else:
+            raise AssertionError(f'cannot set {self.type}!')
 
 class Alarm:
     """
@@ -292,14 +295,11 @@ def build_experiment(runcard, instruments=None):
         instrument_name = specs.pop('type')
         address = specs.pop('address')
 
-        # adapter keywords
+        # Grab any keyword arguments for the adapter
         adapter_kwargs = {}
-        if 'baud rate' in specs:
-            adapter_kwargs['baud_rate'] = specs.pop('baud rate')
-        if 'timeout' in specs:
-            adapter_kwargs['timeout'] = specs.pop('timeout')
-        if 'delay' in specs:
-            adapter_kwargs['delay'] = specs.pop('delay')
+        for kwarg in adapters.Adapter.kwargs:
+            if kwarg.replace('_', ' ') in specs:
+                adapter_kwargs[kwarg] = specs.pop(kwargs)
 
         # Any remaining keywards are instrument presets
         presets = specs

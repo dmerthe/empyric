@@ -1,0 +1,48 @@
+﻿Description:
+ name: Omega CN7500 Temperature Control Example
+ operator: Mike
+ platform: Test Stand 1
+ comments: Who is Mike? There is no Test Stand 1
+
+Settings:
+ follow-up: None
+ step interval: 0.25
+ plot interval: 10
+ save interval: 10
+
+Instruments:
+ PID Controller:
+  type: OmegaCN7500
+  address: /dev/cu.usbserial-14530::1  # replace with your serial address and channel number
+
+Variables:
+ Setpoint:
+  instrument: PID Controller
+  knob: setpoint
+ Temperature:
+  instrument: PID Controller
+  meter: temperature
+
+Alarms:
+ T > 35 C:
+  variable: Temperature
+  condition: '>35'
+
+Plots:
+ Temperature:
+  x: Time
+  y: Temperature
+  xlabel: 'Time'
+  ylabel: 'Temperature (C)'
+
+Routines:
+ Ramp Temperature Up:
+  type: Timecourse
+  variable: Setpoint
+  times: [0, 2 minutes]
+  values: [30, 40]
+ Ramp Temperature Down:
+  type: Timecourse
+  variable: Setpoint
+  times: [ 2 minutes, 4 minutes ]
+  values: [40, 30]

@@ -71,6 +71,8 @@ class Adapter:
     max_repeats = 3
     max_reconnects = 1
 
+    kwargs = ['baud_rate', 'timeout', 'delay', 'byte_size', 'parity', 'stop_bits', 'close_port_after_each_call', 'slave_mode']
+
     def __init__(self, instrument, **kwargs):
 
         # general parameters
@@ -522,26 +524,35 @@ class Modbus(Adapter):
     Handles communications with modbus serial instruments through the Minimal Modbus package
     """
 
+    # Common defaults
+    slave_mode = 'rtu'
+    baud_rate = 38400
+    timeout = 0.05
+    byte_size = 8
+    parity = 'E'
+    stop_bits = 1
+    delay = 0.05
+    close_port_after_each_call = True
+
     def __repr__(self):
         return 'Modbus'
 
     def connect(self):
 
-        # Save parameters
+        minimal_modbus = importlib.import_module('minimalmodbus')
+        serial = importlib.import_module('serial')
+
+        # Get port and channel
         port, channel = self.instrument.address.split('::')
 
-        if not hasattr(self, 'baud_rate'):
-            self.baud_rate = 9600
-
-        if not hasattr(self, 'delay'):
-            self.delay = 0.05
-
         # Handshake with instrument
-        minimal_modbus = importlib.import_module('minimalmodbus')
-        minimal_modbus.CLOSE_PORT_AFTER_EACH_CALL = True
-
-        self.backend = minimal_modbus.Instrument(port, channel)
+        self.backend = minimal_modbus.Instrument(port, int(channel), mode=self.slave_mode)
         self.backend.serial.baudrate = self.baud_rate
+        self.backend.serial.timeout = self.timeout
+        self.backend.serial.bytesize = self.byte_size
+        self.backend.serial.parity = self.parity
+        self.backend.serial.stopbits = self.stop_bits
+        self.backend.close_port_after_each_call = self.close_port_after_each_call
         time.sleep(self.delay)
 
         self.connected = True

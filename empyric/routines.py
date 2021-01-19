@@ -75,7 +75,6 @@ class Routine:
             if isinstance(kwargs['values'][0], numbers.Number):
                 self.interpolator = interp1d(kwargs['times'], kwargs['values'])
             else:
-
                 def interpolator(_time):
                     return kwargs['values'][np.argwhere(np.array(kwargs['times'])<_time).flatten()[-1]]
 
