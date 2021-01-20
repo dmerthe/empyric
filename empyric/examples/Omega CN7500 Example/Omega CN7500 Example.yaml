@@ -13,7 +13,7 @@ Settings:
 Instruments:
  PID Controller:
   type: OmegaCN7500
-  address: /dev/cu.usbserial-14530::1  # replace with your serial address and channel number
+  address: /dev/cu.usbserial-14530::1  # replace with your serial address and channel number, as [addrees]::[channel #]
 
 Variables:
  Setpoint:
@@ -39,8 +39,8 @@ Routines:
  Ramp Temperature Up:
   type: Timecourse
   variable: Setpoint
-  times: [0, 2 minutes]
-  values: [30, 40]
+  times: [0, 2 minutes]  # start and end times
+  values: [30, 40]  # start and end values
  Ramp Temperature Down:
   type: Timecourse
   variable: Setpoint

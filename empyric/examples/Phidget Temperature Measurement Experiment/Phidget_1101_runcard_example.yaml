@@ -13,7 +13,7 @@ Settings:
 Instruments:
  TC Reader:
   type: Phidget1101
-  address: 539886::0::1
+  address: 539886::0::1  # replace with your hub serial #, hub port # and device channel #, as [S/N]::[hub port #]::[device channel #]
 
 Variables:
  TC Type:

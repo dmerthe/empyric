@@ -579,8 +579,6 @@ class Phidget(Adapter):
     def __repr__(self):
         return 'Phidget'
 
-    Exception = importlib.import_module('Phidget22.PhidgetException').PhidgetException
-
     def connect(self):
 
         address_parts = self.instrument.address.split('::')

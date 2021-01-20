@@ -13,7 +13,7 @@ Settings:
 Instruments:
  Sourcemeter:
   type: Keithley2400
-  address: 1
+  address: 1  # replace with your GPIB address
   voltage range: 20
   current range: 1
   fast voltages: 'voltages.csv'
