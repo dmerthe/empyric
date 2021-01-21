@@ -23,7 +23,9 @@ class Phidget1101(Instrument):
     # Available meters
     meters = ('temperature',)
 
-    device_class = importlib.import_module('Phidget22.Devices.TemperatureSensor').TemperatureSensor
+    def __init__(self, *args, **kwarhs):
+        self.device_class = importlib.import_module('Phidget22.Devices.TemperatureSensor').TemperatureSensor
+        Instrument.__init__(self, *args, **kwargs)
 
     @setter
     def set_type(self, type_):
