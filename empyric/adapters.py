@@ -71,7 +71,8 @@ class Adapter:
     max_repeats = 3
     max_reconnects = 1
 
-    kwargs = ['baud_rate', 'timeout', 'delay', 'byte_size', 'parity', 'stop_bits', 'close_port_after_each_call', 'slave_mode']
+    kwargs = ['baud_rate', 'timeout', 'delay', 'byte_size', 'parity', 'stop_bits', 'close_port_after_each_call',
+              'slave_mode', 'byte_order']
 
     def __init__(self, instrument, **kwargs):
 
@@ -529,8 +530,9 @@ class Modbus(Adapter):
     baud_rate = 38400
     timeout = 0.05
     byte_size = 8
-    parity = 'E'
     stop_bits = 1
+    parity = 'N'
+    byte_order = 0 # 0 = BIG, 1 = LITTLE, 2 = BIG+SWAP, 3 = LITTLE+SWAP
     delay = 0.05
     close_port_after_each_call = True
 
@@ -557,17 +559,25 @@ class Modbus(Adapter):
 
         self.connected = True
 
-    def write(self, register, message):
-        self.backend.write_register(register, message)
+    def write(self, register, message, type='int'):
+        if type == 'int':
+            self.backend.write_register(register, message)
+        elif type == 'float':
+            self.backend.write_float(register, message, byteorder=self.byte_order)
         time.sleep(self.delay)
 
     @chaperone
-    def read(self, register):
+    def read(self, register, type='int'):
         self.backend.serial.timeout = self.timeout
-        return self.backend.read_register(register)
+
+        if type == 'int':
+            return self.backend.read_register(register)
+        elif type == 'float':
+            return self.backend.read_float(register, byteorder=self.byte_order)
 
     def disconnect(self):
-        self.backend.serial.close()
+        if not self.close_port_after_each_call:
+            self.backend.serial.close()
         self.connected = False
 
 

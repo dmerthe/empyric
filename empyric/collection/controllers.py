@@ -10,7 +10,7 @@ class OmegaCN7500(Instrument):
     name = 'OmegaCN7500'
 
     supported_adapters = (
-        (Modbus, {}),
+        (Modbus, {'parity':'E'}),
     )
 
     knobs = (
@@ -37,14 +37,17 @@ class OmegaCN7500(Instrument):
     def set_setpoint(self, setpoint):
         self.write(0x1001, 10*setpoint)
 
+    @getter
+    def get_setpoint(self):
+        self.read(0x1001) / 10
+
     @setter
     def set_proportional_band(self, P):
         self.write(0x1009, int(P))
 
     @getter
     def get_proportional_band(self):
-        P = self.read(0x1009)
-        return P
+        return self.read(0x1009)
 
     @setter
     def set_integration_time(self, Ti):
@@ -110,7 +113,7 @@ class RedLionPXU(Instrument):
 
     @measurer
     def measure_power(self):
-        return self.read(0x8, number_of_decimals=1)
+        return self.read(0x8) / 10
 
     @setter
     def set_autotune(self, state):
@@ -118,3 +121,33 @@ class RedLionPXU(Instrument):
             self.write(0xf, 1)
         elif state == 'OFF':
             self.write(0xf, 0)
+
+
+class WatlowEZZone(Instrument):
+
+    name = 'WatlowEZZone'
+
+    supported_adapters = (
+        (Modbus, {'baud_rate': 9600, 'byte_order': 3}),   # LITTLE+SWAP byte order
+    )
+
+    knobs = (
+        'setpoint'
+    )
+
+    meters = (
+        'temperature',
+    )
+
+
+    @measurer
+    def measure_temperature(self):
+        return self.read(360, type='float')
+
+    @getter
+    def get_setpoint(self):
+        return self.read(2160, type='float')
+
+    @setter
+    def set_setpoint(self, setpoint):
+        return self.write(2160, setpoint, type='float')
