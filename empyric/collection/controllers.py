@@ -4,7 +4,7 @@ from empyric.collection.instrument import *
 
 class OmegaCN7500(Instrument):
     """
-    Omega model CN7500 temperature PID controller
+    Omega model CN7500 PID temperature controller
     """
 
     name = 'OmegaCN7500'
@@ -76,7 +76,7 @@ class OmegaCN7500(Instrument):
 
 class RedLionPXU(Instrument):
     """
-    Red Lion's PXU temperature PID controller
+    Red Lion PXU temperature PID controller
     """
 
     name = 'RedLionPXU'
@@ -124,11 +124,14 @@ class RedLionPXU(Instrument):
 
 
 class WatlowEZZone(Instrument):
+    """
+    Watlow EZ-Zone PID process controller
+    """
 
     name = 'WatlowEZZone'
 
     supported_adapters = (
-        (Modbus, {'baud_rate': 9600, 'byte_order': 3}),   # LITTLE+SWAP byte order
+        (Modbus, {'baud_rate': 9600}),
     )
 
     knobs = (
@@ -139,15 +142,14 @@ class WatlowEZZone(Instrument):
         'temperature',
     )
 
-
     @measurer
     def measure_temperature(self):
-        return self.read(360, type='float')
+        return self.read(360, type='float', byte_order=3)  # swapped little-endian byte order (= 3 in minimalmodbus)
 
     @getter
     def get_setpoint(self):
-        return self.read(2160, type='float')
+        return self.read(2160, type='float', byte_order=3)
 
     @setter
     def set_setpoint(self, setpoint):
-        return self.write(2160, setpoint, type='float')
+        return self.write(2160, setpoint, type='float', byte_order=3)

@@ -179,3 +179,17 @@ class Set(Routine):
             raise AttributeError('Set routine must be given an input variable!')
 
         return state[self.input]
+
+
+class Minimize(Routine):
+    """
+    Minimize a variable influenced by a knob
+    """
+    pass
+
+
+class Maximize(Routine):
+    """
+    Mazimize a variable influenced by a knob
+    """
+    pass

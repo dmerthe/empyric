@@ -532,9 +532,7 @@ class Modbus(Adapter):
     byte_size = 8
     stop_bits = 1
     parity = 'N'
-    byte_order = 0 # 0 = BIG, 1 = LITTLE, 2 = BIG+SWAP, 3 = LITTLE+SWAP
     delay = 0.05
-    close_port_after_each_call = True
 
     def __repr__(self):
         return 'Modbus'
@@ -554,26 +552,26 @@ class Modbus(Adapter):
         self.backend.serial.bytesize = self.byte_size
         self.backend.serial.parity = self.parity
         self.backend.serial.stopbits = self.stop_bits
-        self.backend.close_port_after_each_call = self.close_port_after_each_call
+        self.backend.close_port_after_each_call = True
         time.sleep(self.delay)
 
         self.connected = True
 
-    def write(self, register, message, type='int'):
-        if type == 'int':
+    def write(self, register, message, type='uint16', byte_order=0):
+        if type == 'uint16':
             self.backend.write_register(register, message)
         elif type == 'float':
-            self.backend.write_float(register, message, byteorder=self.byte_order)
+            self.backend.write_float(register, message, byteorder=byte_order)
         time.sleep(self.delay)
 
     @chaperone
-    def read(self, register, type='int'):
+    def read(self, register, type='uint16', byte_order=0):
         self.backend.serial.timeout = self.timeout
 
-        if type == 'int':
+        if type == 'uint16':
             return self.backend.read_register(register)
         elif type == 'float':
-            return self.backend.read_float(register, byteorder=self.byte_order)
+            return self.backend.read_float(register, byteorder=byte_order)
 
     def disconnect(self):
         if not self.close_port_after_each_call:

@@ -1,4 +1,4 @@
-import numbers
+import numbers, importlib
 from empyric.adapters import *
 from empyric.collection.instrument import *
 
@@ -108,3 +108,99 @@ class Keithley2110(Instrument):
         if meter == 'temperature':
             self.write('FUNC "TCO"')
 
+
+class LabJackU6(Instrument):
+    """
+    LabJack U6 Multi-function DAQ
+    """
+
+    name = 'LabJackU6'
+
+    supported_adapters = (
+        (Adapter, {})  # custom setup below until I can get serial or modbus comms to work
+    )
+
+    knobs = (
+        'DAC0 ',
+        'DAC1',
+    )
+
+    meters = (
+        'AIN0',
+        'AIN1',
+        'AIN2',
+        'AIN3',
+        'internal temperature',
+        'temperature 0',  # AIN0 / 41 uV / C
+        'temperature 1',
+        'temperature 2',
+        'temperature 3',
+    )
+
+    def __init__(self, *args, **kwargs):
+
+        u6 = importlib.import_module('u6')
+        self.backend = u6.U6()
+
+        if address not in kwargs:
+            kwargs['address'] = str(self.backend.serialNumber)
+
+        Instrument.__init__(self, *args, **kwargs)
+
+    def write(self, register, value):
+        self.backend.writeRegister(register, value)
+
+    def read(self, register):
+        return self.backend.readRegister(register)
+
+    @setter
+    def set_DAC0(self, value):
+        self.write(5000, value)
+
+    @setter
+    def set_DAC1(self, value):
+        self.write(5002, value)
+
+    @getter
+    def get_DAC0(self):
+        self.read(5000)
+
+    @getter
+    def get_DAC1(self):
+        self.read(5002)
+
+    @measurer
+    def measure_AIN0(self):
+        return self.read(0)
+
+    @measurer
+    def measure_AIN1(self):
+        return self.read(2)
+
+    @measurer
+    def measure_AIN2(self):
+        return self.read(4)
+
+    @measurer
+    def measure_AIN3(self):
+        return self.read(6)
+
+    @measurer
+    def measure_internal_temperature(self):
+        return self.backend.getTemperature() - 273.15
+
+    @measurer
+    def measure_temperature_0(self):
+        return self.read(0) / 37e-6 + self.measure_internal_temperature()
+
+    @measurer
+    def measure_temperature_1(self):
+        return self.read(2) / 37e-6 + self.measure_internal_temperature()
+
+    @measurer
+    def measure_temperature_2(self):
+        return self.read(4) / 37e-6 + self.measure_internal_temperature()
+
+    @measurer
+    def measure_temperature_3(self):
+        return self.read(6) / 37e-6 + self.measure_internal_temperature()
