@@ -313,8 +313,6 @@ class ExperimentGUI:
 
         self.experiment = experiment
 
-        self.paused = False  # has experiment been paused through the GUI?
-        self.terminated = False  # has experiment been terminated through the GUI?
         self.quitted = False  # has the GUI been closed?
 
         self.variables = experiment.variables
@@ -414,13 +412,17 @@ class ExperimentGUI:
                                      command=self.open_dashboard, state=tk.DISABLED)
         self.dash_button.grid(row=i + 1, column=0, sticky=tk.W)
 
-        self.pause_button = tk.Button(self.root, text='Pause', font=("Arial", 14, 'bold'),
-                                      command=self.toggle_pause)
-        self.pause_button.grid(row=i + 2, column=0, sticky=tk.W)
+        self.hold_button = tk.Button(self.root, text='Hold', font=("Arial", 14, 'bold'),
+                                      command=self.toggle_hold)
+        self.hold_button.grid(row=i + 2, column=0, sticky=tk.W)
 
-        self.terminate_button = tk.Button(self.root, text='End', font=("Arial", 14, 'bold'),
-                                          command=self.end)
-        self.terminate_button.grid(row=i + 2, column=1, sticky=tk.E)
+        self.stop_button = tk.Button(self.root, text='Stop', font=("Arial", 14, 'bold'),
+                                      command=self.toggle_stop)
+        self.stop_button.grid(row=i + 3, column=0, sticky=tk.W)
+
+        self.terminate_button = tk.Button(self.root, text='Terminate', font=("Arial", 14, 'bold'),
+                                          command=self.end, height=5)
+        self.terminate_button.grid(row=i + 1, column=1, sticky=tk.E, rowspan=3)
 
     def run(self):
         self.update()
@@ -456,13 +458,19 @@ class ExperimentGUI:
             else:
                 label.config(text="CLEAR", bg='green')
 
-        # Update pause/resume and dashboard buttons
-        if not self.paused:
-            self.pause_button.config(text='Pause')
+        # Update hold, stop and dashboard buttons
+        if self.experiment.status == 'Holding':
+            self.dash_button.config(state=tk.NORMAL)
+            self.hold_button.config(text='Resume')
+            self.stop_button.config(text='Stop')
+        elif self.experiment.status == 'Stopped':
+            self.dash_button.config(state=tk.NORMAL)
+            self.hold_button.config(text='Hold')
+            self.stop_button.config(text='Resume')
+        else:
             self.dash_button.config(state=tk.DISABLED)
-        elif self.paused:
-            self.dash_button.config(state=tk.NORMAL)  # enable access to dashboard only when user pauses experiment
-            self.pause_button.config(text='Resume')
+            self.hold_button.config(text='Hold')
+            self.stop_button.config(text='Stop')
 
         # Quit if experiment has ended
         if self.experiment.status == self.experiment.TERMINATED:
@@ -501,27 +509,33 @@ class ExperimentGUI:
         Dashboard(self.root, self.instruments)
 
         # Return experiment to prior state
-        if prior_status == self.experiment.WAITING:
-            self.experiment.wait()
+        if prior_status == self.experiment.HOLDING:
+            print('returning to hold')
+            self.experiment.hold()
         elif prior_status in [self.experiment.READY, self.experiment.RUNNING]:
             self.experiment.start()
+            print('returning to running')
 
-    def toggle_pause(self):
+    def toggle_hold(self):
         # User pauses/resumes the experiment
 
-        if self.paused:
+        if self.experiment.status == 'Holding':
             self.experiment.start()
-            self.paused = False
         else:
-            self.experiment.wait()
-            self.paused = True
+            self.experiment.hold()
+
+    def toggle_stop(self):
+        # User pauses/resumes the experiment
+
+        if self.experiment.status == 'Stopped':
+            self.experiment.start()
+        else:
+            self.experiment.stop()
 
     def end(self):
         # User ends the experiment
 
-        if self.experiment.status != self.experiment.TERMINATED:
-            self.experiment.terminate()
-
+        self.experiment.terminate()
         self.quit()
         self.terminated = True
 
@@ -693,7 +707,7 @@ class ConfigTestDialog(BasicDialog):
         self.name_entry.insert(0, self.instrument.name)
 
         knobs = self.instrument.knobs
-        knob_values = self.instrument.knob_values
+        knob_values = {knob: getattr(self.instrument, knob.replace(' ','_')) for knob in knobs}
         self.knob_entries = {}
 
         meters = self.instrument.meters

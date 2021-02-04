@@ -54,7 +54,7 @@ class Clock:
 
 class Variable:
     """
-    Basic representation of an experimental variable; comes in 3 kinds: knob, meter and expressions.
+    Basic representation of an experimental variable; comes in 3 kinds: knob, meter and expression.
     Knobs can be set, meters can be measured and expressions can be calculated.
 
     A knob is a variable that can be directly controlled by an instrument, e.g. the voltage of a power supply.
@@ -146,9 +146,7 @@ class Alarm:
     @property
     def triggered(self):
         value = self.variable._value  # get last know variable value
-        if value == None or value == float('nan') or value == '':
-            self._triggered = False
-        else:
+        if not (value == None or value == float('nan') or value == ''):
             self._triggered = eval('value' + self.condition)
 
         return self._triggered
@@ -163,7 +161,7 @@ class Experiment:
     # Possible statuses of an experiment
     READY = 'Ready'  # Experiment is initialized but not yet started
     RUNNING = 'Running'  # Experiment is running
-    WAITING = 'Waiting'  # Routines are stopped, but measurements are ongoing
+    HOLDING = 'Holding'  # Routines are stopped, but measurements are ongoing
     STOPPED = 'Stopped'  # Both routines and measurements are stopped
     TERMINATED = 'Terminated'  # Experiment has either finished or has been terminated by the user
 
@@ -196,10 +194,6 @@ class Experiment:
         if self.state.name is None:  # indicates that this is the first step of the experiment
             self.status = Experiment.RUNNING
             self.clock.start()
-
-        # End the experiment, if the duration of the experiment has passed
-        if self.clock.time > self.end:
-            self.terminate()
 
         # Update time
         self.state['time'] = self.clock.time
@@ -241,6 +235,10 @@ class Experiment:
         # Append new state to experiment data set
         self.data.loc[self.state.name] = self.state
 
+        # End the experiment, if the duration of the experiment has passed
+        if self.clock.time > self.end:
+            self.terminate()
+
         if self.status is Experiment.TERMINATED:
             raise StopIteration
 
@@ -258,9 +256,9 @@ class Experiment:
 
         self.data.to_csv(path)
 
-    def wait(self):  # stops routines
+    def hold(self):  # stops routines only
         self.clock.stop()
-        self.status = Experiment.WAITING
+        self.status = Experiment.HOLDING
 
     def stop(self):  # stops routines and measurements
         self.clock.stop()
@@ -405,6 +403,9 @@ class Manager:
             root.withdraw()
             self.runcard = askopenfilename(parent=root, title='Select Runcard', filetypes=[('YAML files', '*.yaml')])
 
+        # For use with alarms
+        self.awaiting_alarms = False
+
     def run(self, directory=None):
 
         # Create a new directory for data storage
@@ -473,13 +474,16 @@ class Manager:
                     if 'yaml' in alarm.protocol:
                         self.experiment.terminate()
                         self.followup = alarm.protocol
-                    elif 'wait' in alarm.protocol:
-                        self.experiment.wait()  # stop routines but keep measuring, and wait for alarm to clear
+                    elif 'hold' in alarm.protocol:
+                        self.experiment.hold()  # stop routines but keep measuring, and wait for alarm to clear
+                        self.awaiting_alarms = True
                     elif 'stop' in alarm.protocol:
                         self.experiment.stop()  # stop routines and measurements, and wait for user action
+                        self.awaiting_alarms = True
 
-            elif self.experiment.status == Experiment.WAITING and not self.gui.paused:
-                # If no alarms are triggered, resume experiment if stopped
+            elif self.awaiting_alarms:
+                # If no alarms are triggered, resume experiment if holding or stopped
+                self.awaiting_alarms = False
                 self.experiment.start()
 
             time.sleep(self.step_interval)
