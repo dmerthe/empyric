@@ -152,7 +152,7 @@ class Serial(Adapter):
     def query(self, question):
         self.write(question)
         time.sleep(self.delay)
-        return self.read()
+        return self.backend.read()
 
     def disconnect(self):
 

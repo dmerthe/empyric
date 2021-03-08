@@ -61,7 +61,7 @@ def measurer(method):
 
         return value
 
-    return method
+    return wrapped_method
 
 
 class Instrument:
