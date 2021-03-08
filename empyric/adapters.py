@@ -146,13 +146,12 @@ class Serial(Adapter):
     @chaperone
     def read(self):
         self.backend.timeout = self.timeout
-        return self.backend.read()
+        return self.backend.read_until()
 
-    @chaperone
     def query(self, question):
         self.write(question)
         time.sleep(self.delay)
-        return self.backend.read()
+        return self.read()
 
     def disconnect(self):
 
