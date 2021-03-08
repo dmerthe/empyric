@@ -141,7 +141,7 @@ class Serial(Adapter):
         self.connected = True
 
     def write(self, message):
-        self.backend.write(message)
+        self.backend.write(message.encode())
 
     @chaperone
     def read(self):
@@ -150,9 +150,9 @@ class Serial(Adapter):
 
     @chaperone
     def query(self, question):
-        self.backend.write(question)
+        self.write(question)
         time.sleep(self.delay)
-        return self.backend.read()
+        return self.read()
 
     def disconnect(self):
 
