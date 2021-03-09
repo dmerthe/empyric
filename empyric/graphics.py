@@ -510,11 +510,9 @@ class ExperimentGUI:
 
         # Return experiment to prior state
         if prior_status == self.experiment.HOLDING:
-            print('returning to hold')
             self.experiment.hold()
         elif prior_status in [self.experiment.READY, self.experiment.RUNNING]:
             self.experiment.start()
-            print('returning to running')
 
     def toggle_hold(self):
         # User pauses/resumes the experiment
