@@ -148,10 +148,12 @@ class Serial(Adapter):
         self.backend.timeout = self.timeout
         return self.backend.read_until().decode().strip()
 
+    @chaperone
     def query(self, question):
         self.write(question)
         time.sleep(self.delay)
-        return self.read()
+        self.backend.timeout = self.timeout
+        return self.backend.read_until().decode().strip()
 
     def disconnect(self):
 

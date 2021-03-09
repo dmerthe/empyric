@@ -1,3 +1,4 @@
+import re
 from empyric.adapters import *
 from empyric.collection.instrument import *
 
@@ -59,4 +60,11 @@ class BRAX3000(Instrument):
 
     @measurer
     def measure_ig_pressure(self):
-        return float(self.query('#RDIG<CR>\r\n')[4:])
+
+        def validator(response):
+            match = re.match('\d\.\d+E-?\d\d', response)
+            return bool(match)
+
+        response = reself.query('#RDIG<CR>\r\n', validator=validator)
+
+        return float(re.findall('\d\.\d+E-?\d\d', response)[0])
