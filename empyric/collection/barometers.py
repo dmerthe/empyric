@@ -65,6 +65,6 @@ class BRAX3000(Instrument):
             match = re.match('\d\.\d+E-?\d\d', response)
             return bool(match)
 
-        response = reself.query('#RDIG<CR>\r\n', validator=validator)
+        response = self.query('#RDIG<CR>\r\n', validator=validator)
 
         return float(re.findall('\d\.\d+E-?\d\d', response)[0])
