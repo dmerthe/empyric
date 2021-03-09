@@ -41,7 +41,7 @@ class OmegaCN7500(Instrument):
 
     @getter
     def get_setpoint(self):
-        self.read(0x1001) / 10
+        return self.read(0x1001) / 10
 
     @setter
     def set_proportional_band(self, P):
