@@ -35,15 +35,15 @@ class BRAX3000(Instrument):
         number = self.filament
 
         if state == 'ON':
-            self.write(f'#IG{number} ON<CR>')
+            self.write(f'#IG{number} ON<CR>\r\n')
         if state == 'OFF':
-            self.write(f'#IG{number} OFF<CR>')
+            self.write(f'#IG{number} OFF<CR>\r\n')
 
         self.read()  # discard the response
 
     @getter
     def get_ig_state(self):
-        return self.query('#IGS<CR>')
+        return self.query('#IGS<CR>\r\n')
 
     @setter
     def set_filament(self, number):
@@ -51,12 +51,12 @@ class BRAX3000(Instrument):
 
     @measurer
     def measure_cg1_pressure(self):
-        return float(self.query('#RDCG1<CR>')[4:-4])
+        return float(self.query('#RDCG1<CR>\r\n')[4:-4])
 
     @measurer
     def measure_cg2_pressure(self):
-        return float(self.query('#RDCG2<CR>')[4:-4])
+        return float(self.query('#RDCG2<CR>\r\n')[4:-4])
 
     @measurer
     def measure_ig_pressure(self):
-        return float(self.query('#RDIG<CR>')[4:])
+        return float(self.query('#RDIG<CR>\r\n')[4:])
