@@ -574,7 +574,7 @@ class Modbus(Adapter):
             return self.backend.read_float(register, byteorder=byte_order)
 
     def disconnect(self):
-        if not self.close_port_after_each_call:
+        if not self.backend.close_port_after_each_call:
             self.backend.serial.close()
         self.connected = False
 

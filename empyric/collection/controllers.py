@@ -10,7 +10,9 @@ class OmegaCN7500(Instrument):
     name = 'OmegaCN7500'
 
     supported_adapters = (
-        (Modbus, {'parity':'E'}),
+        (Modbus, {'slave_mode': 'rtu',
+                  'baud_rate': 38400,
+                  'parity': 'N'}),
     )
 
     knobs = (
