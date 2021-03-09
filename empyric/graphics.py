@@ -71,6 +71,10 @@ class Plotter:
 
             if style == 'basic':
                 new_plots[name] = self._plot_basic(name)
+            elif style == 'log':
+                new_plots[name] = self._plot_log(name)
+            elif style == 'symlog':
+                new_plots[name] = self._plot_symlog(name)
             elif style == 'averaged':
                 new_plots[name] = self._plot_averaged(name)
             elif style == 'errorbars':
@@ -85,7 +89,7 @@ class Plotter:
         plt.pause(0.01)
         return new_plots
 
-    def _plot_basic(self, name):
+    def _plot_basic(self, name, linear=True):
 
         fig, ax = self.plots[name]
         ax.clear()
@@ -105,16 +109,31 @@ class Plotter:
             else:
                 plt_kwargs = self.settings[name].get('options', {})
 
-                if x.lower() ==  'time':
+                if x.lower() == 'time':
                     self.data.plot(y=y,ax=ax, kind='line', **plt_kwargs)  # use index as time axis
                 else:
                     self.data.plot(y=y, x=x, ax=ax, kind='line', **plt_kwargs)
 
         ax.set_title(name)
         ax.grid()
-        ax.ticklabel_format(axis='y', style='sci', scilimits=(-2, 4))
+        if linear:
+            ax.ticklabel_format(axis='y', style='sci', scilimits=(-2, 4))
         ax.set_xlabel(self.settings[name].get('xlabel', x))
         ax.set_ylabel(self.settings[name].get('ylabel', ys[0]))
+
+        return fig, ax
+
+    def _plot_log(self, name):
+
+        fig, ax = _plot_basic(name, linear=False)
+        ax.set_yscale('log')
+
+        return fig, ax
+
+    def _plot_symlog(self, same):
+
+        fig, ax = _plot_basic(name, linear=False)
+        ax.set_yscale('symlog')
 
         return fig, ax
 
