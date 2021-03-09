@@ -125,14 +125,14 @@ class Plotter:
 
     def _plot_log(self, name):
 
-        fig, ax = _plot_basic(name, linear=False)
+        fig, ax = self._plot_basic(name, linear=False)
         ax.set_yscale('log')
 
         return fig, ax
 
-    def _plot_symlog(self, same):
+    def _plot_symlog(self, name):
 
-        fig, ax = _plot_basic(name, linear=False)
+        fig, ax = self._plot_basic(name, linear=False)
         ax.set_yscale('symlog')
 
         return fig, ax
