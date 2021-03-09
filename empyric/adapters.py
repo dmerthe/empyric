@@ -42,11 +42,10 @@ def chaperone(method):
                         self.reconnects = 0  # reset reconnection counter
                         return response
                     else:
-                        raise ValueError('invalid response!')
+                        raise ValueError('invalid response')
 
                 except BaseException as err:
-                    warnings.warn(
-                        f'Encountered {err} while trying to read from {self.instrument}')
+                    warnings.warn(f'Encountered {err} while trying to read from {self.instrument}')
                     self.repeats += 1
                     return wrapped_method(self, *args, validator=validator, **kwargs)
             else:
