@@ -44,7 +44,7 @@ class SRSRGA(Instrument):
         else:
             self.write('FL'+f'{np.round(float(current), 2)}\r\n')
 
-        status_byte = self.read()  # not used; just to clear buffer
+        self.read()  # status byte; not used
 
     @getter
     def get_filament_current(self):

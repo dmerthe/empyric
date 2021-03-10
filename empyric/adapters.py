@@ -33,9 +33,10 @@ def chaperone(method):
                 try:
                     response = method(self, *args, **kwargs)
 
-                    valid_response = True
                     if validator:
                         valid_response = validator(response)
+                    else:
+                        valid_response = response != ''
 
                     if valid_response:
                         self.repeats = 0  # reset repeat counter upon valid communcation
