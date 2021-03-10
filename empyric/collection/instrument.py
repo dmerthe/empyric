@@ -88,6 +88,7 @@ class Instrument:
         :param adapter: (Adapter) desired adapter to use for communications with the instrument
         :param presets: (dict) dictionary of instrument presets of the form {..., knob: value, ...} to apply upon initialization
         :param presets: (dict) dictionary of instrument postsets of the form {..., knob: value, ...} to apply upon disconnection
+        :param kwargs: (dict) any keyword args for the adapter
         """
 
         if address:
@@ -118,10 +119,10 @@ class Instrument:
 
         # Get existing knob settings, if possible
         for knob in self.knobs:
-            if hasattr(self, 'get_'+knob.replace(' ','_')):
-                self.__getattribute__('get_'+knob.replace(' ','_'))()  # retrieves the knob value from the instrument and stores as instrument attribute
+            if hasattr(self, 'get_'+knob.replace(' ', '_')):
+                self.__getattribute__('get_'+knob.replace(' ', '_'))()  # retrieves the knob value from the instrument and stores as instrument attribute
             else:
-                self.__setattr__(knob.replace(' ','_'), None)  # knob value is unknown until it is set
+                self.__setattr__(knob.replace(' ', '_'), None)  # knob value is unknown until it is set
 
         # Apply presets
         if presets:
@@ -157,7 +158,7 @@ class Instrument:
         """
 
         try:
-            set_method = getattr(self, 'set_' + knob.replace(' ' ,'_'))
+            set_method = getattr(self, 'set_' + knob.replace(' ', '_'))
         except AttributeError:
             raise AttributeError(f"{knob} cannot be set on {self.name}")
 
@@ -165,10 +166,10 @@ class Instrument:
 
     def get(self, knob):
 
-        if hasattr(self,'get_'+knob.replace(' ','_')):
+        if hasattr(self, 'get_'+knob.replace(' ', '_')):
             return getattr(self, 'get_'+knob.replace(' ','_'))()
         else:
-            return getattr(self, knob.replace(' ','_'))
+            return getattr(self, knob.replace(' ', '_'))
 
     def measure(self, meter):
         """
