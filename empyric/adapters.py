@@ -148,22 +148,24 @@ class Serial(Adapter):
         self.connected = True
 
     def write(self, message):
-        self.backend.reset_output_buffer()
         self.backend.write(message.encode())
 
     @chaperone
     def read(self):
         self.backend.reset_input_buffer()
         self.backend.timeout = self.timeout
-        return self.backend.read_until().decode().strip()
+        response = self.backend.read_until().decode().strip()
+        self.backend.reset_input_buffer()
+        return response
 
     @chaperone
     def query(self, question):
         self.write(question)
         time.sleep(self.delay)
         self.backend.timeout = self.timeout
+        response = self.backend.read_until().decode().strip()
         self.backend.reset_input_buffer()
-        return self.backend.read_until().decode().strip()
+        return response
 
     def disconnect(self):
         self.backend.reset_input_buffer()
