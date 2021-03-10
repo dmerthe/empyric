@@ -33,8 +33,8 @@ class SRSRGA(Instrument):
         'total pressure'
     }
 
-    def __init__(self, **kwargs):
-        Instrument.__init__(self, **kwargs)
+    def __init__(self, address=None, adapter=None, presets=None, postsets=None, **kwargs):
+        Instrument.__init__(self, address=address, adapter=adapter, presets=presets, postsets=postsets, **kwargs)
         self.write('IN0\r\n')  # initialize the RGA
 
     @setter
