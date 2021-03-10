@@ -35,10 +35,10 @@ class SRSRGA(Instrument):
 
     def __init__(self, address=None, adapter=None, presets=None, postsets=None, **kwargs):
 
-        self.adapter = Serial(Instrument(address), baud_rate=28800, stop_bits=2, timeout=None)
-        self.adapter.write(b'IN0\r\n')  # initialize serial comms with RGA
+        adapter = Serial(Instrument(address), baud_rate=28800, stop_bits=2, timeout=None)
+        adapter.write(b'IN0\r\n')  # initialize serial communications with RGA
 
-        Instrument.__init__(self, address=None, adapter=self.adapter, presets=presets, postsets=postsets, **kwargs)
+        Instrument.__init__(self, address=None, adapter=adapter, presets=presets, postsets=postsets, **kwargs)
 
     @setter
     def set_filament_current(self, current):
