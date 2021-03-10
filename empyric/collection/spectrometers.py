@@ -37,8 +37,11 @@ class SRSRGA(Instrument):
 
         adapter = Serial(Instrument(address), baud_rate=28800, stop_bits=2, timeout=60)
         print('Initializing SRS-RGA...')
-        adapter.query('IN0\r\n')  # initialize serial communications with RGA; returned status byte is not used
-        print('Done')
+        stat_byte = adapter.query('IN0\r\n')  # initialize serial communications with RGA
+        if stat_byte == "0":
+            print('Done')
+        else:
+            raise ConnectionError(f'Unable to communicate with SRS-RGA at {address}')
 
         Instrument.__init__(self, address=None, adapter=adapter, presets=presets, postsets=postsets, **kwargs)
 
