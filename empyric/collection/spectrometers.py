@@ -48,7 +48,7 @@ class SRSRGA(Instrument):
 
     @getter
     def get_filament_current(self):
-        return float(self.read('FL?\r\n'))
+        return float(self.query('FL?\r\n'))
 
     @setter
     def set_initial_mass(self, mass):
