@@ -81,14 +81,13 @@ class Instrument:
 
     meters = tuple()
 
-    def __init__(self, address=None, adapter=None, presets=None, postsets=None, **kwargs):
+    def __init__(self, address=None, adapter=None, presets=None, postsets=None):
         """
 
         :param address: (str/int) the default adapter of the instrument can be set up with default settings based on an address
         :param adapter: (Adapter) desired adapter to use for communications with the instrument
         :param presets: (dict) dictionary of instrument presets of the form {..., knob: value, ...} to apply upon initialization
         :param presets: (dict) dictionary of instrument postsets of the form {..., knob: value, ...} to apply upon disconnection
-        :param kwargs: (dict) any settings for the selected adapter
         """
 
         if address:

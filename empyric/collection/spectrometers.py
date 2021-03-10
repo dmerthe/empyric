@@ -33,12 +33,12 @@ class SRSRGA(Instrument):
         'total pressure'
     }
 
-    def __init__(self, address=None, adapter=None, presets=None, postsets=None, **kwargs):
+    def __init__(self, address=None, adapter=None, presets=None, postsets=None, timeout=None):
 
-        adapter = Serial(Instrument(address), baud_rate=28800, stop_bits=2, timeout=None)
+        adapter = Serial(Instrument(address), baud_rate=28800, stop_bits=2, timeout=timeout)
         adapter.write('IN0\r\n')  # initialize serial communications with RGA
 
-        Instrument.__init__(self, address=None, adapter=adapter, presets=presets, postsets=postsets, **kwargs)
+        Instrument.__init__(self, address=None, adapter=adapter, presets=presets, postsets=postsets)
 
     @setter
     def set_filament_current(self, current):
