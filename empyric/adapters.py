@@ -142,16 +142,18 @@ class Serial(Adapter):
                                      parity=self.parity,
                                      timeout=self.timeout)
 
-        self.backend.flushInput()
-        self.backend.flushOutput()
+        self.backend.reset_input_buffer()
+        self.backend.reset_output_buffer()
 
         self.connected = True
 
     def write(self, message):
+        self.backend.reset_output_buffer()
         self.backend.write(message.encode())
 
     @chaperone
     def read(self):
+        self.backend.reset_input_buffer()
         self.backend.timeout = self.timeout
         return self.backend.read_until().decode().strip()
 
@@ -160,12 +162,12 @@ class Serial(Adapter):
         self.write(question)
         time.sleep(self.delay)
         self.backend.timeout = self.timeout
+        self.backend.reset_input_buffer()
         return self.backend.read_until().decode().strip()
 
     def disconnect(self):
-
-        self.backend.flushInput()
-        self.backend.flushOutput()
+        self.backend.reset_input_buffer()
+        self.backend.reset_output_buffer()
         self.backend.close()
 
         self.connected = False
