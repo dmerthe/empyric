@@ -1,3 +1,4 @@
+import time
 from empyric.adapters import *
 from empyric.collection.instrument import *
 
@@ -39,11 +40,13 @@ class SRSRGA(Instrument):
         # current is in mA
 
         if current >= 3.5:
-            self.write('FL3.5\r\n')
+            self.query('FL3.5\r\n')
         elif current <= 0:
-            self.write('FL0\r\n')
+            self.query('FL0\r\n')
         else:
-            self.write('FL'+f'{np.round(float(current), 2)}\r\n')
+            self.query('FL'+f'{np.round(float(current), 2)}\r\n')
+
+        time.sleep(5)
 
     @measurer
     def measure_filament_current(self):
