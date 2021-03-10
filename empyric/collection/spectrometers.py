@@ -33,18 +33,6 @@ class SRSRGA(Instrument):
         'total pressure'
     }
 
-    def __init__(self, address=None, adapter=None, presets=None, postsets=None, **kwargs):
-
-        adapter = Serial(Instrument(address), baud_rate=28800, stop_bits=2, timeout=10)
-        print('Initializing SRS-RGA...')
-        stat_byte = adapter.query('IN0\r\n')  # initialize serial communications with RGA
-        if stat_byte == "0":
-            print('Done')
-        else:
-            raise ConnectionError(f'Unable to communicate with SRS-RGA at {address}')
-
-        Instrument.__init__(self, address=None, adapter=adapter, presets=presets, postsets=postsets, **kwargs)
-
     @setter
     def set_filament_current(self, current):
         # current is in mA
