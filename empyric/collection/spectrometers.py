@@ -9,7 +9,7 @@ class SRSRGA(Instrument):
     name = 'SRS-RGA'
 
     supported_adapters = (
-        (Serial, {'baud_rate': 28800, 'stop_bits': 2})
+        (Serial, {'baud_rate': 28800, 'stop_bits': 2, 'timeout': None})
     )
 
     knobs = (
@@ -38,50 +38,50 @@ class SRSRGA(Instrument):
         # current is in mA
 
         if current >= 3.5:
-            self.write('FL3.5')
+            self.write('FL3.5\r\n')
         elif current <= 0:
-            self.write('FL0')
+            self.write('FL0\r\n')
         else:
-            self.write('FL'+str(np.round(float(current), 2)))
+            self.write('FL'+f'{np.round(float(current), 2)}\r\n')
 
         status_byte = self.read()  # not used; just to clear buffer
 
     @getter
     def get_filament_current(self):
-        return float(self.read('FL?'))
+        return float(self.read('FL?\r\n'))
 
     @setter
     def set_initial_mass(self, mass):
-        self.write('MI'+f'{int(mass)}')
+        self.write('MI'+f'{int(mass)}\r\n')
 
     @getter
     def get_initial_mass(self):
-        return int(self.query('MI?'))
+        return int(self.query('MI?\r\n'))
 
     @setter
     def set_final_mass(self, mass):
-        self.write('MF'+f'{int(mass)}')
+        self.write('MF'+f'{int(mass)}\r\n')
 
     @getter
     def get_final_mass(self):
-        return int(self.query('MF?'))
+        return int(self.query('MF?\r\n'))
 
     @setter
     def set_steps_per_amu(self, steps):
-        self.write('SA'+f'{int(steps)}')
+        self.write('SA'+f'{int(steps)}\r\n')
 
     @getter
     def get_steps_per_amu(self):
-        return int(self.query('SA?'))
+        return int(self.query('SA?\r\n'))
 
     @measurer
     def measure_spectrum(self):
-        pass
+        return 0
 
     @measurer
     def measure_single_mass(self, mass):
-        return float(self.query('MR'+f'{int(mass)}'))
+        return float(self.query('MR'+f'{int(mass)}\r\n'))
 
     @measurer
     def measure_total_pressure(self):
-        return float(self.query('TP?'))
+        return float(self.query('TP?\r\n'))
