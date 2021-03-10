@@ -28,6 +28,7 @@ class SRSRGA(Instrument):
     }
 
     meters = {
+        'filament current',
         'spectrum',
         'single mass',
         'total pressure'
@@ -44,8 +45,8 @@ class SRSRGA(Instrument):
         else:
             self.write('FL'+f'{np.round(float(current), 2)}\r\n')
 
-    @getter
-    def get_filament_current(self):
+    @measurer
+    def measure_filament_current(self):
         return float(self.query('FL?\r\n'))
 
     @setter
