@@ -81,7 +81,7 @@ class Instrument:
 
     meters = tuple()
 
-    def __init__(self, address=None, adapter=None, presets=None, postsets=None):
+    def __init__(self, address=None, adapter=None, presets=None, postsets=None, **kwargs):
         """
 
         :param address: (str/int) the default adapter of the instrument can be set up with default settings based on an address
