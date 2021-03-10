@@ -20,11 +20,11 @@ class SRSRGA(Instrument):
     )
 
     presets = {
-        'filament': 1
+        'filament current': 1
     }
 
     postsets = {
-        'filament': 0
+        'filament current': 0
     }
 
     meters = {
