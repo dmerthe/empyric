@@ -35,7 +35,7 @@ class SRSRGA(Instrument):
 
     def __init__(self, address=None, adapter=None, presets=None, postsets=None, **kwargs):
 
-        adapter = Serial(Instrument(address), baud_rate=28800, stop_bits=2, timeout=60)
+        adapter = Serial(Instrument(address), baud_rate=28800, stop_bits=2, timeout=10)
         print('Initializing SRS-RGA...')
         stat_byte = adapter.query('IN0\r\n')  # initialize serial communications with RGA
         if stat_byte == "0":
@@ -55,8 +55,6 @@ class SRSRGA(Instrument):
             self.write('FL0\r\n')
         else:
             self.write('FL'+f'{np.round(float(current), 2)}\r\n')
-
-        self.read()  # status byte; not used
 
     @getter
     def get_filament_current(self):
