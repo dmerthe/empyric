@@ -33,10 +33,12 @@ class SRSRGA(Instrument):
         'total pressure'
     }
 
-    def __init__(self, address=None, adapter=None, presets=None, postsets=None, timeout=None, **kwargs):
+    def __init__(self, address=None, adapter=None, presets=None, postsets=None, **kwargs):
 
-        adapter = Serial(Instrument(address), baud_rate=28800, stop_bits=2, timeout=timeout)
+        adapter = Serial(Instrument(address), baud_rate=28800, stop_bits=2, timeout=60)
+        print('Initializing SRS-RGA...')
         adapter.query('IN0\r\n')  # initialize serial communications with RGA; returned status byte is not used
+        print('Done')
 
         Instrument.__init__(self, address=None, adapter=adapter, presets=presets, postsets=postsets, **kwargs)
 
