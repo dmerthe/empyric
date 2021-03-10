@@ -13,9 +13,10 @@ class SRSRGA(Instrument):
     )
 
     knobs = (
-        'filament',
-        'mode',
-        'mass'
+        'filament current',
+        'initial mass',
+        'final mass',
+        'steps per amu'
     )
 
     presets = {
@@ -28,12 +29,12 @@ class SRSRGA(Instrument):
 
     meters = {
         'spectrum',
-        'total pressure',
-        'helium pressure'
+        'single mass',
+        'total pressure'
     }
 
     @setter
-    def set_filament(self, current):
+    def set_filament_current(self, current):
         # current is in mA
 
         if current >= 3.5:
@@ -43,34 +44,44 @@ class SRSRGA(Instrument):
         else:
             self.write('FL'+str(np.round(float(current), 2)))
 
+        status_byte = self.read()  # not used; just to clear buffer
+
     @getter
-    def get_filament(self):
+    def get_filament_current(self):
         return float(self.read('FL?'))
 
     @setter
-    def set_mode(self, mode):
-        pass
+    def set_initial_mass(self, mass):
+        self.write('MI'+f'{int(mass)}')
 
     @getter
-    def get_mode(self):
-        pass
+    def get_initial_mass(self):
+        return int(self.query('MI?'))
 
     @setter
-    def set_mass(self, mass):
-        pass
+    def set_final_mass(self, mass):
+        self.write('MF'+f'{int(mass)}')
 
     @getter
-    def get_mass(self):
-        pass
+    def get_final_mass(self):
+        return int(self.query('MF?'))
+
+    @setter
+    def set_steps_per_amu(self, steps):
+        self.write('SA'+f'{int(steps)}')
+
+    @getter
+    def get_steps_per_amu(self):
+        return int(self.query('SA?'))
 
     @measurer
     def measure_spectrum(self):
         pass
 
     @measurer
-    def measure_total_pressure(self):
-        pass
+    def measure_single_mass(self, mass):
+        return float(self.query('MR'+f'{int(mass)}'))
 
     @measurer
-    def measure_helium_pressure(self):
-        pass
+    def measure_total_pressure(self):
+        return float(self.query('TP?'))
