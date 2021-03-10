@@ -9,7 +9,7 @@ class SRSRGA(Instrument):
     name = 'SRS-RGA'
 
     supported_adapters = (
-        (Serial, {'baud_rate': 28800, 'stop_bits': 2, 'timeout': None})
+        (Serial, {'baud_rate': 28800, 'stop_bits': 2, 'timeout': None}),
     )
 
     knobs = (
