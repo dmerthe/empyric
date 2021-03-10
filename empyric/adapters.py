@@ -126,6 +126,8 @@ class Serial(Adapter):
     baud_rate = 9600
     timeout = 0.1
     delay = 0.1
+    parity = 'N'
+    stop_bits = 1
 
     def __repr__(self):
         return 'Serial'
@@ -135,6 +137,8 @@ class Serial(Adapter):
         serial = importlib.import_module('serial')
         self.backend = serial.Serial(port=self.instrument.address,
                                      baudrate=self.baud_rate,
+                                     stopbits=self.stop_bits,
+                                     parity=self.parity,
                                      timeout=self.timeout)
 
         self.connected = True
