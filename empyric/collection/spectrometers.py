@@ -37,6 +37,7 @@ class SRSRGA(Instrument):
 
         adapter = Serial(Instrument(address), baud_rate=28800, stop_bits=2, timeout=timeout)
         adapter.write('IN0\r\n')  # initialize serial communications with RGA
+        adapter.read()
 
         Instrument.__init__(self, address=None, adapter=adapter, presets=presets, postsets=postsets)
 
