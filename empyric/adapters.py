@@ -142,6 +142,9 @@ class Serial(Adapter):
                                      parity=self.parity,
                                      timeout=self.timeout)
 
+        self.backend.flushInput()
+        self.backend.flushOutput()
+
         self.connected = True
 
     def write(self, message):

@@ -33,10 +33,6 @@ class SRSRGA(Instrument):
         'total pressure'
     }
 
-    def __init__(self, address=None, adapter=None, presets=None, postsets=None, **kwargs):
-        Instrument.__init__(self, address=address, adapter=adapter, presets=presets, postsets=postsets, **kwargs)
-        self.write('IN0\r\n')  # initialize the RGA
-
     @setter
     def set_filament_current(self, current):
         # current is in mA
