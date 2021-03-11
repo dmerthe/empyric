@@ -257,10 +257,6 @@ class Plotter:
             fig.has_colorbar
             fig.scalarmappable.set_clim(vmin=c_min, vmax=c_max)
             fig.cbar.update_normal(fig.scalarmappable)
-
-            if c == 'time':
-                fig.cbar.ax.set_ylabel('Time ' + f" ({units})")
-
         except AttributeError:
             fig.scalarmappable = ScalarMappable(cmap=cmap, norm=norm)
             fig.scalarmappable.set_array(np.linspace(c_min, c_max, 1000))
@@ -268,6 +264,8 @@ class Plotter:
             fig.cbar.ax.set_ylabel(self.settings[name].get('clabel', c))
             fig.has_colorbar = True
 
+        if c == 'time':
+            fig.cbar.ax.set_ylabel('Time ' + f" ({units})")
 
         # Draw the plot
         if marker:
