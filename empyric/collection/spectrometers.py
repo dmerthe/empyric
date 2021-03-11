@@ -97,7 +97,8 @@ class SRSRGA(Instrument):
     def measure_spectrum(self):
 
         self.write('HS1\r')
-        response = self.adapter.backend.read(4*len(self.masses) + 4)
+        response = self.adapter.backend.read(4*len(self.masses))
+        total_pressure = self.adapter.backend.read(4)  # automatically measured after every scan
 
         self.adapter.backend.reset_input_buffer()
 
