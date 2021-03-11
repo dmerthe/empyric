@@ -97,9 +97,9 @@ class SRSRGA(Instrument):
     def measure_spectrum(self):
 
         self.write('HS1\r')
-        response = self.adapter.backend.read(4*len(self.masses))
+        response = self.adapter.backend.read(4*len(self.masses) + 4)
 
-        return np.array(struct.unpack('<'+'i'*len(self.masses), response)) * 1.0e-16 / self.ppsf * 1000
+        return np.array(struct.unpack('<'+'i'*len(self.masses), response))[:-1] * 1.0e-16 / self.ppsf * 1000
 
     @measurer
     def measure_single(self):
