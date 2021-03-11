@@ -1,4 +1,5 @@
 import time
+import struct
 from empyric.adapters import *
 from empyric.collection.instrument import *
 
@@ -10,14 +11,13 @@ class SRSRGA(Instrument):
     name = 'SRS-RGA'
 
     supported_adapters = (
-        (Serial, {'baud_rate': 28800, 'stop_bits': 2, 'timeout': None, 'termination':'\n\r'}),
+        (Serial, {'baud_rate': 28800, 'timeout': None, 'termination': b'\n\r'}),
     )
 
     knobs = (
         'filament current',
-        'initial mass',
-        'final mass',
-        'steps per amu',
+        'mass',
+        'masses',
         'ppsf',  # partial pressure sensitivity factor
         'tpsf'  # total pressure sensitivity factor
     )
@@ -32,8 +32,8 @@ class SRSRGA(Instrument):
 
     meters = {
         'filament current',
+        'single',
         'spectrum',
-        'single mass',
         'total pressure'
     }
 
@@ -45,84 +45,84 @@ class SRSRGA(Instrument):
         # current is in mA
 
         if current >= 3.5:
-            self.query('FL3.5\r\n')
+            self.query('FL3.5\r')
         elif current <= 0:
-            self.query('FL0\r\n')
+            self.query('FL0\r')
         else:
-            self.query('FL'+f'{np.round(float(current), 2)}\r\n')
+            self.query('FL'+f'{np.round(float(current), 2)}\r')
 
         time.sleep(5)
 
     @measurer
     def measure_filament_current(self):
-        return float(self.query('FL?\r\n').decode().strip())
+        return float(self.query('FL?\r').decode().strip())
 
     @setter
-    def set_initial_mass(self, mass):
-        self.write('MI'+f'{int(mass)}\r\n')
-
-    @getter
-    def get_initial_mass(self):
-        return int(self.query('MI?\r\n').decode().strip())
+    def set_mass(self, mass):
+        self.write('ML' + f'{int(mass)}\r')
 
     @setter
-    def set_final_mass(self, mass):
-        self.write('MF'+f'{int(mass)}\r\n')
+    def set_masses(self, masses):
 
-    @getter
-    def get_final_mass(self):
-        return int(self.query('MF?\r\n').decode().strip())
+        initial_mass, final_mass = masses[0], masses[-1]
 
-    @setter
-    def set_steps_per_amu(self, steps):
-        self.write('SA'+f'{int(steps)}\r\n')
-
-    @getter
-    def get_steps_per_amu(self):
-        return int(self.query('SA?\r\n').decode().strip())
+        self.write('MI' + f'{int(initial_mass)}\r')
+        self.write('MF' + f'{int(final_mass)}\r')
 
     @setter
     def set_ppsf(self, value):
-        self.write(f'SP{value}\r\n')
+        self.write(f'SP{value}\r')
 
     @getter
     def get_ppsf(self):
-        return float(self.query('SP?\r\n').decode().strip())
+        return float(self.query('SP?\r').decode().strip())
 
     @setter
     def set_tpsf(self, value):
-        self.write(f'ST{value}\r\n')
+        self.write(f'ST{value}\r')
 
     @getter
     def get_tpsf(self):
-        return float(self.query('ST?\r\n').decode().strip())
+        return float(self.query('ST?\r').decode().strip())
 
     @measurer
     def measure_spectrum(self):
-        return 0
+
+        self.write('HS1\r')
+
+        bytes_waiting = 0
+        while not bytes_waiting:
+            bytes_waiting = self.adapter.backend.in_waiting
+            time.sleep(self.adapter.delay)
+
+        response = self.adapter.backend.read(bytes_waiting)
+
+        return struct.unpack('<i', response)[0] * 1.0e-16 / self.ppsf
 
     @measurer
-    def measure_single_mass(self, mass):
-        import struct
+    def measure_single(self):
 
-        self.write('MR'+f'{int(mass)}\r\n')
+        self.write('MR'+f'{int(self.mass)}\r')
 
-        while not self.adapter.backend.in_waiting:
-            time.sleep(0.1)
+        bytes_waiting = 0
+        while not bytes_waiting:
+            bytes_waiting = self.adapter.backend.in_waiting
+            time.sleep(self.adapter.delay)
 
-        response = self.adapter.read().split(b'\n\r')[0]
+        response = self.adapter.backend.read(bytes_waiting)
 
         return struct.unpack('<i', response)[0] * 1.0e-16 / self.ppsf
 
     @measurer
     def measure_total_pressure(self):
-        import struct
 
         self.write('TP?\r\n')
 
-        while not self.adapter.backend.in_waiting:
-            time.sleep(0.1)
+        bytes_waiting = 0
+        while not bytes_waiting:
+            bytes_waiting = self.adapter.backend.in_waiting
+            time.sleep(self.adapter.delay)
 
-        response = self.adapter.read().split(b'\n\r')[0]
+        response = self.adapter.backend.read(bytes_waiting)
 
         return struct.unpack('<i', response)[0] * 1.0e-16 / self.tpsf
