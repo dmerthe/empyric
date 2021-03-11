@@ -62,7 +62,7 @@ class BRAX3000(Instrument):
     def measure_ig_pressure(self):
 
         def validator(response):
-            match = re.match('\d\.\d+E-?\d\d', response.decode().strip())
+            match = re.search('\d\.\d+E-?\d\d', response.decode().strip())
             return bool(match)
 
         response = self.query('#RDIG<CR>\r\n', validator=validator).decode().strip()

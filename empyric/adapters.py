@@ -36,7 +36,7 @@ def chaperone(method):
                     if validator:
                         valid_response = validator(response)
                     else:
-                        valid_response = response != ''
+                        valid_response = (response != '') * (response != b'') * (response != float('nan'))
 
                     if valid_response:
                         self.repeats = 0  # reset repeat counter upon valid communcation
