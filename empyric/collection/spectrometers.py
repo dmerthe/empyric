@@ -97,13 +97,7 @@ class SRSRGA(Instrument):
     def measure_spectrum(self):
 
         self.write('HS1\r')
-
-        bytes_waiting = 0
-        while not bytes_waiting:
-            bytes_waiting = self.adapter.backend.in_waiting
-            time.sleep(self.adapter.delay)
-
-        response = self.adapter.backend.read(bytes_waiting)
+        response = self.adapter.backend.read(len(self.masses))
 
         return struct.unpack('<i', response)[0] * 1.0e-16 / self.ppsf
 
@@ -111,13 +105,7 @@ class SRSRGA(Instrument):
     def measure_single(self):
 
         self.write('MR'+f'{int(self.mass)}\r')
-
-        bytes_waiting = 0
-        while not bytes_waiting:
-            bytes_waiting = self.adapter.backend.in_waiting
-            time.sleep(self.adapter.delay)
-
-        response = self.adapter.backend.read(bytes_waiting)
+        response = self.adapter.backend.read(4)
 
         return struct.unpack('<i', response)[0] * 1.0e-16 / self.ppsf
 
@@ -125,12 +113,6 @@ class SRSRGA(Instrument):
     def measure_total_pressure(self):
 
         self.write('TP?\r\n')
-
-        bytes_waiting = 0
-        while not bytes_waiting:
-            bytes_waiting = self.adapter.backend.in_waiting
-            time.sleep(self.adapter.delay)
-
-        response = self.adapter.backend.read(bytes_waiting)
+        response = self.adapter.backend.read(4)
 
         return struct.unpack('<i', response)[0] * 1.0e-16 / self.tpsf
