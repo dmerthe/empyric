@@ -129,7 +129,7 @@ class Serial(Adapter):
     delay = 0.1
     parity = 'N'
     stop_bits = 1
-    termination = '\n'
+    termination = b'\n'
 
     def __repr__(self):
         return 'Serial'
