@@ -52,11 +52,11 @@ class BRAX3000(Instrument):
 
     @measurer
     def measure_cg1_pressure(self):
-        return float(self.query('#RDCG1<CR>\r\n')[4:-4])
+        return float(self.query('#RDCG1<CR>\r\n').decode().strip()[4:-4])
 
     @measurer
     def measure_cg2_pressure(self):
-        return float(self.query('#RDCG2<CR>\r\n')[4:-4])
+        return float(self.query('#RDCG2<CR>\r\n').decode().strip()[4:-4])
 
     @measurer
     def measure_ig_pressure(self):
@@ -65,6 +65,6 @@ class BRAX3000(Instrument):
             match = re.match('\d\.\d+E-?\d\d', response)
             return bool(match)
 
-        response = self.query('#RDIG<CR>\r\n', validator=validator)
+        response = self.query('#RDIG<CR>\r\n', validator=validator).decode().strip()
 
         return float(re.findall('\d\.\d+E-?\d\d', response)[0])
