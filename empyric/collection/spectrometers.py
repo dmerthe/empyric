@@ -102,7 +102,7 @@ class SRSRGA(Instrument):
 
         self.adapter.backend.reset_input_buffer()
 
-        return np.array(struct.unpack('<'+'i'*len(self.masses), response))[:-1] * 1.0e-16 / self.ppsf * 1000
+        return np.array(struct.unpack('<'+'i'*len(self.masses), response)) * 1.0e-16 / self.ppsf * 1000
 
     @measurer
     def measure_single(self):
