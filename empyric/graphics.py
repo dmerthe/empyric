@@ -226,6 +226,7 @@ class Plotter:
             x_data = []
             y_data = []
             c_data = []
+            set_nums = []  # used to distinguish between sets when plotting
 
             for i, x_path, y_path in zip(range(len(self.data)), self.data[x].values, self.data[y].values):
 
@@ -251,10 +252,13 @@ class Plotter:
                 x_data.append(x_file_data[x].values)
                 y_data.append(y_file_data[y].values)
                 c_data.append(y_file_data[c].values)
+                set_nums.append(np.array([i]*len(x_file_data)))
+
 
             x_data = np.concatenate(x_data)
             y_data = np.concatenate(y_data)
             c_data = np.concatenate(c_data)
+            set_nums = np.concatenate(set_nums)
 
         c_min, c_max = np.min(c_data), np.max(c_data)
         norm = plt.Normalize(vmin=c_min, vmax=c_max)
@@ -281,7 +285,8 @@ class Plotter:
                 ax.plot([x_data[i]], [y_data[i]], marker=marker, markersize=3, color=cmap(norm(np.mean(c_data[i]))))
         else:
             for i in range(x_data.shape[0] - 1):
-                ax.plot(x_data[i: i + 2], y_data[i: i + 2], color=cmap(norm(np.mean(c_data[i: i + 2]))))
+                if set_nums[i] == set_nums[i+1]:
+                    ax.plot(x_data[i: i + 2], y_data[i: i + 2], color=cmap(norm(np.mean(c_data[i: i + 2]))))
 
         ax.set_title(name)
         ax.grid(True)
