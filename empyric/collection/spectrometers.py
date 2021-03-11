@@ -1,4 +1,5 @@
 import time
+import numpy as np
 import struct
 from empyric.adapters import *
 from empyric.collection.instrument import *
@@ -68,6 +69,13 @@ class SRSRGA(Instrument):
 
         self.write('MI' + f'{int(initial_mass)}\r')
         self.write('MF' + f'{int(final_mass)}\r')
+
+    @getter
+    def get_masses(self):
+        initial_mass = int(self.query('MI?\r').decode().strip())
+        final_mass = int(self.query('MF?\r').decode().strip())
+
+        return np.arange(initial_mass, final_mass + 1)
 
     @setter
     def set_ppsf(self, value):
