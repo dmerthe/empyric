@@ -99,7 +99,7 @@ class SRSRGA(Instrument):
         self.write('HS1\r')
         response = self.adapter.backend.read(4*len(self.masses))
 
-        return struct.unpack('<'+'i'*len(self.masses), response)[0] * 1.0e-16 / self.ppsf
+        return np.array(struct.unpack('<'+'i'*len(self.masses), response)) * 1.0e-16 / self.ppsf
 
     @measurer
     def measure_single(self):
