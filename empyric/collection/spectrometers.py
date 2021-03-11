@@ -99,7 +99,7 @@ class SRSRGA(Instrument):
         self.write('HS1\r')
         response = self.adapter.backend.read(4*len(self.masses))
 
-        return np.array(struct.unpack('<'+'i'*len(self.masses), response)) * 1.0e-16 / self.ppsf
+        return np.array(struct.unpack('<'+'i'*len(self.masses), response)) * 1.0e-16 / self.ppsf * 1000
 
     @measurer
     def measure_single(self):
@@ -107,7 +107,7 @@ class SRSRGA(Instrument):
         self.write('MR'+f'{int(self.mass)}\r')
         response = self.adapter.backend.read(4)
 
-        return struct.unpack('<i', response)[0] * 1.0e-16 / self.ppsf
+        return struct.unpack('<i', response)[0] * 1.0e-16 / self.ppsf * 1000
 
     @measurer
     def measure_total_pressure(self):
@@ -115,4 +115,4 @@ class SRSRGA(Instrument):
         self.write('TP?\r\n')
         response = self.adapter.backend.read(4)
 
-        return struct.unpack('<i', response)[0] * 1.0e-16 / self.tpsf
+        return struct.unpack('<i', response)[0] * 1.0e-16 / self.tpsf * 1000
