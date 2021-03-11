@@ -201,32 +201,21 @@ class Plotter:
 
         # Handle simple numeric data
         y_is_numeric = bool( sum([isinstance(y_value, numbers.Number) for y_value in self.data[y]]) )
-
         if y_is_numeric:
 
             x_data = np.array(self.data[x].values, dtype=float)
             y_data = np.array(self.data[y].values, dtype=float)
             c_data = np.array(self.data[c].values, dtype=float)
-
-            # Rescale time if needed
-            if c == 'time':
-                units = 'seconds'
-                if np.max(c_data) > 60:
-                    units = 'minutes'
-                    c_data = c_data / 60
-                    if np.max(c_data) > 60:
-                        units = 'hours'
-                        c_data = c_data / 60
+            set_nums = np.array([1]*len(self.data))  # all the same data set
 
         # Handle data stored in a file
         y_is_path = bool( sum([ 'csv' in y_value for y_value in self.data[y] if isinstance(y_value, str)]))
-
         if y_is_path:
 
             x_data = []
             y_data = []
             c_data = []
-            set_nums = []  # used to distinguish between sets when plotting
+            set_nums = []  # used to distinguish between sets
 
             for i, x_path, y_path in zip(range(len(self.data)), self.data[x].values, self.data[y].values):
 
@@ -238,14 +227,6 @@ class Plotter:
                     first_datetime = pd.date_range(start=self.data.index[0], end=self.data.index[0], periods=len(y_file_data))
                     y_file_data[c] = (y_file_data.index - first_datetime).total_seconds()
 
-                    # Rescale time if values are large
-                    units = 'seconds'
-                    if np.max(y_file_data[c].values) > 60:
-                        units = 'minutes'
-                        y_file_data[c] = y_file_data[c] / 60
-                        if np.max(y_file_data[c].values) > 60:
-                            units = 'hours'
-                            y_file_data[c] = y_file_data[c] / 60
                 else:
                     y_file_data[c] = [self.data[c].values[i]] * len(y_file_data)
 
@@ -254,11 +235,19 @@ class Plotter:
                 c_data.append(y_file_data[c].values)
                 set_nums.append(np.array([i]*len(x_file_data)))
 
-
             x_data = np.concatenate(x_data)
             y_data = np.concatenate(y_data)
             c_data = np.concatenate(c_data)
             set_nums = np.concatenate(set_nums)
+
+        if c == 'time': # Rescale time if values are large
+            units = 'seconds'
+            if np.max(c_data) > 60:
+                units = 'minutes'
+                c_data = c_data / 60
+                if np.max(c_data) > 60:
+                    units = 'hours'
+                    c_data = c_data / 60
 
         c_min, c_max = np.min(c_data), np.max(c_data)
         norm = plt.Normalize(vmin=c_min, vmax=c_max)
@@ -268,16 +257,17 @@ class Plotter:
             fig.has_colorbar
             fig.scalarmappable.set_clim(vmin=c_min, vmax=c_max)
             fig.cbar.update_normal(fig.scalarmappable)
+
+            if c == 'time':
+                fig.cbar.ax.set_ylabel('Time ' + f" ({units})")
+
         except AttributeError:
             fig.scalarmappable = ScalarMappable(cmap=cmap, norm=norm)
             fig.scalarmappable.set_array(np.linspace(c_min, c_max, 1000))
             fig.cbar = plt.colorbar(fig.scalarmappable, ax=ax)
+            fig.cbar.ax.set_ylabel(self.settings[name].get('clabel', c))
             fig.has_colorbar = True
 
-        if c == 'time':
-            fig.cbar.ax.set_ylabel('Time ' + f" ({units})")
-        else:
-            fig.cbar.ax.set_ylabel(self.settings[name].get('clabel', c))
 
         # Draw the plot
         if marker:
