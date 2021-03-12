@@ -43,7 +43,7 @@ def chaperone(method):
                         self.reconnects = 0  # reset reconnection counter
                         return response
                     else:
-                        raise ValueError('invalid response')
+                        raise ValueError(f'invalid response {response} from method {method.__name__}')
 
                 except BaseException as err:
                     warnings.warn(f'Encountered {err} while trying to read from {self.instrument}')
