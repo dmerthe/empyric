@@ -451,7 +451,7 @@ class ExperimentGUI:
         # Check the state of the experiment
         state = self.experiment.state
         for name, label in self.variable_status_labels.items():
-            if state[name] == None:
+            if state[name] is None:
                 label.config(text='none')
             elif state[name] == np.nan:
                 label.config(text='nan')
@@ -459,7 +459,10 @@ class ExperimentGUI:
                 if name.lower() == 'time':
                     label.config(text=str(datetime.timedelta(seconds=state['time'])))
                 else:
-                    label.config(text=str(state[name]))
+                    if state[name] == float:
+                        label.config(text='%.2e' % state[name])
+                    else:
+                        label.config(text=str(state[name]))
 
         self.status_label.config(text=self.experiment.status)
 
