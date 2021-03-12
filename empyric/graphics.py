@@ -459,8 +459,8 @@ class ExperimentGUI:
                 if name.lower() == 'time':
                     label.config(text=str(datetime.timedelta(seconds=state['time'])))
                 else:
-                    if state[name] == float:
-                        label.config(text='%.2e' % state[name])
+                    if type(state[name]) == float:
+                        label.config(text='%.3e' % state[name])
                     else:
                         label.config(text=str(state[name]))
 
