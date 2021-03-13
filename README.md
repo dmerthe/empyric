@@ -1,9 +1,9 @@
 # Empyric 
 ## A Python Library for Experiment Automation
 
-### Instruments and Adapters
-
 Empyric, at its most basic level, is an easy to use Python interface for communication with and controlling scientific instruments, such as digital multimeters, digital oscilloscopes, and power supplies. On top of that is a general purpose experiment-building architecture, which allows the user to combine process control, measurements and data plotting in a highly customizable fashion, using a straightforward "runcard" formalism, which additionally serves the purpose of experiment documentation.
+
+### Instruments and Adapters
 
 Empyric contains a number of *instruments* with various associated methods of communication, such as serial or GPIB. For example, to connect to a Keithley 2400 Sourcemeter simply import the `Keithley2000` object from the library and instantiate it with its GPIB address:
 
