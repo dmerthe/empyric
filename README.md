@@ -20,13 +20,32 @@ Communication with instruments is facilitated through Empyric's library of *adap
 
 ```
 from empyric.adapters import Modbus
-from empyric.instruments import Instrument  # stand-in for you custom instrument
 
-instr = Instrument('COM5::1')  # serial port 5, slave address 1
-adapter = Modbus(instr, baud_rate=115200)
+class Instrument:
+	"""
+	Basic template of an instrument object in Empyric
+	"""
 
-instr.measure('whatever')
+	name = 'Custom Instrument'
+	
+	supported_adapters = ((Modbus, {'baud_rate':115200}),)
+	
+	knobs = ('knob',)
+	meters = ('meter',)
+	
+	def set_knob(self, value):
+		# ... set your knob
+	
+	def measure_meter(self):
+		# ... measure your meter
+
+adapter = Modbus(instrument)  # adapter connects to your instrument
+
+meter_value = instr.measure_meter()
 
 ```
 
+### Experiments
+
+The real purpose of Empyric is to simplify and standardize construction of an experiment, and automate its execution. The two main elements of an experiment are its *variables*, which are controlled or measured by your instruments, *routines*, which is the collection of any processes that you run on your controllable variables.
 
