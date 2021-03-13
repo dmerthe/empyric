@@ -19,14 +19,15 @@ current = keithley2400.measure('current')
 Communication with instruments is facilitated through Empyric's library of *adapters*. If you have an instrument that is not in the Empyric library but which uses one of the more common communication protocols (Serial, GPIB, USBTMC, Modbus, etc.), you can still make use of Empyric's adapters, which automatically manage many of the underlying details of the communication backends:
 
 ```
+from empyric.instruments import Instrument
 from empyric.adapters import Modbus
 
-class Instrument:
+class MyInstrument(Instrument):
 	"""
 	Basic template of an instrument object in Empyric
 	"""
 
-	name = 'Custom Instrument'
+	name = 'My Instrument'
 	
 	supported_adapters = ((Modbus, {'baud_rate':115200}),)
 	
@@ -38,7 +39,8 @@ class Instrument:
 	
 	def measure_meter(self):
 		# ... measure your meter
-
+	
+instrument = MyInstrument('COM5::1')
 adapter = Modbus(instrument)  # adapter connects to your instrument
 
 meter_value = instr.measure_meter()
