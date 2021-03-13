@@ -17,7 +17,7 @@ def chaperone(method):
     def wrapped_method(self, *args, validator=None, **kwargs):
         """
 
-        :param self: (Phidget) the Phidget adapter class
+        :param self: (Adapter) the adapter object whose method is being wrapped
         :param args: any arguments to the method to be wrapped
         :param validator: (callable) function that returns True if its input looks right or False if it does not
         :param kwargs: any keyword arguments for the method to be wrapped
