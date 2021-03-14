@@ -53,6 +53,23 @@ The real purpose of Empyric is to simplify and standardize construction of an ex
 
 *Variables* come in three flavors: knobs, meters and expressions. A knob is a variable that you can directly control through an instrument, such as voltage from a power supply. A meter is a variable that you directly measure through an instrument, such as temperature from a thermocouple. In some cases, a meter can be controlled indirectly through a feedback loop. For example, PID temperature controllers provide a temperature knob (the setpoint) as well as a temperature meter (the actual temperature measured with a thermocouple or RTD). An expression is a variable that is evaluated in terms of other experiment variables, such as the power delivered by a power supply being the product of the voltage knob value and the current meter value.
 
-Here is an example showing how to define experiment variables:
+Here is an example showing how to define and use experiment variables in Empyric:
+```
+from empyric.experiment import Variable
+from experiment.instruments import Keithley2400
+
+keithley2400 = Keithley2400('GPIB0::1::INSTR')
+
+voltage = Variable(instrument=keithley2400, knob='voltage')
+current = Variable(instrument=keithley2400, meter='current')
+power = Variable(expression='V * I', definitions={'V':voltage, 'I':current})
+
+voltage.value = 10 # sets the voltage of the Keithley 2400 to 10 V
+
+# Obtain 10 measurements of current and power sourced by the Keithley 2400
+measurements = [current.value, power.value for i in range(10)]
+```
+Assigning a value to the `value` property of a knob-type variable, commands the corresponding instrument to set the associated knob accordingly, and the value is stored in the corresponding attribute of the instrument. Calling the `value` property of a meter-type variable commands the corresponding instrument to make to record a measurement of the associated meter, and then return the value. Calling the `value` property of an expression-type variable retrieves the values of the variables that define it from the stored attributes of the corresponding knobs, meters and other expressions; it does not trigger any new measurements. Therefore, for repeated calls, be sure to trigger measurements or retrievals of the values of any defining variables prior to each evaluation of the expression.
+
 
 

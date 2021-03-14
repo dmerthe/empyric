@@ -65,7 +65,7 @@ class Variable:
     An example of an expression is the output power of a power supply, where voltage is a knob and current is a meter: power = voltage * current.
     """
 
-    def __init__(self, knob=None, meter=None, instrument=None, expression=None, definitions=None):
+    def __init__(self, instrument=None, knob=None, meter=None, expression=None, definitions=None):
         """
         One of either the knob, meter or expression keyword arguments must be supplied along with the respective instrument or definitions.
 
