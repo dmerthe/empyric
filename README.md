@@ -56,7 +56,7 @@ The real purpose of Empyric is to simplify and standardize construction of an ex
 Here is an example showing how to define and use experiment variables in Empyric:
 ```
 from empyric.experiment import Variable
-from experiment.instruments import Keithley2400
+from empyric.instruments import Keithley2400
 
 keithley2400 = Keithley2400('GPIB0::1::INSTR')
 
