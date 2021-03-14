@@ -67,7 +67,7 @@ power = Variable(expression='V * I', definitions={'V':voltage, 'I':current})
 voltage.value = 10 # sets the voltage of the Keithley 2400 to 10 V
 
 # Obtain 10 measurements of current and power sourced by the Keithley 2400
-measurements = [current.value, power.value for i in range(10)]
+measurements = [[current.value, power.value] for i in range(10)]
 ```
 Assigning a value to the `value` property of a knob-type variable commands the corresponding instrument to set the associated knob accordingly, and the value is stored in the corresponding attribute of the instrument. Calling the `value` property of a meter-type variable commands the corresponding instrument to make to record a measurement of the associated meter, and then return the value as well as store it as an attribute of the instrument. Calling the `value` property of an expression-type variable retrieves the values of the variables that define it from the stored attributes of the corresponding knobs, meters and other expressions; it does not trigger any new measurements. Therefore, for repeated calls, be sure to trigger measurements or retrievals of the values of any defining variables prior to each evaluation of the expression.
 
