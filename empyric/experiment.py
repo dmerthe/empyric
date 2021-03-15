@@ -123,7 +123,7 @@ class Variable:
     @value.setter
     def value(self, value):
         # value property can only be set if variable is a knob; None value indicates no setting should be applied
-        if hasattr(self, 'knob') and value is not None:
+        if hasattr(self, 'knob') and value is not None and value != np.nan:
             self.instrument.set(self.knob, value)
             self._value = self.instrument.__getattribute__(self.knob)
         elif value is None:
@@ -171,8 +171,7 @@ class Experiment:
 
         if routines:
             self.routines = routines  # dictionary of experimental routines of the form {..., name: (variable_name, routine), ...}
-            self.end = max(
-                [routine.end for _, routine in routines.values()])  # time at which all routines are exhausted
+            self.end = max([routine.end for routine in routines.values()])  # time at which all routines are exhausted
         else:
             self.routines = {}
             self.end = float('inf')
@@ -201,17 +200,11 @@ class Experiment:
 
         # Apply new settings to knobs according to the routines (if there are any and the experiment is running)
         if self.status is Experiment.RUNNING:
-            for name, routine in self.routines.values():
-
-                new_value = routine(self.state)
-
-                # if new value is a path to a CSV file, read in data as numpy array
-                if type(new_value) == str:
-                    if 'csv' in new_value:
-                        dataframe = pd.read_csv(new_value)
-                        new_value = dataframe[name].values
-
-                self.variables[name].value = new_value
+            for routine in self.routines.values():
+                update = routine(self.state)
+                for name, value in update.items():
+                    self.variables[name].value = value
+                    self.state[name] = value
 
         elif self.status == Experiment.STOPPED:
             for name, variable in self.variables.items():
@@ -224,7 +217,7 @@ class Experiment:
 
             value = variable.value
 
-            if isinstance(value, np.ndarray): # store array data as CSV files
+            if np.size(value) > 1: # store array data as CSV files
                 dataframe = pd.DataFrame({name: value}, index=[self.state.name]*len(value))
                 path = name.replace(' ','_') +'_' + self.state.name.strftime('%Y%m%d-%H%M%S') + '.csv'
                 dataframe.to_csv(path)
@@ -319,23 +312,9 @@ def build_experiment(runcard, instruments=None):
     routines = {}
     if 'Routines' in runcard:
         for name, specs in runcard['Routines'].items():
-
             specs = specs.copy()  # avoids modifying the runcard
-
             _type = specs.pop('type')
-            variable_name = specs.pop('variable')
-
-            if 'feedback' in specs:
-                # Get the feedback variable
-                specs['feedback'] = variables[specs['feedback']]
-
-                if 'controller' in specs:
-                    # Initialize a controller based on the controller specs
-                    contr_type = specs['controller'].pop('type')
-                    contr_kwargs = specs['controller']
-                    specs['controller'] = controllers.__dict__[contr_type](**contr_kwargs)
-
-            routines[name] = (variable_name, rout.__dict__[_type](**specs))
+            routines[name] = rout.__dict__[_type](**specs)
 
     return Experiment(variables, routines=routines)
 
