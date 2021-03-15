@@ -42,13 +42,13 @@ class Plotter:
         if plot_name:
             fig, ax = self.plots[plot_name]
             if save_as:
-                fig.savefig(save_as + '-' + '.png')
+                fig.savefig(save_as + '.png')
             else:
-                fig.savefig(plot_name + '-' + '.png')
+                fig.savefig(plot_name + '.png')
         else:
             for name, plot in self.plots.items():
                 fig, ax = plot
-                fig.savefig(name + '-' + '.png')
+                fig.savefig(name + '.png')
 
     def close(self, plot_name=None):
 
