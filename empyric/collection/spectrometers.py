@@ -16,6 +16,7 @@ class SRSRGA(Instrument):
     )
 
     knobs = (
+        'initialize'
         'filament current',
         'mass',
         'masses',
@@ -37,6 +38,11 @@ class SRSRGA(Instrument):
         'spectrum',
         'total pressure'
     }
+
+    def __init__(self, *args, **kwargs):
+
+        Instrument.__init__(self, *args, **kwargs)
+        initialized = self.query('IN0')
 
     @setter
     def set_filament_current(self, current):
