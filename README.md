@@ -71,4 +71,33 @@ measurements = [[current.value, power.value] for i in range(10)]
 ```
 Assigning a value to the `value` property of a knob-type variable commands the corresponding instrument to set the associated knob accordingly, and the value is stored in the corresponding attribute of the instrument. Calling the `value` property of a meter-type variable commands the corresponding instrument to record a measurement of the associated meter, and then return the value as well as store it as an attribute of the instrument. Calling the `value` property of an expression-type variable retrieves the values of the variables that define it from the stored attributes of the corresponding knobs, meters and other expressions; it does not trigger any new measurements. Therefore, for repeated calls, be sure to trigger measurements or retrievals of the values of any defining variables prior to each evaluation of the expression.
 
-*Routines* allow one to define the trajectory that an experiment takes through parameter space over the duration of the experiment.
+*Routines* allow one to define the trajectory that an experiment takes through parameter space over the duration of the experiment. Every routine has a start and end, assigned variables and assigned values. Routines update their associated variables based on a supplied state, indicating current time and values of all variables. The most basic routine is the hold routine:
+```
+import time
+
+# ... define variable1 and variable2 as instances of Variable from above
+
+variables = {'Variable 1':variable1, 'Variable 2':variable2}
+values = [10, 20]
+
+# Hold variable1 at a value of 10, and variable2 at a value of 20 for 60 seconds
+hold = Hold(variables, values, start=0, end=60)
+
+start_time = time.time()
+
+while True:
+
+	t = time.time() - start_time  # get time since beginning of process
+	
+	state = {'time': t, 'Variable 1': None, 'Variable 2': None} # define a process state
+	
+	new_values = hold.update(state)  # get the updated values from the hold routine
+	
+	state.update(new_values) # update the process state
+	
+	print(state)  # prints "{'time': t, 'Variable 1': 10, 'Variable 2': 20}"
+	
+	if t > 60:
+		break
+
+```

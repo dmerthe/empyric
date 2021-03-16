@@ -201,10 +201,7 @@ class Experiment:
         # Apply new settings to knobs according to the routines (if there are any and the experiment is running)
         if self.status is Experiment.RUNNING:
             for routine in self.routines.values():
-                update = routine(self.state)
-                for name, value in update.items():
-                    self.variables[name].value = value
-                    self.state[name] = value
+                self.state.update(routine.update(self.state))
 
         elif self.status == Experiment.STOPPED:
             for name, variable in self.variables.items():
@@ -314,6 +311,7 @@ def build_experiment(runcard, instruments=None):
         for name, specs in runcard['Routines'].items():
             specs = specs.copy()  # avoids modifying the runcard
             _type = specs.pop('type')
+            specs['variables'] = {name: variables[name] for name in np.array([specs['variables']]).flatten()}
             routines[name] = rout.__dict__[_type](**specs)
 
     return Experiment(variables, routines=routines)
