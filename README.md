@@ -85,20 +85,17 @@ hold = Hold(variables, values, start=0, end=60)
 
 start_time = time.time()
 
-while True:
+state = {'time': 0, 'Variable 1': None, 'Variable 2': None} # define a process state
 
-	t = time.time() - start_time  # get time since beginning of process
+while state['time'] <= 60:
 	
-	state = {'time': t, 'Variable 1': None, 'Variable 2': None} # define a process state
+	state['time'] = time.time() - start_time  # update the process time
 	
 	new_values = hold.update(state)  # get the updated values from the hold routine
 	
 	state.update(new_values) # update the process state
 	
-	print(state)  # prints "{'time': t, 'Variable 1': 10, 'Variable 2': 20}"
-	
-	if t > 60:
-		break
+	print(state)  # prints "{'time': ..., 'Variable 1': 10, 'Variable 2': 20}"
 ```
 
 An *Experiment* monitors a set of variables as a set of routines take action on them. In Empyric, the `Experiment` object is an iterable that updates routines and records data on each iteration. It also has `start`, `hold` and `stop` methods which initiate/resume the experiment, holds routines while continuing to measure meters, and stops all routines and measurements, respectively. The `terminate` method saves the collected data to a file in the working directory and raises the `StopIteration` exception. An experiment will terminate automatically when all routines are finished. See henon_python_eaxmple.py in the 'examples/Henon Map Experiment' folder to see how a basic experiment is set up as a python script. This particular example uses a virtual instrument (`HenonMapper`), so the only requirement to run it is having Python installed. Try it!
