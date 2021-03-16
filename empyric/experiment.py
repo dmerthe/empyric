@@ -70,9 +70,9 @@ class Variable:
         """
         One of either the knob, meter or expression keyword arguments must be supplied along with the respective instrument or definitions.
 
+        :param instrument: (Instrument) instrument with the corresponding knob or meter
         :param knob: (str) instrument knob label, if variable is a knob
         :param meter: (str) instrument meter label, if variable is a meter
-        :param instrument: (Instrument) instrument with the corresponding knob or meter
         :param expression: (str) expression for the variable in terms of other variables, if variable is an expression
         :param definitions: (dict) dictionary of the form {..., symbol: variable, ...} mapping the symbols in the expression to other variable objects; only used if type is 'expression'
         """
@@ -142,7 +142,7 @@ def convert_time(time_value):
     :return: (int) time in seconds
     """
 
-    if hasattr(time_value, '__len__') and not isinstance(time_value, str):
+    if np.size(time_value) > 1:
         return [convert_time(t) for t in time_value]
 
     if isinstance(time_value, numbers.Number):
@@ -200,8 +200,18 @@ class Routine:
             raise AttributeError(f'{self.__name__} routine requires values!')
 
 
-        self.start = start
-        self.end = end
+        self.start = convert_time(start)
+        self.end = convert_time(end)
+
+    def update(self, state):
+        """
+        Updates the controlled variables and returns the new substate; overwritten by child classes
+
+        :param state: (dict/Series) state of the calling experiment or process in the form, {..., variable: value, ...}
+        :return: (dict/Series) substate with the updated values of the controlled variables
+        """
+
+        pass
 
 
 class Hold(Routine):
@@ -237,7 +247,7 @@ class Timecourse(Routine):
         Routine.__init__(self, **kwargs)
 
         if times:
-            self.times = times
+            self.times = convert_time(times)
 
             # times can be specified in a CSV file
             for i, times_i in enumerate(times):
