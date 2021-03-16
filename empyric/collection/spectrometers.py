@@ -12,7 +12,7 @@ class SRSRGA(Instrument):
     name = 'SRS-RGA'
 
     supported_adapters = (
-        (Serial, {'baud_rate': 28800, 'timeout': None, 'input_termination': '\n\r'}),
+        (Serial, {'baud_rate': 28800, 'timeout': 300, 'input_termination': '\n\r'}),
     )
 
     knobs = (
@@ -38,9 +38,6 @@ class SRSRGA(Instrument):
         'total pressure'
     }
 
-    ppsf = 0.119
-    tpsf = 0.0023
-
     @setter
     def set_filament_current(self, current):
         # current is in mA
@@ -56,7 +53,7 @@ class SRSRGA(Instrument):
 
     @measurer
     def measure_filament_current(self):
-        return float(self.query('FL?').decode().strip())
+        return float(self.query('FL?'))
 
     @setter
     def set_mass(self, mass):
@@ -72,8 +69,8 @@ class SRSRGA(Instrument):
 
     @getter
     def get_masses(self):
-        initial_mass = int(self.query('MI?').decode().strip())
-        final_mass = int(self.query('MF?').decode().strip())
+        initial_mass = int(self.query('MI?'))
+        final_mass = int(self.query('MF?'))
 
         return np.arange(initial_mass, final_mass + 1)
 
@@ -83,7 +80,7 @@ class SRSRGA(Instrument):
 
     @getter
     def get_ppsf(self):
-        return float(self.query('SP?').decode().strip())
+        return float(self.query('SP?'))
 
     @setter
     def set_tpsf(self, value):
@@ -91,7 +88,7 @@ class SRSRGA(Instrument):
 
     @getter
     def get_tpsf(self):
-        return float(self.query('ST?').decode().strip())
+        return float(self.query('ST?'))
 
     @measurer
     def measure_spectrum(self):
