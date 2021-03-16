@@ -246,6 +246,10 @@ class Experiment:
 
         self.data.to_csv(path)
 
+    def start(self):
+        self.clock.start()
+        self.status = Experiment.RUNNING
+
     def hold(self):  # stops routines only
         self.clock.stop()
         self.status = Experiment.HOLDING
@@ -253,10 +257,6 @@ class Experiment:
     def stop(self):  # stops routines and measurements
         self.clock.stop()
         self.status = Experiment.STOPPED
-
-    def start(self):
-        self.clock.start()
-        self.status = Experiment.RUNNING
 
     def terminate(self):
         self.stop()
