@@ -45,7 +45,7 @@ class BRAX3000(Instrument):
     @getter
     def get_ig_state(self):
 
-        respose = self.query('#IGS<CR>')
+        response = self.query('#IGS<CR>')
 
         if 'ON' in response:
             return 'ON'
