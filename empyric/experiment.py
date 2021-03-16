@@ -136,7 +136,9 @@ class Variable:
 
 def convert_time(time_value):
     """
-    Converts a time of the form "number units" (e.g. "3.5 hours") to the time in seconds.
+    If time_value is a string, converts a time of the form "number units" (e.g. "3.5 hours") to the time in seconds.
+    If time_value is a number, just returns the same number
+    If time_value is an array, it iterates through the array doing either of the previous two operations on every element.
 
     :param time_value: (str/float) time value, possibly including units such as 'hours'
     :return: (int) time in seconds
