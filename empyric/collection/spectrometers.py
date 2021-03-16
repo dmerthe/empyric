@@ -12,7 +12,7 @@ class SRSRGA(Instrument):
     name = 'SRS-RGA'
 
     supported_adapters = (
-        (Serial, {'baud_rate': 28800, 'timeout': None, 'termination': b'\n\r'}),
+        (Serial, {'baud_rate': 28800, 'timeout': None, 'input_termination': '\n\r'}),
     )
 
     knobs = (
@@ -46,57 +46,57 @@ class SRSRGA(Instrument):
         # current is in mA
 
         if current >= 3.5:
-            self.query('FL3.5\r')
+            self.query('FL3.5')
         elif current <= 0:
-            self.query('FL0\r')
+            self.query('FL0')
         else:
-            self.query('FL'+f'{np.round(float(current), 2)}\r')
+            self.query('FL'+f'{np.round(float(current), 2)}')
 
         time.sleep(5)
 
     @measurer
     def measure_filament_current(self):
-        return float(self.query('FL?\r').decode().strip())
+        return float(self.query('FL?').decode().strip())
 
     @setter
     def set_mass(self, mass):
-        self.write('ML' + f'{int(mass)}\r')
+        self.write('ML' + f'{int(mass)}')
 
     @setter
     def set_masses(self, masses):
 
         initial_mass, final_mass = masses[0], masses[-1]
 
-        self.write('MI' + f'{int(initial_mass)}\r')
-        self.write('MF' + f'{int(final_mass)}\r')
+        self.write('MI' + f'{int(initial_mass)}')
+        self.write('MF' + f'{int(final_mass)}')
 
     @getter
     def get_masses(self):
-        initial_mass = int(self.query('MI?\r').decode().strip())
-        final_mass = int(self.query('MF?\r').decode().strip())
+        initial_mass = int(self.query('MI?').decode().strip())
+        final_mass = int(self.query('MF?').decode().strip())
 
         return np.arange(initial_mass, final_mass + 1)
 
     @setter
     def set_ppsf(self, value):
-        self.write(f'SP{value}\r')
+        self.write(f'SP{value}')
 
     @getter
     def get_ppsf(self):
-        return float(self.query('SP?\r').decode().strip())
+        return float(self.query('SP?').decode().strip())
 
     @setter
     def set_tpsf(self, value):
-        self.write(f'ST{value}\r')
+        self.write(f'ST{value}')
 
     @getter
     def get_tpsf(self):
-        return float(self.query('ST?\r').decode().strip())
+        return float(self.query('ST?').decode().strip())
 
     @measurer
     def measure_spectrum(self):
 
-        self.write('HS1\r')
+        self.write('HS1')
         response = self.adapter.backend.read(4*len(self.masses))
         total_pressure = self.adapter.backend.read(4)  # automatically measured after every scan
 
@@ -107,7 +107,7 @@ class SRSRGA(Instrument):
     @measurer
     def measure_single(self):
 
-        self.write('MR'+f'{int(self.mass)}\r')
+        self.write('MR'+f'{int(self.mass)}')
         response = self.adapter.backend.read(4)
 
         self.adapter.backend.reset_input_buffer()
@@ -117,7 +117,7 @@ class SRSRGA(Instrument):
     @measurer
     def measure_total_pressure(self):
 
-        self.write('TP?\r\n')
+        self.write('TP?')
         response = self.adapter.backend.read(4)
 
         self.adapter.backend.reset_input_buffer()

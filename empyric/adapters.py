@@ -129,7 +129,8 @@ class Serial(Adapter):
     delay = 0.1
     parity = 'N'
     stop_bits = 1
-    termination = b'\n'
+    input_termination = '\n'
+    output_termination = '\r'
 
     def __repr__(self):
         return 'Serial'
@@ -150,10 +151,7 @@ class Serial(Adapter):
 
     def write(self, message):
 
-        if type(message) == bytes:
-            self.backend.write(message)
-        else:
-            self.backend.write(message.encode())
+        self.backend.write((message + self.output_termination).encode())
 
     @chaperone
     def read(self, until=None, bytes=None):
@@ -165,11 +163,11 @@ class Serial(Adapter):
         elif until:
             response = self.backend.read_until(until)
         else:
-            response = self.backend.read_until(self.termination)
+            response = self.backend.read_until(self.input_termination)
 
         self.backend.reset_input_buffer()
 
-        return response
+        return response.decode().strip()
 
     @chaperone
     def query(self, question, until=None, bytes=None):
@@ -183,11 +181,11 @@ class Serial(Adapter):
         elif until:
             response = self.backend.read_until(until)
         else:
-            response = self.backend.read_until(self.termination)
+            response = self.backend.read_until(self.input_termination)
 
         self.backend.reset_input_buffer()
 
-        return response
+        return response.decode().strip()
 
     def disconnect(self):
         self.backend.reset_input_buffer()
