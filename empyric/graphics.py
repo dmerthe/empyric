@@ -372,25 +372,26 @@ class ExperimentGUI:
         self.status_frame.grid(row=0, column=0, columnspan=2)
 
         # Status field shows current experiment status
-        tk.Label(self.status_frame, text='Status', width=len('Status'), anchor=tk.E).grid(row=0, column=0, sticky=tk.E)
+        i = 0
+        tk.Label(self.status_frame, text='Status', width=len('Status'), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
 
         self.status_label = tk.Label(self.status_frame, text='', width=30, relief=tk.SUNKEN)
-        self.status_label.grid(row=0, column=1, sticky=tk.W, padx=10)
+        self.status_label.grid(row=i, column=1, sticky=tk.W, padx=10)
 
         # Table of variables shows most recently measured/set variable values
         self.variable_status_labels = {}
-
-        i = 2
-        tk.Label(self.status_frame, text='Run Time', width=len('Run Time'), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
-
-        self.variable_status_labels['time'] = tk.Label(self.status_frame, text='', relief=tk.SUNKEN, width=30)
-        self.variable_status_labels['time'].grid(row=i, column=1, sticky=tk.W, padx=10)
 
         i += 1
         tk.Label(self.status_frame, text='', font=("Arial", 14, 'bold')).grid(row=i, column=0, sticky=tk.E)
 
         i += 1
         tk.Label(self.status_frame, text='Variables', font=("Arial", 14, 'bold')).grid(row=i, column=1)
+
+        i += 1
+        tk.Label(self.status_frame, text='Run Time', width=len('Run Time'), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
+
+        self.variable_status_labels['time'] = tk.Label(self.status_frame, text='', relief=tk.SUNKEN, width=30)
+        self.variable_status_labels['time'].grid(row=i, column=1, sticky=tk.W, padx=10)
 
         i += 1
         for variable in self.variables:
