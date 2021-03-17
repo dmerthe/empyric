@@ -5,17 +5,15 @@ from math import *
 import time
 import datetime
 import numbers
+import importlib
 from scipy.interpolate import interp1d
 import numpy as np
 import pandas as pd
 import warnings
 import threading
 import queue
-from ruamel.yaml import YAML
 import tkinter as tk
 from tkinter.filedialog import askopenfilename
-
-yaml = YAML()
 
 from empyric import instruments as instr
 from empyric import adapters, graphics
@@ -487,7 +485,7 @@ def build_experiment(runcard, instruments=None):
     """
     Build an Experiment object based on a runcard, in the form of a .yaml file or a dictionary
 
-    :param runcard: (str/dict) the description of the experiment in the runcard format
+    :param runcard: (dict) the description of the experiment in the runcard format
     :param instruments: (None) variable pointing to instruments, if needed
     :return: (Experiment) the experiment described by the runcard
     """
@@ -550,7 +548,7 @@ class Manager:
 
         if isinstance(runcard, str):  # runcard argument can be a path string
             with open(runcard, 'rb') as runcard_file:
-                self._runcard = yaml.load(runcard_file)
+                self._runcard = self.yaml.load(runcard_file)
 
             os.chdir(os.path.dirname(runcard))
         elif isinstance(runcard, dict):  # ... or a properly formatted dictionary
@@ -591,6 +589,11 @@ class Manager:
 
     def __init__(self, runcard=None):
 
+        try:
+            self.yaml = importlib.import_module('ruamel.yaml').YAML()
+        except ImportError:
+            raise ImportError('Using the Manager requires the ruamel.yaml module!')
+
         if runcard:
             self.runcard = runcard
         else:
@@ -617,7 +620,7 @@ class Manager:
 
         # Save executed runcard alongside data for record keeping
         with open(f"{experiment_name}_{self.experiment.timestamp}.yaml", 'w') as runcard_file:
-            yaml.dump(self.runcard, runcard_file)
+            self.yaml.dump(self.runcard, runcard_file)
 
         # Run experiment loop in separate thread
         experiment_thread = threading.Thread(target=self._run)
