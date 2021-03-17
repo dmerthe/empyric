@@ -163,7 +163,7 @@ class Serial(Adapter):
         elif until:
             response = self.backend.read_until(until)
         else:
-            response = self.backend.read_until(self.input_termination)
+            response = self.backend.read_until(self.input_termination.encode())
 
         self.backend.reset_input_buffer()
 
@@ -181,7 +181,7 @@ class Serial(Adapter):
         elif until:
             response = self.backend.read_until(until)
         else:
-            response = self.backend.read_until(self.input_termination)
+            response = self.backend.read_until(self.input_termination.encode())
 
         self.backend.reset_input_buffer()
 
