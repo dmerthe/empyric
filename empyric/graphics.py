@@ -479,21 +479,21 @@ class ExperimentGUI:
                 label.config(text="CLEAR", bg='green')
 
         # Update hold, stop and dashboard buttons
-        if self.experiment.status == 'Holding':
+        if 'Holding' in self.experiment.status:
             self.dash_button.config(state=tk.NORMAL)
             self.hold_button.config(text='Resume')
             self.stop_button.config(text='Stop')
-        elif self.experiment.status == 'Stopped':
+        elif 'Stopped' in self.experiment.status:
             self.dash_button.config(state=tk.NORMAL)
             self.hold_button.config(text='Hold')
             self.stop_button.config(text='Resume')
-        else:
+        else:  # otherwise, experiment is running
             self.dash_button.config(state=tk.DISABLED)
             self.hold_button.config(text='Hold')
             self.stop_button.config(text='Stop')
 
         # Quit if experiment has ended
-        if self.experiment.status == self.experiment.TERMINATED:
+        if 'Terminated' in self.experiment.status:
             self.quit()
 
         # Plot data
@@ -529,23 +529,23 @@ class ExperimentGUI:
         Dashboard(self.root, self.instruments)
 
         # Return experiment to prior state
-        if prior_status == self.experiment.HOLDING:
+        if 'Holding' in prior_status:
             self.experiment.hold()
-        elif prior_status in [self.experiment.READY, self.experiment.RUNNING]:
+        elif 'Ready' in prior_status or 'Running' in prior_status:
             self.experiment.start()
 
     def toggle_hold(self):
         # User pauses/resumes the experiment
 
-        if self.experiment.status == 'Holding':
+        if 'Holding' in  self.experiment.status:
             self.experiment.start()
         else:
             self.experiment.hold()
 
     def toggle_stop(self):
-        # User pauses/resumes the experiment
+        # User stops the experiment
 
-        if self.experiment.status == 'Stopped':
+        if 'Stopped' in self.experiment.status:
             self.experiment.start()
         else:
             self.experiment.stop()

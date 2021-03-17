@@ -408,7 +408,7 @@ class Experiment:
 
         # Start the clock on first call
         if self.state.name is None:  # indicates that this is the first step of the experiment
-            self.status = Experiment.RUNNING
+            self.status = Experiment.RUNNING + ': initializing...'
             self.clock.start()
 
         # Update time
@@ -416,19 +416,22 @@ class Experiment:
         self.state.name = datetime.datetime.now()
 
         # Apply new settings to knobs according to the routines (if there are any and the experiment is running)
-        if self.status is Experiment.RUNNING:
-            for routine in self.routines.values():
+        if Experiment.RUNNING in self.status:
+            for name, routine in self.routines.items():
+                self.status = Experiment.RUNNING + f': executing {name}'
                 self.state.update(routine.update(self.state))
+            self.status = Experiment.RUNNING
 
-        elif self.status == Experiment.STOPPED:
+        elif Experiment.STOPPED in self.status:
             for name, variable in self.variables.items():
                 if variable.type in ['meter', 'expression']:
                     self.state[name] = None
             return self.state
 
         # Get all variable values
+        base_status = self.status
         for name, variable in self.variables.items():
-
+            self.status = base_status + f': retrieving {name}'
             value = variable.value
 
             if np.size(value) > 1: # store array data as CSV files
@@ -439,6 +442,8 @@ class Experiment:
             else:
                 self.state[name] = value
 
+        self.status = base_status
+
         # Append new state to experiment data set
         self.data.loc[self.state.name] = self.state
 
@@ -446,7 +451,7 @@ class Experiment:
         if self.clock.time > self.end:
             self.terminate()
 
-        if self.status is Experiment.TERMINATED:
+        if Experiment.TERMINATED in self.status:
             raise StopIteration
 
         return self.state
@@ -456,12 +461,16 @@ class Experiment:
 
     def save(self, directory=None):
 
+        base_status = self.status
+        self.status = base_status + ': saving data'
+
         path = f"data_{self.timestamp}.csv"
 
         if directory:
             path = os.path.join(directory, path)
 
         self.data.to_csv(path)
+        self.status = base_status
 
     def start(self):
         self.clock.start()
