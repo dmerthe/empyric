@@ -2,6 +2,7 @@
 
 import time
 import os
+import sys
 import threading
 from empyric.instruments import HenonMapper
 from empyric.experiment import Variable, Alarm, Experiment
@@ -13,7 +14,12 @@ import matplotlib.pyplot as plt
 
 plt.ion()
 
-os.chdir(os.path.join(os.environ["HOME"], "Desktop"))  # put example data on desktop
+if sys.platform == 'win32':
+    directory = os.path.join(os.environ['USERPROFILE'], "Desktop") # put example data on desktop
+else:
+    directory = os.path.join(os.environ['HOME'], 'Desktop')
+
+os.chdir(directory)
 
 henon_mapper = HenonMapper()
 

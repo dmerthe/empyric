@@ -368,37 +368,40 @@ class ExperimentGUI:
         else:
             self.root.title('Experiment')
 
-        # Status field shows current experiment status
-        tk.Label(self.root, text='Status', width=len('Status'), anchor=tk.E).grid(row=0, column=0, sticky=tk.E)
+        self.status_frame = tk.Frame(self.root)
+        self.status_frame.grid(row=0, column=0, columnspan=2)
 
-        self.status_label = tk.Label(self.root, text='', width=40, relief=tk.SUNKEN)
-        self.status_label.grid(row=0, column=1, sticky=tk.W)
+        # Status field shows current experiment status
+        tk.Label(self.status_frame, text='Status', width=len('Status'), anchor=tk.E).grid(row=0, column=0, sticky=tk.E)
+
+        self.status_label = tk.Label(self.status_frame, text='', width=30, relief=tk.SUNKEN)
+        self.status_label.grid(row=0, column=1, sticky=tk.W, padx=10)
 
         # Table of variables shows most recently measured/set variable values
         self.variable_status_labels = {}
 
         i = 2
-        tk.Label(self.root, text='Run Time', width=len('Run Time'), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
+        tk.Label(self.status_frame, text='Run Time', width=len('Run Time'), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
 
-        self.variable_status_labels['time'] = tk.Label(self.root, text='', relief=tk.SUNKEN, width=40)
-        self.variable_status_labels['time'].grid(row=i, column=1, sticky=tk.W)
-
-        i += 1
-        tk.Label(self.root, text='', font=("Arial", 14, 'bold')).grid(row=i, column=0, sticky=tk.E)
+        self.variable_status_labels['time'] = tk.Label(self.status_frame, text='', relief=tk.SUNKEN, width=30)
+        self.variable_status_labels['time'].grid(row=i, column=1, sticky=tk.W, padx=10)
 
         i += 1
-        tk.Label(self.root, text='Variables', font=("Arial", 14, 'bold')).grid(row=i, column=1)
+        tk.Label(self.status_frame, text='', font=("Arial", 14, 'bold')).grid(row=i, column=0, sticky=tk.E)
+
+        i += 1
+        tk.Label(self.status_frame, text='Variables', font=("Arial", 14, 'bold')).grid(row=i, column=1)
 
         i += 1
         for variable in self.variables:
-            tk.Label(self.root, text=variable, width=len(variable), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
+            tk.Label(self.status_frame, text=variable, width=len(variable), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
 
-            self.variable_status_labels[variable] = tk.Label(self.root, text='', relief=tk.SUNKEN, width=40)
-            self.variable_status_labels[variable].grid(row=i, column=1, sticky=tk.W)
+            self.variable_status_labels[variable] = tk.Label(self.status_frame, text='', relief=tk.SUNKEN, width=30)
+            self.variable_status_labels[variable].grid(row=i, column=1, sticky=tk.W, padx=10)
 
             i += 1
 
-        tk.Label(self.root, text='', font=("Arial", 14, 'bold')).grid(row=i, column=0, sticky=tk.E)
+        tk.Label(self.status_frame, text='', font=("Arial", 14, 'bold')).grid(row=i, column=0, sticky=tk.E)
 
         # Table of alarm indicators shows the status of any alarms being monitored
         self.alarm_status_labels = {}
@@ -406,35 +409,36 @@ class ExperimentGUI:
         if len(alarms) > 0:
 
             i += 1
-            tk.Label(self.root, text='Alarms', font=("Arial", 14, 'bold')).grid(row=i, column=1)
+            tk.Label(self.status_frame, text='Alarms', font=("Arial", 14, 'bold')).grid(row=i, column=1)
 
             i += 1
             for alarm in self.alarms:
-                tk.Label(self.root, text=alarm, width=len(alarm), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
+                tk.Label(self.status_frame, text=alarm, width=len(alarm), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
 
-                self.alarm_status_labels[alarm] = tk.Label(self.root, text='Clear', relief=tk.SUNKEN, width=40)
-                self.alarm_status_labels[alarm].grid(row=i, column=1, sticky=tk.W)
+                self.alarm_status_labels[alarm] = tk.Label(self.status_frame, text='Clear', relief=tk.SUNKEN, width=30)
+                self.alarm_status_labels[alarm].grid(row=i, column=1, sticky=tk.W, padx=10)
 
                 i += 1
 
-            tk.Label(self.root, text='', font=("Arial", 14, 'bold')).grid(row=i, column=0, sticky=tk.E)
+            tk.Label(self.status_frame, text='', font=("Arial", 14, 'bold')).grid(row=i, column=0, sticky=tk.E)
 
 
-        self.dash_button = tk.Button(self.root, text='Dashboard', font=("Arial", 14, 'bold'),
+        i = 1
+        self.dash_button = tk.Button(self.root, text='Dashboard', font=("Arial", 14, 'bold'), width=10,
                                      command=self.open_dashboard, state=tk.DISABLED)
-        self.dash_button.grid(row=i + 1, column=0, sticky=tk.W)
+        self.dash_button.grid(row=i, column=0, sticky=tk.W)
 
-        self.hold_button = tk.Button(self.root, text='Hold', font=("Arial", 14, 'bold'),
+        self.hold_button = tk.Button(self.root, text='Hold', font=("Arial", 14, 'bold'), width=10,
                                       command=self.toggle_hold)
-        self.hold_button.grid(row=i + 2, column=0, sticky=tk.W)
+        self.hold_button.grid(row=i + 1, column=0, sticky=tk.W)
 
-        self.stop_button = tk.Button(self.root, text='Stop', font=("Arial", 14, 'bold'),
+        self.stop_button = tk.Button(self.root, text='Stop', font=("Arial", 14, 'bold'), width=10,
                                       command=self.toggle_stop)
-        self.stop_button.grid(row=i + 3, column=0, sticky=tk.W)
+        self.stop_button.grid(row=i + 2, column=0, sticky=tk.W)
 
-        self.terminate_button = tk.Button(self.root, text='Terminate', font=("Arial", 14, 'bold'),
+        self.terminate_button = tk.Button(self.root, text='Terminate', font=("Arial", 14, 'bold'), width=10, fg='red', bg='gray87',
                                           command=self.end, height=5)
-        self.terminate_button.grid(row=i + 1, column=1, sticky=tk.E, rowspan=3)
+        self.terminate_button.grid(row=i, column=1, sticky=tk.E, rowspan=3)
 
     def run(self):
         self.update()
