@@ -26,7 +26,7 @@ henon_mapper = HenonMapper()
 x = Variable(instrument=henon_mapper, meter='x')
 y = Variable(instrument=henon_mapper, meter='y')
 
-alarm = Alarm(y, '>0', None)
+alarm = Alarm(y, '>0')
 
 experiment = Experiment({'x':x,'y':y})  # an experiment that simply measures the values of x and y over time
 
