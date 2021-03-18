@@ -31,7 +31,7 @@ alarm = Alarm(y, '>0')
 experiment = Experiment({'x':x,'y':y})  # an experiment that simply measures the values of x and y over time
 
 plots = {'Henon Plot': {'x': 'x', 'y':'y', 'style':'parametric', 'marker':'o'}}
-gui = ExperimentGUI(experiment, alarms={"y>0": alarm}, title='Test', plots=plots)
+gui = ExperimentGUI(experiment, alarms={"y>0": alarm}, title='Henon Map Example', plots=plots)
 
 def run_experiment():
     for state in experiment:
