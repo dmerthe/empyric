@@ -5,7 +5,7 @@ Empyric, at its most basic level, is an easy to use Python interface for communi
 
 ### Instruments and Adapters
 
-Empyric contains a number of *instruments* with various associated methods of communication, such as serial or GPIB. For example, to connect to a Keithley 2400 Sourcemeter simply import the `Keithley2400` object from the library and instantiate it with its GPIB address:
+Empyric contains a number of *instruments* with various associated methods of communication, such as serial or GPIB. For example, to remotely control a Keithley 2400 Sourcemeter from your PC, simply import the `Keithley2400` object from the library and instantiate it with its GPIB address:
 
 ```
 from empyric.instruments import Keithley2400
