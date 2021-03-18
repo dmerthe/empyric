@@ -42,7 +42,7 @@ def run_experiment():
 
         time.sleep(1)
 
-experiment_thread = threading.Thread(target=run_experiment)
+experiment_thread = threading.Thread(target=run_experiment)  # run experiment loop in a separate thread
 experiment_thread.start()
 
 gui.run()
