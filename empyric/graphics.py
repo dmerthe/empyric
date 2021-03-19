@@ -363,16 +363,19 @@ class ExperimentGUI:
         self.root.wm_attributes('-topmost', True)  # bring window to front
         self.root.protocol("WM_DELETE_WINDOW", self.end)
 
-        if title:
-            self.root.title(f'Experiment: {title}')
-        else:
-            self.root.title('Experiment')
+        self.root.title('Empyric')
 
         self.status_frame = tk.Frame(self.root)
         self.status_frame.grid(row=0, column=0, columnspan=2)
 
-        # Status field shows current experiment status
         i = 0
+        if title:
+            tk.Label(self.status_frame, text=f'{title}', font=("Arial", 14, 'bold')).grid(row=i, column=1)
+        else:
+            tk.Label(self.status_frame, text=f'Experiment', font=("Arial", 14, 'bold')).grid(row=i, column=1)
+
+        # Status field shows current experiment status
+        i += 1
         tk.Label(self.status_frame, text='Status', width=len('Status'), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
 
         self.status_label = tk.Label(self.status_frame, text='', width=30, relief=tk.SUNKEN)
