@@ -124,13 +124,11 @@ class Variable:
     @value.setter
     def value(self, value):
         # value property can only be set if variable is a knob; None value indicates no setting should be applied
-        if hasattr(self, 'knob') and value is not None and value != np.nan:
+        if hasattr(self, 'knob') and value is not None and value is not np.nan:
             self.instrument.set(self.knob, value)
             self._value = self.instrument.__getattribute__(self.knob)
-        elif value is None:
-            pass
         else:
-            raise AssertionError(f'cannot set {self.type}!')
+            pass
 
 ## Routines
 
@@ -189,11 +187,11 @@ class Routine:
             raise AttributeError(f'{self.__name__} routine requires variables!')
 
         if values:
-            self.values = np.array([values]).flatten()
+            self.values = np.array([values], dtype=object).flatten()
 
             # values can be specified in a CSV file
             for i, values_i in enumerate(self.values):
-                if type(values_i) == np.str_:
+                if type(values_i) == str:
                     if '.csv' in values_i:
                         df = pd.read_csv(values_i)
                         self.values[i] = df[df.columns[-1]].values
