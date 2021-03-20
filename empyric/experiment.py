@@ -282,7 +282,7 @@ class Sequence(Routine):
     """
 
     def __init__(self, **kwargs):
-        Routine.__init__(**kwargs)
+        Routine.__init__(self, **kwargs)
 
         self.iteration = 0
 
@@ -309,7 +309,7 @@ class Set(Routine):
 
     def __init__(self, input=None, **kwargs):
 
-        Routine.__init__(**kwargs)
+        Routine.__init__(self, **kwargs)
 
         if inputs:
             self.inputs = inputs
