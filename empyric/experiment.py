@@ -189,7 +189,7 @@ class Routine:
             raise AttributeError(f'{self.__name__} routine requires variables!')
 
         if values:
-            self.values = values
+            self.values = np.array([values]).flatten()
 
             # values can be specified in a CSV file
             for i, values_i in enumerate(self.values):
@@ -198,7 +198,7 @@ class Routine:
                         df = pd.read_csv(values_i)
                         self.values[i] = df[df.columns[-1]].values
 
-            self.values = np.array([self.values]).flatten().reshape((len(self.variables),-1)) # make rows match self.variables
+            self.values = self.values.reshape((len(self.variables),-1)) # make rows match self.variables
         else:
             raise AttributeError(f'{self.__name__} routine requires values!')
 
