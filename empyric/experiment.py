@@ -193,7 +193,7 @@ class Routine:
 
             # values can be specified in a CSV file
             for i, values_i in enumerate(self.values):
-                if type(values_i) == str:
+                if type(values_i) == np.str_:
                     if '.csv' in values_i:
                         df = pd.read_csv(values_i)
                         self.values[i] = df[df.columns[-1]].values
