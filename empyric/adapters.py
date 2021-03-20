@@ -410,7 +410,7 @@ class PrologixGPIBUSB:
 
         port = None
         for comport in list_ports.comports():
-            if comport.interface == 'Prologix GPIB-USB Controller':
+            if comport.manufacturer == 'Prologix':
                 port = comport.device
 
         if port:
