@@ -14,6 +14,8 @@ import threading
 import queue
 import tkinter as tk
 from tkinter.filedialog import askopenfilename
+from ruamel.yaml import YAML
+yaml = YAML()
 
 from empyric import instruments as instr
 from empyric import adapters, graphics
@@ -191,9 +193,10 @@ class Routine:
 
             # values can be specified in a CSV file
             for i, values_i in enumerate(self.values):
-                if values_i == 'csv':
-                    df = pd.read_csv(values_i)
-                    self.values[i] = df[df.columns[-1]].values
+                if type(values_i) == str:
+                    if '.csv' in values_i:
+                        df = pd.read_csv(values_i)
+                        self.values[i] = df[df.columns[-1]].values
 
             self.values = np.array([self.values]).flatten().reshape((len(self.variables),-1)) # make rows match self.variables
         else:
@@ -419,7 +422,7 @@ class Experiment:
         if Experiment.RUNNING in self.status:
             for name, routine in self.routines.items():
                 self.status = Experiment.RUNNING + f': executing {name}'
-                self.state.update(routine.update(self.state))
+                routine.update(self.state)
             self.status = Experiment.RUNNING
 
         elif Experiment.STOPPED in self.status:
@@ -490,17 +493,24 @@ class Experiment:
         self.status = Experiment.TERMINATED
 
 
-def build_experiment(runcard, instruments=None):
+def build_experiment(runcard, settings=None, instruments=None, alarms=None):
     """
     Build an Experiment object based on a runcard, in the form of a .yaml file or a dictionary
 
-    :param runcard: (dict) the description of the experiment in the runcard format
-    :param instruments: (None) variable pointing to instruments, if needed
+    :param runcard: (dict/str) description of the experiment in the runcard format; can be a path
+    :param settings: (dict) dictionary of settings to be populated
+    :param instruments: (dict) dictionary instruments to be populated
+    :param alarms: (dict) dictionary of alarms to be populated
+
     :return: (Experiment) the experiment described by the runcard
     """
 
     if instruments is None:
         instruments = {}
+
+    # If given a settings keyword argument, get settings from runcard and store it there
+    if 'Settings' in runcard and settings is not None:
+        settings.update(runcard['Settings'])
 
     for name, specs in runcard['Instruments'].items():
 
@@ -540,6 +550,15 @@ def build_experiment(runcard, instruments=None):
             specs['variables'] = {name: variables[name] for name in np.array([specs['variables']]).flatten()}
             routines[name] = routines_dict[_type](**specs)
 
+    # Set up any alarms
+    if 'Alarms' in runcard and alarms is not None:
+        alarms.update({
+            name: Alarm(
+                variables[specs['variable']], specs['condition'],
+                protocol=specs.get('protocol', None)
+            ) for name, specs in runcard['Alarms'].items()
+        })
+
     return Experiment(variables, routines=routines)
 
 
@@ -548,31 +567,34 @@ class Manager:
     Utility class which sets up and manages the above experiments
     """
 
-    @property
-    def runcard(self):
-        return self._runcard
+    def __init__(self, runcard=None):
+        """
+        :param runcard: (dict/str) runcard as a dictionary or path pointing to a runcard
+        """
 
-    @runcard.setter
-    def runcard(self, runcard):
-
-        if isinstance(runcard, str):  # runcard argument can be a path string
-            with open(runcard, 'rb') as runcard_file:
-                self._runcard = self.yaml.load(runcard_file)
-
-            os.chdir(os.path.dirname(runcard))
-        elif isinstance(runcard, dict):  # ... or a properly formatted dictionary
-            self._runcard = runcard
+        if not runcard:
+            # Have user locate runcard
+            root = tk.Tk()
+            root.withdraw()
+            self.runcard = askopenfilename(parent=root, title='Select Runcard', filetypes=[('YAML files', '*.yaml')])
         else:
-            raise ValueError('runcard not recognized!')
+            self.runcard = runcard
 
-        # Register settings
-        self.settings = self._runcard.get('Settings', {})
+        if type(self.runcard) == str:
+            with open(self.runcard) as runcard_file:
+                self.runcard = yaml.load(runcard_file)
 
+        self.instruments = {}  # instruments will be stored here, so that they can be disconnected after the experiment
+        self.alarms = {}
+        self.settings = {}
+        self.experiment = build_experiment(self.runcard, settings=self.settings, instruments=self.instruments, alarms=self.alarms)
+
+        # Unpack settings
         self.step_interval = self.settings.get('step interval', 0.1)
         self.save_interval = self.settings.get('save interval', 60)
         self.last_step = self.last_save = float('-inf')
 
-        self.followup = self.settings.get('follow-up', None)        # Register settings
+        self.followup = self.settings.get('follow-up', None)  # Register settings
         self.settings = self.runcard.get('Settings', {})
 
         self.step_interval = self.settings.get('step interval', 0.1)
@@ -580,36 +602,6 @@ class Manager:
         self.last_step = self.last_save = float('-inf')
 
         self.followup = self.settings.get('follow-up', None)
-
-        # Rebuild the experiment based on the new runcard
-        self.instruments = {}  # experiment instruments will be stored here
-        self.experiment = build_experiment(self._runcard, instruments=self.instruments)
-
-        # Set up any alarms
-        if 'Alarms' in self._runcard:
-            self.alarms = {
-                name: Alarm(
-                    self.experiment.variables[specs['variable']], specs['condition'],
-                    protocol=specs.get('protocol', None)
-                ) for name, specs in self._runcard['Alarms'].items()
-            }
-        else:
-            self.alarms = {}
-
-    def __init__(self, runcard=None):
-
-        try:
-            self.yaml = importlib.import_module('ruamel.yaml').YAML()
-        except ImportError:
-            raise ImportError('Using the Manager requires the ruamel.yaml module!')
-
-        if runcard:
-            self.runcard = runcard
-        else:
-            # Have user locate runcard
-            root = tk.Tk()
-            root.withdraw()
-            self.runcard = askopenfilename(parent=root, title='Select Runcard', filetypes=[('YAML files', '*.yaml')])
 
         # For use with alarms
         self.awaiting_alarms = False
@@ -628,8 +620,11 @@ class Manager:
         os.chdir(working_dir)
 
         # Save executed runcard alongside data for record keeping
+        from ruamel.yaml import YAML
+        yaml = YAML()
+
         with open(f"{experiment_name}_{self.experiment.timestamp}.yaml", 'w') as runcard_file:
-            self.yaml.dump(self.runcard, runcard_file)
+            yaml.dump(self.runcard, runcard_file)
 
         # Run experiment loop in separate thread
         experiment_thread = threading.Thread(target=self._run)
