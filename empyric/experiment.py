@@ -433,10 +433,14 @@ class Experiment:
         self.state.name = datetime.datetime.now()
 
         # Apply new settings to knobs according to the routines (if there are any and the experiment is running)
-        if Experiment.RUNNING in self.status:
-            for name, routine in self.routines.items():
+        for name, routine in self.routines.items():
+            if Experiment.RUNNING in self.status:  # make sure experiment has not been stopped during routine execution
                 self.status = Experiment.RUNNING + f': executing {name}'
                 routine.update(self.state)
+            else:
+                break
+
+        if Experiment.RUNNING in self.status:
             self.status = Experiment.RUNNING
 
         elif Experiment.STOPPED in self.status:
@@ -448,16 +452,19 @@ class Experiment:
         # Get all variable values
         base_status = self.status
         for name, variable in self.variables.items():
-            self.status = base_status + f': retrieving {name}'
-            value = variable.value
+            if Experiment.RUNNING in self.status or Experiment.HOLDING in self.status:
+                self.status = base_status + f': retrieving {name}'
+                value = variable.value
 
-            if np.size(value) > 1: # store array data as CSV files
-                dataframe = pd.DataFrame({name: value}, index=[self.state.name]*len(value))
-                path = name.replace(' ','_') +'_' + self.state.name.strftime('%Y%m%d-%H%M%S') + '.csv'
-                dataframe.to_csv(path)
-                self.state[name] = path
+                if np.size(value) > 1: # store array data as CSV files
+                    dataframe = pd.DataFrame({name: value}, index=[self.state.name]*len(value))
+                    path = name.replace(' ','_') +'_' + self.state.name.strftime('%Y%m%d-%H%M%S') + '.csv'
+                    dataframe.to_csv(path)
+                    self.state[name] = path
+                else:
+                    self.state[name] = value
             else:
-                self.state[name] = value
+                break
 
         self.status = base_status
 
