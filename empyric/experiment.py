@@ -596,10 +596,10 @@ class Manager:
 
         if type(self.runcard) == str:
 
-            os.chdir(os.path.dirname(self.runcard))  # go to runcard directory
-            
+            os.chdir(os.path.dirname(self.runcard))  # go to runcard directory to put data in same location
+
             with open(self.runcard) as runcard_file:
-                self.runcard = yaml.load(runcard_file)
+                self.runcard = yaml.load(runcard_file)  # load the runcard
 
         self.instruments = {}  # instruments will be stored here, so that they can be disconnected after the experiment
         self.alarms = {}
