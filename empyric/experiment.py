@@ -187,18 +187,34 @@ class Routine:
             raise AttributeError(f'{self.__name__} routine requires variables!')
 
         if values:
-            self.values = np.array([values], dtype=object).flatten()
 
-            # values can be specified in a CSV file
-            for i, values_i in enumerate(self.values):
-                if type(values_i) == str:
-                    if '.csv' in values_i:
-                        df = pd.read_csv(values_i)
-                        self.values[i] = df[df.columns[-1]].values
+            if np.array(variables).ndim == 0:  # single variable given as a scalar
 
-            self.values = self.values.reshape((len(self.variables),-1)) # make rows match self.variables
+                if type(values) == str:
+                    if '.csv' in values:  # values stored in a CSV file
+                        df = pd.read_csv(values)
+                        values = df[df.columns[-1]].values.reshape((1,len(df)))
+
+                self.values = np.array(values).reshape((1,-1))
+
+            else:  # list of variables
+
+                if len(values) != len(variables):
+                    raise ValueError('Routine values arguments must have the same length as the variables argument')
+
+                self.values = []
+
+                for element in values:
+
+                    if type(element) == str:
+                        if '.csv' in values:  # values stored in a CSV file
+                            df = pd.read_csv(element)
+                            element = df[df.columns[-1]].values
+
+                    self.values.append(np.array(element).reshape(1))
+
         else:
-            raise AttributeError(f'{self.__name__} routine requires values!')
+            raise AttributeError(f'{self.__name__} routine requires values')
 
 
         self.start = convert_time(start)
