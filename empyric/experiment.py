@@ -314,7 +314,7 @@ class Sequence(Routine):
             variable.value = value
             update[name] = value
 
-        self.iteration = (self.iteration + 1) % len(self.values)
+        self.iteration = (self.iteration + 1) % len(values)
 
         return update
 
