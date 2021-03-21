@@ -598,6 +598,8 @@ class Manager:
             with open(self.runcard) as runcard_file:
                 self.runcard = yaml.load(runcard_file)
 
+            os.chdir(os.path.dirname(runcard))  # go to runcard directory
+
         self.instruments = {}  # instruments will be stored here, so that they can be disconnected after the experiment
         self.alarms = {}
         self.settings = {}
