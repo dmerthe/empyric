@@ -393,11 +393,24 @@ class Experiment:
     """
 
     # Possible statuses of an experiment
-    READY = 'Ready'  # Experiment is initialized but not yet started
+    READY = 'Ready'  # Experiment is waiting to start
     RUNNING = 'Running'  # Experiment is running
     HOLDING = 'Holding'  # Routines are stopped, but measurements are ongoing
     STOPPED = 'Stopped'  # Both routines and measurements are stopped
     TERMINATED = 'Terminated'  # Experiment has either finished or has been terminated by the user
+
+    @property
+    def status(self):
+        return self._status
+
+    @status.setter
+    def status(self, status):
+        prior_base_status = self._status.split(':')[0]
+        new_base_status =  status.split(':')[0]
+
+        # Only allow change if the status is unlocked, or if the base status is the same
+        if not self.status_locked or new_base_status == prior_base_status:
+            self._status = status
 
     def __init__(self, variables, routines=None):
 
@@ -419,40 +432,42 @@ class Experiment:
 
         self.state = pd.Series({column: None for column in self.data.columns})
         self.state['time'] = 0
-        self.status = Experiment.READY
+
+        self._status = Experiment.READY
+        status_locked = True  # can only be unlocked by the start, hold, stop and terminate methods
 
     def __next__(self):
 
         # Start the clock on first call
         if self.state.name is None:  # indicates that this is the first step of the experiment
+            self.start()
             self.status = Experiment.RUNNING + ': initializing...'
-            self.clock.start()
 
         # Update time
         self.state['time'] = self.clock.time
         self.state.name = datetime.datetime.now()
 
-        # Apply new settings to knobs according to the routines (if there are any and the experiment is running)
-        for name, routine in self.routines.items():
-            if Experiment.RUNNING in self.status:  # make sure experiment has not been stopped during routine execution
-                self.status = Experiment.RUNNING + f': executing {name}'
-                routine.update(self.state)
-            else:
-                break
-
-        if Experiment.RUNNING in self.status:
-            self.status = Experiment.RUNNING
-
-        elif Experiment.STOPPED in self.status:
+        if Experiment.STOPPED in self.status:
             for name, variable in self.variables.items():
                 if variable.type in ['meter', 'expression']:
                     self.state[name] = None
             return self.state
 
-        # Get all variable values
-        base_status = self.status
-        for name, variable in self.variables.items():
-            if Experiment.RUNNING in self.status or Experiment.HOLDING in self.status:
+        # Apply new settings to knobs according to the routines (if there are any and the experiment is running)
+        if Experiment.RUNNING in self.status:
+
+            for name, routine in self.routines.items():
+                self.status = Experiment.RUNNING + f': executing {name}'
+                routine.update(self.state)
+
+            self.status = Experiment.RUNNING
+
+        # Get all variable values if experiment is running or holding
+        if Experiment.RUNNING in self.status or Experiment.HOLDING in self.status:
+
+            base_status = self.status
+
+            for name, variable in self.variables.items():
                 self.status = base_status + f': retrieving {name}'
                 value = variable.value
 
@@ -461,15 +476,14 @@ class Experiment:
                     path = name.replace(' ','_') +'_' + self.state.name.strftime('%Y%m%d-%H%M%S') + '.csv'
                     dataframe.to_csv(path)
                     self.state[name] = path
+
                 else:
                     self.state[name] = value
-            else:
-                break
 
-        self.status = base_status
+            self.status = base_status
 
-        # Append new state to experiment data set
-        self.data.loc[self.state.name] = self.state
+            # Append new state to experiment data set
+            self.data.loc[self.state.name] = self.state
 
         # End the experiment, if the duration of the experiment has passed
         if self.clock.time > self.end:
@@ -498,20 +512,32 @@ class Experiment:
 
     def start(self):
         self.clock.start()
+
+        self.status_locked = False
         self.status = Experiment.RUNNING
+        self.status_locked = True
 
     def hold(self):  # stops routines only
         self.clock.stop()
+
+        self.status_locked = False
         self.status = Experiment.HOLDING
+        self.status_locked = True
 
     def stop(self):  # stops routines and measurements
         self.clock.stop()
+
+        self.status_locked = False
         self.status = Experiment.STOPPED
+        self.status_locked = True
 
     def terminate(self):
         self.stop()
         self.save()
+
+        self.status_locked = False
         self.status = Experiment.TERMINATED
+        self.status_locked = True
 
 
 def build_experiment(runcard, settings=None, instruments=None, alarms=None):
