@@ -1,0 +1,588 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Welcome to empyric’s documentation! &#8212; empyric 0.0.1 documentation</title>
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="welcome-to-empyric-s-documentation">
+<h1>Welcome to empyric’s documentation!<a class="headerlink" href="#welcome-to-empyric-s-documentation" title="Permalink to this headline">¶</a></h1>
+<div class="toctree-wrapper compound">
+</div>
+<span class="target" id="module-empyric.experiment"></span><dl class="py class">
+<dt id="empyric.experiment.Alarm">
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">empyric.experiment.</span></code><code class="sig-name descname"><span class="pre">Alarm</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">variable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">condition</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">protocol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.experiment.Alarm" title="Permalink to this definition">¶</a></dt>
+<dd><p>Monitors a variable, triggers if a condition is met and indicates the response protocol</p>
+</dd></dl>
+
+<dl class="py class">
+<dt id="empyric.experiment.Clock">
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">empyric.experiment.</span></code><code class="sig-name descname"><span class="pre">Clock</span></code><a class="headerlink" href="#empyric.experiment.Clock" title="Permalink to this definition">¶</a></dt>
+<dd><p>Clock for keeping time in an experiment; works like a standard stopwatch</p>
+</dd></dl>
+
+<dl class="py class">
+<dt id="empyric.experiment.Experiment">
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">empyric.experiment.</span></code><code class="sig-name descname"><span class="pre">Experiment</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">variables</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">routines</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.experiment.Experiment" title="Permalink to this definition">¶</a></dt>
+<dd><p>An iterable class which represents an experiment; iterates through any assigned routines,
+and retrieves and stores the values of all experiment variables.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt id="empyric.experiment.Hold">
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">empyric.experiment.</span></code><code class="sig-name descname"><span class="pre">Hold</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">variables</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">values</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">inf</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.experiment.Hold" title="Permalink to this definition">¶</a></dt>
+<dd><p>Holds a fixed value</p>
+<dl class="py method">
+<dt id="empyric.experiment.Hold.update">
+<code class="sig-name descname"><span class="pre">update</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.experiment.Hold.update" title="Permalink to this definition">¶</a></dt>
+<dd><p>Updates the controlled variables and returns the new substate; overwritten by child classes</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>state</strong> – (dict/Series) state of the calling experiment or process in the form, {…, variable: value, …}</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>(dict/Series) substate with the updated values of the controlled variables</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="empyric.experiment.Manager">
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">empyric.experiment.</span></code><code class="sig-name descname"><span class="pre">Manager</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">runcard</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.experiment.Manager" title="Permalink to this definition">¶</a></dt>
+<dd><p>Utility class which sets up and manages the above experiments</p>
+</dd></dl>
+
+<dl class="py class">
+<dt id="empyric.experiment.Maximize">
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">empyric.experiment.</span></code><code class="sig-name descname"><span class="pre">Maximize</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">variables</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">values</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">inf</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.experiment.Maximize" title="Permalink to this definition">¶</a></dt>
+<dd><p>Mazimize a variable influenced by a knob</p>
+</dd></dl>
+
+<dl class="py class">
+<dt id="empyric.experiment.Minimize">
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">empyric.experiment.</span></code><code class="sig-name descname"><span class="pre">Minimize</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">variables</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">values</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">inf</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.experiment.Minimize" title="Permalink to this definition">¶</a></dt>
+<dd><p>Minimize a variable influenced by a knob</p>
+</dd></dl>
+
+<dl class="py class">
+<dt id="empyric.experiment.Routine">
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">empyric.experiment.</span></code><code class="sig-name descname"><span class="pre">Routine</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">variables</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">values</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">inf</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.experiment.Routine" title="Permalink to this definition">¶</a></dt>
+<dd><p>Base class for all routines</p>
+<dl class="py method">
+<dt id="empyric.experiment.Routine.update">
+<code class="sig-name descname"><span class="pre">update</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.experiment.Routine.update" title="Permalink to this definition">¶</a></dt>
+<dd><p>Updates the controlled variables and returns the new substate; overwritten by child classes</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>state</strong> – (dict/Series) state of the calling experiment or process in the form, {…, variable: value, …}</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>(dict/Series) substate with the updated values of the controlled variables</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="empyric.experiment.Sequence">
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">empyric.experiment.</span></code><code class="sig-name descname"><span class="pre">Sequence</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.experiment.Sequence" title="Permalink to this definition">¶</a></dt>
+<dd><p>Passes through a series of values regardless of time</p>
+<dl class="py method">
+<dt id="empyric.experiment.Sequence.update">
+<code class="sig-name descname"><span class="pre">update</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.experiment.Sequence.update" title="Permalink to this definition">¶</a></dt>
+<dd><p>Updates the controlled variables and returns the new substate; overwritten by child classes</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>state</strong> – (dict/Series) state of the calling experiment or process in the form, {…, variable: value, …}</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>(dict/Series) substate with the updated values of the controlled variables</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="empyric.experiment.Set">
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">empyric.experiment.</span></code><code class="sig-name descname"><span class="pre">Set</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.experiment.Set" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sets a knob based on the value of another variable</p>
+<dl class="py method">
+<dt id="empyric.experiment.Set.update">
+<code class="sig-name descname"><span class="pre">update</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.experiment.Set.update" title="Permalink to this definition">¶</a></dt>
+<dd><p>Updates the controlled variables and returns the new substate; overwritten by child classes</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>state</strong> – (dict/Series) state of the calling experiment or process in the form, {…, variable: value, …}</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>(dict/Series) substate with the updated values of the controlled variables</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="empyric.experiment.Timecourse">
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">empyric.experiment.</span></code><code class="sig-name descname"><span class="pre">Timecourse</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">times</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.experiment.Timecourse" title="Permalink to this definition">¶</a></dt>
+<dd><p>Ramps linearly through a series of values at given times</p>
+<dl class="py method">
+<dt id="empyric.experiment.Timecourse.update">
+<code class="sig-name descname"><span class="pre">update</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.experiment.Timecourse.update" title="Permalink to this definition">¶</a></dt>
+<dd><p>Updates the controlled variables and returns the new substate; overwritten by child classes</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>state</strong> – (dict/Series) state of the calling experiment or process in the form, {…, variable: value, …}</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>(dict/Series) substate with the updated values of the controlled variables</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="empyric.experiment.Variable">
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">empyric.experiment.</span></code><code class="sig-name descname"><span class="pre">Variable</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">instrument</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">knob</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">meter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">expression</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">definitions</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.experiment.Variable" title="Permalink to this definition">¶</a></dt>
+<dd><p>Basic representation of an experimental variable; comes in 3 kinds: knob, meter and expression.
+Knobs can be set, meters can be measured and expressions can be calculated.</p>
+<p>A knob is a variable that can be directly controlled by an instrument, e.g. the voltage of a power supply.</p>
+<p>A meter is a variable that is measured by an instrument, such as temperature. Some meters can be controlled directly or indirectly through an associated (but distinct) knob.</p>
+<p>An expression is a variable that is not directly measured, but is calculated based on other variables of the experiment.
+An example of an expression is the output power of a power supply, where voltage is a knob and current is a meter: power = voltage * current.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt id="empyric.experiment.build_experiment">
+<code class="sig-prename descclassname"><span class="pre">empyric.experiment.</span></code><code class="sig-name descname"><span class="pre">build_experiment</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">runcard</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">settings</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">instruments</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alarms</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.experiment.build_experiment" title="Permalink to this definition">¶</a></dt>
+<dd><p>Build an Experiment object based on a runcard, in the form of a .yaml file or a dictionary</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>runcard</strong> – (dict/str) description of the experiment in the runcard format; can be a path</p></li>
+<li><p><strong>settings</strong> – (dict) dictionary of settings to be populated</p></li>
+<li><p><strong>instruments</strong> – (dict) dictionary instruments to be populated</p></li>
+<li><p><strong>alarms</strong> – (dict) dictionary of alarms to be populated</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>(Experiment) the experiment described by the runcard</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt id="empyric.experiment.convert_time">
+<code class="sig-prename descclassname"><span class="pre">empyric.experiment.</span></code><code class="sig-name descname"><span class="pre">convert_time</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time_value</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.experiment.convert_time" title="Permalink to this definition">¶</a></dt>
+<dd><p>If time_value is a string, converts a time of the form “number units” (e.g. “3.5 hours”) to the time in seconds.
+If time_value is a number, just returns the same number
+If time_value is an array, it iterates through the array doing either of the previous two operations on every element.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>time_value</strong> – (str/float) time value, possibly including units such as ‘hours’</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>(int) time in seconds</p>
+</dd>
+</dl>
+</dd></dl>
+
+<span class="target" id="module-empyric.adapters"></span><dl class="py class">
+<dt id="empyric.adapters.Adapter">
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">empyric.adapters.</span></code><code class="sig-name descname"><span class="pre">Adapter</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">instrument</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.adapters.Adapter" title="Permalink to this definition">¶</a></dt>
+<dd><p>Adapters connect instruments defined in an experiment to the appropriate communication backends.</p>
+<dl class="py method">
+<dt id="empyric.adapters.Adapter.query">
+<code class="sig-name descname"><span class="pre">query</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">validator</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.adapters.Adapter.query" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>self</strong> – (Adapter) the adapter object whose method is being wrapped</p></li>
+<li><p><strong>args</strong> – any arguments to the method to be wrapped</p></li>
+<li><p><strong>validator</strong> – (callable) function that returns True if its input looks right or False if it does not</p></li>
+<li><p><strong>kwargs</strong> – any keyword arguments for the method to be wrapped</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>(str/float/int/bool) instrument response, if valid</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="empyric.adapters.Adapter.read">
+<code class="sig-name descname"><span class="pre">read</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">validator</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.adapters.Adapter.read" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>self</strong> – (Adapter) the adapter object whose method is being wrapped</p></li>
+<li><p><strong>args</strong> – any arguments to the method to be wrapped</p></li>
+<li><p><strong>validator</strong> – (callable) function that returns True if its input looks right or False if it does not</p></li>
+<li><p><strong>kwargs</strong> – any keyword arguments for the method to be wrapped</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>(str/float/int/bool) instrument response, if valid</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="empyric.adapters.LinuxGPIB">
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">empyric.adapters.</span></code><code class="sig-name descname"><span class="pre">LinuxGPIB</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">instrument</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.adapters.LinuxGPIB" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handles communications with GPIB instruments through the Linux-GPIB interface</p>
+<dl class="py method">
+<dt id="empyric.adapters.LinuxGPIB.query">
+<code class="sig-name descname"><span class="pre">query</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">validator</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.adapters.LinuxGPIB.query" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>self</strong> – (Adapter) the adapter object whose method is being wrapped</p></li>
+<li><p><strong>args</strong> – any arguments to the method to be wrapped</p></li>
+<li><p><strong>validator</strong> – (callable) function that returns True if its input looks right or False if it does not</p></li>
+<li><p><strong>kwargs</strong> – any keyword arguments for the method to be wrapped</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>(str/float/int/bool) instrument response, if valid</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="empyric.adapters.LinuxGPIB.read">
+<code class="sig-name descname"><span class="pre">read</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">validator</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.adapters.LinuxGPIB.read" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>self</strong> – (Adapter) the adapter object whose method is being wrapped</p></li>
+<li><p><strong>args</strong> – any arguments to the method to be wrapped</p></li>
+<li><p><strong>validator</strong> – (callable) function that returns True if its input looks right or False if it does not</p></li>
+<li><p><strong>kwargs</strong> – any keyword arguments for the method to be wrapped</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>(str/float/int/bool) instrument response, if valid</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="empyric.adapters.Modbus">
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">empyric.adapters.</span></code><code class="sig-name descname"><span class="pre">Modbus</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">instrument</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.adapters.Modbus" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handles communications with modbus serial instruments through the Minimal Modbus package</p>
+<dl class="py method">
+<dt id="empyric.adapters.Modbus.read">
+<code class="sig-name descname"><span class="pre">read</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">validator</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.adapters.Modbus.read" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>self</strong> – (Adapter) the adapter object whose method is being wrapped</p></li>
+<li><p><strong>args</strong> – any arguments to the method to be wrapped</p></li>
+<li><p><strong>validator</strong> – (callable) function that returns True if its input looks right or False if it does not</p></li>
+<li><p><strong>kwargs</strong> – any keyword arguments for the method to be wrapped</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>(str/float/int/bool) instrument response, if valid</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="empyric.adapters.Phidget">
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">empyric.adapters.</span></code><code class="sig-name descname"><span class="pre">Phidget</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">instrument</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.adapters.Phidget" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="py method">
+<dt id="empyric.adapters.Phidget.get">
+<code class="sig-name descname"><span class="pre">get</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">validator</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.adapters.Phidget.get" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>self</strong> – (Adapter) the adapter object whose method is being wrapped</p></li>
+<li><p><strong>args</strong> – any arguments to the method to be wrapped</p></li>
+<li><p><strong>validator</strong> – (callable) function that returns True if its input looks right or False if it does not</p></li>
+<li><p><strong>kwargs</strong> – any keyword arguments for the method to be wrapped</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>(str/float/int/bool) instrument response, if valid</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="empyric.adapters.PrologixGPIB">
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">empyric.adapters.</span></code><code class="sig-name descname"><span class="pre">PrologixGPIB</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">instrument</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.adapters.PrologixGPIB" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handles communications with GPIB instruments using the Prologix GPIB-USB adapter</p>
+<dl class="py method">
+<dt id="empyric.adapters.PrologixGPIB.query">
+<code class="sig-name descname"><span class="pre">query</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">validator</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.adapters.PrologixGPIB.query" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>self</strong> – (Adapter) the adapter object whose method is being wrapped</p></li>
+<li><p><strong>args</strong> – any arguments to the method to be wrapped</p></li>
+<li><p><strong>validator</strong> – (callable) function that returns True if its input looks right or False if it does not</p></li>
+<li><p><strong>kwargs</strong> – any keyword arguments for the method to be wrapped</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>(str/float/int/bool) instrument response, if valid</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="empyric.adapters.PrologixGPIB.read">
+<code class="sig-name descname"><span class="pre">read</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">validator</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.adapters.PrologixGPIB.read" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>self</strong> – (Adapter) the adapter object whose method is being wrapped</p></li>
+<li><p><strong>args</strong> – any arguments to the method to be wrapped</p></li>
+<li><p><strong>validator</strong> – (callable) function that returns True if its input looks right or False if it does not</p></li>
+<li><p><strong>kwargs</strong> – any keyword arguments for the method to be wrapped</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>(str/float/int/bool) instrument response, if valid</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="empyric.adapters.PrologixGPIBUSB">
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">empyric.adapters.</span></code><code class="sig-name descname"><span class="pre">PrologixGPIBUSB</span></code><a class="headerlink" href="#empyric.adapters.PrologixGPIBUSB" title="Permalink to this definition">¶</a></dt>
+<dd><p>Wraps serial communications with the Prologix GPIB-USB adapter</p>
+</dd></dl>
+
+<dl class="py class">
+<dt id="empyric.adapters.Serial">
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">empyric.adapters.</span></code><code class="sig-name descname"><span class="pre">Serial</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">instrument</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.adapters.Serial" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handles communications with serial instruments through the PySerial module</p>
+<dl class="py method">
+<dt id="empyric.adapters.Serial.query">
+<code class="sig-name descname"><span class="pre">query</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">validator</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.adapters.Serial.query" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>self</strong> – (Adapter) the adapter object whose method is being wrapped</p></li>
+<li><p><strong>args</strong> – any arguments to the method to be wrapped</p></li>
+<li><p><strong>validator</strong> – (callable) function that returns True if its input looks right or False if it does not</p></li>
+<li><p><strong>kwargs</strong> – any keyword arguments for the method to be wrapped</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>(str/float/int/bool) instrument response, if valid</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="empyric.adapters.Serial.read">
+<code class="sig-name descname"><span class="pre">read</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">validator</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.adapters.Serial.read" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>self</strong> – (Adapter) the adapter object whose method is being wrapped</p></li>
+<li><p><strong>args</strong> – any arguments to the method to be wrapped</p></li>
+<li><p><strong>validator</strong> – (callable) function that returns True if its input looks right or False if it does not</p></li>
+<li><p><strong>kwargs</strong> – any keyword arguments for the method to be wrapped</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>(str/float/int/bool) instrument response, if valid</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="empyric.adapters.USBTMC">
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">empyric.adapters.</span></code><code class="sig-name descname"><span class="pre">USBTMC</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">instrument</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.adapters.USBTMC" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handles communications with pure USB instruments through the USBTMC interface</p>
+<dl class="py method">
+<dt id="empyric.adapters.USBTMC.query">
+<code class="sig-name descname"><span class="pre">query</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">validator</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.adapters.USBTMC.query" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>self</strong> – (Adapter) the adapter object whose method is being wrapped</p></li>
+<li><p><strong>args</strong> – any arguments to the method to be wrapped</p></li>
+<li><p><strong>validator</strong> – (callable) function that returns True if its input looks right or False if it does not</p></li>
+<li><p><strong>kwargs</strong> – any keyword arguments for the method to be wrapped</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>(str/float/int/bool) instrument response, if valid</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt id="empyric.adapters.USBTMC.read">
+<code class="sig-name descname"><span class="pre">read</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">validator</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.adapters.USBTMC.read" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>self</strong> – (Adapter) the adapter object whose method is being wrapped</p></li>
+<li><p><strong>args</strong> – any arguments to the method to be wrapped</p></li>
+<li><p><strong>validator</strong> – (callable) function that returns True if its input looks right or False if it does not</p></li>
+<li><p><strong>kwargs</strong> – any keyword arguments for the method to be wrapped</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>(str/float/int/bool) instrument response, if valid</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt id="empyric.adapters.VISAGPIB">
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">empyric.adapters.</span></code><code class="sig-name descname"><span class="pre">VISAGPIB</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">instrument</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.adapters.VISAGPIB" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handles communications with GPIB instruments through the PyVISA module and NI-VISA</p>
+</dd></dl>
+
+<dl class="py class">
+<dt id="empyric.adapters.VISASerial">
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">empyric.adapters.</span></code><code class="sig-name descname"><span class="pre">VISASerial</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">instrument</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.adapters.VISASerial" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handles communications with serial instruments through the PyVISA module and NI-VISA</p>
+</dd></dl>
+
+<dl class="py class">
+<dt id="empyric.adapters.VISAUSB">
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">empyric.adapters.</span></code><code class="sig-name descname"><span class="pre">VISAUSB</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">instrument</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.adapters.VISAUSB" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handles communications with pure USB instruments through the PyVISA module and NI-VISA</p>
+</dd></dl>
+
+<dl class="py function">
+<dt id="empyric.adapters.chaperone">
+<code class="sig-prename descclassname"><span class="pre">empyric.adapters.</span></code><code class="sig-name descname"><span class="pre">chaperone</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">method</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#empyric.adapters.chaperone" title="Permalink to this definition">¶</a></dt>
+<dd><p>Wraps all read and query methods of adapters; monitors and handles communication issues</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>method</strong> – (callable) method to be wrapped</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>(callable) wrapped method</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+<div class="section" id="indices-and-tables">
+<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h1>
+<ul class="simple">
+<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
+<li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></p></li>
+<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
+</ul>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="#">empyric</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="#">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2021, Daniel Merthe.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.5.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/index.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
