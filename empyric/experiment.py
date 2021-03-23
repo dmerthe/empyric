@@ -710,6 +710,7 @@ class Manager:
 
 
     def _run(self):
+        # Run in a separate thread
 
         for state in self.experiment:
 

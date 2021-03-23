@@ -10,12 +10,6 @@ Welcome to empyric's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-.. automodule:: empyric.experiment
-   :members:
-   
-.. automodule:: empyric.adapters
-   :members:
-
 
 Indices and tables
 ==================
@@ -23,3 +17,24 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
+
+Variables, Routines & Experiments
+---------------------------------
+.. automodule:: empyric.experiment
+   :members:
+   
+GUI & Plots
+-----------
+.. automodule:: empyric.graphics
+   :members:
+
+Adapters
+--------
+.. automodule:: empyric.adapters
+   :members:
+
+Instruments
+-----------
+.. automodule:: empyric.instruments
+   :members:
+
