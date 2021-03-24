@@ -500,6 +500,7 @@ class Experiment:
     def save(self, directory=None):
         """
         Save the experiment dataframe to a CSV file
+
         :param directory: (path) (optional) directory to save data to, if different from working directory
         :return: None
         """
@@ -518,6 +519,7 @@ class Experiment:
     def start(self):
         """
         Start the experiment: clock starts/resumes, routines resume, measurements continue
+
         :return: None
         """
         self.clock.start()
@@ -529,6 +531,7 @@ class Experiment:
     def hold(self):
         """
         Hold the experiment: clock stops, routines stop, measurements continue
+
         :return: None
         """
         self.clock.stop()
@@ -540,6 +543,7 @@ class Experiment:
     def stop(self):
         """
         Stop the experiment: clock stops, routines stop, measurements stop
+
         :return: None
         """
         self.clock.stop()
@@ -551,7 +555,8 @@ class Experiment:
     def terminate(self):
         """
         Terminate the experiment: clock, routines and measurements stop, data is saved and StopIteration is raised
-        :return:
+
+        :return: None
         """
         self.stop()
         self.save()
@@ -637,6 +642,7 @@ class Manager:
 
     def __init__(self, runcard=None):
         """
+
         :param runcard: (dict/str) runcard as a dictionary or path pointing to a runcard
         """
 
@@ -680,6 +686,7 @@ class Manager:
     def run(self, directory=None):
         """
         Run the experiment defined by the runcard. A GUI shows experiment status, while the experiment is run in a separate thread.
+
         :param directory: (path) (optional) directory in which to run the experiment if different from the working directory
         :return: None
         """
