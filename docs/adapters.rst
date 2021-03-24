@@ -1,4 +1,4 @@
-.. adapters:
+.. _adapters-section:
 
 Adapters
 ========
