@@ -69,16 +69,24 @@ class Instrument:
     Basic representation of an instrument, essentially a set of knobs and meters
     """
 
+    #: Once connected via an adapter, the name of the instrument is converted to self.name + '@' + self.address
     name = 'Instrument'
 
+    #: Each instrument has a set of supported adapters, e.g. serial, GPIB or USB
     supported_adapters = (
         (Adapter, {}),
     )
 
+    #: Each instrument has a set of knobs
     knobs = tuple()
-    presets = {}  # values knobs should be when instrument is connected
+
+    #: The presets attribute indicate how the instrument should be configured upon connection
+    presets = {}
+
+    #: The postsets attribute indicate how the instrument should be configured upon disconnection
     postsets = {}  # values knobs should be when instrument is disconnected
 
+    #: Each instrument has a set of meters
     meters = tuple()
 
     def __init__(self, address=None, adapter=None, presets=None, postsets=None, **kwargs):
@@ -212,6 +220,11 @@ class Instrument:
         return measurement
 
     def disconnect(self):
+        """
+        Apply any postsets to the instrument and disconnect the adapter
+
+        :return: None
+        """
 
         if self.adapter.connected:
             for knob, value in self.postsets.items():
@@ -233,6 +246,7 @@ class HenonMapper(Instrument):
     It has two virtual knobs (a,b) and two virtual meters (x,y), useful for testing in the absence of actual instruments.
     """
 
+    #: Once connected
     name = 'HenonMapper'
 
     supported_adapters = (

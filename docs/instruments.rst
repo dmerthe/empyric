@@ -6,19 +6,25 @@ The instruments listed below are supported by the empyric module. All supported 
 .. autoclass:: empyric.collection.instrument.Instrument
    :members:
 
-An instrument is generally a collection of knobs and meters that you set and measure, respectively, through an adapter (see :ref:`adapters-section`). The methods for setting knobs are of the format, ``set_knob_name`` or ``set('knob_name')``, where ``knob_name`` is the name of the knob. Similarly, measuring a meter is done by calling the instrument's ``measure_meter_name`` or ``measure('meter_name')`` methods.
+An instrument is generally a collection of knobs and meters that you set and measure, respectively, through an adapter (see :ref:`adapters-section`). The methods for setting knobs are of the format, ``set_knob`` or ``set('knob')``, where ``knob`` is the name of the knob. Similarly, measuring a meter is done by calling the instrument's ``measure_meter`` or ``measure('meter')`` methods.
 
 Often, it is also possible to read a knob value from an instrument, which is done by calling the ``get_knob_name`` method of the instrument, if it has one.
+
+Each instrument has a one or more supported adapters, found by retrieving the ``supported_adapters`` attribute of the class.
 
 The Collection
 --------------
 
 .. toctree::
    :maxdepth: 2
-
+	
+   humans
+   controllers
+   multimeters
    sourcemeters
    barometers
    spectrometers
+
 
 Virtual Instruments
 -------------------
