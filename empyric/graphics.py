@@ -1,6 +1,3 @@
-import matplotlib
-matplotlib.use('TkAgg')
-
 import time
 import threading
 import queue
