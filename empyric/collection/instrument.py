@@ -140,12 +140,35 @@ class Instrument:
 
     # map write, read and query methods to the adapter's
     def write(self, *args, **kwargs):
+        """
+        Alias for the adapter's write method
+
+        :param args: any arguments for the adapter's write method, usually including a command string
+        :param kwargs: any arguments for the adapter's write method
+        :return: whatever is returned by the adapter's write method, usually None
+        """
         return self.adapter.write(*args, **kwargs)
 
     def read(self, *args, **kwargs):
+        """
+        Alias for the adapter's read method
+
+        :param args: any arguments for the adapter's read method, usually empty
+        :param kwargs: any arguments for the adapter's write method
+        :return: whatever is returned by the adapter's write method, usually a response string
+        """
+
         return self.adapter.read(*args, **kwargs)
 
     def query(self, *args, **kwargs):
+        """
+        Alias for the adapter's query method, if it has one
+
+        :param args: any arguments for the adapter's read method, usually including a query string
+        :param kwargs: any arguments for the adapter's write method
+        :return: whatever is returned by the adapter's write method, usually a response string
+        """
+
         return self.adapter.query(*args, **kwargs)
 
     def set(self, knob, value):
@@ -201,8 +224,11 @@ class Instrument:
 
 class HenonMapper(Instrument):
     """
-    Virtual instrument based on the behavior of a 2D Henon Map
-    It has two virtual knobs and two virtual meters, useful for testing in the absence of actual instruments.
+    Virtual instrument based on the behavior of a 2D Henon Map:
+    x_{n+1} = 1 - a x_n^2 + y_n
+    y_{n+1} = b x_n
+
+    It has two virtual knobs (a,b) and two virtual meters (x,y), useful for testing in the absence of actual instruments.
     """
 
     name = 'HenonMapper'
@@ -223,14 +249,32 @@ class HenonMapper(Instrument):
 
     @setter
     def set_a(self, value):
+        """
+        Set the parameter a
+
+        :param value: (float) new value for a
+        :return: None
+        """
         pass
 
     @setter
     def set_b(self, value):
+        """
+        Set the parameter b
+
+        :param value: (float) new value for b
+        :return: None
+        """
         pass
 
     @measurer
     def measure_x(self):
+        """
+        Measure the coordinate x.
+        Each call triggers a new iteration, with new values set for x and y based on the Henon Map
+
+        :return: (float) current value of x
+        """
 
         x_new = 1 - self.a * self.x ** 2 + self.y
         y_new = self.b * self.x
@@ -242,5 +286,10 @@ class HenonMapper(Instrument):
 
     @measurer
     def measure_y(self):
+        """
+        Measure the coordinate y
+
+        :return: (float) current value of y
+        """
 
         return self.y
