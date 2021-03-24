@@ -69,7 +69,7 @@ class Instrument:
     Basic representation of an instrument, essentially a set of knobs and meters
     """
 
-    #: Once connected via an adapter, the name of the instrument is converted to self.name + '@' + self.address
+    #: Once connected via an adapter, the name of the instrument is converted to ``self.name + '@' + self.address``
     name = 'Instrument'
 
     #: Each instrument has a set of supported adapters, e.g. serial, GPIB or USB
