@@ -498,6 +498,11 @@ class Experiment:
         return self
 
     def save(self, directory=None):
+        """
+        Save the experiment dataframe to a CSV file
+        :param directory: (path) (optional) directory to save data to, if different from working directory
+        :return: None
+        """
 
         base_status = self.status
         self.status = base_status + ': saving data'
@@ -511,20 +516,32 @@ class Experiment:
         self.status = base_status
 
     def start(self):
+        """
+        Start the experiment: clock starts/resumes, routines resume, measurements continue
+        :return: None
+        """
         self.clock.start()
 
         self.status_locked = False
         self.status = Experiment.RUNNING
         self.status_locked = True
 
-    def hold(self):  # stops routines only
+    def hold(self):
+        """
+        Hold the experiment: clock stops, routines stop, measurements continue
+        :return: None
+        """
         self.clock.stop()
 
         self.status_locked = False
         self.status = Experiment.HOLDING
         self.status_locked = True
 
-    def stop(self):  # stops routines and measurements
+    def stop(self):
+        """
+        Stop the experiment: clock stops, routines stop, measurements stop
+        :return: None
+        """
         self.clock.stop()
 
         self.status_locked = False
@@ -532,6 +549,10 @@ class Experiment:
         self.status_locked = True
 
     def terminate(self):
+        """
+        Terminate the experiment: clock, routines and measurements stop, data is saved and StopIteration is raised
+        :return:
+        """
         self.stop()
         self.save()
 
@@ -657,6 +678,11 @@ class Manager:
         self.awaiting_alarms = False
 
     def run(self, directory=None):
+        """
+        Run the experiment defined by the runcard. A GUI shows experiment status, while the experiment is run in a separate thread.
+        :param directory: (path) (optional) directory in which to run the experiment if different from the working directory
+        :return: None
+        """
 
         # Create a new directory for data storage
         if directory:
