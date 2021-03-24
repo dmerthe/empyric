@@ -225,7 +225,9 @@ class Instrument:
 class HenonMapper(Instrument):
     """
     Virtual instrument based on the behavior of a 2D Henon Map:
+
     x_{n+1} = 1 - a x_n^2 + y_n
+
     y_{n+1} = b x_n
 
     It has two virtual knobs (a,b) and two virtual meters (x,y), useful for testing in the absence of actual instruments.
