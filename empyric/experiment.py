@@ -565,7 +565,7 @@ def build_experiment(runcard, settings=None, instruments=None, alarms=None):
     """
     Build an Experiment object based on a runcard, in the form of a .yaml file or a dictionary
 
-    :param runcard: (dict/str) description of the experiment in the runcard format; can be a path
+    :param runcard: (dict/str) description of the experiment in the runcard format
     :param settings: (dict) dictionary of settings to be populated
     :param instruments: (dict) dictionary instruments to be populated
     :param alarms: (dict) dictionary of alarms to be populated
