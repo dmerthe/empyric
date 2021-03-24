@@ -1,3 +1,5 @@
+.. adapters:
+
 Adapters
 ========
 

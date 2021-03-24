@@ -9,10 +9,10 @@ Empyric: Experiment Automation
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
-
-   experiments
-   adapters
+   
    instruments
+   adapters
+   experiments
    graphics
 
 
