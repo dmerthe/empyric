@@ -17,6 +17,8 @@ Instruments:
  Henon Mapper:
   type: HenonMapper
   address: 1
+  a: 0
+  b: 0
 
 Variables:
  Parameter a:
