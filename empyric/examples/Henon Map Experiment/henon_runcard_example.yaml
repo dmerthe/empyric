@@ -24,11 +24,9 @@ Variables:
  Parameter a:
   instrument: Henon Mapper
   knob: a
-  preset: 1.0
  Parameter b:
   instrument: Henon Mapper
   knob: b
-  preset: 0.3
  Coordinate x:
   instrument: Henon Mapper
   meter: x

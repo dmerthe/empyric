@@ -767,6 +767,9 @@ class Manager:
                     elif 'stop' in alarm.protocol:
                         self.experiment.stop()  # stop routines and measurements, and wait for user action
                         self.awaiting_alarms = True
+                    elif 'terminate' in alarm.protocol:
+                        self.experiment.terminate()
+                        self.awaiting_alarms = True
 
             elif self.awaiting_alarms:
                 # If no alarms are triggered, resume experiment if holding or stopped
