@@ -246,7 +246,6 @@ class HenonMapper(Instrument):
     It has two virtual knobs (a,b) and two virtual meters (x,y), useful for testing in the absence of actual instruments.
     """
 
-    #: Once connected
     name = 'HenonMapper'
 
     supported_adapters = (

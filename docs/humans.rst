@@ -5,3 +5,4 @@ Humans
 
 .. automodule:: empyric.collection.humans
    :members:
+   :undoc-members:

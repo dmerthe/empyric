@@ -8,17 +8,17 @@ import re
 
 def chaperone(method):
     """
-    Wraps all read and query methods of adapters; monitors and handles communication issues
+    Wraps all read methods of the adapters; monitors and handles communication issues
 
     :param method: (callable) method to be wrapped
     :return: (callable) wrapped method
     """
 
-    def wrapped_method(self, *args, validator=None, **kwargs):
+    def wrapped_method(self, validator=None, **kwargs):
         """
+        Read an awaiting message. A validator function can be provided to determine if a response is valid.
+        If a response is invalid, the adapter will try again to read or will try to reset communcations.
 
-        :param self: (Adapter) the adapter object whose method is being wrapped
-        :param args: any arguments to the method to be wrapped
         :param validator: (callable) function that returns True if its input looks right or False if it does not
         :param kwargs: any keyword arguments for the method to be wrapped
         :return: (str/float/int/bool) instrument response, if valid
@@ -31,7 +31,7 @@ def chaperone(method):
         if self.reconnects < self.max_reconnects:
             if self.repeats < self.max_repeats:
                 try:
-                    response = method(self, *args, **kwargs)
+                    response = method(self, **kwargs)
 
                     if validator:
                         valid_response = validator(response)
@@ -48,7 +48,7 @@ def chaperone(method):
                 except BaseException as err:
                     warnings.warn(f'Encountered {err} while trying to read from {self.instrument}')
                     self.repeats += 1
-                    return wrapped_method(self, *args, validator=validator, **kwargs)
+                    return wrapped_method(self, validator=validator, **kwargs)
             else:
                 self.disconnect()
                 time.sleep(self.delay)
@@ -56,9 +56,11 @@ def chaperone(method):
 
                 self.repeats = 0
                 self.reconnects += 1
-                return wrapped_method(self, *args, validator=validator, **kwargs)
+                return wrapped_method(self, validator=validator, **kwargs)
         else:
             raise ConnectionError(f'Unable to communicate with instrument at address {self.instrument.address}!')
+
+    wrapped_method.__doc__ = method.__doc__
 
     return wrapped_method
 
@@ -68,7 +70,10 @@ class Adapter:
     Adapters connect instruments defined in an experiment to the appropriate communication backends.
     """
 
+    #: Maximum number of attempts to read from a port/channel
     max_repeats = 3
+
+    #: Maximum number of times to try to reset communcations
     max_reconnects = 1
 
     kwargs = ['baud_rate', 'timeout', 'delay', 'byte_size', 'parity', 'stop_bits', 'close_port_after_each_call',
@@ -102,20 +107,49 @@ class Adapter:
         return 'Adapter'
 
     def connect(self):
+        """
+        Establishes communcations with the instrument through the appropriate backend
+
+        :return: None
+        """
         self.connected = True
 
     def write(self, message):
+        """
+        Write a command
+
+        :param message: (str/float/int) command message
+        :return: None
+        """
         pass
 
     @chaperone
     def read(self):
+        """
+        Read an awaiting message. A validator function can be provided to determine if a response is valid.
+        If a response is invalid, the adapter will try again to read or will try to reset communcations.
+
+        :param validator: (callable) function that returns True if its input looks right or False if it does not
+        :param kwargs: any keyword arguments for the method to be wrapped
+        :return: (str/float/int/bool) instrument response, if valid
+        """
         pass
 
-    @chaperone
     def query(self, question):
+        """
+        Submit a query; usually implemented by calling the ``write`` method and then the ``read`` method
+
+        :param question: (str/float/int) query message
+        :return: (str/float/int) query response
+        """
         pass
 
     def disconnect(self):
+        """
+        Close communication port/channel
+
+        :return: None
+        """
         self.connected = False
 
 
@@ -169,23 +203,11 @@ class Serial(Adapter):
 
         return response.decode().strip()
 
-    @chaperone
     def query(self, question, until=None, bytes=None):
 
         self.write(question)
         time.sleep(self.delay)
-        self.backend.timeout = self.timeout
-
-        if bytes:
-            response = self.backend.read(bytes)
-        elif until:
-            response = self.backend.read_until(until)
-        else:
-            response = self.backend.read_until(self.input_termination.encode())
-
-        self.backend.reset_input_buffer()
-
-        return response.decode().strip()
+        return self.read(until=until, bytes=bytes)
 
     def disconnect(self):
         self.backend.reset_input_buffer()
@@ -196,6 +218,9 @@ class Serial(Adapter):
 
 
 class VISA:
+    """
+    Base class for VISA adapters; basic communination format is the same for all
+    """
 
     @property
     def timeout(self):
@@ -217,11 +242,10 @@ class VISA:
         self.backend.timeout = 1000 * self.timeout
         return self.backend.read()
 
-    @chaperone
     def query(self, question):
         self.backend.write(question)
         time.sleep(self.delay)
-        return self.backend.read()
+        return self.read()
 
     def disconnect(self):
         self.backend.clear()
@@ -375,11 +399,10 @@ class LinuxGPIB(Adapter):
         self.set_timeout(self.timeout)
         return self.backend.read(self.descr, read_length).decode()
 
-    @chaperone
     def query(self, question):
         self.backend.write(question)
         time.sleep(self.delay)
-        return self.backend.read()
+        return self.read()
 
     def disconnect(self):
         self.backend.clear(self.descr)
@@ -390,7 +413,7 @@ class LinuxGPIB(Adapter):
 
 class PrologixGPIBUSB:
     """
-    Wraps serial communications with the Prologix GPIB-USB adapter
+    Wraps serial communications with the Prologix GPIB-USB adapter; used by ``PrologixGPIB`` adapter
     """
 
     @property
@@ -501,11 +524,10 @@ class PrologixGPIB(Adapter):
         self.backend.timeout = self.timeout
         return self.backend.read(address=self.instrument.address)
 
-    @chaperone
     def query(self, question):
         self.backend.write(question, address=self.instrument.address)
         time.sleep(self.delay)
-        return self.backend.read(address=self.instrument.address)
+        return self.read()
 
     def disconnect(self):
         self.backend.write('clr', to_controller=True, address=self.instrument.address)  # clear the instrument buffers
@@ -541,11 +563,10 @@ class USBTMC(Adapter):
     def read(self):
         return self.backend.read()
 
-    @chaperone
     def query(self, question):
         self.backend.write(question)
         time.sleep(self.delay)
-        return self.backend.read()
+        return self.read()
 
     def disconnect(self):
         self.backend.close()
@@ -638,22 +659,18 @@ class Phidget(Adapter):
             self.backend.setHubPort(address_parts[1])
             self.backend.setChannel(address_parts[2])
 
-
-
         self.backend.openWaitForAttachment(1000*self.timeout)
 
         self.connected = True
 
-    @chaperone
     def get(self, parameter):
-
         try:
             return self.backend.__getattribute__('get'+parameter)()
         except Phidget.Exception:
             return float('nan')
 
     def set(self, parameter, value):
-        set_method = self.backend.__getattribute__('set'+parameter)(value)
+        self.backend.__getattribute__('set'+parameter)(value)
 
     def disconnect(self):
         self.backend.close()

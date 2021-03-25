@@ -5,3 +5,4 @@ Barometers
 
 .. automodule:: empyric.collection.barometers
    :members:
+   :undoc-members:

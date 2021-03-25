@@ -5,3 +5,4 @@ Sourcemeters
 
 .. automodule:: empyric.collection.sourcemeters
    :members:
+   :undoc-members:

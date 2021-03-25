@@ -20,11 +20,13 @@ The Collection
 	
    humans
    controllers
+   supplies
    multimeters
    sourcemeters
+   thermometers
    barometers
    spectrometers
-
+   scopes
 
 Virtual Instruments
 -------------------

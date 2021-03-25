@@ -5,6 +5,9 @@ from empyric.adapters import *
 from empyric.instruments import *
 
 class ConsoleUser(Instrument):
+    """
+    Virtual instrument that simply queries a human operator via the Python console
+    """
 
     name = 'ConsoleUser'
 

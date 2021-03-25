@@ -5,3 +5,4 @@ Spectrometers
 
 .. automodule:: empyric.collection.spectrometers
    :members:
+   :undoc-members:

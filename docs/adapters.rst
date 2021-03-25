@@ -5,3 +5,4 @@ Adapters
 
 .. automodule:: empyric.adapters
    :members:
+   :exclude-members: chaperone
