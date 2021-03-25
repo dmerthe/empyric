@@ -18,15 +18,15 @@ The Collection
 .. toctree::
    :maxdepth: 2
 	
-   humans
-   controllers
-   supplies
-   multimeters
-   sourcemeters
-   thermometers
-   barometers
-   spectrometers
-   scopes
+   instruments/humans
+   instruments/controllers
+   instruments/supplies
+   instruments/multimeters
+   instruments/sourcemeters
+   instruments/thermometers
+   instruments/barometers
+   instruments/spectrometers
+   instruments/scopes
 
 Virtual Instruments
 -------------------

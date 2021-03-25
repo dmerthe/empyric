@@ -653,7 +653,7 @@ class BasicDialog(tk.Toplevel):
 
 class Dashboard(BasicDialog):
     """
-    Once the instruments are selected, this window allows the user to configure and test instruments before setting up an experiment
+    Allows the user to configure instruments while running up an experiment
     """
 
     def __init__(self, parent, instruments):
