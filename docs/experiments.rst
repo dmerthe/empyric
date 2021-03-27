@@ -1,3 +1,5 @@
+.. _experiment-section:
+
 Variables, Routines & Experiments
 =================================
 

@@ -28,10 +28,8 @@ The Collection
    instruments/spectrometers
    instruments/scopes
 
-Virtual Instruments
--------------------
 
-The ``HenonMapper`` class is useful for testing in the absense of a physical instrument:
+The ``HenonMapper`` is a virtual instrument that is useful for testing in the absense of a physical instrument:
    
 .. autoclass:: empyric.collection.instrument.HenonMapper
    :members:

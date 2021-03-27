@@ -14,13 +14,14 @@ def chaperone(method):
     :return: (callable) wrapped method
     """
 
-    def wrapped_method(self, validator=None, **kwargs):
+    def wrapped_method(self, *args, validator=None, **kwargs):
         """
         Read an awaiting message. A validator function can be provided to determine if a response is valid.
         If a response is invalid, the adapter will try again to read or will try to reset communcations.
 
+        :param args: any arguments for the read method
         :param validator: (callable) function that returns True if its input looks right or False if it does not
-        :param kwargs: any keyword arguments for the method to be wrapped
+        :param kwargs: any keyword arguments for the read method
         :return: (str/float/int/bool) instrument response, if valid
         """
 
@@ -31,7 +32,7 @@ def chaperone(method):
         if self.reconnects < self.max_reconnects:
             if self.repeats < self.max_repeats:
                 try:
-                    response = method(self, **kwargs)
+                    response = method(self, *args, **kwargs)
 
                     if validator:
                         valid_response = validator(response)
@@ -48,7 +49,7 @@ def chaperone(method):
                 except BaseException as err:
                     warnings.warn(f'Encountered {err} while trying to read from {self.instrument}')
                     self.repeats += 1
-                    return wrapped_method(self, validator=validator, **kwargs)
+                    return wrapped_method(self, *args, validator=validator, **kwargs)
             else:
                 self.disconnect()
                 time.sleep(self.delay)
@@ -56,7 +57,7 @@ def chaperone(method):
 
                 self.repeats = 0
                 self.reconnects += 1
-                return wrapped_method(self, validator=validator, **kwargs)
+                return wrapped_method(self, *args, validator=validator, **kwargs)
         else:
             raise ConnectionError(f'Unable to communicate with instrument at address {self.instrument.address}!')
 
@@ -70,10 +71,10 @@ class Adapter:
     Adapters connect instruments defined in an experiment to the appropriate communication backends.
     """
 
-    #: Maximum number of attempts to read from a port/channel
+    #: Maximum number of attempts to read from a port/channel, in the event of a communcation error
     max_repeats = 3
 
-    #: Maximum number of times to try to reset communcations
+    #: Maximum number of times to try to reset communcations, in the event of a communcation error
     max_reconnects = 1
 
     kwargs = ['baud_rate', 'timeout', 'delay', 'byte_size', 'parity', 'stop_bits', 'close_port_after_each_call',
@@ -129,18 +130,23 @@ class Adapter:
         Read an awaiting message. A validator function can be provided to determine if a response is valid.
         If a response is invalid, the adapter will try again to read or will try to reset communcations.
 
+
+        :param args: any arguments for the read method
         :param validator: (callable) function that returns True if its input looks right or False if it does not
-        :param kwargs: any keyword arguments for the method to be wrapped
+        :param kwargs: any keyword arguments for the read method
         :return: (str/float/int/bool) instrument response, if valid
         """
         pass
 
+    @chaperone
     def query(self, question):
         """
         Submit a query; usually implemented by calling the ``write`` method and then the ``read`` method
 
-        :param question: (str/float/int) query message
-        :return: (str/float/int) query response
+        :param args: any arguments for the query method
+        :param validator: (callable) function that returns True if its input looks right or False if it does not
+        :param kwargs: any keyword arguments for the query method
+        :return: (str/float/int/bool) instrument response, if valid
         """
         pass
 
@@ -203,6 +209,7 @@ class Serial(Adapter):
 
         return response.decode().strip()
 
+    @chaperone
     def query(self, question, until=None, bytes=None):
 
         self.write(question)
@@ -242,6 +249,7 @@ class VISA:
         self.backend.timeout = 1000 * self.timeout
         return self.backend.read()
 
+    @chaperone
     def query(self, question):
         self.backend.write(question)
         time.sleep(self.delay)
@@ -399,6 +407,7 @@ class LinuxGPIB(Adapter):
         self.set_timeout(self.timeout)
         return self.backend.read(self.descr, read_length).decode()
 
+    @chaperone
     def query(self, question):
         self.backend.write(question)
         time.sleep(self.delay)
@@ -524,6 +533,7 @@ class PrologixGPIB(Adapter):
         self.backend.timeout = self.timeout
         return self.backend.read(address=self.instrument.address)
 
+    @chaperone
     def query(self, question):
         self.backend.write(question, address=self.instrument.address)
         time.sleep(self.delay)
@@ -563,6 +573,7 @@ class USBTMC(Adapter):
     def read(self):
         return self.backend.read()
 
+    @chaperone
     def query(self, question):
         self.backend.write(question)
         time.sleep(self.delay)

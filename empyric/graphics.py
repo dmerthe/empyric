@@ -314,8 +314,8 @@ class ExperimentGUI:
     GUI showing experimental progress, values of all experiment variables, any alarms.
     Also, manages plotting data via the Plotter class
 
-    This GUI allows the user to pause or stop the experiment.
-    When paused, the user can also directly interact with instruments through the Dashboard button.
+    This GUI allows the user to hold, stop and terminate the experiment.
+    When paused, the user can also directly interact with instruments through the Dashboard.
     """
 
     def __init__(self, experiment, alarms=None, instruments=None, title=None, plots=None, save_interval=None):
