@@ -1,4 +1,5 @@
 import time
+import sys
 import threading
 import queue
 import numpy as np
@@ -6,6 +7,10 @@ import datetime
 import tkinter as tk
 import numbers
 import pandas as pd
+
+if sys.platform == 'darwin':
+    import matplotlib
+    matplotlib.use('TkAgg')  # works better on MacOS
 
 import matplotlib.pyplot as plt
 from matplotlib.cm import ScalarMappable
