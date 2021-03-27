@@ -456,29 +456,33 @@ class Experiment:
         # Apply new settings to knobs according to the routines (if there are any and the experiment is running)
         if Experiment.RUNNING in self.status:
 
+            threads = {}
+
             for name, routine in self.routines.items():
+                threads[name] = threading.Thread(target=routine.update, args=(self.state,))
+                threads[name].start()
+
+            # Wait for all routine threads to finish
+            for name, thread in threads.items():
                 self.status = Experiment.RUNNING + f': executing {name}'
-                routine.update(self.state)
+                thread.join()
 
             self.status = Experiment.RUNNING
 
         # Get all variable values if experiment is running or holding
         if Experiment.RUNNING in self.status or Experiment.HOLDING in self.status:
 
+            threads = {}
+
+            for name in self.variables:
+                threads[name] = threading.Thread(target=self._update_variable, args=(name,))
+                threads[name].start()
+
             base_status = self.status
 
-            for name, variable in self.variables.items():
+            for name, thread in threads.items():
                 self.status = base_status + f': retrieving {name}'
-                value = variable.value
-
-                if np.size(value) > 1: # store array data as CSV files
-                    dataframe = pd.DataFrame({name: value}, index=[self.state.name]*len(value))
-                    path = name.replace(' ','_') +'_' + self.state.name.strftime('%Y%m%d-%H%M%S') + '.csv'
-                    dataframe.to_csv(path)
-                    self.state[name] = path
-
-                else:
-                    self.state[name] = value
+                thread.join()
 
             self.status = base_status
 
@@ -496,6 +500,19 @@ class Experiment:
 
     def __iter__(self):
         return self
+
+    def _update_variable(self, name):
+
+        value = self.variables[name].value
+
+        if np.size(value) > 1:  # store array data as CSV files
+            dataframe = pd.DataFrame({name: value}, index=[self.state.name] * len(value))
+            path = name.replace(' ', '_') + '_' + self.state.name.strftime('%Y%m%d-%H%M%S') + '.csv'
+            dataframe.to_csv(path)
+            self.state[name] = path
+        else:
+            self.state[name] = value
+
 
     def save(self, directory=None):
         """
