@@ -8,7 +8,7 @@ import re
 
 def chaperone(method):
     """
-    Wraps all read methods of the adapters; monitors and handles communication issues
+    Wraps all write & read methods of the adapters; monitors and handles communication issues
 
     :param method: (callable) method to be wrapped
     :return: (callable) wrapped method
@@ -28,16 +28,22 @@ def chaperone(method):
         if not self.connected:
             raise ConnectionError(f'Adapter is not connected for instrument at address {self.instrument.address}')
 
+        while self.busy:  # wait for turn
+            pass
+
+        self.busy = True
+
         # Catch communication errors and either try to repeat communication or reset the connection
         if self.reconnects < self.max_reconnects:
             if self.repeats < self.max_repeats:
+
                 try:
                     response = method(self, *args, **kwargs)
 
                     if validator:
                         valid_response = validator(response)
                     else:
-                        valid_response = (response != '') * (response != b'') * (response != float('nan'))
+                        valid_response = (response != '') * (response != float('nan'))
 
                     if valid_response:
                         self.repeats = 0  # reset repeat counter upon valid communcation
@@ -60,6 +66,8 @@ def chaperone(method):
                 return wrapped_method(self, *args, validator=validator, **kwargs)
         else:
             raise ConnectionError(f'Unable to communicate with instrument at address {self.instrument.address}!')
+
+        self.busy = False
 
     wrapped_method.__doc__ = method.__doc__
 
@@ -94,6 +102,8 @@ class Adapter:
 
         self.connect()
 
+        self.busy = False  # indicator for multithreading
+
     def __del__(self):
         # Try to cleanly close communications when adapters are deleted
         if self.connected:
@@ -115,6 +125,7 @@ class Adapter:
         """
         self.connected = True
 
+    @chaperone
     def write(self, message):
         """
         Write a command
@@ -189,9 +200,12 @@ class Serial(Adapter):
 
         self.connected = True
 
+    @chaperone
     def write(self, message):
 
         self.backend.write((message + self.output_termination).encode())
+
+        return "Success"
 
     @chaperone
     def read(self, until=None, bytes=None):
@@ -241,8 +255,10 @@ class VISA:
         if self.connected:
             self.backend.timeout = timeout
 
+    @chaperone
     def write(self, message):
         self.backend.write(message)
+        return "Success"
 
     @chaperone
     def read(self):
@@ -399,8 +415,10 @@ class LinuxGPIB(Adapter):
 
         self._timeout = new_timeout
 
+    @chaperone
     def write(self, message):
         self.backend.write(self.descr, message)
+        return "Success"
 
     @chaperone
     def read(self, read_length=512):
@@ -457,6 +475,7 @@ class PrologixGPIBUSB:
         self.write('mode 1', to_controller=True)
         self.write('auto 0', to_controller=True)
 
+    @chaperone
     def write(self, message, to_controller=False, address=None):
 
         if address:
@@ -471,6 +490,8 @@ class PrologixGPIBUSB:
             proper_message = b'++' + proper_message
 
         self.serial_port.write(proper_message)
+
+        return "Success"
 
     def read(self, address=None):
 
@@ -525,8 +546,10 @@ class PrologixGPIB(Adapter):
 
         self.connected = True
 
+    @chaperone
     def write(self, message):
         self.backend.write(message, address=self.instrument.address)
+        return "Success"
 
     @chaperone
     def read(self):
@@ -566,8 +589,10 @@ class USBTMC(Adapter):
 
         self.connected = True
 
+    @chaperone
     def write(self, message):
         self.backend.write(message)
+        return "Success"
 
     @chaperone
     def read(self):
@@ -621,12 +646,15 @@ class Modbus(Adapter):
 
         self.connected = True
 
+    @chaperone
     def write(self, register, message, type='uint16', byte_order=0):
         if type == 'uint16':
             self.backend.write_register(register, message)
         elif type == 'float':
             self.backend.write_float(register, message, byteorder=byte_order)
         time.sleep(self.delay)
+
+        return "Success"
 
     @chaperone
     def read(self, register, type='uint16', byte_order=0):
@@ -673,15 +701,31 @@ class Phidget(Adapter):
         self.backend.openWaitForAttachment(1000*self.timeout)
 
         self.connected = True
+        self.busy = False
 
     def get(self, parameter):
+
+        while self.busy:  # wait for turn
+            pass
+
+        self.busy = True
         try:
             return self.backend.__getattribute__('get'+parameter)()
         except Phidget.Exception:
             return float('nan')
 
+        self.busy = False
+
     def set(self, parameter, value):
+
+        while self.busy:  # wait for turn
+            pass
+
+        self.busy = True
+
         self.backend.__getattribute__('set'+parameter)(value)
+
+        self.busy = False
 
     def disconnect(self):
         self.backend.close()

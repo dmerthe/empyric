@@ -447,17 +447,18 @@ class Experiment:
         self.state['time'] = self.clock.time
         self.state.name = datetime.datetime.now()
 
+        # If experiment is stopped, just return the last knob settings and nullify meter & expression values
         if Experiment.STOPPED in self.status:
             for name, variable in self.variables.items():
                 if variable.type in ['meter', 'expression']:
                     self.state[name] = None
             return self.state
 
-        # Apply new settings to knobs according to the routines (if there are any and the experiment is running)
+        # If the experiment is running, apply new settings to knobs according to the routines (if there are any)
         if Experiment.RUNNING in self.status:
 
+            # Update each routine in its own thread
             threads = {}
-
             for name, routine in self.routines.items():
                 threads[name] = threading.Thread(target=routine.update, args=(self.state,))
                 threads[name].start()
@@ -472,14 +473,15 @@ class Experiment:
         # Get all variable values if experiment is running or holding
         if Experiment.RUNNING in self.status or Experiment.HOLDING in self.status:
 
+            # Run each measure / get operation in its own thread
             threads = {}
-
             for name in self.variables:
                 threads[name] = threading.Thread(target=self._update_variable, args=(name,))
                 threads[name].start()
 
             base_status = self.status
 
+            # Wait for all threads to finish
             for name, thread in threads.items():
                 self.status = base_status + f': retrieving {name}'
                 thread.join()
