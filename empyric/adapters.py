@@ -70,10 +70,10 @@ class Adapter:
     Adapters connect instruments to the appropriate communication backends.
     """
 
-    #: Maximum number of attempts to read from a port/channel, in the event of a communcation error
+    #: Maximum number of attempts to read from a port/channel, in the event of a communication error
     max_attempts = 3
 
-    #: Maximum number of times to try to reset communcations, in the event of a communcation error
+    #: Maximum number of times to try to reset communcations, in the event of a communication error
     max_reconnects = 1
 
     kwargs = ['baud_rate', 'timeout', 'delay', 'byte_size', 'parity', 'stop_bits', 'close_port_after_each_call',
