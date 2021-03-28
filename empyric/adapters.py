@@ -8,22 +8,13 @@ import re
 
 def chaperone(method):
     """
-    Wraps all write & read methods of the adapters; monitors and handles communication issues
+    Wraps all write, read and query methods of the adapters; monitors and handles communication issues
 
     :param method: (callable) method to be wrapped
     :return: (callable) wrapped method
     """
 
     def wrapped_method(self, *args, validator=None, **kwargs):
-        """
-        Read an awaiting message. A validator function can be provided to determine if a response is valid.
-        If a response is invalid, the adapter will try again to read or will try to reset communcations.
-
-        :param args: any arguments for the read method
-        :param validator: (callable) function that returns True if its input looks right or False if it does not
-        :param kwargs: any keyword arguments for the read method
-        :return: (str/float/int/bool) instrument response, if valid
-        """
 
         if not self.connected:
             raise ConnectionError(f'Adapter is not connected for instrument at address {self.instrument.address}')
@@ -35,7 +26,7 @@ def chaperone(method):
 
         # Catch communication errors and either try to repeat communication or reset the connection
         if self.reconnects < self.max_reconnects:
-            if self.repeats < self.max_repeats:
+            if self.repeats < self.max_attempts:
 
                 try:
                     response = method(self, *args, **kwargs)
@@ -76,11 +67,11 @@ def chaperone(method):
 
 class Adapter:
     """
-    Adapters connect instruments defined in an experiment to the appropriate communication backends.
+    Adapters connect instruments to the appropriate communication backends.
     """
 
     #: Maximum number of attempts to read from a port/channel, in the event of a communcation error
-    max_repeats = 3
+    max_attempts = 3
 
     #: Maximum number of times to try to reset communcations, in the event of a communcation error
     max_reconnects = 1
@@ -128,19 +119,19 @@ class Adapter:
     @chaperone
     def write(self, message):
         """
-        Write a command
+        Write a command.
 
-        :param message: (str/float/int) command message
-        :return: None
+        :param args: any arguments for the write method
+        :param validator: (callable) function that returns True if its input looks right or False if it does not
+        :param kwargs: any keyword arguments for the write method
+        :return: (str/float/int/bool) instrument response, if valid
         """
         pass
 
     @chaperone
     def read(self):
         """
-        Read an awaiting message. A validator function can be provided to determine if a response is valid.
-        If a response is invalid, the adapter will try again to read or will try to reset communcations.
-
+        Read an awaiting message.
 
         :param args: any arguments for the read method
         :param validator: (callable) function that returns True if its input looks right or False if it does not
@@ -149,10 +140,10 @@ class Adapter:
         """
         pass
 
-    @chaperone
+    @chaperonef
     def query(self, question):
         """
-        Submit a query; usually implemented by calling the ``write`` method and then the ``read`` method
+        Submit a query; usually implemented by calling the ``write`` method and then the ``read`` method.
 
         :param args: any arguments for the query method
         :param validator: (callable) function that returns True if its input looks right or False if it does not
