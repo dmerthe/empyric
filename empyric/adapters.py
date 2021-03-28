@@ -37,7 +37,7 @@ def chaperone(method):
                         valid_response = (response != '') * (response != float('nan'))
 
                     if valid_response:
-                        self.repeats = 0  # reset repeat counter upon valid communcation
+                        self.repeats = 0  # reset repeat counter upon valid communication
                         self.reconnects = 0  # reset reconnection counter
                         return response
                     else:
@@ -73,7 +73,7 @@ class Adapter:
     #: Maximum number of attempts to read from a port/channel, in the event of a communication error
     max_attempts = 3
 
-    #: Maximum number of times to try to reset communcations, in the event of a communication error
+    #: Maximum number of times to try to reset communications, in the event of a communication error
     max_reconnects = 1
 
     kwargs = ['baud_rate', 'timeout', 'delay', 'byte_size', 'parity', 'stop_bits', 'close_port_after_each_call',
@@ -110,7 +110,7 @@ class Adapter:
 
     def connect(self):
         """
-        Establishes communcations with the instrument through the appropriate backend
+        Establishes communications with the instrument through the appropriate backend
 
         :return: None
         """
@@ -456,7 +456,7 @@ class PrologixGPIBUSB:
 
         if port:
             self.serial_port = serial.Serial(port=port, timeout=1)
-            # communcations with this controller are a bit slow, so timeout should be set high
+            # communications with this controller are a bit slow, so timeout should be set high
         else:
             raise ConnectionError(f'Prologix GPIB-USB adapter not found!')
 
