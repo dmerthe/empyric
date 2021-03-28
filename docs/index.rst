@@ -6,7 +6,7 @@
 Empyric: Experiment Automation
 ===================================
 
-Empyric is an instrument control and experiment automation library. Many of its basic features are still being developed tested, so bear with me!
+Empyric is an instrument control and experiment automation library. Many of its basic features are still being developed and tested, so bear with me!
 
 .. toctree::
    :maxdepth: 2
