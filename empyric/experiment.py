@@ -279,6 +279,9 @@ class Timecourse(Routine):
         self.interpolators = {variable: interp1d(times, values, bounds_error=False) for variable, times, values
                               in zip(self.variables, self.times, self.values)}
 
+        self.start = np.min(self.times)
+        self.end = np.max(self.times)
+
     def update(self, state):
 
         update = {name: value for name, value in state.items() if name in self.variables}
@@ -651,7 +654,12 @@ def build_experiment(runcard, settings=None, instruments=None, alarms=None):
             ) for name, specs in runcard['Alarms'].items()
         })
 
-    return Experiment(variables, routines=routines)
+    experiment = Experiment(variables, routines=routines)
+
+    if 'end' in settings:
+        experiment.end = convert_time(settings['end'])
+
+    return experiment
 
 
 class Manager:
