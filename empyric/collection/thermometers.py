@@ -39,8 +39,8 @@ class Phidget1101(Instrument):
             'E': types.ThermocoupleType.THERMOCOUPLE_TYPE_E,
         }
 
-        self.adapter.set('ThermocoupleType', type_dict[type_])
+        self.write('ThermocoupleType', type_dict[type_])
 
     @measurer
     def measure_temperature(self):
-        return self.adapter.get('Temperature')
+        return self.query('Temperature')

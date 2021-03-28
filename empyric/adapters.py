@@ -663,6 +663,10 @@ class Modbus(Adapter):
 
 
 class Phidget(Adapter):
+    """
+    Handles communications with Phidget devices
+
+    """
 
     delay = 0.2
     timeout = 5
@@ -694,29 +698,15 @@ class Phidget(Adapter):
         self.connected = True
         self.busy = False
 
-    def get(self, parameter):
-
-        while self.busy:  # wait for turn
-            pass
-
-        self.busy = True
-        try:
-            return self.backend.__getattribute__('get'+parameter)()
-        except Phidget.Exception:
-            return float('nan')
-
-        self.busy = False
-
-    def set(self, parameter, value):
-
-        while self.busy:  # wait for turn
-            pass
-
-        self.busy = True
-
+    @chaperone
+    def write(self, parameter, value):
         self.backend.__getattribute__('set'+parameter)(value)
+        return "Success"
 
-        self.busy = False
+    @chaperone
+    def query(self, parameter):
+        return self.backend.__getattribute__('get'+parameter)()
+
 
     def disconnect(self):
         self.backend.close()
