@@ -140,7 +140,7 @@ class Adapter:
         """
         pass
 
-    @chaperonef
+    @chaperone
     def query(self, question):
         """
         Submit a query; usually implemented by calling the ``write`` method and then the ``read`` method.
