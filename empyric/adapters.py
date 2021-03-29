@@ -228,7 +228,7 @@ class Serial(Adapter):
 
     def _query(self, question, until=None, bytes=None):
 
-        self._write(message)
+        self._write(question)
         time.sleep(self.delay)
         return self._read(until=until, bytes=bytes)
 
