@@ -638,7 +638,7 @@ class Modbus(Adapter):
         # Get port and channel
         self.port, self.channel = self.instrument.address.split('::')
 
-        if self.port in modbus_adapters:
+        if self.port in Modbus.adapters:
             Modbus.adapters[self.port].append(self)
         else:
             Modbus.adapters[self.port] = [self]
