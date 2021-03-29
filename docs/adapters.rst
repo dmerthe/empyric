@@ -9,7 +9,7 @@ The write, read and query methods of adapters are all wrapped by the ``chaperone
 
 The ``chaperone`` function also aids in multithreading: when multiple communications are attempted simultaneously with the same instrument, the ``chaperone`` function holds each write, read or query method until the adapter is free.
 
-Each wrapped write, read and query method accepts a ``validator`` function as an optional keyword argument. A ``validator``` takes as its only argument the response of the unwrapped write/read/query method, and returns ``True`` if the response is of the correct form or ``False`` if it is not. The ``chaperone`` function checks the returned value of the ``validator`` function, if one is provided, to assess if the communication was successful.
+Each wrapped write, read and query method accepts a ``validator`` function as an optional keyword argument. A ``validator`` takes as its only argument the response of the unwrapped write/read/query method, and returns ``True`` if the response is of the correct form or ``False`` if it is not. The ``chaperone`` function checks the returned value of the ``validator`` function, if one is provided, to assess if the communication was successful.
 
 .. automodule:: empyric.adapters
    :members:
