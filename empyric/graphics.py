@@ -471,10 +471,10 @@ class ExperimentGUI:
                 else:
                     if type(state[name]) == float:
 
-                        if np.abs(np.log10(state[name])) > 2:
+                        if np.abs(np.log10(state[name])) > 3:
                             label.config(text='%.3e' % state[name])
                         else:
-                            label.config(text='%.2f' % state[name])
+                            label.config(text='%.3f' % state[name])
                     else:
                         label.config(text=str(state[name]))
 
