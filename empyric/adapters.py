@@ -636,15 +636,15 @@ class Modbus(Adapter):
         serial = importlib.import_module('serial')
 
         # Get port and channel
-        self.port, self.channel = int(self.instrument.address.split('::'))
+        self.port, self.channel = self.instrument.address.split('::')
 
-        if port in modbus_adapters:
+        if self.port in modbus_adapters:
             Modbus.adapters[self.port].append(self)
         else:
             Modbus.adapters[self.port] = [self]
 
         # Handshake with instrument
-        self.backend = minimal_modbus.Instrument(self.port, self.channel, mode=self.slave_mode)
+        self.backend = minimal_modbus.Instrument(self.port, int(self.channel), mode=self.slave_mode)
         self.backend.serial.baudrate = self.baud_rate
         self.backend.serial.timeout = self.timeout
         self.backend.serial.bytesize = self.byte_size
