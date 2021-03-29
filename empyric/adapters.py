@@ -20,7 +20,7 @@ def chaperone(method):
             raise ConnectionError(f'Adapter is not connected for instrument at address {self.instrument.address}')
 
         while self.busy:  # wait for turn
-            pass
+            time.sleep(0.01)
 
         # Catch communication errors and either try to repeat communication or reset the connection
         if self.reconnects < self.max_reconnects:
