@@ -615,7 +615,7 @@ class Modbus(Adapter):
     parity = 'N'
     delay = 0.05
 
-    adapters = []  # modbus adapters using the same serial port; for traffic control
+    adapters = {}  # modbus adapters using the same serial port; for traffic control
 
     _busy = False
 
