@@ -775,14 +775,14 @@ class Manager:
         for state in self.experiment:
 
             # Save experimental data periodically
-            if time.time() >= self.last_save + self.save_interval:
+            if time.time() >= self.last_save + self.save_interval and Experiment.STOPPED not in self.experiment.status:
                 self.experiment.save()
 
             # Check if any alarms are triggered and handle them
             alarms_triggered = [alarm for alarm in self.alarms.values() if alarm.triggered]
             if len(alarms_triggered) > 0:
 
-                alarm = alarms_triggered[0]  # highest priority alarm goes first
+                alarm = alarms_triggered[0]  # highest priority alarm is handled first
 
                 if alarm.protocol:
                     if 'yaml' in alarm.protocol:
@@ -792,11 +792,19 @@ class Manager:
                         self.experiment.hold()  # stop routines but keep measuring, and wait for alarm to clear
                         self.awaiting_alarms = True
                     elif 'stop' in alarm.protocol:
-                        self.experiment.stop()  # stop routines and measurements, and wait for user action
+                        self.experiment.stop()  # stop routines and measurements, and wait for alarm to clear
                         self.awaiting_alarms = True
+                    elif 'check' in alarm.protocol:
+                        self.experiment.stop()
+                        self.experiment.status = self.experiment.STOPPED + ': waiting for alarm check'
+                        self.awaiting_alarms = 'check'
                     elif 'terminate' in alarm.protocol:
                         self.experiment.terminate()
                         self.awaiting_alarms = True
+
+            elif self.awaiting_alarms == 'check':
+                if self.experiment.STOPPED not in self.experiment.status:
+                    self.awaiting_alarms = False
 
             elif self.awaiting_alarms:
                 # If no alarms are triggered, resume experiment if holding or stopped

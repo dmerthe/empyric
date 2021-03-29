@@ -506,7 +506,7 @@ class ExperimentGUI:
             self.quit()
 
         # Plot data
-        if hasattr(self, 'plotter') and len(self.experiment.data) > 0:
+        if hasattr(self, 'plotter') and len(self.experiment.data) > 0 and 'Stopped' not in self.experiment.status:
             if time.time() > self.last_plot + self.plot_interval:
 
                 start_plot = time.perf_counter()
