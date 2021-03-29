@@ -20,7 +20,7 @@ def chaperone(method):
             raise ConnectionError(f'Adapter is not connected for instrument at address {self.instrument.address}')
 
         while self.busy:  # wait for turn
-            time.sleep(0.01)
+            time.sleep(0.05)
 
         # Catch communication errors and either try to repeat communication or reset the connection
         if self.reconnects < self.max_reconnects:
@@ -118,7 +118,7 @@ class Adapter:
         self.connected = True
 
     @chaperone
-    def write(self, message):
+    def write(self, *args, **kwargs):
         """
         Write a command.
 
@@ -127,10 +127,14 @@ class Adapter:
         :param kwargs: any keyword arguments for the write method
         :return: (str/float/int/bool) instrument response, if valid
         """
-        pass
+
+        if hasattr(self, '_write'):
+            self._write(*args, **kwargs)
+        else:
+            raise AttributeError(self.__name__ + " adapter has no _write method")
 
     @chaperone
-    def read(self):
+    def read(self, *args, **kwargs):
         """
         Read an awaiting message.
 
@@ -139,19 +143,28 @@ class Adapter:
         :param kwargs: any keyword arguments for the read method
         :return: (str/float/int/bool) instrument response, if valid
         """
-        pass
+
+        if hasattr(self, '_read'):
+            return self._read(*args, **kwargs)
+        else:
+            raise AttributeError(self.__name__ + " adapter has no _read method")
+
 
     @chaperone
-    def query(self, question):
+    def query(self, *args, **kwargs):
         """
-        Submit a query; usually implemented by calling the ``write`` method and then the ``read`` method.
+        Submit a query.
 
         :param args: any arguments for the query method
         :param validator: (callable) function that returns True if its input looks right or False if it does not
         :param kwargs: any keyword arguments for the query method
         :return: (str/float/int/bool) instrument response, if valid
         """
-        pass
+
+        if hasattr(self, '_query'):
+            return self._query(*args, **kwargs)
+        else:
+            raise AttributeError(self.__name__ + " adapter has no _query method")
 
     def disconnect(self):
         """
@@ -192,15 +205,13 @@ class Serial(Adapter):
 
         self.connected = True
 
-    @chaperone
-    def write(self, message):
+    def _write(self, message):
 
         self.backend.write((message + self.output_termination).encode())
 
         return "Success"
 
-    @chaperone
-    def read(self, until=None, bytes=None):
+    def _read(self, until=None, bytes=None):
 
         self.backend.timeout = self.timeout
 
@@ -215,12 +226,11 @@ class Serial(Adapter):
 
         return response.decode().strip()
 
-    @chaperone
-    def query(self, question, until=None, bytes=None):
+    def _query(self, question, until=None, bytes=None):
 
-        self.write(question)
+        self._write(message)
         time.sleep(self.delay)
-        return self.read(until=until, bytes=bytes)
+        return self._read(until=until, bytes=bytes)
 
     def disconnect(self):
         self.backend.reset_input_buffer()
@@ -247,21 +257,18 @@ class VISA:
         if self.connected:
             self.backend.timeout = timeout
 
-    @chaperone
-    def write(self, message):
+    def _write(self, message):
         self.backend.write(message)
         return "Success"
 
-    @chaperone
-    def read(self):
+    def _read(self):
         self.backend.timeout = 1000 * self.timeout
         return self.backend.read()
 
-    @chaperone
-    def query(self, question):
-        self.backend.write(question)
+    def _query(self, question):
+        self._write(question)
         time.sleep(self.delay)
-        return self.read()
+        return self._read()
 
     def disconnect(self):
         self.backend.clear()
@@ -408,20 +415,20 @@ class LinuxGPIB(Adapter):
         self._timeout = new_timeout
 
     @chaperone
-    def write(self, message):
+    def _write(self, message):
         self.backend.write(self.descr, message)
         return "Success"
 
     @chaperone
-    def read(self, read_length=512):
+    def _read(self, read_length=512):
         self.set_timeout(self.timeout)
         return self.backend.read(self.descr, read_length).decode()
 
     @chaperone
-    def query(self, question):
-        self.backend.write(question)
+    def _query(self, question, read_length=512):
+        self._write(question)
         time.sleep(self.delay)
-        return self.read()
+        return self._read(read_length=read_length)
 
     def disconnect(self):
         self.backend.clear(self.descr)
@@ -467,7 +474,6 @@ class PrologixGPIBUSB:
         self.write('mode 1', to_controller=True)
         self.write('auto 0', to_controller=True)
 
-    @chaperone
     def write(self, message, to_controller=False, address=None):
 
         if address:
@@ -538,21 +544,18 @@ class PrologixGPIB(Adapter):
 
         self.connected = True
 
-    @chaperone
-    def write(self, message):
+    def _write(self, message):
         self.backend.write(message, address=self.instrument.address)
         return "Success"
 
-    @chaperone
-    def read(self):
+    def _read(self):
         self.backend.timeout = self.timeout
         return self.backend.read(address=self.instrument.address)
 
-    @chaperone
-    def query(self, question):
-        self.backend.write(question, address=self.instrument.address)
+    def _query(self, question):
+        self._write(question)
         time.sleep(self.delay)
-        return self.read()
+        return self._read()
 
     def disconnect(self):
         self.backend.write('clr', to_controller=True, address=self.instrument.address)  # clear the instrument buffers
@@ -581,20 +584,17 @@ class USBTMC(Adapter):
 
         self.connected = True
 
-    @chaperone
-    def write(self, message):
+    def _write(self, message):
         self.backend.write(message)
         return "Success"
 
-    @chaperone
-    def read(self):
+    def _read(self):
         return self.backend.read()
 
-    @chaperone
-    def query(self, question):
-        self.backend.write(question)
+    def _query(self, question):
+        self._write(question)
         time.sleep(self.delay)
-        return self.read()
+        return self._read()
 
     def disconnect(self):
         self.backend.close()
@@ -638,8 +638,7 @@ class Modbus(Adapter):
 
         self.connected = True
 
-    @chaperone
-    def write(self, register, message, type='uint16', byte_order=0):
+    def _write(self, register, message, type='uint16', byte_order=0):
         if type == 'uint16':
             self.backend.write_register(register, message)
         elif type == 'float':
@@ -648,8 +647,7 @@ class Modbus(Adapter):
 
         return "Success"
 
-    @chaperone
-    def read(self, register, type='uint16', byte_order=0):
+    def _read(self, register, type='uint16', byte_order=0):
         self.backend.serial.timeout = self.timeout
 
         if type == 'uint16':
@@ -699,13 +697,11 @@ class Phidget(Adapter):
         self.connected = True
         self.busy = False
 
-    @chaperone
-    def write(self, parameter, value):
+    def _write(self, parameter, value):
         self.backend.__getattribute__('set'+parameter)(value)
         return "Success"
 
-    @chaperone
-    def query(self, parameter):
+    def _query(self, parameter):
         return self.backend.__getattribute__('get'+parameter)()
 
 
