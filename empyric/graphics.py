@@ -470,7 +470,11 @@ class ExperimentGUI:
                     label.config(text=str(datetime.timedelta(seconds=state['time'])))
                 else:
                     if type(state[name]) == float:
-                        label.config(text='%.3e' % state[name])
+
+                        if np.abs(np.log10(state[name])) > 2:
+                            label.config(text='%.3e' % state[name])
+                        else:
+                            label.config(text='%.2f' % state[name])
                     else:
                         label.config(text=str(state[name]))
 
