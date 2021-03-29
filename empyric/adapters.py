@@ -615,6 +615,18 @@ class Modbus(Adapter):
     parity = 'N'
     delay = 0.05
 
+    adapters = []  # modbus adapters using the same serial port; for traffic control
+
+    _busy = False
+
+    @property
+    def busy(self):
+        return bool(sum([adapter._busy for adapter in Modbus.adapters.get(self.port, [])]))
+
+    @busy.setter
+    def busy(self, busy):
+        self._busy = busy
+
     def __repr__(self):
         return 'Modbus'
 
@@ -624,10 +636,15 @@ class Modbus(Adapter):
         serial = importlib.import_module('serial')
 
         # Get port and channel
-        port, channel = self.instrument.address.split('::')
+        self.port, self.channel = int(self.instrument.address.split('::'))
+
+        if port in modbus_adapters:
+            Modbus.adapters[self.port].append(self)
+        else:
+            Modbus.adapters[self.port] = [self]
 
         # Handshake with instrument
-        self.backend = minimal_modbus.Instrument(port, int(channel), mode=self.slave_mode)
+        self.backend = minimal_modbus.Instrument(self.port, self.channel, mode=self.slave_mode)
         self.backend.serial.baudrate = self.baud_rate
         self.backend.serial.timeout = self.timeout
         self.backend.serial.bytesize = self.byte_size
