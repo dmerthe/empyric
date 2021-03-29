@@ -22,13 +22,12 @@ def chaperone(method):
         while self.busy:  # wait for turn
             pass
 
-        self.busy = True
-
         # Catch communication errors and either try to repeat communication or reset the connection
         if self.reconnects < self.max_reconnects:
             if self.repeats < self.max_attempts:
 
                 try:
+                    self.busy = True
                     response = method(self, *args, **kwargs)
 
                     if validator:
@@ -39,6 +38,7 @@ def chaperone(method):
                     if valid_response:
                         self.repeats = 0  # reset repeat counter upon valid communication
                         self.reconnects = 0  # reset reconnection counter
+                        self.busy = False
                         return response
                     else:
                         raise ValueError(f'invalid response, {response}, from {method.__name__} method')
@@ -46,6 +46,7 @@ def chaperone(method):
                 except BaseException as err:
                     warnings.warn(f'Encountered {err} while trying to read from {self.instrument}')
                     self.repeats += 1
+                    self.busy = False
                     return wrapped_method(self, *args, validator=validator, **kwargs)
             else:
                 self.disconnect()
@@ -54,11 +55,11 @@ def chaperone(method):
 
                 self.repeats = 0
                 self.reconnects += 1
+                self.busy = False
                 return wrapped_method(self, *args, validator=validator, **kwargs)
         else:
+            self.busy = False
             raise ConnectionError(f'Unable to communicate with instrument at address {self.instrument.address}!')
-
-        self.busy = False
 
     wrapped_method.__doc__ = method.__doc__
 
