@@ -195,7 +195,7 @@ class Routine:
                         df = pd.read_csv(values)
                         values = df[df.columns[-1]].values.reshape((1,len(df)))
 
-                self.values = np.array(values).reshape((1,-1))
+                self.values = np.array(values).reshape((len(values),-1))
 
             else:  # list of variables
 
@@ -276,7 +276,7 @@ class Timecourse(Routine):
         else:
             raise AttributeError('Timecourse routine requires times!')
 
-        self.interpolators = {variable: interp1d(times, values, bounds_error=False) for variable, times, values
+        self.interpolators = {_variable: interp1d(_times, _values, bounds_error=False) for _variable, _times, _values
                               in zip(self.variables, self.times, self.values)}
 
         self.start = np.min(self.times)
