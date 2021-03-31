@@ -484,7 +484,7 @@ class ExperimentGUI:
         # Check alarms
         for name, label in self.alarm_status_labels.items():
             if self.alarms[name].triggered:
-                label.config(text="TRIGGERED", bg='red')
+                label.config(text="TRIGGERED" + f': {self.alarms[name].protocol.upper()}', bg='red')
             else:
                 label.config(text="CLEAR", bg='green')
 
