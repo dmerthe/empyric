@@ -235,6 +235,59 @@ class Instrument:
             raise ConnectionError(f"adapter for {self.name} is not connected!")
 
 
+class Clock(Instrument):
+    """
+    Virtual clock for time keeping; works like a standard stopwatch
+    """
+
+    name = "Clock"
+
+    supported_adapters = (
+        (Adapter, {}),
+    )
+
+    knobs = ('state', )
+    meters = ('time', )
+
+    @property
+    def time(self):
+        if self.stop_time:
+            elapsed_time = self.stop_time - self.start_time - self.stoppage
+        else:
+            elapsed_time = time.time() - self.start_time - self.stoppage
+
+        return elapsed_time
+
+    def __init__(self, *args, **kwargs):
+
+        Instrument.__init__(self, *args, **kwargs)
+
+        self.start_time = self.stop_time = time.time()  # clock is initially stopped
+        self.stoppage = 0  # total time during which the clock has been stopped
+
+    @setter
+    def set_state(self, state):
+
+        if state == 'START':
+
+            if self.stop_time:
+                self.stoppage += time.time() - self.stop_time
+                self.stop_time = False
+
+        elif state == 'STOP':
+
+            if not self.stop_time:
+                self.stop_time = time.time()
+
+        elif state == 'RESET':
+
+            self.__init__()
+
+    @measurer
+    def measure_time(self):
+        return self.time
+
+
 class HenonMapper(Instrument):
     """
     Virtual instrument based on the behavior of a 2D Henon Map:
