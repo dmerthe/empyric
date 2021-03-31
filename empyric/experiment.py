@@ -188,6 +188,8 @@ class Routine:
 
         if values:
 
+            self.values = []
+
             if np.array(variables).ndim == 0:  # single variable given as a scalar
 
                 if type(values) == str:
@@ -195,14 +197,12 @@ class Routine:
                         df = pd.read_csv(values)
                         values = df[df.columns[-1]].values.reshape((1,len(df)))
 
-                self.values = np.array(values).reshape((len(values),-1))
+                self.values.append(values)
 
             else:  # list of variables
 
                 if len(values) != len(variables):
                     raise ValueError('Routine values arguments must have the same length as the variables argument')
-
-                self.values = []
 
                 for element in values:
 
