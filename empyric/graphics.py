@@ -323,7 +323,7 @@ class ExperimentGUI:
     When paused, the user can also directly interact with instruments through the Dashboard.
     """
 
-    def __init__(self, experiment, alarms=None, instruments=None, title=None, plots=None, save_interval=None):
+    def __init__(self, experiment, alarms=None, instruments=None, title=None, plots=None, save_interval=None, plot_interval=0):
 
         self.experiment = experiment
 
@@ -350,7 +350,7 @@ class ExperimentGUI:
         if plots:
             self.plotter = Plotter(experiment.data, plots)
 
-            self.plot_interval = 0  # grows if plotting takes longer
+            self.plot_interval = plot_interval  # grows if plotting takes longer
             self.last_plot = float('-inf')
 
             # Set interval for saving plots
@@ -514,7 +514,7 @@ class ExperimentGUI:
                 self.plotter.plot()
                 end_plot = time.perf_counter()
 
-                self.plot_interval = int(5*(end_plot - start_plot))  # increase plot interval, if plotting slows down
+                self.plot_interval = int(2*(end_plot - start_plot))  # increase plot interval, if plotting slows down
                 self.last_plot = time.time()
 
             # Save plots

@@ -696,6 +696,7 @@ class Manager:
         # Unpack settings
         self.step_interval = self.settings.get('step interval', 0.1)
         self.save_interval = self.settings.get('save interval', 60)
+        self.plot_interval = self.settings.get('plot interval', 0)
         self.last_step = self.last_save = float('-inf')
 
         self.followup = self.settings.get('follow-up', None)  # Register settings
@@ -746,7 +747,8 @@ class Manager:
                                           instruments=self.instruments,
                                           title=self.runcard['Description'].get('name', 'Experiment'),
                                           plots=self.runcard.get('Plots', None),
-                                          save_interval=self.save_interval)
+                                          save_interval=self.save_interval,
+                                          plot_interval=self.plot_interval)
 
         self.gui.run()
 
