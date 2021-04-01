@@ -13,7 +13,7 @@ The ``Description`` section, of the general form,
 .. code-block:: yaml
    
    Description:
-    name: (Unique name of the experiment)
+    name: (Unique name of the experiment; default = 'Experiment')
     operator: (Name of person running the experiment)
     platform: (Name of experimental apparatus)
     comments: (Contextual information for the experiment)
