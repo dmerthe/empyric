@@ -5,7 +5,7 @@ Writing python scripts to run experiments can be tedious, especially when you ar
 
 The following illustrates a typical experiment runcard:
 
-.. literalinclude:: ../empyric/examples/Henon Map Experiment/henon_runcard_example.yaml
+.. literalinclude:: ../examples/Henon Map Experiment/henon_runcard_example.yaml
    :language: yaml
 
 The ``Description`` section, of the general form,
