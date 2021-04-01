@@ -8,9 +8,31 @@ The following illustrates a typical experiment runcard:
 .. literalinclude:: ../empyric/examples/Henon Map Experiment/henon_runcard_example.yaml
    :language: yaml
 
-The ``Description`` section contains the name of the experiment, name of the operator, where the experiment is taking place and any relevant comments for future reference.
+The ``Description`` section, of the general form,
 
-The optional ``Settings`` section contains some global settings for the experiment. The ``follow-up`` entry allows one to chain experiments; simply give the path name to another experiment runcard here. The ``step interval`` defines the minimum time to take between experiment iterations. The ``plot interval`` sets a minimum time between calls the any ``matplotlib`` plotting functions. The ``save interval`` specifies how often to save the acquired experimental data.
+.. code-block:: yaml
+   
+   Description:
+    name: (Unique name of the experiment)
+    operator: (Name of person running the experiment)
+    platform: (Name of experimental apparatus)
+    comments: (Contextual information for the experiment)
+
+contains the name of the experiment, name of the operator, where the experiment is taking place and any relevant comments for future reference. This section has the general form,
+
+The optional ``Settings`` section, of the general form,
+
+.. code-block:: yaml
+   
+   Settings: # All settings below are optional
+    follow-up: (None, 'Repeat', or 'another_experiment_runcard.yaml'; default = None)
+    step interval: (minimum time between experiment steps; default = 0.1 seconds)
+    plot interval: (minimum time in between plot remakes; adjusts automatically; default = 0)
+    save interval: (minimum time between data saves to file; default = 60 seconds)
+    end: (when to force experiment terminate; overrides routines; default = inf)
+    
+
+contains some global settings for the experiment. The ``follow-up`` entry allows one to chain experiments; simply give the path name to another experiment runcard here. The ``step interval`` defines the minimum time to take between experiment iterations. The ``plot interval`` sets a minimum time between calls the any ``matplotlib`` plotting functions. The ``save interval`` specifies how often to save the acquired experimental data.
 
 The ``Instruments`` section is where you specify which instruments from Empyric's collection the experiment will use. For each specification dictionary, the top level key is the name that you endow upon the instrument (here it is "Henon Mapper"). Every instrument must have a unique name. The ``type`` is the class name from the collection and the ``address`` is the properly formatted address of the instrument (something like "COM3" for a serial instrument at port 3 on a Windows machine; the HenonMapper virtual instrument here uses a dummy address of 1). It is also possible to alter the instrument presets by assigning values to the corresponding variable names in this dictionary. The entries ``a: 0`` and ``b: 0`` set both knobs *a* and *b* to 0 immediately upon creation of the ``HenonMapper`` instance.
 
