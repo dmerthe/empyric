@@ -17,8 +17,10 @@ Instruments:
  Henon Mapper:
   type: HenonMapper
   address: 1
-  a: 0
-  b: 0
+  presets:
+   a: 0
+  postsets:
+   b: 0
 
 Variables:
  Parameter a:

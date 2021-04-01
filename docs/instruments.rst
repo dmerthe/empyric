@@ -1,3 +1,5 @@
+.. _instruments-section:
+
 Instruments
 ===========
 
@@ -12,6 +14,7 @@ The instruments listed in the collection below are supported by the empyric modu
 .. autoclass:: empyric.collection.instrument.Instrument
    :members:
 
+.. _collection-section:
 
 The Collection
 --------------

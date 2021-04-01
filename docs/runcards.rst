@@ -18,7 +18,7 @@ The ``Description`` section, of the general form,
     platform: (Name of experimental apparatus)
     comments: (Contextual information for the experiment)
 
-contains the name of the experiment, name of the operator, where the experiment is taking place and any relevant comments for future reference. This section has the general form,
+contains the name of the experiment, name of the operator, where the experiment is taking place and any relevant comments for future reference. Technically, this section is optional, but it is good practice to fill it out for future reference.
 
 The optional ``Settings`` section, of the general form,
 
@@ -29,14 +29,29 @@ The optional ``Settings`` section, of the general form,
     step interval: (minimum time between experiment steps; default = 0.1 seconds)
     plot interval: (minimum time in between plot remakes; adjusts automatically; default = 0)
     save interval: (minimum time between data saves to file; default = 60 seconds)
-    end: (when to force experiment terminate; overrides routines; default = inf)
+    end: (when to force experiment termination; overrides routines; default = inf)
     
 
 contains some global settings for the experiment. The ``follow-up`` entry allows one to chain experiments; simply give the path name to another experiment runcard here. The ``step interval`` defines the minimum time to take between experiment iterations. The ``plot interval`` sets a minimum time between calls the any ``matplotlib`` plotting functions. The ``save interval`` specifies how often to save the acquired experimental data.
 
-The ``Instruments`` section is where you specify which instruments from Empyric's collection the experiment will use. For each specification dictionary, the top level key is the name that you endow upon the instrument (here it is "Henon Mapper"). Every instrument must have a unique name. The ``type`` is the class name from the collection and the ``address`` is the properly formatted address of the instrument (something like "COM3" for a serial instrument at port 3 on a Windows machine; the HenonMapper virtual instrument here uses a dummy address of 1). It is also possible to alter the instrument presets by assigning values to the corresponding variable names in this dictionary. The entries ``a: 0`` and ``b: 0`` set both knobs *a* and *b* to 0 immediately upon creation of the ``HenonMapper`` instance.
+The ``Instruments`` section, of the general form,
 
-The ``Variables`` section defines the experiment variables in relation to the instruments. Each variable must have a unique name. The knob and meter type variables must be assigned an instrument as well as the name of the knob or meter. The expression type variables are defined by a mathematical ``expression``, using algebraic operations (+, -, *, /, ^) and the common functions (sin, exp, log, sum, etc.) that are built into or in the math module of Python. The symbols in the expression are defined by the ``definitions`` entry which maps those symbols to any variables defined above.
+.. code-block:: yaml
+
+   Instruments:
+    ...
+    (Unique Name for an Instrument)
+     type: (class name of instrument)
+     address: (address value used by the adapter to locate and connect the instrument)
+     presets:  # optional
+      (knob name): (setting to apply to knob upon initialization of the instrument)
+     postsets: # optional
+      (knob name): (setting to apply to knob upon disconnection of the instrument)
+    ...
+    
+is where you specify which instruments from Empyric's collection the experiment will use (see :ref:`instruments-section` for the full set of supported instruments and their class names). For each specification dictionary, the top level key is the name that you endow upon the instrument. Every instrument must have a unique name. The ``type`` is the class name from the collection and the ``address`` is the properly formatted address of the instrument (something like "COM3" for a serial instrument at port 3 on a Windows machine; the HenonMapper virtual instrument here uses a dummy address of 1). It is also possible to alter the instrument presets by assigning values to the corresponding variable names in the ``presets`` dictionary, as well as set the postsets in a similar way.
+
+The ``Variables`` section defines the experiment variables in relation to the instruments. Each variable must have a unique name. The knob and meter type variables must be assigned an instrument as well as the name of the knob or meter. The expression type variables are defined by a mathematical ``expression``, using algebraic operations (``+``, ``-``, ``*``, ``/``, ``^``) and the common functions (sin, exp, log, sum, etc.) that are built into or in the math module of Python. The symbols in the expression are defined by the ``definitions`` entry which maps those symbols to any variables defined above.
 
 The optional ``Alarms`` section contains alarms which can monitor any of the variables and alert the user of any concerning conditions. Each alarm is defined by the variable that it is monitoring, the condition to watch for and the protocol, which tells the experiment manager what to do when an alarm is triggered. Possible protocols include 'hold', 'stop' and 'terminate', each of which calls the corresponding method of the ``Experiment`` instance; for 'hold' and 'stop', the experiment manager resumes the experiment when the alarm is cleared. Another option is setting the protocol to another runcard, in which case the current experiment is terminated and the experiment or process defined in the new runcard is built and run.
 
