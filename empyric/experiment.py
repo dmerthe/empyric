@@ -254,6 +254,8 @@ class Timecourse(Routine):
                         df = pd.read_csv(element[0])
                         self.times[i] = df[df.columns[0]].values.reshape(len(df))
 
+            self.times = convert_time(self.times)
+
             self.times = self.times.astype(float)
 
         else:
