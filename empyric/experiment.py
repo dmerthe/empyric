@@ -209,9 +209,9 @@ class Routine:
                     if type(element) == str:
                         if '.csv' in values:  # values stored in a CSV file
                             df = pd.read_csv(element)
-                            element = df[df.columns[-1]].values
+                            element = df[df.columns[-1]].values.reshape(len(df))
 
-                    self.values.append(np.array(element).reshape(1))
+                    self.values.append(element)
 
         else:
             raise AttributeError(f'{self.__name__} routine requires values')
