@@ -223,7 +223,7 @@ class Hold(Routine):
     def update(self, state):
 
         if state['time'] < self.start or state['time'] > self.end:
-            return update  # no change
+            return  # no change
 
         for variable, value in zip(self.variables, self.values):
             variable.value = value[0]
@@ -267,7 +267,7 @@ class Timecourse(Routine):
     def update(self, state):
 
         if state['time'] < self.start or state['time'] > self.end:
-            return update  # no change
+            return  # no change
 
         for variable, interpolator in zip(self.variables, self.interpolators):
             value = interpolator(state['time'] - self.start)
@@ -287,7 +287,7 @@ class Sequence(Routine):
     def update(self, state):
 
         if state['time'] < self.start or state['time'] > self.end:
-            return update  # no change
+            return  # no change
 
         for variable, values in zip(self.variables, self.values):
             value = values[self.iteration]
@@ -313,7 +313,7 @@ class Set(Routine):
     def update(self, state):
 
         if state['time'] < self.start or state['time'] > self.end:
-            return update  # no change
+            return  # no change
 
         for variable, input in zip(self.variables, self.inputs):
             value = state[input]
