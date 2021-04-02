@@ -175,8 +175,8 @@ class Routine:
     def __init__(self, variables=None, values=None, start=0, end=np.inf):
         """
 
-        :param variables: (1D array) array or list of variables to be controlled
-        :param values: (1D/2D array) array or list of values for each variable
+        :param variables: (1D array) variables to be controlled
+        :param values: (1D/2D array) array or list of values for each variable; can only be 1D if there is only one variable
         :param start: (float) time to start the routine
         :param stop: (float) time to end the routine
         """
@@ -188,30 +188,14 @@ class Routine:
 
         if values:
 
-            self.values = []
+            self.values = np.array(values, dtype=object).reshape((len(self.variables),-1))
 
-            if np.array(variables).ndim == 0:  # single variable given as a scalar
-
-                if type(values) == str:
-                    if '.csv' in values:  # values stored in a CSV file
-                        df = pd.read_csv(values)
-                        values = df[df.columns[-1]].values.reshape((1,len(df)))
-
-                self.values.append(values)
-
-            else:  # list of variables
-
-                if len(values) != len(variables):
-                    raise ValueError('Routine values arguments must have the same length as the variables argument')
-
-                for element in values:
-
-                    if type(element) == str:
-                        if '.csv' in values:  # values stored in a CSV file
-                            df = pd.read_csv(element)
-                            element = df[df.columns[-1]].values.reshape(len(df))
-
-                    self.values.append(element)
+            # Values can be stored in a CSV file
+            for i, element in enumerate(self.values):
+                if type(element[0]) == str:
+                    if '.csv' in element[0]:
+                        df = pd.read_csv(element[0])
+                        self.values[i] = df[df.columns[-1]].values.reshape(len(df))
 
         else:
             raise AttributeError(f'{self.__name__} routine requires values')
@@ -238,15 +222,11 @@ class Hold(Routine):
 
     def update(self, state):
 
-        update = {name: value for name, value in state.items() if name in self.variables}
         if state['time'] < self.start or state['time'] > self.end:
             return update  # no change
 
-        for name, variable, value in zip(self.variables, self.variables.values(), self.values):
-            variable.value = value
-            update[name] = value
-
-        return update
+        for variable, value in zip(self.variables, self.values):
+            variable.value = value[0]
 
 
 class Timecourse(Routine):
@@ -264,36 +244,34 @@ class Timecourse(Routine):
         Routine.__init__(self, **kwargs)
 
         if times:
-            self.times = convert_time(times)
 
-            # times can be specified in a CSV file
-            for i, times_i in enumerate(times):
-                if times_i == 'csv':
-                    df = pd.read_csv(times_i)
-                    self.times[i] = df[df.columns[-1]].values
+            self.times = np.array(times, dtype=object).reshape((len(self.variables), -1))
 
-            self.times = np.array([self.times]).flatten().reshape((len(self.variables), -1))  # make rows match self.variables
+            # Values can be stored in a CSV file
+            for i, element in enumerate(self.times):
+                if type(element[0]) == str:
+                    if '.csv' in element[0]:
+                        df = pd.read_csv(element[0])
+                        self.times[i] = df[df.columns[0]].values.reshape(len(df))
+
+            self.times = self.times.astype(float)
+
         else:
             raise AttributeError('Timecourse routine requires times!')
 
-        self.interpolators = {_variable: interp1d(_times, _values, bounds_error=False) for _variable, _times, _values
-                              in zip(self.variables, self.times, self.values)}
+        self.interpolators = [interp1d(t, vals, bounds_error=False) for t, vals in zip(self.times, self.values)]
 
         self.start = np.min(self.times)
         self.end = np.max(self.times)
 
     def update(self, state):
 
-        update = {name: value for name, value in state.items() if name in self.variables}
         if state['time'] < self.start or state['time'] > self.end:
             return update  # no change
 
-        for name, variable in zip(self.variables, self.variables.values()):
-            value = self.interpolators[name](state['time']-self.start)
+        for variable, interpolator in zip(self.variables, self.interpolators):
+            value = interpolator(state['time'] - self.start)
             variable.value = value
-            update[name] = value
-
-        return update
 
 
 class Sequence(Routine):
@@ -308,18 +286,14 @@ class Sequence(Routine):
 
     def update(self, state):
 
-        update = {name: value for name, value in state.items() if name in self.variables}
         if state['time'] < self.start or state['time'] > self.end:
             return update  # no change
 
-        for name, variable, values in zip(self.variables, self.variables.values(), self.values):
+        for variable, values in zip(self.variables, self.values):
             value = values[self.iteration]
             variable.value = value
-            update[name] = value
 
         self.iteration = (self.iteration + 1) % len(values)
-
-        return update
 
 
 class Set(Routine):
@@ -338,16 +312,12 @@ class Set(Routine):
 
     def update(self, state):
 
-        update = {name: value for name, value in state.items() if name in self.variables}
         if state['time'] < self.start or state['time'] > self.end:
             return update  # no change
 
-        for name, variable, input in zip(self.variables, self.variables.values(), self.inputs):
+        for variable, input in zip(self.variables, self.inputs):
             value = state[input]
             variable.value = value
-            update[name] = value
-
-        return update
 
 
 class Minimize(Routine):
@@ -643,7 +613,7 @@ def build_experiment(runcard, settings=None, instruments=None, alarms=None):
         for name, specs in runcard['Routines'].items():
             specs = specs.copy()  # avoids modifying the runcard
             _type = specs.pop('type')
-            specs['variables'] = {name: variables[name] for name in np.array([specs['variables']]).flatten()}
+            specs['variables'] = [variables[name] for name in np.array([specs['variables']]).flatten()]
             routines[name] = routines_dict[_type](**specs)
 
     # Set up any alarms
