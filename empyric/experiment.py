@@ -322,16 +322,45 @@ class Set(Routine):
 
 class Minimize(Routine):
     """
+    (NOT IMPLEMENTED)
     Minimize a variable influenced by a knob
     """
-    pass
 
+    def __init__(self, controls=None, **kwargs):
+
+        Routine.__init__(self, **kwargs)
+        self.controls = controls
+
+    def update(self, state):
+        pass
 
 class Maximize(Routine):
     """
+    (NOT IMPLEMENTED)
     Mazimize a variable influenced by a knob
     """
     pass
+
+
+class ModelPredictiveControl(Routine):
+    """
+    (NOT IMPLEMENTED)
+    Simple model predictive control; learns the relationship between knob x and meter y, assuming a linear model,
+
+    y(t) = y0 + int_{-inf}^{t} dt' m(t-t') x(t')
+
+    then sets x to minimize the error in y relative to setpoint, over some time interval defined by cutoff.
+
+    """
+
+    def __init__(self, controls=None, **kwargs):
+
+        Routine.__init__(self, **kwargs)
+        self.controls = controls
+
+    def update(self, state):
+        pass
+
 
 routines_dict = {
     routine.__name__: routine for routine in Routine.__subclasses__()
