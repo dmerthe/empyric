@@ -62,11 +62,11 @@ Plots:
 Routines:
  Ramp Parameter a:
   type: Timecourse
-  variables: Parameter a
+  knobs: Parameter a
   times: [0, 3, 5.001, 60]
   values: [0.0, 0.0, 1.4, 1.4]
  Ramp Parameter b:
   type: Timecourse
-  variables: Parameter b
+  knobs: Parameter b
   times: [0, 3, 5.001, 60]
   values: [0.0, 0.0, 0.3, 0.3]

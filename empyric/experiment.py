@@ -172,23 +172,23 @@ class Routine:
     Base class for all routines
     """
 
-    def __init__(self, variables=None, values=None, start=0, end=np.inf):
+    def __init__(self, knobs=None, values=None, start=0, end=np.inf):
         """
 
-        :param variables: (1D array) variables to be controlled
+        :param knobs: (1D array) knobs to be controlled
         :param values: (1D/2D array) array or list of values for each variable; can only be 1D if there is only one variable
         :param start: (float) time to start the routine
         :param stop: (float) time to end the routine
         """
 
-        if variables:
-            self.variables = variables
+        if knobs:
+            self.knobs = knobs
         else:
-            raise AttributeError(f'{self.__name__} routine requires variables!')
+            raise AttributeError(f'{self.__name__} routine requires knobs!')
 
         if values:
 
-            self.values = np.array(values, dtype=object).reshape((len(self.variables),-1))
+            self.values = np.array(values, dtype=object).reshape((len(self.knobs),-1))
 
             # Values can be stored in a CSV file
             for i, element in enumerate(self.values):
@@ -206,10 +206,10 @@ class Routine:
 
     def update(self, state):
         """
-        Updates the controlled variables and returns the new substate; overwritten by child classes
+        Updates the knobs controlled by the routine
 
         :param state: (dict/Series) state of the calling experiment or process in the form, {..., variable: value, ...}
-        :return: (dict/Series) substate with the updated values of the controlled variables
+        :return: None
         """
 
         pass
@@ -225,7 +225,7 @@ class Hold(Routine):
         if state['time'] < self.start or state['time'] > self.end:
             return  # no change
 
-        for variable, value in zip(self.variables, self.values):
+        for variable, value in zip(self.knobs.values(), self.values):
             variable.value = value[0]
 
 
@@ -245,7 +245,7 @@ class Timecourse(Routine):
 
         if times:
 
-            self.times = np.array(times, dtype=object).reshape((len(self.variables), -1))
+            self.times = np.array(times, dtype=object).reshape((len(self.knobs), -1))
 
             # Values can be stored in a CSV file
             for i, element in enumerate(self.times):
@@ -269,7 +269,7 @@ class Timecourse(Routine):
         if state['time'] < self.start or state['time'] > self.end:
             return  # no change
 
-        for variable, interpolator in zip(self.variables, self.interpolators):
+        for variable, interpolator in zip(self.knobs.values(), self.interpolators):
             value = interpolator(state['time'] - self.start)
             variable.value = value
 
@@ -289,7 +289,7 @@ class Sequence(Routine):
         if state['time'] < self.start or state['time'] > self.end:
             return  # no change
 
-        for variable, values in zip(self.variables, self.values):
+        for variable, values in zip(self.knobs.values(), self.values):
             value = values[self.iteration]
             variable.value = value
 
@@ -315,31 +315,90 @@ class Set(Routine):
         if state['time'] < self.start or state['time'] > self.end:
             return  # no change
 
-        for variable, input in zip(self.variables, self.inputs):
+        for variable, input in zip(self.knobs.values(), self.inputs):
             value = state[input]
             variable.value = value
 
 
 class Minimize(Routine):
     """
-    (NOT IMPLEMENTED)
-    Minimize a variable influenced by a knob
+    Minimize a set of meters (by some metric) influenced by a set of knobs, using simulated annealing
+
+    Possible metrics include 'sum', 'norm', 'prod' (product).
     """
 
-    def __init__(self, controls=None, **kwargs):
+    def better(self, meter_values):
+
+        if np.prod(self.last_meters) != np.nan:
+            if self.metric == 'sum':
+                better = (np.sum(meter_values) < np.sum(self.last_meters))
+            elif self.metric == 'norm':
+                better = (np.linalg.norm(meter_values) < np.linalg.norm(self.last_meters))
+            elif self.metric == 'prod':
+                better = (np.prod(meter_values) < np.prod(self.last_meters))
+        else:
+            better = True
+
+        return better
+
+
+    def __init__(self, meters=None, max_deltas=None, metric='sum', **kwargs):
 
         Routine.__init__(self, **kwargs)
-        self.controls = controls
+
+        if meters:
+            self.meters = np.array([meters]).flatten()
+        else:
+            raise AttributeError(f'{self.__name__} routine requires meters for feedback')
+
+        if max_deltas:
+            self.max_deltas = np.array([max_deltas]).flatten()
+        else:
+            self.max_deltas = np.ones(len(self.knobs))
+
+        self.metric = metric
+        self.last_knobs = [np.nan]*len(self.knobs)
+        self.last_meters = [np.nan]*len(self.controls)
 
     def update(self, state):
-        pass
 
-class Maximize(Routine):
+        # Get meter values
+        meter_values = np.array([state[meter] for meter in self.meters])
+
+        if self.better(meter_values):
+
+            # Record this new optimal state
+            self.last_knobs = [state[knob] for knob in self.knobs]
+            self.last_meters = [state[meter] for meter in self.meters]
+
+            # Generate and apply new knob settings
+            new_knobs = self.last_knobs + self.max_deltas*np.random.rand()
+            for knob, new_value in zip(self.knobs.values(), new_knobs):
+                knob.value = new_value
+
+        else:  # go back
+            for knob, last_value in zip(self.knobs.values(), self.last_knobs):
+                knob.value = last_value
+
+
+class Maximize(Minimize):
     """
-    (NOT IMPLEMENTED)
-    Mazimize a variable influenced by a knob
+    Maximize a set of meters (by some metric) influenced by a set of knobs; works the same way as Minimize.
     """
-    pass
+
+    def better(self, meter_values):
+
+        if np.prod(self.last_meters) != np.nan:
+            if self.metric == 'sum':
+                better = (np.sum(meter_values) > np.sum(self.last_meters))
+            elif self.metric == 'norm':
+                better = (np.linalg.norm(meter_values) > np.linalg.norm(self.last_meters))
+            elif self.metric == 'prod':
+                better = (np.prod(meter_values) > np.prod(self.last_meters))
+        else:
+            better = True
+
+        return better
 
 
 class ModelPredictiveControl(Routine):
@@ -642,7 +701,7 @@ def build_experiment(runcard, settings=None, instruments=None, alarms=None):
         for name, specs in runcard['Routines'].items():
             specs = specs.copy()  # avoids modifying the runcard
             _type = specs.pop('type')
-            specs['variables'] = [variables[name] for name in np.array([specs['variables']]).flatten()]
+            specs['knobs'] = {name: variables[name] for name in np.array([specs['knobs']]).flatten()}
             routines[name] = routines_dict[_type](**specs)
 
     # Set up any alarms
