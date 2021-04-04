@@ -239,6 +239,21 @@ class Serial(Adapter):
 
         self.connected = False
 
+    @staticmethod
+    def locate():
+        list_ports = importlib.import_module('serial.tools.list_ports').comports
+
+        input('Press enter when the instrument is disconnected')
+        other_ports = list_ports()
+        input('Press enter when the instrument is connected')
+        all_ports = list_ports()
+
+        try:
+            instrument_port = [port.device for port in all_ports if port not in other_ports][0]
+            print('Instrument is at', instrument_port)
+        except IndexError:
+            raise ConnectionError('Instrument not found!')
+
 
 class VISA:
     """
