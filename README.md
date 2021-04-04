@@ -93,7 +93,10 @@ while state['time'] <= 60:
 	
 	state['time'] = time.time() - start_time  # update process time
 	
-	state.update(hold.update(state)) # update process state, based on the hold routine
+	hold.update(state) # update process state, based on the hold routine
+	
+	state['Variable 1] = variable1.value
+	state['Variable 2] = variable2.value
 	
 	print(state)  # prints "{'time': ..., 'Variable 1': 10, 'Variable 2': 20}"
 ```
