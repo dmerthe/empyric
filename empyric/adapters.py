@@ -241,6 +241,11 @@ class Serial(Adapter):
 
     @staticmethod
     def locate():
+        """
+        Determine the address of a serial instrument via the "unplug-it-then-plug-it-back-in" method.
+
+        :return: None (address is printed to console)
+        """
         list_ports = importlib.import_module('serial.tools.list_ports').comports
 
         input('Press enter when the instrument is disconnected')
@@ -249,8 +254,11 @@ class Serial(Adapter):
         all_ports = list_ports()
 
         try:
-            instrument_port = [port.device for port in all_ports if port not in other_ports][0]
-            print('Instrument is at', instrument_port)
+            instrument_address = [port.device for port in all_ports if port not in other_ports][0]
+            print(f'Address: {instrument_address}')
+            again = 'y' in input('Again? [y/n]').lower()
+            if again:
+                Serial.locate()
         except IndexError:
             raise ConnectionError('Instrument not found!')
 
@@ -313,6 +321,33 @@ class VISASerial(VISA, Adapter):
                                              baud_rate=self.baud_rate)
 
         self.connected = True
+
+    @staticmethod
+    def locate():
+        """
+        Determine the address of a serial instrument via the "unplug-it-then-plug-it-back-in" method.
+
+        :return: None (address is printed to console)
+        """
+        pyvisa = importlib.import_module('pyvisa')
+
+        rm = pyvisa.ResourceManager()
+
+        input('Press enter when the instrument is disconnected')
+        other_ports = [resource for resource in rm.list_resources_info()
+                       if resource.Interface_type == pyvisa.constants.InterfaceType.asrl]
+        input('Press enter when the instrument is connected')
+        all_ports = [resource for resource in rm.list_resources_info()
+                       if resource.Interface_type == pyvisa.constants.InterfaceType.asrl]
+
+        try:
+            instrument_address = [port.Resource_name for port in all_ports if port not in other_ports][0]
+            print(f'Address: {instrument_address}')
+            again = 'y' in input('Again? [y/n]').lower()
+            if again:
+                Serial.locate()
+        except IndexError:
+            raise ConnectionError('Instrument not found!')
 
 
 class VISAGPIB(VISA, Adapter):
@@ -615,6 +650,28 @@ class USBTMC(Adapter):
         self.backend.close()
         self.connected = False
 
+    def locate():
+        """
+        Determine the address of a serial instrument via the "unplug-it-then-plug-it-back-in" method.
+
+        :return: None (address is printed to console)
+        """
+        list_addresses = importlib.import_module('usbtmc').list_resources
+
+        input('Press enter when the instrument is disconnected')
+        other_addresses = list_addresses()
+        input('Press enter when the instrument is connected')
+        all_addresses = list_addresses()
+
+        try:
+            instrument_address = [address for address in all_addresses if address not in other_addresses][0]
+            print(f'Address: {instrument_address}')
+            again = 'y' in input('Again? [y/n]').lower()
+            if again:
+                USBTMC.locate()
+        except IndexError:
+            raise ConnectionError('Instrument not found!')
+
 
 class Modbus(Adapter):
     """
@@ -691,6 +748,10 @@ class Modbus(Adapter):
         if not self.backend.close_port_after_each_call:
             self.backend.serial.close()
         self.connected = False
+
+    @staticmethod
+    def locate():
+        return Serial.locate()
 
 
 class Phidget(Adapter):
