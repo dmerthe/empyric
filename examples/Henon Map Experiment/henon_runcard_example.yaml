@@ -45,7 +45,7 @@ Alarms:
  r > 1:
   variable: Distance r
   condition: '>1'
-  protocol: wait
+  protocol: hold
 
 Plots:
  Henon Map:

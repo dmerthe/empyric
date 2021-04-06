@@ -7,7 +7,6 @@
 Settings:
  follow-up: None
  step interval: 0.25
- plot interval: 10
  save interval: 10
 
 Instruments:
