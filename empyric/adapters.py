@@ -22,12 +22,17 @@ def chaperone(method):
         while self.busy:  # wait for turn
             time.sleep(0.05)
 
+        self.busy = True
+
         # Catch communication errors and either try to repeat communication or reset the connection
-        if self.reconnects < self.max_reconnects:
-            if self.repeats < self.max_attempts:
+        attempts = 0
+        reconnects = 0
+
+        while reconnects <= self.max_reconnects:
+            while attempts < self.max_attempts:
 
                 try:
-                    self.busy = True
+                    
                     response = method(self, *args, **kwargs)
 
                     if validator:
@@ -35,31 +40,26 @@ def chaperone(method):
                     else:
                         valid_response = (response != '') * (response != float('nan'))
 
-                    if valid_response:
-                        self.repeats = 0  # reset repeat counter upon valid communication
-                        self.reconnects = 0  # reset reconnection counter
-                        self.busy = False
-                        return response
-                    else:
+                    if not valid_response:
                         raise ValueError(f'invalid response, {response}, from {method.__name__} method')
+
+                    self.busy = False
+                    return response
 
                 except BaseException as err:
                     warnings.warn(f'Encountered {err} while trying to read from {self.instrument}')
-                    self.repeats += 1
-                    self.busy = False
-                    return wrapped_method(self, *args, validator=validator, **kwargs)
-            else:
-                self.disconnect()
-                time.sleep(self.delay)
-                self.connect()
+                    attempts += 1
 
-                self.repeats = 0
-                self.reconnects += 1
-                self.busy = False
-                return wrapped_method(self, *args, validator=validator, **kwargs)
-        else:
-            self.busy = False
-            raise ConnectionError(f'Unable to communicate with instrument at address {self.instrument.address}!')
+            # repeats have maxed out, so try reconnecting with the instrument
+            self.disconnect()
+            time.sleep(self.delay)
+            self.connect()
+
+            attempts = 0
+            reconnects += 1
+
+        # Getting here means that both repeats and reconnects have been maxed out
+        raise ConnectionError(f'Unable to communicate with instrument at address {self.instrument.address}!')
 
     wrapped_method.__doc__ = method.__doc__
 
@@ -211,7 +211,7 @@ class Serial(Adapter):
 
         return "Success"
 
-    def _read(self, until=None, bytes=None):
+    def _read(self, until=None, bytes=None, decode=True):
 
         self.backend.timeout = self.timeout
 
@@ -224,13 +224,16 @@ class Serial(Adapter):
 
         self.backend.reset_input_buffer()
 
-        return response.decode().strip()
+        if decode:
+            return response.decode().strip()
+        else:
+            return response
 
-    def _query(self, question, until=None, bytes=None):
+    def _query(self, question, until=None, bytes=None, decode=True):
 
         self._write(question)
         time.sleep(self.delay)
-        return self._read(until=until, bytes=bytes)
+        return self._read(until=until, bytes=bytes, decode=decode)
 
     def disconnect(self):
         self.backend.reset_input_buffer()
