@@ -130,7 +130,6 @@ class Variable:
         else:
             pass
 
-## Routines
 
 def convert_time(time_value):
     """
@@ -327,22 +326,8 @@ class Minimize(Routine):
     Possible metrics include 'sum', 'norm', 'prod' (product).
     """
 
-    def better(self, meter_values):
 
-        if np.prod(self.last_meters) != np.nan:
-            if self.metric == 'sum':
-                better = (np.sum(meter_values) < np.sum(self.last_meters))
-            elif self.metric == 'norm':
-                better = (np.linalg.norm(meter_values) < np.linalg.norm(self.last_meters))
-            elif self.metric == 'prod':
-                better = (np.prod(meter_values) < np.prod(self.last_meters))
-        else:
-            better = True
-
-        return better
-
-
-    def __init__(self, meters=None, max_deltas=None, metric='sum', **kwargs):
+    def __init__(self, meters=None, max_deltas=None, T0=0.1, T1=0, metric='sum', **kwargs):
 
         Routine.__init__(self, **kwargs)
 
@@ -356,6 +341,9 @@ class Minimize(Routine):
         else:
             self.max_deltas = np.ones(len(self.knobs))
 
+        self.T = T0
+        self.T0 = T0
+        self.T1 = T1
         self.metric = metric
         self.last_knobs = [np.nan]*len(self.knobs)
         self.last_meters = [np.nan]*len(self.controls)
@@ -365,6 +353,9 @@ class Minimize(Routine):
         # Get meter values
         meter_values = np.array([state[meter] for meter in self.meters])
 
+        # Update temperature
+        self.T = self.T0 + self.T1*(state['time'] - self.start)/(self.end - self.start)
+
         if self.better(meter_values):
 
             # Record this new optimal state
@@ -372,13 +363,28 @@ class Minimize(Routine):
             self.last_meters = [state[meter] for meter in self.meters]
 
             # Generate and apply new knob settings
-            new_knobs = self.last_knobs + self.max_deltas*np.random.rand()
+            new_knobs = self.last_knobs + self.max_deltas*np.random.rand(len(self.knobs))
             for knob, new_value in zip(self.knobs.values(), new_knobs):
                 knob.value = new_value
 
         else:  # go back
             for knob, last_value in zip(self.knobs.values(), self.last_knobs):
                 knob.value = last_value
+
+    def better(self, meter_values):
+
+        if np.prod(self.last_meters) != np.nan:
+
+            if self.metric == 'sum':
+                change = np.sum(meter_values) - np.sum(self.last_meters)
+            elif self.metric == 'norm':
+                change = np.linalg.norm(meter_values) - np.linalg.norm(self.last_meters)
+            elif self.metric == 'prod':
+                change = np.prod(meter_values) - np.prod(self.last_meters)
+
+            return (change < 0) or (np.exp(-change/self.T) > np.random.rand())
+        else:
+            return True
 
 
 class Maximize(Minimize):
@@ -389,16 +395,17 @@ class Maximize(Minimize):
     def better(self, meter_values):
 
         if np.prod(self.last_meters) != np.nan:
-            if self.metric == 'sum':
-                better = (np.sum(meter_values) > np.sum(self.last_meters))
-            elif self.metric == 'norm':
-                better = (np.linalg.norm(meter_values) > np.linalg.norm(self.last_meters))
-            elif self.metric == 'prod':
-                better = (np.prod(meter_values) > np.prod(self.last_meters))
-        else:
-            better = True
 
-        return better
+            if self.metric == 'sum':
+                change = np.sum(meter_values) - np.sum(self.last_meters)
+            elif self.metric == 'norm':
+                change = np.linalg.norm(meter_values) - np.linalg.norm(self.last_meters)
+            elif self.metric == 'prod':
+                change = np.prod(meter_values) - np.prod(self.last_meters)
+
+            return (change > 0) or (np.exp(change / self.T) > np.random.rand())
+        else:
+            return True
 
 
 class ModelPredictiveControl(Routine):
