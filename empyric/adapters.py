@@ -797,7 +797,6 @@ class Phidget(Adapter):
     def _query(self, parameter):
         return self.backend.__getattribute__('get'+parameter)()
 
-
     def disconnect(self):
         self.backend.close()
         self.connected = True
