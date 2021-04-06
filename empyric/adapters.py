@@ -19,10 +19,10 @@ def chaperone(method):
         if not self.connected:
             raise ConnectionError(f'Adapter is not connected for instrument at address {self.instrument.address}')
 
-        while self.busy:  # wait for turn
+        while self.busy:  # wait for turn to talk to the instrument
             time.sleep(0.05)
 
-        self.busy = True
+        self.busy = True  # block other methods from talking to the instrument
 
         # Catch communication errors and either try to repeat communication or reset the connection
         attempts = 0
@@ -38,7 +38,7 @@ def chaperone(method):
                     if validator:
                         valid_response = validator(response)
                     else:
-                        valid_response = (response != '') * (response != float('nan'))
+                        valid_response = (response != '') * (response != float('nan')) * (response != None)
 
                     if not valid_response:
                         raise ValueError(f'invalid response, {response}, from {method.__name__} method')
@@ -47,7 +47,7 @@ def chaperone(method):
                     return response
 
                 except BaseException as err:
-                    warnings.warn(f'Encountered {err} while trying to read from {self.instrument}')
+                    warnings.warn(f'Encountered {err} while trying to talk to {self.instrument}')
                     attempts += 1
 
             # repeats have maxed out, so try reconnecting with the instrument
@@ -61,7 +61,7 @@ def chaperone(method):
         # Getting here means that both repeats and reconnects have been maxed out
         raise ConnectionError(f'Unable to communicate with instrument at address {self.instrument.address}!')
 
-    wrapped_method.__doc__ = method.__doc__
+    wrapped_method.__doc__ = method.__doc__  # keep method doc string
 
     return wrapped_method
 
@@ -467,17 +467,14 @@ class LinuxGPIB(Adapter):
 
         self._timeout = new_timeout
 
-    @chaperone
     def _write(self, message):
         self.backend.write(self.descr, message)
         return "Success"
 
-    @chaperone
     def _read(self, read_length=512):
         self.set_timeout(self.timeout)
         return self.backend.read(self.descr, read_length).decode()
 
-    @chaperone
     def _query(self, question, read_length=512):
         self._write(question)
         time.sleep(self.delay)
