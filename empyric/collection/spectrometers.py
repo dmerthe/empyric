@@ -20,6 +20,7 @@ class SRSRGA(Instrument):
         'filament current',
         'mass',
         'masses',
+        'mass range',
         'ppsf',  # partial pressure sensitivity factor
         'tpsf'  # total pressure sensitivity factor
     )
@@ -42,7 +43,6 @@ class SRSRGA(Instrument):
     def __init__(self, *args, **kwargs):
 
         Instrument.__init__(self, *args, **kwargs)
-        initialized = self.query('IN0')
 
     @setter
     def set_filament_current(self, current):
@@ -67,18 +67,42 @@ class SRSRGA(Instrument):
 
     @setter
     def set_masses(self, masses):
-
         initial_mass, final_mass = masses[0], masses[-1]
 
         self.write('MI' + f'{int(initial_mass)}')
         self.write('MF' + f'{int(final_mass)}')
 
+        self.mass_range = [initial_mass, final_mass]
+
     @getter
     def get_masses(self):
+
         initial_mass = int(self.query('MI?'))
         final_mass = int(self.query('MF?'))
 
+        self.mass_range = [initial_mass, final_mass]
+
         return np.arange(initial_mass, final_mass + 1)
+
+    @setter
+    def set_mass_range(self, mass_range):
+
+        initial_mass, final_mass = mass_range
+
+        self.write('MI' + f'{int(initial_mass)}')
+        self.write('MF' + f'{int(final_mass)}')
+
+        self.masses = np.arange(initial_mass, final_mass + 1)
+
+    @getter
+    def get_mass_range(self):
+        initial_mass = int(self.query('MI?'))
+        final_mass = int(self.query('MF?'))
+
+        self.masses = np.arange(initial_mass, final_mass + 1)
+
+        return [initial_mass, final_mass]
+
 
     @setter
     def set_ppsf(self, value):
@@ -98,31 +122,15 @@ class SRSRGA(Instrument):
 
     @measurer
     def measure_spectrum(self):
-
-        self.write('HS1')
-        response = self.adapter.backend.read(4*len(self.masses))
-        total_pressure = self.adapter.backend.read(4)  # automatically measured after every scan
-
-        self.adapter.backend.reset_input_buffer()
-
-        return np.array(struct.unpack('<'+'i'*len(self.masses), response)) * 1.0e-16 / self.ppsf * 1000
+        response = self.query('HS1', bytes=4*(len(self.masses)+1), decode=False)
+        return np.array(struct.unpack('<'+'i'*(len(self.masses)+1), response))[:-1] * 1.0e-16 / self.ppsf * 1000
 
     @measurer
     def measure_single(self):
-
-        self.write('MR'+f'{int(self.mass)}')
-        response = self.adapter.backend.read(4)
-
-        self.adapter.backend.reset_input_buffer()
-
+        response = self.query('MR'+f'{int(self.mass)}', bytes=4, decode=False)
         return struct.unpack('<i', response)[0] * 1.0e-16 / self.ppsf * 1000
 
     @measurer
     def measure_total_pressure(self):
-
-        self.write('TP?')
-        response = self.adapter.backend.read(4)
-
-        self.adapter.backend.reset_input_buffer()
-
+        response = self.query('TP?', bytes=4, decode=False)
         return struct.unpack('<i', response)[0] * 1.0e-16 / self.tpsf * 1000
