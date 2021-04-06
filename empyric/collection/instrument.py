@@ -137,6 +137,7 @@ class Instrument:
             self.presets.update(presets)
 
         for knob, value in self.presets.items():
+
             self.set(knob, value)
 
         # Get postsets
