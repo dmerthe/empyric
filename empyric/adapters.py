@@ -129,7 +129,7 @@ class Adapter:
         """
 
         if hasattr(self, '_write'):
-            self._write(*args, **kwargs)
+            return self._write(*args, **kwargs)
         else:
             raise AttributeError(self.__name__ + " adapter has no _write method")
 
