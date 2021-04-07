@@ -42,15 +42,19 @@ def chaperone(method):
 
                     if not valid_response:
                         raise ValueError(f'invalid response, {response}, from {method.__name__} method')
+                    elif attempts > 0 or reconnects > 0:
+                        print('Resolved')
 
                     self.busy = False
                     return response
 
                 except BaseException as err:
-                    warnings.warn(f'Encountered {err} while trying to talk to {self.instrument}')
+                    print(f'Encountered {err} while trying to talk to {self.instrument}')
+                    print('Trying again...')
                     attempts += 1
 
             # repeats have maxed out, so try reconnecting with the instrument
+            print('Reconnecting...')
             self.disconnect()
             time.sleep(self.delay)
             self.connect()
