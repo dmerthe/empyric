@@ -43,6 +43,6 @@ Plots:
 Routines:
  Sweep Voltage:
   type: Sequence
-  variables: Voltage
+  knobs: Voltage
   end: 2 minutes
   values: 'voltages.csv'

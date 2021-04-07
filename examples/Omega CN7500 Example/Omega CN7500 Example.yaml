@@ -37,11 +37,11 @@ Plots:
 Routines:
  Ramp Temperature Up:
   type: Timecourse
-  variables: Setpoint
+  knobs: Setpoint
   times: [0, 2 minutes]  # start and end times
   values: [30, 40]  # start and end values
  Ramp Temperature Down:
   type: Timecourse
-  variables: Setpoint
+  knobs: Setpoint
   times: [ 2 minutes, 4 minutes ]
   values: [40, 30]
