@@ -15,7 +15,6 @@ import queue
 import tkinter as tk
 from tkinter.filedialog import askopenfilename
 from ruamel.yaml import YAML
-yaml = YAML()
 
 from empyric import instruments as instr
 from empyric import adapters, graphics
@@ -750,7 +749,7 @@ class Manager:
         if type(self.runcard) == str:
 
             os.chdir(os.path.dirname(self.runcard))  # go to runcard directory to put data in same location
-
+            yaml = YAML()
             with open(self.runcard, 'rb') as runcard_file:
                 self.runcard = yaml.load(runcard_file)  # load the runcard
 
@@ -797,7 +796,6 @@ class Manager:
         os.chdir(working_dir)
 
         # Save executed runcard alongside data for record keeping
-        from ruamel.yaml import YAML
         yaml = YAML()
 
         with open(f"{experiment_name}_{self.experiment.timestamp}.yaml", 'w') as runcard_file:
