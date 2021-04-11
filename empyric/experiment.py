@@ -5,13 +5,10 @@ from math import *
 import time
 import datetime
 import numbers
-import importlib
 from scipy.interpolate import interp1d
 import numpy as np
 import pandas as pd
-import warnings
 import threading
-import queue
 import tkinter as tk
 from tkinter.filedialog import askopenfilename
 from ruamel.yaml import YAML
@@ -176,7 +173,7 @@ class Routine:
         :param knobs: (1D array) knobs to be controlled
         :param values: (1D/2D array) array or list of values for each variable; can only be 1D if there is only one variable
         :param start: (float) time to start the routine
-        :param stop: (float) time to end the routine
+        :param end: (float) time to end the routine
         """
 
         if knobs:
@@ -274,7 +271,7 @@ class Timecourse(Routine):
 
 class Sequence(Routine):
     """
-    Passes through a series of values regardless of time
+    Passes knobs through series of values regardless of time; each series for each knob must have the same length
     """
 
     def __init__(self, **kwargs):
@@ -287,11 +284,11 @@ class Sequence(Routine):
         if state['time'] < self.start or state['time'] > self.end:
             return  # no change
 
-        for variable, values in zip(self.knobs.values(), self.values):
+        for knob, values in zip(self.knobs.values(), self.values):
             value = values[self.iteration]
-            variable.value = value
+            knob.value = value
 
-        self.iteration = (self.iteration + 1) % len(values)
+        self.iteration = (self.iteration + 1) % len(self.values[0])
 
 
 class Set(Routine):
@@ -299,7 +296,7 @@ class Set(Routine):
     Sets a knob based on the value of another variable
     """
 
-    def __init__(self, input=None, **kwargs):
+    def __init__(self, inputs=None, **kwargs):
 
         Routine.__init__(self, **kwargs)
 
@@ -325,7 +322,6 @@ class Minimize(Routine):
     Possible metrics include 'sum', 'norm', 'prod' (product).
     """
 
-
     def __init__(self, meters=None, max_deltas=None, T0=0.1, T1=0, metric='sum', **kwargs):
 
         Routine.__init__(self, **kwargs)
@@ -345,7 +341,7 @@ class Minimize(Routine):
         self.T1 = T1
         self.metric = metric
         self.last_knobs = [np.nan]*len(self.knobs)
-        self.last_meters = [np.nan]*len(self.controls)
+        self.last_meters = [np.nan]*len(self.meters)
 
     def update(self, state):
 
@@ -374,12 +370,12 @@ class Minimize(Routine):
 
         if np.prod(self.last_meters) != np.nan:
 
-            if self.metric == 'sum':
-                change = np.sum(meter_values) - np.sum(self.last_meters)
-            elif self.metric == 'norm':
+            if self.metric == 'norm':
                 change = np.linalg.norm(meter_values) - np.linalg.norm(self.last_meters)
             elif self.metric == 'prod':
                 change = np.prod(meter_values) - np.prod(self.last_meters)
+            else:  # assume 'sum' metric
+                change = np.sum(meter_values) - np.sum(self.last_meters)
 
             return (change < 0) or (np.exp(-change/self.T) > np.random.rand())
         else:
@@ -395,12 +391,12 @@ class Maximize(Minimize):
 
         if np.prod(self.last_meters) != np.nan:
 
-            if self.metric == 'sum':
-                change = np.sum(meter_values) - np.sum(self.last_meters)
-            elif self.metric == 'norm':
+            if self.metric == 'norm':
                 change = np.linalg.norm(meter_values) - np.linalg.norm(self.last_meters)
             elif self.metric == 'prod':
                 change = np.prod(meter_values) - np.prod(self.last_meters)
+            else:  # assume 'sum' metric
+                change = np.sum(meter_values) - np.sum(self.last_meters)
 
             return (change > 0) or (np.exp(change / self.T) > np.random.rand())
         else:
@@ -682,7 +678,7 @@ def build_experiment(runcard, settings=None, instruments=None, alarms=None):
         adapter_kwargs = {}
         for kwarg in adapters.Adapter.kwargs:
             if kwarg.replace('_', ' ') in specs:
-                adapter_kwargs[kwarg] = specs.pop(kwargs)
+                adapter_kwargs[kwarg] = specs.pop(kwarg)
 
         # Any remaining keywards are instrument presets
         presets = specs.get('presets', {})
