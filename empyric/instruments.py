@@ -9,3 +9,4 @@ from empyric.collection.multimeters import *
 from empyric.collection.controllers import *
 from empyric.collection.humans import *
 from empyric.collection.spectrometers import *
+from empyric.collection.virtual import *
