@@ -842,6 +842,8 @@ class Manager:
 
         for state in self.experiment:
 
+            step_start = time.time()
+
             # Save experimental data periodically
             if time.time() >= self.last_save + self.save_interval and Experiment.STOPPED not in self.experiment.status:
                 self.experiment.save()
@@ -879,4 +881,6 @@ class Manager:
                 self.awaiting_alarms = False
                 self.experiment.start()
 
-            time.sleep(self.step_interval)
+            step_end = time.time()
+
+            time.sleep(self.step_interval - (step_end - step_start))
