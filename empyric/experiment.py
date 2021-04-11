@@ -883,4 +883,6 @@ class Manager:
 
             step_end = time.time()
 
-            time.sleep(self.step_interval - (step_end - step_start))
+            remaining_time = np.max([self.step_interval - (step_end - step_start), 0])
+
+            time.sleep(remaining_time)
