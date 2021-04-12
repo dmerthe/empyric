@@ -56,21 +56,25 @@ class Variable:
 
     A knob is a variable that can be directly controlled by an instrument, e.g. the voltage of a power supply.
 
-    A meter is a variable that is measured by an instrument, such as temperature. Some meters can be controlled directly or indirectly through an associated (but distinct) knob.
+    A meter is a variable that is measured by an instrument, such as temperature. Some meters can be controlled directly
+    or indirectly through an associated (but distinct) knob.
 
-    An expression is a variable that is not directly measured, but is calculated based on other variables of the experiment.
-    An example of an expression is the output power of a power supply, where voltage is a knob and current is a meter: power = voltage * current.
+    An expression is a variable that is not directly measured, but is calculated based on other variables of the
+    experiment. An example of an expression is the output power of a power supply, where voltage is a knob and current
+    is a meter: power = voltage * current.
     """
 
     def __init__(self, instrument=None, knob=None, meter=None, expression=None, definitions=None):
         """
-        One of either the knob, meter or expression keyword arguments must be supplied along with the respective instrument or definitions.
+        One of either the knob, meter or expression keyword arguments must be supplied along with the respective
+        instrument or definitions.
 
         :param instrument: (Instrument) instrument with the corresponding knob or meter
         :param knob: (str) instrument knob label, if variable is a knob
         :param meter: (str) instrument meter label, if variable is a meter
         :param expression: (str) expression for the variable in terms of other variables, if variable is an expression
-        :param definitions: (dict) dictionary of the form {..., symbol: variable, ...} mapping the symbols in the expression to other variable objects; only used if type is 'expression'
+        :param definitions: (dict) dictionary of the form {..., symbol: variable, ...} mapping the symbols in the
+        expression to other variable objects; only used if type is 'expression'
         """
 
         if meter:
@@ -105,14 +109,15 @@ class Variable:
             self._value = self.instrument.measure(self.meter)
         elif hasattr(self, 'expression'):
             expression = self.expression
-            expression = expression.replace('^', '**')  # carets represent exponents to everyone except for Guido van Rossum
+            expression = expression.replace('^', '**')  # carets represent exponents
 
             for symbol, variable in self.definitions.items():
                 expression = expression.replace(symbol, '(' + str(variable._value) + ')')
 
             try:
                 self._value = eval(expression)
-            except BaseException:
+            except BaseException as err:
+                print(f'Error while trying to evaluate expression {self.expression}:', err)
                 self._value = float('nan')
 
         return self._value
@@ -131,7 +136,7 @@ def convert_time(time_value):
     """
     If time_value is a string, converts a time of the form "number units" (e.g. "3.5 hours") to the time in seconds.
     If time_value is a number, just returns the same number
-    If time_value is an array, it iterates through the array doing either of the previous two operations on every element.
+    If time_value is an array, iterates through the array doing either of the previous two operations on every element.
 
     :param time_value: (str/float) time value, possibly including units such as 'hours'
     :return: (int) time in seconds
@@ -152,16 +157,16 @@ def convert_time(time_value):
             value, unit = time_parts
             value = float(value)
             return value * {
-                'seconds': 1, 'second':1,
+                'seconds': 1, 'second': 1,
                 'minutes': 60, 'minute': 60,
                 'hours': 3600, 'hour': 3600,
-                'days': 86400, 'day':86400
+                'days': 86400, 'day': 86400
             }[unit]
         else:
             raise ValueError(f'Unrecognized time format for {time_value}!')
 
-## Routines ##
 
+# Routines
 class Routine:
     """
     Base class for all routines
@@ -171,7 +176,7 @@ class Routine:
         """
 
         :param knobs: (1D array) knobs to be controlled
-        :param values: (1D/2D array) array or list of values for each variable; can only be 1D if there is only one variable
+        :param values: (1D/2D array) array or list of values for each variable; can only be 1D if there is one variable
         :param start: (float) time to start the routine
         :param end: (float) time to end the routine
         """
@@ -183,7 +188,7 @@ class Routine:
 
         if values:
 
-            self.values = np.array(values, dtype=object).reshape((len(self.knobs),-1))
+            self.values = np.array(values, dtype=object).reshape((len(self.knobs), -1))
 
             # Values can be stored in a CSV file
             for i, element in enumerate(self.values):
@@ -194,7 +199,6 @@ class Routine:
 
         else:
             raise AttributeError(f'{self.__name__} routine requires values')
-
 
         self.start = convert_time(start)
         self.end = convert_time(end)
@@ -232,7 +236,7 @@ class Timecourse(Routine):
     def __init__(self, times=None, **kwargs):
         """
 
-        :param times: (1D/2D array) array or list of times, relative to the start time, to set each variable to each value
+        :param times: (1D/2D array) array or list of times relative to the start time
         :param kwargs: keyword arguments for Routine
         """
 
@@ -310,8 +314,8 @@ class Set(Routine):
         if state['time'] < self.start or state['time'] > self.end:
             return  # no change
 
-        for variable, input in zip(self.knobs.values(), self.inputs):
-            value = state[input]
+        for variable, _input in zip(self.knobs.values(), self.inputs):
+            value = state[_input]
             variable.value = value
 
 
@@ -443,7 +447,7 @@ class Alarm:
     @property
     def triggered(self):
         value = self.variable._value  # get last know variable value
-        if not (value == None or value == float('nan') or value == ''):
+        if not (value is None or value == float('nan') or value == ''):
             self._triggered = eval('value' + self.condition)
 
         return self._triggered
@@ -469,7 +473,7 @@ class Experiment:
     @status.setter
     def status(self, status):
         prior_base_status = self._status.split(':')[0]
-        new_base_status =  status.split(':')[0]
+        new_base_status = status.split(':')[0]
 
         # Only allow change if the status is unlocked, or if the base status is the same
         if not self.status_locked or new_base_status == prior_base_status:
@@ -480,7 +484,7 @@ class Experiment:
         self.variables = variables  # dict of the form {..., name: variable, ...}
 
         if routines:
-            self.routines = routines  # dictionary of experimental routines of the form {..., name: (variable_name, routine), ...}
+            self.routines = routines  # dictionary of the form {..., name: (variable_name, routine), ...}
             self.end = max([routine.end for routine in routines.values()])  # time at which all routines are exhausted
         else:
             self.routines = {}
@@ -497,7 +501,7 @@ class Experiment:
         self.state['time'] = 0
 
         self._status = Experiment.READY
-        status_locked = True  # can only be unlocked by the start, hold, stop and terminate methods
+        self.status_locked = True  # can only be unlocked by the start, hold, stop and terminate methods
 
     def __next__(self):
 
@@ -577,7 +581,6 @@ class Experiment:
             self.state[name] = path
         else:
             self.state[name] = value
-
 
     def save(self, directory=None):
         """
@@ -680,7 +683,7 @@ def build_experiment(runcard, settings=None, instruments=None, alarms=None):
             if kwarg.replace('_', ' ') in specs:
                 adapter_kwargs[kwarg] = specs.pop(kwarg)
 
-        # Any remaining keywards are instrument presets
+        # Any remaining keywords are instrument presets
         presets = specs.get('presets', {})
         postsets = specs.get('postsets', {})
 
@@ -752,7 +755,10 @@ class Manager:
         self.instruments = {}  # instruments will be stored here, so that they can be disconnected after the experiment
         self.alarms = {}
         self.settings = {}
-        self.experiment = build_experiment(self.runcard, settings=self.settings, instruments=self.instruments, alarms=self.alarms)
+        self.experiment = build_experiment(self.runcard,
+                                           settings=self.settings,
+                                           instruments=self.instruments,
+                                           alarms=self.alarms)
 
         # Unpack settings
         self.step_interval = self.settings.get('step interval', 0.1)
@@ -774,9 +780,11 @@ class Manager:
 
     def run(self, directory=None):
         """
-        Run the experiment defined by the runcard. A GUI shows experiment status, while the experiment is run in a separate thread.
+        Run the experiment defined by the runcard. A GUI shows experiment status, while the experiment is run in a
+        eparate thread.
 
-        :param directory: (path) (optional) directory in which to run the experiment if different from the working directory
+        :param directory: (path) (optional) directory in which to run the experiment if different from the working
+        directory
         :return: None
         """
 
@@ -829,7 +837,6 @@ class Manager:
         elif 'repeat' in self.followup:
             self.__init__(self.runcard)
             self.run()
-
 
     def _run(self):
         # Run in a separate thread
