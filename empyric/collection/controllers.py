@@ -147,36 +147,36 @@ class WatlowEZZone(Instrument):
 
     @measurer
     def measure_temperature(self):
-        return self.read(360, type='float', byte_order=3)  # swapped little-endian byte order (= 3 in minimalmodbus)
+        return self.read(360, dtype='float', byte_order=3)  # swapped little-endian byte order (= 3 in minimalmodbus)
 
     @getter
     def get_setpoint(self):
-        return self.read(2160, type='float', byte_order=3)
+        return self.read(2160, dtype='float', byte_order=3)
 
     @setter
     def set_setpoint(self, setpoint):
-        return self.write(2160, setpoint, type='float', byte_order=3)
+        return self.write(2160, setpoint, dtype='float', byte_order=3)
 
     @getter
     def get_proportional_band(self):
-        return self.read(1890, type='float', byte_order=3)
+        return self.read(1890, dtype='float', byte_order=3)
 
     @setter
     def set_proportional_band(self, band):
-        return self.write(1890, band, type='float', byte_order=3)
+        return self.write(1890, band, dtype='float', byte_order=3)
 
     @getter
     def get_time_integral(self):
-        return self.read(1894, type='float', byte_order=3)
+        return self.read(1894, dtype='float', byte_order=3)
 
     @setter
     def set_time_integral(self, integral):
-        return self.write(1894, integral, type='float', byte_order=3)
+        return self.write(1894, integral, dtype='float', byte_order=3)
 
     @getter
     def get_time_derivative(self):
-        return self.read(1896, type='float', byte_order=3)
+        return self.read(1896, dtype='float', byte_order=3)
 
     @setter
     def set_time_derivative(self, derivative):
-        return self.write(1896, derivative, type='float', byte_order=3)
+        return self.write(1896, derivative, dtype='float', byte_order=3)

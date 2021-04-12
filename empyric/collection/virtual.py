@@ -1,6 +1,6 @@
 import time
 from empyric.instruments import Instrument
-from empyric.instruments import setter, getter, measurer
+from empyric.instruments import setter, measurer
 from empyric.adapters import Adapter
 
 
@@ -65,7 +65,7 @@ class HenonMapper(Instrument):
 
     y_{n+1} = b x_n
 
-    It has two virtual knobs (a,b) and two virtual meters (x,y), useful for testing in the absence of actual instruments.
+    It has two virtual knobs (a,b) and two virtual meters (x,y), useful for testing in the absence of actual instruments
     """
 
     name = 'HenonMapper'
@@ -74,7 +74,7 @@ class HenonMapper(Instrument):
         (Adapter, {}),
     )
 
-    knobs = ('a','b')
+    knobs = ('a', 'b')
     presets = {'a': 1.4, 'b': 0.3}
 
     meters = ('x', 'y')

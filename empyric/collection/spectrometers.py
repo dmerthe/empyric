@@ -4,6 +4,7 @@ import struct
 from empyric.adapters import *
 from empyric.collection.instrument import *
 
+
 class SRSRGA(Instrument):
     """
     SRS Residual Gas Analyzer, a quadrupole mass spectrometer with mass ranges from 100 to 300 amu
@@ -122,15 +123,15 @@ class SRSRGA(Instrument):
 
     @measurer
     def measure_spectrum(self):
-        response = self.query('HS1', bytes=4*(len(self.masses)+1), decode=False)
+        response = self.query('HS1', num_bytes=4*(len(self.masses)+1), decode=False)
         return np.array(struct.unpack('<'+'i'*(len(self.masses)+1), response))[:-1] * 1.0e-16 / self.ppsf * 1000
 
     @measurer
     def measure_single(self):
-        response = self.query('MR'+f'{int(self.mass)}', bytes=4, decode=False)
+        response = self.query('MR'+f'{int(self.mass)}', num_bytes=4, decode=False)
         return struct.unpack('<i', response)[0] * 1.0e-16 / self.ppsf * 1000
 
     @measurer
     def measure_total_pressure(self):
-        response = self.query('TP?', bytes=4, decode=False)
+        response = self.query('TP?', num_bytes=4, decode=False)
         return struct.unpack('<i', response)[0] * 1.0e-16 / self.tpsf * 1000

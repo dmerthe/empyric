@@ -1,4 +1,3 @@
-import numpy as np
 from functools import wraps
 from empyric.adapters import *
 
@@ -42,6 +41,7 @@ def getter(method):
         return value
 
     return wrapped_method
+
 
 def measurer(method):
     """
@@ -92,10 +92,10 @@ class Instrument:
     def __init__(self, address=None, adapter=None, presets=None, postsets=None, **kwargs):
         """
 
-        :param address: (str/int) the default adapter of the instrument can be set up with default settings based on an address
+        :param address: (str/int) address of instrument
         :param adapter: (Adapter) desired adapter to use for communications with the instrument
-        :param presets: (dict) dictionary of instrument presets of the form {..., knob: value, ...} to apply upon initialization
-        :param presets: (dict) dictionary of instrument postsets of the form {..., knob: value, ...} to apply upon disconnection
+        :param presets: (dict) dictionary of instrument presets of the form {..., knob: value, ...}
+        :param presets: (dict) dictionary of instrument postsets of the form {..., knob: value, ...}
         :param kwargs: (dict) any keyword args for the adapter
         """
 
@@ -115,7 +115,8 @@ class Instrument:
                     self.adapter = _adapter(self, **settings)
                     adapter_connected = True
                 except BaseException as error:
-                    errors.append('in trying '+_adapter.__name__+' adapter, got '+type(error).__name__ +': '+ str(error))
+                    errors.append('in trying ' + _adapter.__name__ + ' adapter, got '
+                                  + type(error).__name__ + ': ' + str(error))
 
             if not adapter_connected:
                 message = f'unable to connect an adapter to instrument {self.name} at address {address}:\n'
@@ -128,7 +129,7 @@ class Instrument:
         # Get existing knob settings, if possible
         for knob in self.knobs:
             if hasattr(self, 'get_'+knob.replace(' ', '_')):
-                self.__getattribute__('get_'+knob.replace(' ', '_'))()  # retrieves the knob value from the instrument and stores as instrument attribute
+                self.__getattribute__('get_'+knob.replace(' ', '_'))()  # retrieves the knob value from the instrument
             else:
                 self.__setattr__(knob.replace(' ', '_'), None)  # knob value is unknown until it is set
 
@@ -199,7 +200,7 @@ class Instrument:
     def get(self, knob):
 
         if hasattr(self, 'get_'+knob.replace(' ', '_')):
-            return getattr(self, 'get_'+knob.replace(' ','_'))()
+            return getattr(self, 'get_'+knob.replace(' ', '_'))()
         else:
             return getattr(self, knob.replace(' ', '_'))
 
@@ -212,7 +213,7 @@ class Instrument:
         """
 
         try:
-            measure_method = self.__getattribute__('measure_' + meter.replace(' ' ,'_'))
+            measure_method = self.__getattribute__('measure_' + meter.replace(' ', '_'))
         except AttributeError:
             raise AttributeError(f"{meter} cannot be measured on {self.name}")
 
