@@ -1,7 +1,7 @@
 # This submodule defines the basic behavior of the key features of the empyric package
 
 import os
-from math import *
+from math import *  # imported for use in evaluating expression variables
 import time
 import datetime
 import numbers
