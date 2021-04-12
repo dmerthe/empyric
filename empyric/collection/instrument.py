@@ -102,7 +102,7 @@ class Instrument:
         if address:
             self.address = address
         else:
-            self.address = 1
+            self.address = None
 
         adapter_connected = False
         if adapter:
@@ -124,7 +124,8 @@ class Instrument:
                     message = message + f"{error}\n"
                 raise ConnectionError(message)
 
-        self.name = self.name + '@' + str(self.address)
+        if self.address:
+            self.name = self.name + '@' + str(self.address)
 
         # Get existing knob settings, if possible
         for knob in self.knobs:

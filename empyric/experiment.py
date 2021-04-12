@@ -407,6 +407,9 @@ class Maximize(Minimize):
             return True
 
 
+
+
+
 class ModelPredictiveControl(Routine):
     """
     (NOT IMPLEMENTED)
@@ -418,10 +421,10 @@ class ModelPredictiveControl(Routine):
 
     """
 
-    def __init__(self, controls=None, **kwargs):
+    def __init__(self, meters=None, **kwargs):
 
         Routine.__init__(self, **kwargs)
-        self.controls = controls
+        self.meters = meters
 
     def update(self, state):
         pass

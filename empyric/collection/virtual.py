@@ -130,3 +130,93 @@ class HenonMapper(Instrument):
         """
 
         return self.y
+
+
+class PIDController(Instrument):
+    """
+    Virtual PID controller
+
+    """
+
+    name = 'PIDController'
+
+    supported_adapters = (
+        (Adapter, {}),
+    )
+
+    knobs = (
+        'setpoint',
+        'proportional gain'
+        'derivative time'
+        'integral time',
+        'input'
+    )
+
+    meters = ('output',)
+
+    def __init__(self, *args, **kwargs):
+
+        Instrument.__init_(self, *args, **kwargs)
+        self.clock = Clock()
+
+        self.setpoint = 0
+
+        self.times = []
+        self.setpoints = []
+        self.inputs = []
+        self.outputs = []
+
+    @setter
+    def set_setpoint(self, setpoint):
+        pass
+
+    @setter
+    def set_proportional_gain(self, gain):
+        pass
+
+    @setter
+    def set_derivative_time(self, _time):
+        pass
+
+    @setter
+    def set_integral_time(self, _time):
+        pass
+
+    @setter
+    def set_input(self, input):
+
+        if len(self.times) == 0:
+            self.clock.start()
+
+        self.times.append(self.clock.time)
+        self.setpoints.append(self.setpoint)
+        self.inputs.append(input)
+
+    @measurer
+    def measure_output(self):
+
+        if len(self.outputs) < len(self.inputs):
+
+            error = self.setpoint - self.input
+
+            if len(self.times) > 1:
+                derivative = -(self.inputs[-1] - self.inputs[-2]) / (self.times[-1] - self.times[-2])
+            else:
+                derivative = 0
+
+            if len(self.times) > 1:
+                integral = np.sum(np.diff(self.times)*(self.setpoints - self.inputs)[1:])
+            else:
+                integral = 0
+
+            tD = self.derivative_time
+            tI = self.integral_time
+
+            output = self.proportional_gain*(error + tD*derivative + integral/tI)
+
+            self.outputs.append(output)
+
+            return output
+        else:
+            return self.outputs[-1]
+        
