@@ -27,7 +27,6 @@ The optional ``Settings`` section, of the general form,
    Settings: # All settings below are optional
     follow-up: (None, 'Repeat', or 'another_experiment_runcard.yaml'; default = None)
     step interval: (minimum time between experiment steps; default = 0.1 seconds)
-    plot interval: (minimum time in between plot remakes; adjusts automatically; default = 0)
     save interval: (minimum time between data saves to file; default = 60 seconds)
     end: (when to force experiment termination; overrides routines; default = inf)
     
