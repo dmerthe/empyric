@@ -188,26 +188,31 @@ class PIDController(Instrument):
         if len(self.times) == 0:
             self.clock.start()
 
-        self.times.append(self.clock.time)
-        self.setpoints.append(self.setpoint)
-        self.inputs.append(input)
+        if len(self.outputs) == len(self.inputs):
+            self.times.append(self.clock.time)
+            self.setpoints.append(self.setpoint)
+            self.inputs.append(input)
 
     @measurer
     def measure_output(self):
 
-        if len(self.outputs) < len(self.inputs):
+        if len(self.outputs) < len(self.inputs):  # if input has been updated
 
+            # Proportional term
             error = self.setpoint - self.input
 
+            # Integral term
+            if len(self.times) > 1:
+                integral = np.sum(np.diff(self.times)*(self.setpoints - self.inputs)[1:])
+            else:
+                integral = 0
+
+            # Derivative term
             if len(self.times) > 1:
                 derivative = -(self.inputs[-1] - self.inputs[-2]) / (self.times[-1] - self.times[-2])
             else:
                 derivative = 0
 
-            if len(self.times) > 1:
-                integral = np.sum(np.diff(self.times)*(self.setpoints - self.inputs)[1:])
-            else:
-                integral = 0
 
             tD = self.derivative_time
             tI = self.integral_time
