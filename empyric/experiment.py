@@ -244,6 +244,12 @@ class Timecourse(Routine):
 
         if times:
 
+            if len(self.knobs) > 1:
+                if np.ndims(times) == 1:  # single list of times for all variables
+                    times = [times]*len(self.variables)
+                elif np.shape(times)[0] == 1: # array with one list of times for all variables
+                    times = [times[0]]*len(self.variables)
+
             self.times = np.array(times, dtype=object).reshape((len(self.knobs), -1))
 
             # Values can be stored in a CSV file
@@ -295,17 +301,17 @@ class Sequence(Routine):
         self.iteration = (self.iteration + 1) % len(self.values[0])
 
 
-class Set(Routine):
+class Feed(Routine):
     """
     Sets a knob based on the value of another variable
     """
 
-    def __init__(self, inputs=None, **kwargs):
+    def __init__(self, meters=None, **kwargs):
 
         Routine.__init__(self, **kwargs)
 
-        if inputs:
-            self.inputs = inputs
+        if meters:
+            self.meters = meters
         else:
             raise AttributeError('Set routine requires inputs!')
 
@@ -314,8 +320,8 @@ class Set(Routine):
         if state['time'] < self.start or state['time'] > self.end:
             return  # no change
 
-        for variable, _input in zip(self.knobs.values(), self.inputs):
-            value = state[_input]
+        for variable, meter in zip(self.knobs.values(), self.meters):
+            value = state[meter]
             variable.value = value
 
 
