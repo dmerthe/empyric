@@ -1,4 +1,5 @@
 import time
+import numpy as np
 from empyric.instruments import Instrument
 from empyric.instruments import setter, measurer
 from empyric.adapters import Adapter
@@ -152,19 +153,25 @@ class PIDController(Instrument):
         'input'
     )
 
+    presets = {
+        'proportional gain': 1,
+        'derivative time': 12,
+        'integral time': 180
+    }
+
     meters = ('output',)
 
     def __init__(self, *args, **kwargs):
 
+        self.setpoint = None
+
         Instrument.__init_(self, *args, **kwargs)
         self.clock = Clock()
 
-        self.setpoint = 0
-
-        self.times = []
-        self.setpoints = []
-        self.inputs = []
-        self.outputs = []
+        self.times = np.array([])
+        self.setpoints = np.array([])
+        self.inputs = np.array([])
+        self.outputs = np.array([])
 
     @setter
     def set_setpoint(self, setpoint):
@@ -189,30 +196,35 @@ class PIDController(Instrument):
             self.clock.start()
 
         if len(self.outputs) == len(self.inputs):
-            self.times.append(self.clock.time)
-            self.setpoints.append(self.setpoint)
-            self.inputs.append(input)
+            self.times = np.concatenate([self.times, [self.clock.time]])
+            self.setpoints = np.concatenate([self.setpoints, [self.setpoint]])
+            self.inputs = np.concatenate([self.inputs, [input]])
 
     @measurer
     def measure_output(self):
+
+        if self.setpoint is None:  # Don't output anything unless the setpoint is defined
+            return None
 
         if len(self.outputs) < len(self.inputs):  # if input has been updated
 
             # Proportional term
             error = self.setpoint - self.input
 
-            # Integral term
+            # Integral and derivative terms
             if len(self.times) > 1:
-                integral = np.sum(np.diff(self.times)*(self.setpoints - self.inputs)[1:])
-            else:
-                integral = 0
 
-            # Derivative term
-            if len(self.times) > 1:
+                interval = np.argwhere(self.times >= self.times[-1] - self.integral_time).flatten()
+
+                dt = np.diff(self.times[interval])
+                errors = (self.setpoints - self.inputs)[interval[1:]]
+
+                integral = np.sum(dt*errors)
+
                 derivative = -(self.inputs[-1] - self.inputs[-2]) / (self.times[-1] - self.times[-2])
             else:
+                integral = 0
                 derivative = 0
-
 
             tD = self.derivative_time
             tI = self.integral_time
@@ -224,4 +236,52 @@ class PIDController(Instrument):
             return output
         else:
             return self.outputs[-1]
-        
+
+
+class RandomWalk(Instrument):
+    """
+    Virtual random walk process for testing controllers
+
+    Dynamics of the process value is determined by the mean, step and affinity knobs. The mean is the mean
+    value of the process in steady state, the step is the size of the step that the process can take in either direction upon each
+    measurement of the process value, and the affinity is the tendancy of the process value to return to its mean value
+    at each step.
+    """
+
+    name = 'RandomWalk'
+
+    supported_adapters = (
+        (Adapter, {}),
+    )
+
+    knobs = ('mean',
+             'step',
+             'affinity')
+
+    meters = ('value',)
+
+    def __init__(self, *args, **kwargs):
+
+        Instrument.__init__(self,*args, **kwargs)
+
+        self.mean = 0
+        self.step = 1
+        self.affinity = 0.01
+        self.value = self.mean
+
+    @setter
+    def set_mean(self, mean):
+        pass
+
+    @setter
+    def set_step(self, step):
+        pass
+
+    @setter
+    def set_drift(self, drift):
+        pass
+
+    @measurer
+    def measure_value(self):
+        self.value += np.random.choice([-self.step, self.step]) + self.affinity*(self.mean - self.value)
+        return self.value

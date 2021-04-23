@@ -1,7 +1,6 @@
 # This submodule defines the basic behavior of the key features of the empyric package
 
 import os
-from math import *  # imported for use in evaluating expression variables
 import time
 import datetime
 import numbers
@@ -64,6 +63,22 @@ class Variable:
     is a meter: power = voltage * current.
     """
 
+    # Some abbreviated functions that can be used to evaluate expression variables
+    expression_functions = {
+        'sum': 'np.nansum',
+        'mean': 'np.nanmean',
+        'rms': 'np.nanstd',
+        'std': 'np.nanstd',
+        'var': 'np.nanvar',
+        'diff': 'np.diff',
+        'max': 'np.nanmax',
+        'min': 'np.nanmin',
+        'exp': 'np.exp',
+        'sin': 'np.sin',
+        'cos': 'np.cos',
+        'tan': 'np.tan'
+    }
+
     def __init__(self, instrument=None, knob=None, meter=None, expression=None, definitions=None):
         """
         One of either the knob, meter or expression keyword arguments must be supplied along with the respective
@@ -113,6 +128,10 @@ class Variable:
 
             for symbol, variable in self.definitions.items():
                 expression = expression.replace(symbol, '(' + str(variable._value) + ')')
+
+            for shorthand, longhand in self.expression_functions.items():
+                if shorthand in expression:
+                    expression.replace(shorthand, longhand)
 
             try:
                 self._value = eval(expression)
