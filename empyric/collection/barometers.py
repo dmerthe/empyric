@@ -1,3 +1,4 @@
+import re
 from empyric.adapters import *
 from empyric.collection.instrument import *
 
@@ -9,8 +10,8 @@ class BRAX3000(Instrument):
     name = "BRAX3000"
 
     supported_adapters = (
-        (Serial, {'baud_rate': 19200}),
-        (VISASerial, {'baud_rate': 19200})
+        (Serial, {'baud_rate': 19200, 'input_termination':'\r', 'timeout': 1}),
+        (VISASerial, {'baud_rate': 19200, 'timeout': 1})
     )
 
     knobs = (
@@ -43,7 +44,13 @@ class BRAX3000(Instrument):
 
     @getter
     def get_ig_state(self):
-        return self.query('#IGS<CR>')
+
+        response = self.query('#IGS<CR>')
+
+        if 'ON' in response:
+            return 'ON'
+        elif 'OFF' in response:
+            return 'OFF'
 
     @setter
     def set_filament(self, number):
@@ -59,4 +66,11 @@ class BRAX3000(Instrument):
 
     @measurer
     def measure_ig_pressure(self):
-        return float(self.query('#RDIG<CR>')[4:])
+
+        def validator(response):
+            match = re.search('\d\.\d+E-?\d\d', response)
+            return bool(match)
+
+        response = self.query('#RDIG<CR>', validator=validator)
+
+        return float(re.findall('\d\.\d+E-?\d\d', response)[0])

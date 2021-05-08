@@ -10,8 +10,8 @@ class Keithley2260B(Instrument):
     name = 'Keithley2260B'
 
     supported_adapters = (
-        (Serial, {}),
-        (VISASerial, {})
+        (Serial, {'baud_rate': 115200, 'output_termination': '\r\n'}),
+        (VISASerial, {'baud_rate': 115200})
     )
 
     knobs = (

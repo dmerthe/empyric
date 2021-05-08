@@ -1,74 +1,81 @@
 import importlib
-import functools
 import time
-import warnings
-import sys
 import re
 
 
 def chaperone(method):
     """
-    Wraps all read and query methods of adapters; monitors and handles communication issues
+    Wraps all write, read and query methods of the adapters; monitors and handles communication issues
 
     :param method: (callable) method to be wrapped
     :return: (callable) wrapped method
     """
 
     def wrapped_method(self, *args, validator=None, **kwargs):
-        """
-
-        :param self: (Phidget) the Phidget adapter class
-        :param args: any arguments to the method to be wrapped
-        :param validator: (callable) function that returns True if its input looks right or False if it does not
-        :param kwargs: any keyword arguments for the method to be wrapped
-        :return: (str/float/int/bool) instrument response, if valid
-        """
 
         if not self.connected:
             raise ConnectionError(f'Adapter is not connected for instrument at address {self.instrument.address}')
 
+        while self.busy:  # wait for turn to talk to the instrument
+            time.sleep(0.05)
+
+        self.busy = True  # block other methods from talking to the instrument
+
         # Catch communication errors and either try to repeat communication or reset the connection
-        if self.reconnects < self.max_reconnects:
-            if self.repeats < self.max_repeats:
+        attempts = 0
+        reconnects = 0
+
+        while reconnects <= self.max_reconnects:
+            while attempts < self.max_attempts:
+
                 try:
+
                     response = method(self, *args, **kwargs)
 
-                    valid_response = True
                     if validator:
                         valid_response = validator(response)
-
-                    if valid_response:
-                        self.repeats = 0  # reset repeat counter upon valid communcation
-                        self.reconnects = 0  # reset reconnection counter
-                        return response
                     else:
-                        raise ValueError('invalid response!')
+                        valid_response = (response != '') * (response != float('nan')) * (response is not None)
+
+                    if not valid_response:
+                        raise ValueError(f'invalid response, {response}, from {method.__name__} method')
+                    elif attempts > 0 or reconnects > 0:
+                        print('Resolved')
+
+                    self.busy = False
+                    return response
 
                 except BaseException as err:
-                    warnings.warn(
-                        f'Encountered {err} while trying to read from {self.instrument}')
-                    self.repeats += 1
-                    return wrapped_method(self, *args, validator=validator, **kwargs)
-            else:
-                self.disconnect()
-                time.sleep(self.delay)
-                self.connect()
+                    print(f'Encountered {err} while trying to talk to {self.instrument}')
+                    print('Trying again...')
+                    attempts += 1
 
-                self.repeats = 0
-                self.reconnects += 1
-                return wrapped_method(self, *args, validator=validator, **kwargs)
-        else:
-            raise ConnectionError(f'Unable to communicate with instrument at address {self.instrument.address}!')
+            # repeats have maxed out, so try reconnecting with the instrument
+            print('Reconnecting...')
+            self.disconnect()
+            time.sleep(self.delay)
+            self.connect()
+
+            attempts = 0
+            reconnects += 1
+
+        # Getting here means that both repeats and reconnects have been maxed out
+        raise ConnectionError(f'Unable to communicate with instrument at address {self.instrument.address}!')
+
+    wrapped_method.__doc__ = method.__doc__  # keep method doc string
 
     return wrapped_method
 
 
 class Adapter:
     """
-    Adapters connect instruments defined in an experiment to the appropriate communication backends.
+    Adapters connect instruments to the appropriate communication backends.
     """
 
-    max_repeats = 3
+    #: Maximum number of attempts to read from a port/channel, in the event of a communication error
+    max_attempts = 3
+
+    #: Maximum number of times to try to reset communications, in the event of a communication error
     max_reconnects = 1
 
     kwargs = ['baud_rate', 'timeout', 'delay', 'byte_size', 'parity', 'stop_bits', 'close_port_after_each_call',
@@ -78,22 +85,25 @@ class Adapter:
 
         # general parameters
         self.instrument = instrument
-
+        self.backend = None
         self.connected = False
         self.repeats = 0
         self.reconnects = 0
 
         for key, value in kwargs.items():
-                self.__setattr__(key, value)
+            self.__setattr__(key, value)
 
         self.connect()
+
+        self.busy = False  # indicator for multithreading
 
     def __del__(self):
         # Try to cleanly close communications when adapters are deleted
         if self.connected:
             try:
                 self.disconnect()
-            except BaseException:
+            except BaseException as err:
+                print(f'Error while disconnecting {self.instrument.name}:', err)
                 pass
 
     # All methods below should be overwritten in child class definitions
@@ -102,20 +112,67 @@ class Adapter:
         return 'Adapter'
 
     def connect(self):
+        """
+        Establishes communications with the instrument through the appropriate backend
+
+        :return: None
+        """
         self.connected = True
 
-    def write(self, message):
-        pass
+    @chaperone
+    def write(self, *args, **kwargs):
+        """
+        Write a command.
+
+        :param args: any arguments for the write method
+        :param validator: (callable) function that returns True if its input looks right or False if it does not
+        :param kwargs: any keyword arguments for the write method
+        :return: (str/float/int/bool) instrument response, if valid
+        """
+
+        if hasattr(self, '_write'):
+            return self._write(*args, **kwargs)
+        else:
+            raise AttributeError(self.__name__ + " adapter has no _write method")
 
     @chaperone
-    def read(self):
-        pass
+    def read(self, *args, **kwargs):
+        """
+        Read an awaiting message.
+
+        :param args: any arguments for the read method
+        :param validator: (callable) function that returns True if its input looks right or False if it does not
+        :param kwargs: any keyword arguments for the read method
+        :return: (str/float/int/bool) instrument response, if valid
+        """
+
+        if hasattr(self, '_read'):
+            return self._read(*args, **kwargs)
+        else:
+            raise AttributeError(self.__name__ + " adapter has no _read method")
 
     @chaperone
-    def query(self, question):
-        pass
+    def query(self, *args, **kwargs):
+        """
+        Submit a query.
+
+        :param args: any arguments for the query method
+        :param validator: (callable) function that returns True if its input looks right or False if it does not
+        :param kwargs: any keyword arguments for the query method
+        :return: (str/float/int/bool) instrument response, if valid
+        """
+
+        if hasattr(self, '_query'):
+            return self._query(*args, **kwargs)
+        else:
+            raise AttributeError(self.__name__ + " adapter has no _query method")
 
     def disconnect(self):
+        """
+        Close communication port/channel
+
+        :return: None
+        """
         self.connected = False
 
 
@@ -127,6 +184,10 @@ class Serial(Adapter):
     baud_rate = 9600
     timeout = 0.1
     delay = 0.1
+    parity = 'N'
+    stop_bits = 1
+    input_termination = '\n'
+    output_termination = '\r'
 
     def __repr__(self):
         return 'Serial'
@@ -134,36 +195,82 @@ class Serial(Adapter):
     def connect(self):
 
         serial = importlib.import_module('serial')
-        self.backend = serial.Serial(port='COM' + self.instrument.address,
+        self.backend = serial.Serial(port=self.instrument.address,
                                      baudrate=self.baud_rate,
+                                     stopbits=self.stop_bits,
+                                     parity=self.parity,
                                      timeout=self.timeout)
+
+        self.backend.reset_input_buffer()
+        self.backend.reset_output_buffer()
 
         self.connected = True
 
-    def write(self, message):
-        self.backend.write(message)
+    def _write(self, message):
 
-    @chaperone
-    def read(self):
+        self.backend.write((message + self.output_termination).encode())
+
+        return "Success"
+
+    def _read(self, until=None, num_bytes=None, decode=True):
+
         self.backend.timeout = self.timeout
-        return self.backend.read()
 
-    @chaperone
-    def query(self, question):
-        self.backend.write(question)
+        if num_bytes:
+            response = self.backend.read(num_bytes)
+        elif until:
+            response = self.backend.read_until(until)
+        else:
+            response = self.backend.read_until(self.input_termination.encode())
+
+        self.backend.reset_input_buffer()
+
+        if decode:
+            return response.decode().strip()
+        else:
+            return response
+
+    def _query(self, question, until=None, num_bytes=None, decode=True):
+
+        self._write(question)
         time.sleep(self.delay)
-        return self.backend.read()
+        return self._read(until=until, num_bytes=num_bytes, decode=decode)
 
     def disconnect(self):
-
-        self.backend.flushInput()
-        self.backend.flushOutput()
+        self.backend.reset_input_buffer()
+        self.backend.reset_output_buffer()
         self.backend.close()
 
         self.connected = False
 
+    @staticmethod
+    def locate():
+        """
+        Determine the address of a serial instrument via the "unplug-it-then-plug-it-back-in" method.
+
+        :return: None (address is printed to console)
+        """
+        list_ports = importlib.import_module('serial.tools.list_ports').comports
+
+        input('Press enter when the instrument is disconnected')
+        other_ports = list_ports()
+        input('Press enter when the instrument is connected')
+        all_ports = list_ports()
+
+        try:
+            instrument_address = [port.device for port in all_ports if port not in other_ports][0]
+            print(f'Address: {instrument_address}')
+            again = 'y' in input('Again? [y/n]').lower()
+            if again:
+                Serial.locate()
+        except IndexError:
+            raise ConnectionError('Instrument not found!')
+
 
 class VISA:
+    """
+    Base class for VISA adapters; basic communination format is the same for all
+    """
 
     @property
     def timeout(self):
@@ -177,19 +284,18 @@ class VISA:
         if self.connected:
             self.backend.timeout = timeout
 
-    def write(self, message):
+    def _write(self, message):
         self.backend.write(message)
+        return "Success"
 
-    @chaperone
-    def read(self):
+    def _read(self):
         self.backend.timeout = 1000 * self.timeout
         return self.backend.read()
 
-    @chaperone
-    def query(self, question):
-        self.backend.write(question)
+    def _query(self, question):
+        self._write(question)
         time.sleep(self.delay)
-        return self.backend.read()
+        return self._read()
 
     def disconnect(self):
         self.backend.clear()
@@ -220,6 +326,33 @@ class VISASerial(VISA, Adapter):
 
         self.connected = True
 
+    @staticmethod
+    def locate():
+        """
+        Determine the address of a serial instrument via the "unplug-it-then-plug-it-back-in" method.
+
+        :return: None (address is printed to console)
+        """
+        pyvisa = importlib.import_module('pyvisa')
+
+        rm = pyvisa.ResourceManager()
+
+        input('Press enter when the instrument is disconnected')
+        other_ports = [resource for resource in rm.list_resources_info()
+                       if resource.Interface_type == pyvisa.constants.InterfaceType.asrl]
+        input('Press enter when the instrument is connected')
+        all_ports = [resource for resource in rm.list_resources_info()
+                     if resource.Interface_type == pyvisa.constants.InterfaceType.asrl]
+
+        try:
+            instrument_address = [port.Resource_name for port in all_ports if port not in other_ports][0]
+            print(f'Address: {instrument_address}')
+            again = 'y' in input('Again? [y/n]').lower()
+            if again:
+                Serial.locate()
+        except IndexError:
+            raise ConnectionError('Instrument not found!')
+
 
 class VISAGPIB(VISA, Adapter):
     """
@@ -236,7 +369,7 @@ class VISAGPIB(VISA, Adapter):
 
         full_address = None
         for address in manager.list_resources():
-            if re.match('GPIB[0-9]::'+str(self.instrument.address)+'::INSTR', address):
+            if re.match('GPIB[0-9]::' + str(self.instrument.address) + '::INSTR', address):
                 full_address = address
 
         if full_address:
@@ -311,7 +444,6 @@ class LinuxGPIB(Adapter):
         else:
             self._timeout = None
 
-
     def __repr__(self):
         return 'LinuxGPIB'
 
@@ -319,7 +451,8 @@ class LinuxGPIB(Adapter):
 
         self.backend = importlib.import_module('gpib')
 
-        self.descr = self.backend.dev(0, self.instrument.address, 0, 9, 1, 0)  # integer corresponding to the device descriptor
+        self.descr = self.backend.dev(0, self.instrument.address, 0, 9, 1,
+                                      0)  # integer corresponding to the device descriptor
 
         self.connected = True
 
@@ -335,19 +468,18 @@ class LinuxGPIB(Adapter):
 
         self._timeout = new_timeout
 
-    def write(self, message):
+    def _write(self, message):
         self.backend.write(self.descr, message)
+        return "Success"
 
-    @chaperone
-    def read(self, read_length=512):
+    def _read(self, read_length=512):
         self.set_timeout(self.timeout)
         return self.backend.read(self.descr, read_length).decode()
 
-    @chaperone
-    def query(self, question):
-        self.backend.write(question)
+    def _query(self, question, read_length=512):
+        self._write(question)
         time.sleep(self.delay)
-        return self.backend.read()
+        return self._read(read_length=read_length)
 
     def disconnect(self):
         self.backend.clear(self.descr)
@@ -358,7 +490,7 @@ class LinuxGPIB(Adapter):
 
 class PrologixGPIBUSB:
     """
-    Wraps serial communications with the Prologix GPIB-USB adapter
+    Wraps serial communications with the Prologix GPIB-USB adapter; used by ``PrologixGPIB`` adapter
     """
 
     @property
@@ -378,12 +510,12 @@ class PrologixGPIBUSB:
 
         port = None
         for comport in list_ports.comports():
-            if comport.interface == 'Prologix GPIB-USB Controller':
+            if comport.manufacturer == 'Prologix':
                 port = comport.device
 
         if port:
             self.serial_port = serial.Serial(port=port, timeout=1)
-            # communcations with this controller are a bit slow, so timeout should be set high
+            # communications with this controller are a bit slow, so timeout should be set high
         else:
             raise ConnectionError(f'Prologix GPIB-USB adapter not found!')
 
@@ -407,6 +539,8 @@ class PrologixGPIBUSB:
             proper_message = b'++' + proper_message
 
         self.serial_port.write(proper_message)
+
+        return "Success"
 
     def read(self, address=None):
 
@@ -461,19 +595,18 @@ class PrologixGPIB(Adapter):
 
         self.connected = True
 
-    def write(self, message):
+    def _write(self, message):
         self.backend.write(message, address=self.instrument.address)
+        return "Success"
 
-    @chaperone
-    def read(self):
+    def _read(self):
         self.backend.timeout = self.timeout
         return self.backend.read(address=self.instrument.address)
 
-    @chaperone
-    def query(self, question):
-        self.backend.write(question, address=self.instrument.address)
+    def _query(self, question):
+        self._write(question)
         time.sleep(self.delay)
-        return self.backend.read(address=self.instrument.address)
+        return self._read()
 
     def disconnect(self):
         self.backend.write('clr', to_controller=True, address=self.instrument.address)  # clear the instrument buffers
@@ -498,26 +631,48 @@ class USBTMC(Adapter):
 
     def connect(self):
         usbtmc = importlib.import_module('usbtmc')
-        self.backend = usbtmc.Instrument('USB::'+self.instrument.address+'::INSTR')
+        self.backend = usbtmc.Instrument('USB::' + self.instrument.address + '::INSTR')
 
         self.connected = True
 
-    def write(self, message):
+    def _write(self, message):
         self.backend.write(message)
+        return "Success"
 
-    @chaperone
-    def read(self):
+    def _read(self):
         return self.backend.read()
 
-    @chaperone
-    def query(self, question):
-        self.backend.write(question)
+    def _query(self, question):
+        self._write(question)
         time.sleep(self.delay)
-        return self.backend.read()
+        return self._read()
 
     def disconnect(self):
         self.backend.close()
         self.connected = False
+
+    @staticmethod
+    def locate():
+        """
+        Determine the address of a serial instrument via the "unplug-it-then-plug-it-back-in" method.
+
+        :return: None (address is printed to console)
+        """
+        list_addresses = importlib.import_module('usbtmc').list_resources
+
+        input('Press enter when the instrument is disconnected')
+        other_addresses = list_addresses()
+        input('Press enter when the instrument is connected')
+        all_addresses = list_addresses()
+
+        try:
+            instrument_address = [address for address in all_addresses if address not in other_addresses][0]
+            print(f'Address: {instrument_address}')
+            again = 'y' in input('Again? [y/n]').lower()
+            if again:
+                USBTMC.locate()
+        except IndexError:
+            raise ConnectionError('Instrument not found!')
 
 
 class Modbus(Adapter):
@@ -534,19 +689,35 @@ class Modbus(Adapter):
     parity = 'N'
     delay = 0.05
 
+    adapters = {}  # modbus adapters using the same serial port; for traffic control
+
+    _busy = False
+
+    @property
+    def busy(self):
+        return bool(sum([adapter._busy for adapter in Modbus.adapters.get(self.port, [])]))
+
+    @busy.setter
+    def busy(self, busy):
+        self._busy = busy
+
     def __repr__(self):
         return 'Modbus'
 
     def connect(self):
 
         minimal_modbus = importlib.import_module('minimalmodbus')
-        serial = importlib.import_module('serial')
 
         # Get port and channel
-        port, channel = self.instrument.address.split('::')
+        self.port, self.channel = self.instrument.address.split('::')
+
+        if self.port in Modbus.adapters:
+            Modbus.adapters[self.port].append(self)
+        else:
+            Modbus.adapters[self.port] = [self]
 
         # Handshake with instrument
-        self.backend = minimal_modbus.Instrument(port, int(channel), mode=self.slave_mode)
+        self.backend = minimal_modbus.Instrument(self.port, int(self.channel), mode=self.slave_mode)
         self.backend.serial.baudrate = self.baud_rate
         self.backend.serial.timeout = self.timeout
         self.backend.serial.bytesize = self.byte_size
@@ -557,29 +728,38 @@ class Modbus(Adapter):
 
         self.connected = True
 
-    def write(self, register, message, type='uint16', byte_order=0):
-        if type == 'uint16':
+    def _write(self, register, message, dtype='uint16', byte_order=0):
+        if dtype == 'uint16':
             self.backend.write_register(register, message)
-        elif type == 'float':
+        elif dtype == 'float':
             self.backend.write_float(register, message, byteorder=byte_order)
         time.sleep(self.delay)
 
-    @chaperone
-    def read(self, register, type='uint16', byte_order=0):
+        return "Success"
+
+    def _read(self, register, dtype='uint16', byte_order=0):
         self.backend.serial.timeout = self.timeout
 
-        if type == 'uint16':
+        if dtype == 'uint16':
             return self.backend.read_register(register)
-        elif type == 'float':
+        elif dtype == 'float':
             return self.backend.read_float(register, byteorder=byte_order)
 
     def disconnect(self):
-        if not self.close_port_after_each_call:
+        if not self.backend.close_port_after_each_call:
             self.backend.serial.close()
         self.connected = False
 
+    @staticmethod
+    def locate():
+        return Serial.locate()
+
 
 class Phidget(Adapter):
+    """
+    Handles communications with Phidget devices
+
+    """
 
     delay = 0.2
     timeout = 5
@@ -606,22 +786,17 @@ class Phidget(Adapter):
             self.backend.setHubPort(address_parts[1])
             self.backend.setChannel(address_parts[2])
 
-
-
-        self.backend.openWaitForAttachment(1000*self.timeout)
+        self.backend.openWaitForAttachment(1000 * self.timeout)
 
         self.connected = True
+        self.busy = False
 
-    @chaperone
-    def get(self, parameter):
+    def _write(self, parameter, value):
+        self.backend.__getattribute__('set' + parameter)(value)
+        return "Success"
 
-        try:
-            return self.backend.__getattribute__('get'+parameter)()
-        except Phidget.Exception:
-            return float('nan')
-
-    def set(self, parameter, value):
-        set_method = self.backend.__getattribute__('set'+parameter)(value)
+    def _query(self, parameter):
+        return self.backend.__getattribute__('get' + parameter)()
 
     def disconnect(self):
         self.backend.close()

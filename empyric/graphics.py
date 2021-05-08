@@ -1,7 +1,5 @@
-import matplotlib
-matplotlib.use('TkAgg')
-
 import time
+import sys
 import threading
 import queue
 import numpy as np
@@ -9,6 +7,10 @@ import datetime
 import tkinter as tk
 import numbers
 import pandas as pd
+
+if sys.platform == 'darwin':
+    import matplotlib
+    matplotlib.use('TkAgg')  # works better on MacOS
 
 import matplotlib.pyplot as plt
 from matplotlib.cm import ScalarMappable
@@ -42,13 +44,13 @@ class Plotter:
         if plot_name:
             fig, ax = self.plots[plot_name]
             if save_as:
-                fig.savefig(save_as + '-' + '.png')
+                fig.savefig(save_as + '.png')
             else:
-                fig.savefig(plot_name + '-' + '.png')
+                fig.savefig(plot_name + '.png')
         else:
             for name, plot in self.plots.items():
                 fig, ax = plot
-                fig.savefig(name + '-' + '.png')
+                fig.savefig(name + '.png')
 
     def close(self, plot_name=None):
 
@@ -71,6 +73,10 @@ class Plotter:
 
             if style == 'basic':
                 new_plots[name] = self._plot_basic(name)
+            elif style == 'log':
+                new_plots[name] = self._plot_log(name)
+            elif style == 'symlog':
+                new_plots[name] = self._plot_symlog(name)
             elif style == 'averaged':
                 new_plots[name] = self._plot_averaged(name)
             elif style == 'errorbars':
@@ -85,7 +91,7 @@ class Plotter:
         plt.pause(0.01)
         return new_plots
 
-    def _plot_basic(self, name):
+    def _plot_basic(self, name, linear=True):
 
         fig, ax = self.plots[name]
         ax.clear()
@@ -105,16 +111,31 @@ class Plotter:
             else:
                 plt_kwargs = self.settings[name].get('options', {})
 
-                if x.lower() ==  'time':
+                if x.lower() == 'time':
                     self.data.plot(y=y,ax=ax, kind='line', **plt_kwargs)  # use index as time axis
                 else:
                     self.data.plot(y=y, x=x, ax=ax, kind='line', **plt_kwargs)
 
         ax.set_title(name)
         ax.grid()
-        ax.ticklabel_format(axis='y', style='sci', scilimits=(-2, 4))
+        if linear:
+            ax.ticklabel_format(axis='y', style='sci', scilimits=(-2, 4))
         ax.set_xlabel(self.settings[name].get('xlabel', x))
         ax.set_ylabel(self.settings[name].get('ylabel', ys[0]))
+
+        return fig, ax
+
+    def _plot_log(self, name):
+
+        fig, ax = self._plot_basic(name, linear=False)
+        ax.set_yscale('log')
+
+        return fig, ax
+
+    def _plot_symlog(self, name):
+
+        fig, ax = self._plot_basic(name, linear=False)
+        ax.set_yscale('symlog')
 
         return fig, ax
 
@@ -182,31 +203,21 @@ class Plotter:
 
         # Handle simple numeric data
         y_is_numeric = bool( sum([isinstance(y_value, numbers.Number) for y_value in self.data[y]]) )
-
         if y_is_numeric:
 
             x_data = np.array(self.data[x].values, dtype=float)
             y_data = np.array(self.data[y].values, dtype=float)
             c_data = np.array(self.data[c].values, dtype=float)
-
-            # Rescale time if needed
-            if c == 'time':
-                units = 'seconds'
-                if np.max(c_data) > 60:
-                    units = 'minutes'
-                    c_data = c_data / 60
-                    if np.max(c_data) > 60:
-                        units = 'hours'
-                        c_data = c_data / 60
+            set_nums = np.array([1]*len(self.data))  # all the same data set
 
         # Handle data stored in a file
         y_is_path = bool( sum([ 'csv' in y_value for y_value in self.data[y] if isinstance(y_value, str)]))
-
         if y_is_path:
 
             x_data = []
             y_data = []
             c_data = []
+            set_nums = []  # used to distinguish between sets
 
             for i, x_path, y_path in zip(range(len(self.data)), self.data[x].values, self.data[y].values):
 
@@ -218,24 +229,27 @@ class Plotter:
                     first_datetime = pd.date_range(start=self.data.index[0], end=self.data.index[0], periods=len(y_file_data))
                     y_file_data[c] = (y_file_data.index - first_datetime).total_seconds()
 
-                    # Rescale time if values are large
-                    units = 'seconds'
-                    if np.max(y_file_data[c].values) > 60:
-                        units = 'minutes'
-                        y_file_data[c] = y_file_data[c] / 60
-                        if np.max(y_file_data[c].values) > 60:
-                            units = 'hours'
-                            y_file_data[c] = y_file_data[c] / 60
                 else:
                     y_file_data[c] = [self.data[c].values[i]] * len(y_file_data)
 
                 x_data.append(x_file_data[x].values)
                 y_data.append(y_file_data[y].values)
                 c_data.append(y_file_data[c].values)
+                set_nums.append(np.array([i]*len(x_file_data)))
 
             x_data = np.concatenate(x_data)
             y_data = np.concatenate(y_data)
             c_data = np.concatenate(c_data)
+            set_nums = np.concatenate(set_nums)
+
+        if c == 'time': # Rescale time if values are large
+            units = 'seconds'
+            if np.max(c_data) > 60:
+                units = 'minutes'
+                c_data = c_data / 60
+                if np.max(c_data) > 60:
+                    units = 'hours'
+                    c_data = c_data / 60
 
         c_min, c_max = np.min(c_data), np.max(c_data)
         norm = plt.Normalize(vmin=c_min, vmax=c_max)
@@ -249,12 +263,11 @@ class Plotter:
             fig.scalarmappable = ScalarMappable(cmap=cmap, norm=norm)
             fig.scalarmappable.set_array(np.linspace(c_min, c_max, 1000))
             fig.cbar = plt.colorbar(fig.scalarmappable, ax=ax)
+            fig.cbar.ax.set_ylabel(self.settings[name].get('clabel', c))
             fig.has_colorbar = True
 
         if c == 'time':
             fig.cbar.ax.set_ylabel('Time ' + f" ({units})")
-        else:
-            fig.cbar.ax.set_ylabel(self.settings[name].get('clabel', c))
 
         # Draw the plot
         if marker:
@@ -262,7 +275,8 @@ class Plotter:
                 ax.plot([x_data[i]], [y_data[i]], marker=marker, markersize=3, color=cmap(norm(np.mean(c_data[i]))))
         else:
             for i in range(x_data.shape[0] - 1):
-                ax.plot(x_data[i: i + 2], y_data[i: i + 2], color=cmap(norm(np.mean(c_data[i: i + 2]))))
+                if set_nums[i] == set_nums[i+1]:
+                    ax.plot(x_data[i: i + 2], y_data[i: i + 2], color=cmap(norm(np.mean(c_data[i: i + 2]))))
 
         ax.set_title(name)
         ax.grid(True)
@@ -305,11 +319,11 @@ class ExperimentGUI:
     GUI showing experimental progress, values of all experiment variables, any alarms.
     Also, manages plotting data via the Plotter class
 
-    This GUI allows the user to pause or stop the experiment.
-    When paused, the user can also directly interact with instruments through the Dashboard button.
+    This GUI allows the user to hold, stop and terminate the experiment.
+    When paused, the user can also directly interact with instruments through the Dashboard.
     """
 
-    def __init__(self, experiment, alarms=None, instruments=None, title=None, plots=None, save_interval=None):
+    def __init__(self, experiment, alarms=None, instruments=None, title=None, plots=None, save_interval=None, plot_interval=0):
 
         self.experiment = experiment
 
@@ -336,7 +350,7 @@ class ExperimentGUI:
         if plots:
             self.plotter = Plotter(experiment.data, plots)
 
-            self.plot_interval = 0  # grows if plotting takes longer
+            self.plot_interval = plot_interval  # grows if plotting takes longer
             self.last_plot = float('-inf')
 
             # Set interval for saving plots
@@ -351,42 +365,49 @@ class ExperimentGUI:
         self.root.wm_attributes('-topmost', True)  # bring window to front
         self.root.protocol("WM_DELETE_WINDOW", self.end)
 
+        self.root.title('Empyric')
+
+        self.status_frame = tk.Frame(self.root)
+        self.status_frame.grid(row=0, column=0, columnspan=2)
+
+        i = 0
         if title:
-            self.root.title(f'Experiment: {title}')
+            tk.Label(self.status_frame, text=f'{title}', font=("Arial", 14, 'bold')).grid(row=i, column=1)
         else:
-            self.root.title('Experiment')
+            tk.Label(self.status_frame, text=f'Experiment', font=("Arial", 14, 'bold')).grid(row=i, column=1)
 
         # Status field shows current experiment status
-        tk.Label(self.root, text='Status', width=len('Status'), anchor=tk.E).grid(row=0, column=0, sticky=tk.E)
+        i += 1
+        tk.Label(self.status_frame, text='Status', width=len('Status'), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
 
-        self.status_label = tk.Label(self.root, text='', width=40, relief=tk.SUNKEN)
-        self.status_label.grid(row=0, column=1, sticky=tk.W)
+        self.status_label = tk.Label(self.status_frame, text='', width=30, relief=tk.SUNKEN)
+        self.status_label.grid(row=i, column=1, sticky=tk.W, padx=10)
 
         # Table of variables shows most recently measured/set variable values
         self.variable_status_labels = {}
 
-        i = 2
-        tk.Label(self.root, text='Run Time', width=len('Run Time'), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
-
-        self.variable_status_labels['time'] = tk.Label(self.root, text='', relief=tk.SUNKEN, width=40)
-        self.variable_status_labels['time'].grid(row=i, column=1, sticky=tk.W)
+        i += 1
+        tk.Label(self.status_frame, text='', font=("Arial", 14, 'bold')).grid(row=i, column=0, sticky=tk.E)
 
         i += 1
-        tk.Label(self.root, text='', font=("Arial", 14, 'bold')).grid(row=i, column=0, sticky=tk.E)
+        tk.Label(self.status_frame, text='Variables', font=("Arial", 14, 'bold')).grid(row=i, column=1)
 
         i += 1
-        tk.Label(self.root, text='Variables', font=("Arial", 14, 'bold')).grid(row=i, column=1)
+        tk.Label(self.status_frame, text='Run Time', width=len('Run Time'), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
+
+        self.variable_status_labels['time'] = tk.Label(self.status_frame, text='', relief=tk.SUNKEN, width=30)
+        self.variable_status_labels['time'].grid(row=i, column=1, sticky=tk.W, padx=10)
 
         i += 1
         for variable in self.variables:
-            tk.Label(self.root, text=variable, width=len(variable), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
+            tk.Label(self.status_frame, text=variable, width=len(variable), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
 
-            self.variable_status_labels[variable] = tk.Label(self.root, text='', relief=tk.SUNKEN, width=40)
-            self.variable_status_labels[variable].grid(row=i, column=1, sticky=tk.W)
+            self.variable_status_labels[variable] = tk.Label(self.status_frame, text='', relief=tk.SUNKEN, width=30)
+            self.variable_status_labels[variable].grid(row=i, column=1, sticky=tk.W, padx=10)
 
             i += 1
 
-        tk.Label(self.root, text='', font=("Arial", 14, 'bold')).grid(row=i, column=0, sticky=tk.E)
+        tk.Label(self.status_frame, text='', font=("Arial", 14, 'bold')).grid(row=i, column=0, sticky=tk.E)
 
         # Table of alarm indicators shows the status of any alarms being monitored
         self.alarm_status_labels = {}
@@ -394,35 +415,36 @@ class ExperimentGUI:
         if len(alarms) > 0:
 
             i += 1
-            tk.Label(self.root, text='Alarms', font=("Arial", 14, 'bold')).grid(row=i, column=1)
+            tk.Label(self.status_frame, text='Alarms', font=("Arial", 14, 'bold')).grid(row=i, column=1)
 
             i += 1
             for alarm in self.alarms:
-                tk.Label(self.root, text=alarm, width=len(alarm), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
+                tk.Label(self.status_frame, text=alarm, width=len(alarm), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
 
-                self.alarm_status_labels[alarm] = tk.Label(self.root, text='Clear', relief=tk.SUNKEN, width=40)
-                self.alarm_status_labels[alarm].grid(row=i, column=1, sticky=tk.W)
+                self.alarm_status_labels[alarm] = tk.Label(self.status_frame, text='Clear', relief=tk.SUNKEN, width=30)
+                self.alarm_status_labels[alarm].grid(row=i, column=1, sticky=tk.W, padx=10)
 
                 i += 1
 
-            tk.Label(self.root, text='', font=("Arial", 14, 'bold')).grid(row=i, column=0, sticky=tk.E)
+            tk.Label(self.status_frame, text='', font=("Arial", 14, 'bold')).grid(row=i, column=0, sticky=tk.E)
 
 
-        self.dash_button = tk.Button(self.root, text='Dashboard', font=("Arial", 14, 'bold'),
+        i = 1
+        self.dash_button = tk.Button(self.root, text='Dashboard', font=("Arial", 14, 'bold'), width=10,
                                      command=self.open_dashboard, state=tk.DISABLED)
-        self.dash_button.grid(row=i + 1, column=0, sticky=tk.W)
+        self.dash_button.grid(row=i, column=0, sticky=tk.W)
 
-        self.hold_button = tk.Button(self.root, text='Hold', font=("Arial", 14, 'bold'),
+        self.hold_button = tk.Button(self.root, text='Hold', font=("Arial", 14, 'bold'), width=10,
                                       command=self.toggle_hold)
-        self.hold_button.grid(row=i + 2, column=0, sticky=tk.W)
+        self.hold_button.grid(row=i + 1, column=0, sticky=tk.W)
 
-        self.stop_button = tk.Button(self.root, text='Stop', font=("Arial", 14, 'bold'),
+        self.stop_button = tk.Button(self.root, text='Stop', font=("Arial", 14, 'bold'), width=10,
                                       command=self.toggle_stop)
-        self.stop_button.grid(row=i + 3, column=0, sticky=tk.W)
+        self.stop_button.grid(row=i + 2, column=0, sticky=tk.W)
 
-        self.terminate_button = tk.Button(self.root, text='Terminate', font=("Arial", 14, 'bold'),
+        self.terminate_button = tk.Button(self.root, text='Terminate', font=("Arial", 14, 'bold'), width=10, fg='red', bg='gray87',
                                           command=self.end, height=5)
-        self.terminate_button.grid(row=i + 1, column=1, sticky=tk.E, rowspan=3)
+        self.terminate_button.grid(row=i, column=1, sticky=tk.E, rowspan=3)
 
     def run(self):
         self.update()
@@ -439,7 +461,7 @@ class ExperimentGUI:
         # Check the state of the experiment
         state = self.experiment.state
         for name, label in self.variable_status_labels.items():
-            if state[name] == None:
+            if state[name] is None:
                 label.config(text='none')
             elif state[name] == np.nan:
                 label.config(text='nan')
@@ -447,44 +469,52 @@ class ExperimentGUI:
                 if name.lower() == 'time':
                     label.config(text=str(datetime.timedelta(seconds=state['time'])))
                 else:
-                    label.config(text=str(state[name]))
+                    if type(state[name]) == float:
+                        if state[name] == 0:
+                            label.config(text='0.0')
+                        elif np.abs(np.log10(np.abs(state[name]))) > 3:
+                            label.config(text='%.3e' % state[name])
+                        else:
+                            label.config(text='%.3f' % state[name])
+                    else:
+                        label.config(text=str(state[name]))
 
         self.status_label.config(text=self.experiment.status)
 
         # Check alarms
         for name, label in self.alarm_status_labels.items():
             if self.alarms[name].triggered:
-                label.config(text="TRIGGERED", bg='red')
+                label.config(text="TRIGGERED" + f': {self.alarms[name].protocol.upper()}', bg='red')
             else:
                 label.config(text="CLEAR", bg='green')
 
         # Update hold, stop and dashboard buttons
-        if self.experiment.status == 'Holding':
+        if 'Holding' in self.experiment.status:
             self.dash_button.config(state=tk.NORMAL)
             self.hold_button.config(text='Resume')
             self.stop_button.config(text='Stop')
-        elif self.experiment.status == 'Stopped':
+        elif 'Stopped' in self.experiment.status:
             self.dash_button.config(state=tk.NORMAL)
             self.hold_button.config(text='Hold')
             self.stop_button.config(text='Resume')
-        else:
+        else:  # otherwise, experiment is running
             self.dash_button.config(state=tk.DISABLED)
             self.hold_button.config(text='Hold')
             self.stop_button.config(text='Stop')
 
         # Quit if experiment has ended
-        if self.experiment.status == self.experiment.TERMINATED:
+        if 'Terminated' in self.experiment.status:
             self.quit()
 
         # Plot data
-        if hasattr(self, 'plotter') and len(self.experiment.data) > 0:
+        if hasattr(self, 'plotter') and len(self.experiment.data) > 0 and 'Stopped' not in self.experiment.status:
             if time.time() > self.last_plot + self.plot_interval:
 
                 start_plot = time.perf_counter()
                 self.plotter.plot()
                 end_plot = time.perf_counter()
 
-                self.plot_interval = int(5*(end_plot - start_plot))  # increase plot interval, if plotting slows down
+                self.plot_interval = int(2*(end_plot - start_plot))  # increase plot interval, if plotting slows down
                 self.last_plot = time.time()
 
             # Save plots
@@ -509,25 +539,23 @@ class ExperimentGUI:
         Dashboard(self.root, self.instruments)
 
         # Return experiment to prior state
-        if prior_status == self.experiment.HOLDING:
-            print('returning to hold')
+        if 'Holding' in prior_status:
             self.experiment.hold()
-        elif prior_status in [self.experiment.READY, self.experiment.RUNNING]:
+        elif 'Ready' in prior_status or 'Running' in prior_status:
             self.experiment.start()
-            print('returning to running')
 
     def toggle_hold(self):
         # User pauses/resumes the experiment
 
-        if self.experiment.status == 'Holding':
+        if 'Holding' in  self.experiment.status:
             self.experiment.start()
         else:
             self.experiment.hold()
 
     def toggle_stop(self):
-        # User pauses/resumes the experiment
+        # User stops the experiment
 
-        if self.experiment.status == 'Stopped':
+        if 'Stopped' in self.experiment.status:
             self.experiment.start()
         else:
             self.experiment.stop()
@@ -635,7 +663,7 @@ class BasicDialog(tk.Toplevel):
 
 class Dashboard(BasicDialog):
     """
-    Once the instruments are selected, this window allows the user to configure and test instruments before setting up an experiment
+    Allows the user to configure instruments while running up an experiment
     """
 
     def __init__(self, parent, instruments):

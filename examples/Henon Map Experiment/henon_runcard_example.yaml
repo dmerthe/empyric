@@ -17,16 +17,18 @@ Instruments:
  Henon Mapper:
   type: HenonMapper
   address: 1
+  presets:
+   a: 0
+  postsets:
+   b: 0
 
 Variables:
  Parameter a:
   instrument: Henon Mapper
   knob: a
-  preset: 1.0
  Parameter b:
   instrument: Henon Mapper
   knob: b
-  preset: 0.3
  Coordinate x:
   instrument: Henon Mapper
   meter: x
@@ -43,7 +45,7 @@ Alarms:
  r > 1:
   variable: Distance r
   condition: '>1'
-  protocol: wait
+  protocol: hold
 
 Plots:
  Henon Map:
@@ -60,11 +62,11 @@ Plots:
 Routines:
  Ramp Parameter a:
   type: Timecourse
-  variable: Parameter a
+  knobs: Parameter a
   times: [0, 3, 5.001, 60]
   values: [0.0, 0.0, 1.4, 1.4]
  Ramp Parameter b:
   type: Timecourse
-  variable: Parameter b
+  knobs: Parameter b
   times: [0, 3, 5.001, 60]
   values: [0.0, 0.0, 0.3, 0.3]

@@ -5,6 +5,9 @@ from empyric.adapters import *
 from empyric.instruments import *
 
 class ConsoleUser(Instrument):
+    """
+    Virtual instrument that simply queries a human operator via the Python console
+    """
 
     name = 'ConsoleUser'
 
@@ -15,11 +18,16 @@ class ConsoleUser(Instrument):
     knobs = ('prompt',  # message or query to send to user
              'cooldown')  # minimum time before sending repeat messages
 
-    presets = {'cooldown':0}
+    presets = {
+        'cooldown': 0,
+        'prompt': '?'
+    }
 
     meters = ('response',)
 
-    last_message = ''
+    response = ''
+
+    last_prompt = ''
     last_sent = float('-inf')
 
     @setter
@@ -33,13 +41,17 @@ class ConsoleUser(Instrument):
     @measurer
     def measure_response(self):
 
-        new_message = (self.prompt != self.last_message)
+        new_message = (self.prompt != self.last_prompt)
 
         if time.time() >= self.last_sent + self.cooldown or new_message:  # don't spam user
 
-            self.last_response = input(self.prompt)
+            response = input(self.prompt)
 
-            self.last_sent = time.time()
-            self.last_message = self.prompt
+            try:
+                response = float(response)
+            except ValueError:
+                pass
 
-        return self.last_response
+            self.last_prompt = self.prompt
+
+        return response

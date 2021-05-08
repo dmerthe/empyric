@@ -1,4 +1,3 @@
-import numpy as np
 from functools import wraps
 from empyric.adapters import *
 
@@ -43,6 +42,7 @@ def getter(method):
 
     return wrapped_method
 
+
 def measurer(method):
     """
     Utility function that wraps all measure_[meter] methods; right now does nothing
@@ -61,7 +61,7 @@ def measurer(method):
 
         return value
 
-    return method
+    return wrapped_method
 
 
 class Instrument:
@@ -69,36 +69,44 @@ class Instrument:
     Basic representation of an instrument, essentially a set of knobs and meters
     """
 
+    #: Once connected via an adapter, the name of the instrument is converted to ``self.name + '@' + self.address``
     name = 'Instrument'
 
+    #: Each instrument has a set of supported adapters, e.g. serial, GPIB or USB
     supported_adapters = (
         (Adapter, {}),
     )
 
+    #: Each instrument has a set of knobs
     knobs = tuple()
-    presets = {}  # values knobs should be when instrument is connected
+
+    #: The presets attribute indicate how the instrument should be configured upon connection
+    presets = {}
+
+    #: The postsets attribute indicate how the instrument should be configured upon disconnection
     postsets = {}  # values knobs should be when instrument is disconnected
 
+    #: Each instrument has a set of meters
     meters = tuple()
 
     def __init__(self, address=None, adapter=None, presets=None, postsets=None, **kwargs):
         """
 
-        :param address: (str/int) the default adapter of the instrument can be set up with default settings based on an address
+        :param address: (str/int) address of instrument
         :param adapter: (Adapter) desired adapter to use for communications with the instrument
-        :param presets: (dict) dictionary of instrument presets of the form {..., knob: value, ...} to apply upon initialization
-        :param presets: (dict) dictionary of instrument postsets of the form {..., knob: value, ...} to apply upon disconnection
-        :param kwargs: (dict) any settings for the selected adapter
+        :param presets: (dict) dictionary of instrument presets of the form {..., knob: value, ...}
+        :param presets: (dict) dictionary of instrument postsets of the form {..., knob: value, ...}
+        :param kwargs: (dict) any keyword args for the adapter
         """
 
         if address:
             self.address = address
         else:
-            self.address = 1
+            self.address = None
 
         adapter_connected = False
         if adapter:
-            self.adapter = adapter(self, **kwargs)
+            self.adapter = adapter
         else:
             errors = []
             for _adapter, settings in self.supported_adapters:
@@ -107,7 +115,8 @@ class Instrument:
                     self.adapter = _adapter(self, **settings)
                     adapter_connected = True
                 except BaseException as error:
-                    errors.append('in trying '+_adapter.__name__+' adapter, got '+type(error).__name__ +': '+ str(error))
+                    errors.append('in trying ' + _adapter.__name__ + ' adapter, got '
+                                  + type(error).__name__ + ': ' + str(error))
 
             if not adapter_connected:
                 message = f'unable to connect an adapter to instrument {self.name} at address {address}:\n'
@@ -115,20 +124,22 @@ class Instrument:
                     message = message + f"{error}\n"
                 raise ConnectionError(message)
 
-        self.name = self.name + '@' + str(self.address)
+        if self.address:
+            self.name = self.name + '@' + str(self.address)
 
         # Get existing knob settings, if possible
         for knob in self.knobs:
-            if hasattr(self, 'get_'+knob.replace(' ','_')):
-                self.__getattribute__('get_'+knob.replace(' ','_'))()  # retrieves the knob value from the instrument and stores as instrument attribute
+            if hasattr(self, 'get_'+knob.replace(' ', '_')):
+                self.__getattribute__('get_'+knob.replace(' ', '_'))()  # retrieves the knob value from the instrument
             else:
-                self.__setattr__(knob.replace(' ','_'), None)  # knob value is unknown until it is set
+                self.__setattr__(knob.replace(' ', '_'), None)  # knob value is unknown until it is set
 
         # Apply presets
         if presets:
             self.presets.update(presets)
 
         for knob, value in self.presets.items():
+
             self.set(knob, value)
 
         # Get postsets
@@ -140,12 +151,35 @@ class Instrument:
 
     # map write, read and query methods to the adapter's
     def write(self, *args, **kwargs):
+        """
+        Alias for the adapter's write method
+
+        :param args: any arguments for the adapter's write method, usually including a command string
+        :param kwargs: any arguments for the adapter's write method
+        :return: whatever is returned by the adapter's write method, usually None
+        """
         return self.adapter.write(*args, **kwargs)
 
     def read(self, *args, **kwargs):
+        """
+        Alias for the adapter's read method
+
+        :param args: any arguments for the adapter's read method, usually empty
+        :param kwargs: any arguments for the adapter's write method
+        :return: whatever is returned by the adapter's write method, usually a response string
+        """
+
         return self.adapter.read(*args, **kwargs)
 
     def query(self, *args, **kwargs):
+        """
+        Alias for the adapter's query method, if it has one
+
+        :param args: any arguments for the adapter's read method, usually including a query string
+        :param kwargs: any arguments for the adapter's write method
+        :return: whatever is returned by the adapter's write method, usually a response string
+        """
+
         return self.adapter.query(*args, **kwargs)
 
     def set(self, knob, value):
@@ -158,7 +192,7 @@ class Instrument:
         """
 
         try:
-            set_method = getattr(self, 'set_' + knob.replace(' ' ,'_'))
+            set_method = getattr(self, 'set_' + knob.replace(' ', '_'))
         except AttributeError:
             raise AttributeError(f"{knob} cannot be set on {self.name}")
 
@@ -166,10 +200,10 @@ class Instrument:
 
     def get(self, knob):
 
-        if hasattr(self,'get_'+knob.replace(' ','_')):
-            return getattr(self, 'get_'+knob.replace(' ','_'))()
+        if hasattr(self, 'get_'+knob.replace(' ', '_')):
+            return getattr(self, 'get_'+knob.replace(' ', '_'))()
         else:
-            return getattr(self, knob.replace(' ','_'))
+            return getattr(self, knob.replace(' ', '_'))
 
     def measure(self, meter):
         """
@@ -180,7 +214,7 @@ class Instrument:
         """
 
         try:
-            measure_method = self.__getattribute__('measure_' + meter.replace(' ' ,'_'))
+            measure_method = self.__getattribute__('measure_' + meter.replace(' ', '_'))
         except AttributeError:
             raise AttributeError(f"{meter} cannot be measured on {self.name}")
 
@@ -189,6 +223,11 @@ class Instrument:
         return measurement
 
     def disconnect(self):
+        """
+        Apply any postsets to the instrument and disconnect the adapter
+
+        :return: None
+        """
 
         if self.adapter.connected:
             for knob, value in self.postsets.items():
@@ -197,50 +236,3 @@ class Instrument:
             self.adapter.disconnect()
         else:
             raise ConnectionError(f"adapter for {self.name} is not connected!")
-
-
-class HenonMapper(Instrument):
-    """
-    Virtual instrument based on the behavior of a 2D Henon Map
-    It has two virtual knobs and two virtual meters, useful for testing in the absence of actual instruments.
-    """
-
-    name = 'HenonMapper'
-
-    supported_adapters = (
-        (Adapter, {}),
-    )
-
-    knobs = ('a','b')
-    presets = {'a': 1.4, 'b': 0.3}
-
-    meters = ('x', 'y')
-
-    a = 1.4
-    b = 0.3
-
-    x, y = 0.63, 0.19  # near the unstable fixed point
-
-    @setter
-    def set_a(self, value):
-        pass
-
-    @setter
-    def set_b(self, value):
-        pass
-
-    @measurer
-    def measure_x(self):
-
-        x_new = 1 - self.a * self.x ** 2 + self.y
-        y_new = self.b * self.x
-
-        self.x = x_new
-        self.y = y_new
-
-        return self.x
-
-    @measurer
-    def measure_y(self):
-
-        return self.y

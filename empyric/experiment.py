@@ -1,23 +1,19 @@
 # This submodule defines the basic behavior of the key features of the empyric package
 
 import os
-from math import *
 import time
 import datetime
+import numbers
+from scipy.interpolate import interp1d
 import numpy as np
 import pandas as pd
-import warnings
 import threading
-import queue
-from ruamel.yaml import YAML
 import tkinter as tk
 from tkinter.filedialog import askopenfilename
-
-yaml = YAML()
+from ruamel.yaml import YAML
 
 from empyric import instruments as instr
-from empyric import routines as rout
-from empyric import adapters, graphics, control
+from empyric import adapters, graphics
 
 
 class Clock:
@@ -59,21 +55,41 @@ class Variable:
 
     A knob is a variable that can be directly controlled by an instrument, e.g. the voltage of a power supply.
 
-    A meter is a variable that is measured by an instrument, such as temperature. Some meters can be controlled directly or indirectly through an associated (but distinct) knob.
+    A meter is a variable that is measured by an instrument, such as temperature. Some meters can be controlled directly
+    or indirectly through an associated (but distinct) knob.
 
-    An expression is a variable that is not directly measured, but is calculated based on other variables of the experiment.
-    An example of an expression is the output power of a power supply, where voltage is a knob and current is a meter: power = voltage * current.
+    An expression is a variable that is not directly measured, but is calculated based on other variables of the
+    experiment. An example of an expression is the output power of a power supply, where voltage is a knob and current
+    is a meter: power = voltage * current.
     """
 
-    def __init__(self, knob=None, meter=None, instrument=None, expression=None, definitions=None):
-        """
-        One of either the knob, meter or expression keyword arguments must be supplied along with the respective instrument or definitions.
+    # Some abbreviated functions that can be used to evaluate expression variables
+    expression_functions = {
+        'sum': 'np.nansum',
+        'mean': 'np.nanmean',
+        'rms': 'np.nanstd',
+        'std': 'np.nanstd',
+        'var': 'np.nanvar',
+        'diff': 'np.diff',
+        'max': 'np.nanmax',
+        'min': 'np.nanmin',
+        'exp': 'np.exp',
+        'sin': 'np.sin',
+        'cos': 'np.cos',
+        'tan': 'np.tan'
+    }
 
+    def __init__(self, instrument=None, knob=None, meter=None, expression=None, definitions=None):
+        """
+        One of either the knob, meter or expression keyword arguments must be supplied along with the respective
+        instrument or definitions.
+
+        :param instrument: (Instrument) instrument with the corresponding knob or meter
         :param knob: (str) instrument knob label, if variable is a knob
         :param meter: (str) instrument meter label, if variable is a meter
-        :param instrument: (Instrument) instrument with the corresponding knob or meter
         :param expression: (str) expression for the variable in terms of other variables, if variable is an expression
-        :param definitions: (dict) dictionary of the form {..., symbol: variable, ...} mapping the symbols in the expression to other variable objects; only used if type is 'expression'
+        :param definitions: (dict) dictionary of the form {..., symbol: variable, ...} mapping the symbols in the
+        expression to other variable objects; only used if type is 'expression'
         """
 
         if meter:
@@ -108,14 +124,19 @@ class Variable:
             self._value = self.instrument.measure(self.meter)
         elif hasattr(self, 'expression'):
             expression = self.expression
-            expression = expression.replace('^', '**')  # carets represent exponents to everyone except for Guido van Rossum
+            expression = expression.replace('^', '**')  # carets represent exponents
 
             for symbol, variable in self.definitions.items():
                 expression = expression.replace(symbol, '(' + str(variable._value) + ')')
 
+            for shorthand, longhand in self.expression_functions.items():
+                if shorthand in expression:
+                    expression.replace(shorthand, longhand)
+
             try:
                 self._value = eval(expression)
-            except BaseException:
+            except BaseException as err:
+                print(f'Error while trying to evaluate expression {self.expression}:', err)
                 self._value = float('nan')
 
         return self._value
@@ -123,13 +144,321 @@ class Variable:
     @value.setter
     def value(self, value):
         # value property can only be set if variable is a knob; None value indicates no setting should be applied
-        if hasattr(self, 'knob') and value is not None:
+        if hasattr(self, 'knob') and value is not None and value is not np.nan:
             self.instrument.set(self.knob, value)
             self._value = self.instrument.__getattribute__(self.knob)
-        elif value is None:
-            pass
         else:
-            raise AssertionError(f'cannot set {self.type}!')
+            pass
+
+
+def convert_time(time_value):
+    """
+    If time_value is a string, converts a time of the form "number units" (e.g. "3.5 hours") to the time in seconds.
+    If time_value is a number, just returns the same number
+    If time_value is an array, iterates through the array doing either of the previous two operations on every element.
+
+    :param time_value: (str/float) time value, possibly including units such as 'hours'
+    :return: (int) time in seconds
+    """
+
+    if np.size(time_value) > 1:
+        return [convert_time(t) for t in time_value]
+
+    if isinstance(time_value, numbers.Number):
+        return time_value
+    elif isinstance(time_value, str):
+        # times can be specified in the runcard with units, such as minutes, hours or days, e.g.  "6 hours"
+        time_parts = time_value.split(' ')
+
+        if len(time_parts) == 1:
+            return float(time_parts[0])
+        elif len(time_parts) == 2:
+            value, unit = time_parts
+            value = float(value)
+            return value * {
+                'seconds': 1, 'second': 1,
+                'minutes': 60, 'minute': 60,
+                'hours': 3600, 'hour': 3600,
+                'days': 86400, 'day': 86400
+            }[unit]
+        else:
+            raise ValueError(f'Unrecognized time format for {time_value}!')
+
+
+# Routines
+class Routine:
+    """
+    Base class for all routines
+    """
+
+    def __init__(self, knobs=None, values=None, start=0, end=np.inf):
+        """
+
+        :param knobs: (1D array) knobs to be controlled
+        :param values: (1D/2D array) array or list of values for each variable; can only be 1D if there is one variable
+        :param start: (float) time to start the routine
+        :param end: (float) time to end the routine
+        """
+
+        if knobs:
+            self.knobs = knobs
+        else:
+            raise AttributeError(f'{self.__name__} routine requires knobs!')
+
+        if values:
+
+            self.values = np.array(values, dtype=object).reshape((len(self.knobs), -1))
+
+            # Values can be stored in a CSV file
+            for i, element in enumerate(self.values):
+                if type(element[0]) == str:
+                    if '.csv' in element[0]:
+                        df = pd.read_csv(element[0])
+                        self.values[i] = df[df.columns[-1]].values.reshape(len(df))
+
+        else:
+            raise AttributeError(f'{self.__name__} routine requires values')
+
+        self.start = convert_time(start)
+        self.end = convert_time(end)
+
+    def update(self, state):
+        """
+        Updates the knobs controlled by the routine
+
+        :param state: (dict/Series) state of the calling experiment or process in the form, {..., variable: value, ...}
+        :return: None
+        """
+
+        pass
+
+
+class Hold(Routine):
+    """
+    Holds a fixed value
+    """
+
+    def update(self, state):
+
+        if state['time'] < self.start or state['time'] > self.end:
+            return  # no change
+
+        for variable, value in zip(self.knobs.values(), self.values):
+            variable.value = value[0]
+
+
+class Timecourse(Routine):
+    """
+    Ramps linearly through a series of values at given times
+    """
+
+    def __init__(self, times=None, **kwargs):
+        """
+
+        :param times: (1D/2D array) array or list of times relative to the start time
+        :param kwargs: keyword arguments for Routine
+        """
+
+        Routine.__init__(self, **kwargs)
+
+        if times:
+
+            if len(self.knobs) > 1:
+                if np.ndims(times) == 1:  # single list of times for all variables
+                    times = [times]*len(self.variables)
+                elif np.shape(times)[0] == 1: # array with one list of times for all variables
+                    times = [times[0]]*len(self.variables)
+
+            self.times = np.array(times, dtype=object).reshape((len(self.knobs), -1))
+
+            # Values can be stored in a CSV file
+            for i, element in enumerate(self.times):
+                if type(element[0]) == str:
+                    if '.csv' in element[0]:
+                        df = pd.read_csv(element[0])
+                        self.times[i] = df[df.columns[0]].values.reshape(len(df))
+
+            self.times = np.array(convert_time(self.times)).astype(float)
+
+        else:
+            raise AttributeError('Timecourse routine requires times!')
+
+        self.interpolators = [interp1d(t, vals, bounds_error=False) for t, vals in zip(self.times, self.values)]
+
+        self.start = np.min(self.times)
+        self.end = np.max(self.times)
+
+    def update(self, state):
+
+        if state['time'] < self.start or state['time'] > self.end:
+            return  # no change
+
+        for variable, interpolator in zip(self.knobs.values(), self.interpolators):
+            value = interpolator(state['time'] - self.start)
+            variable.value = value
+
+
+class Sequence(Routine):
+    """
+    Passes knobs through series of values regardless of time; each series for each knob must have the same length
+    """
+
+    def __init__(self, **kwargs):
+        Routine.__init__(self, **kwargs)
+
+        self.iteration = 0
+
+    def update(self, state):
+
+        if state['time'] < self.start or state['time'] > self.end:
+            return  # no change
+
+        for knob, values in zip(self.knobs.values(), self.values):
+            value = values[self.iteration]
+            knob.value = value
+
+        self.iteration = (self.iteration + 1) % len(self.values[0])
+
+
+class Feed(Routine):
+    """
+    Sets a knob based on the value of another variable
+    """
+
+    def __init__(self, meters=None, **kwargs):
+
+        Routine.__init__(self, **kwargs)
+
+        if meters:
+            self.meters = meters
+        else:
+            raise AttributeError('Set routine requires inputs!')
+
+    def update(self, state):
+
+        if state['time'] < self.start or state['time'] > self.end:
+            return  # no change
+
+        for variable, meter in zip(self.knobs.values(), self.meters):
+            value = state[meter]
+            variable.value = value
+
+
+class Minimize(Routine):
+    """
+    Minimize a set of meters (by some metric) influenced by a set of knobs, using simulated annealing
+
+    Possible metrics include 'sum', 'norm', 'prod' (product).
+    """
+
+    def __init__(self, meters=None, max_deltas=None, T0=0.1, T1=0, metric='sum', **kwargs):
+
+        Routine.__init__(self, **kwargs)
+
+        if meters:
+            self.meters = np.array([meters]).flatten()
+        else:
+            raise AttributeError(f'{self.__name__} routine requires meters for feedback')
+
+        if max_deltas:
+            self.max_deltas = np.array([max_deltas]).flatten()
+        else:
+            self.max_deltas = np.ones(len(self.knobs))
+
+        self.T = T0
+        self.T0 = T0
+        self.T1 = T1
+        self.metric = metric
+        self.last_knobs = [np.nan]*len(self.knobs)
+        self.last_meters = [np.nan]*len(self.meters)
+
+    def update(self, state):
+
+        # Get meter values
+        meter_values = np.array([state[meter] for meter in self.meters])
+
+        # Update temperature
+        self.T = self.T0 + self.T1*(state['time'] - self.start)/(self.end - self.start)
+
+        if self.better(meter_values):
+
+            # Record this new optimal state
+            self.last_knobs = [state[knob] for knob in self.knobs]
+            self.last_meters = [state[meter] for meter in self.meters]
+
+            # Generate and apply new knob settings
+            new_knobs = self.last_knobs + self.max_deltas*np.random.rand(len(self.knobs))
+            for knob, new_value in zip(self.knobs.values(), new_knobs):
+                knob.value = new_value
+
+        else:  # go back
+            for knob, last_value in zip(self.knobs.values(), self.last_knobs):
+                knob.value = last_value
+
+    def better(self, meter_values):
+
+        if np.prod(self.last_meters) != np.nan:
+
+            if self.metric == 'norm':
+                change = np.linalg.norm(meter_values) - np.linalg.norm(self.last_meters)
+            elif self.metric == 'prod':
+                change = np.prod(meter_values) - np.prod(self.last_meters)
+            else:  # assume 'sum' metric
+                change = np.sum(meter_values) - np.sum(self.last_meters)
+
+            return (change < 0) or (np.exp(-change/self.T) > np.random.rand())
+        else:
+            return True
+
+
+class Maximize(Minimize):
+    """
+    Maximize a set of meters (by some metric) influenced by a set of knobs; works the same way as Minimize.
+    """
+
+    def better(self, meter_values):
+
+        if np.prod(self.last_meters) != np.nan:
+
+            if self.metric == 'norm':
+                change = np.linalg.norm(meter_values) - np.linalg.norm(self.last_meters)
+            elif self.metric == 'prod':
+                change = np.prod(meter_values) - np.prod(self.last_meters)
+            else:  # assume 'sum' metric
+                change = np.sum(meter_values) - np.sum(self.last_meters)
+
+            return (change > 0) or (np.exp(change / self.T) > np.random.rand())
+        else:
+            return True
+
+
+
+
+
+class ModelPredictiveControl(Routine):
+    """
+    (NOT IMPLEMENTED)
+    Simple model predictive control; learns the relationship between knob x and meter y, assuming a linear model,
+
+    y(t) = y0 + int_{-inf}^{t} dt' m(t-t') x(t')
+
+    then sets x to minimize the error in y relative to setpoint, over some time interval defined by cutoff.
+
+    """
+
+    def __init__(self, meters=None, **kwargs):
+
+        Routine.__init__(self, **kwargs)
+        self.meters = meters
+
+    def update(self, state):
+        pass
+
+
+routines_dict = {
+    routine.__name__: routine for routine in Routine.__subclasses__()
+}
+
 
 class Alarm:
     """
@@ -146,7 +475,7 @@ class Alarm:
     @property
     def triggered(self):
         value = self.variable._value  # get last know variable value
-        if not (value == None or value == float('nan') or value == ''):
+        if not (value is None or value == float('nan') or value == ''):
             self._triggered = eval('value' + self.condition)
 
         return self._triggered
@@ -159,20 +488,32 @@ class Experiment:
     """
 
     # Possible statuses of an experiment
-    READY = 'Ready'  # Experiment is initialized but not yet started
+    READY = 'Ready'  # Experiment is waiting to start
     RUNNING = 'Running'  # Experiment is running
     HOLDING = 'Holding'  # Routines are stopped, but measurements are ongoing
     STOPPED = 'Stopped'  # Both routines and measurements are stopped
     TERMINATED = 'Terminated'  # Experiment has either finished or has been terminated by the user
+
+    @property
+    def status(self):
+        return self._status
+
+    @status.setter
+    def status(self, status):
+        prior_base_status = self._status.split(':')[0]
+        new_base_status = status.split(':')[0]
+
+        # Only allow change if the status is unlocked, or if the base status is the same
+        if not self.status_locked or new_base_status == prior_base_status:
+            self._status = status
 
     def __init__(self, variables, routines=None):
 
         self.variables = variables  # dict of the form {..., name: variable, ...}
 
         if routines:
-            self.routines = routines  # dictionary of experimental routines of the form {..., name: (variable_name, routine), ...}
-            self.end = max(
-                [routine.end for _, routine in routines.values()])  # time at which all routines are exhausted
+            self.routines = routines  # dictionary of the form {..., name: (variable_name, routine), ...}
+            self.end = max([routine.end for routine in routines.values()])  # time at which all routines are exhausted
         else:
             self.routines = {}
             self.end = float('inf')
@@ -186,60 +527,70 @@ class Experiment:
 
         self.state = pd.Series({column: None for column in self.data.columns})
         self.state['time'] = 0
-        self.status = Experiment.READY
+
+        self._status = Experiment.READY
+        self.status_locked = True  # can only be unlocked by the start, hold, stop and terminate methods
 
     def __next__(self):
 
         # Start the clock on first call
         if self.state.name is None:  # indicates that this is the first step of the experiment
-            self.status = Experiment.RUNNING
-            self.clock.start()
+            self.start()
+            self.status = Experiment.RUNNING + ': initializing...'
 
         # Update time
         self.state['time'] = self.clock.time
         self.state.name = datetime.datetime.now()
 
-        # Apply new settings to knobs according to the routines (if there are any and the experiment is running)
-        if self.status is Experiment.RUNNING:
-            for name, routine in self.routines.values():
-
-                new_value = routine(self.state)
-
-                # if new value is a path to a CSV file, read in data as numpy array
-                if type(new_value) == str:
-                    if 'csv' in new_value:
-                        dataframe = pd.read_csv(new_value)
-                        new_value = dataframe[name].values
-
-                self.variables[name].value = new_value
-
-        elif self.status == Experiment.STOPPED:
+        # If experiment is stopped, just return the last knob settings and nullify meter & expression values
+        if Experiment.STOPPED in self.status:
             for name, variable in self.variables.items():
                 if variable.type in ['meter', 'expression']:
                     self.state[name] = None
             return self.state
 
-        # Get all variable values
-        for name, variable in self.variables.items():
+        # If the experiment is running, apply new settings to knobs according to the routines (if there are any)
+        if Experiment.RUNNING in self.status:
 
-            value = variable.value
+            # Update each routine in its own thread
+            threads = {}
+            for name, routine in self.routines.items():
+                threads[name] = threading.Thread(target=routine.update, args=(self.state,))
+                threads[name].start()
 
-            if isinstance(value, np.ndarray): # store array data as CSV files
-                dataframe = pd.DataFrame({name: value}, index=[self.state.name]*len(value))
-                path = name.replace(' ','_') +'_' + self.state.name.strftime('%Y%m%d-%H%M%S') + '.csv'
-                dataframe.to_csv(path)
-                self.state[name] = path
-            else:
-                self.state[name] = value
+            # Wait for all routine threads to finish
+            for name, thread in threads.items():
+                self.status = Experiment.RUNNING + f': executing {name}'
+                thread.join()
 
-        # Append new state to experiment data set
-        self.data.loc[self.state.name] = self.state
+            self.status = Experiment.RUNNING
+
+        # Get all variable values if experiment is running or holding
+        if Experiment.RUNNING in self.status or Experiment.HOLDING in self.status:
+
+            # Run each measure / get operation in its own thread
+            threads = {}
+            for name in self.variables:
+                threads[name] = threading.Thread(target=self._update_variable, args=(name,))
+                threads[name].start()
+
+            base_status = self.status
+
+            # Wait for all threads to finish
+            for name, thread in threads.items():
+                self.status = base_status + f': retrieving {name}'
+                thread.join()
+
+            self.status = base_status
+
+            # Append new state to experiment data set
+            self.data.loc[self.state.name] = self.state
 
         # End the experiment, if the duration of the experiment has passed
         if self.clock.time > self.end:
             self.terminate()
 
-        if self.status is Experiment.TERMINATED:
+        if Experiment.TERMINATED in self.status:
             raise StopIteration
 
         return self.state
@@ -247,7 +598,28 @@ class Experiment:
     def __iter__(self):
         return self
 
+    def _update_variable(self, name):
+
+        value = self.variables[name].value
+
+        if np.size(value) > 1:  # store array data as CSV files
+            dataframe = pd.DataFrame({name: value}, index=[self.state.name] * len(value))
+            path = name.replace(' ', '_') + '_' + self.state.name.strftime('%Y%m%d-%H%M%S') + '.csv'
+            dataframe.to_csv(path)
+            self.state[name] = path
+        else:
+            self.state[name] = value
+
     def save(self, directory=None):
+        """
+        Save the experiment dataframe to a CSV file
+
+        :param directory: (path) (optional) directory to save data to, if different from working directory
+        :return: None
+        """
+
+        base_status = self.status
+        self.status = base_status + ': saving data'
 
         path = f"data_{self.timestamp}.csv"
 
@@ -255,36 +627,76 @@ class Experiment:
             path = os.path.join(directory, path)
 
         self.data.to_csv(path)
-
-    def hold(self):  # stops routines only
-        self.clock.stop()
-        self.status = Experiment.HOLDING
-
-    def stop(self):  # stops routines and measurements
-        self.clock.stop()
-        self.status = Experiment.STOPPED
+        self.status = base_status
 
     def start(self):
+        """
+        Start the experiment: clock starts/resumes, routines resume, measurements continue
+
+        :return: None
+        """
         self.clock.start()
+
+        self.status_locked = False
         self.status = Experiment.RUNNING
+        self.status_locked = True
+
+    def hold(self):
+        """
+        Hold the experiment: clock stops, routines stop, measurements continue
+
+        :return: None
+        """
+        self.clock.stop()
+
+        self.status_locked = False
+        self.status = Experiment.HOLDING
+        self.status_locked = True
+
+    def stop(self):
+        """
+        Stop the experiment: clock stops, routines stop, measurements stop
+
+        :return: None
+        """
+        self.clock.stop()
+
+        self.status_locked = False
+        self.status = Experiment.STOPPED
+        self.status_locked = True
 
     def terminate(self):
+        """
+        Terminate the experiment: clock, routines and measurements stop, data is saved and StopIteration is raised
+
+        :return: None
+        """
         self.stop()
         self.save()
+
+        self.status_locked = False
         self.status = Experiment.TERMINATED
+        self.status_locked = True
 
 
-def build_experiment(runcard, instruments=None):
+def build_experiment(runcard, settings=None, instruments=None, alarms=None):
     """
     Build an Experiment object based on a runcard, in the form of a .yaml file or a dictionary
 
-    :param runcard: (str/dict) the description of the experiment in the runcard format
-    :param instruments: (None) variable pointing to instruments, if needed
+    :param runcard: (dict/str) description of the experiment in the runcard format
+    :param settings: (dict) dictionary of settings to be populated
+    :param instruments: (dict) dictionary instruments to be populated
+    :param alarms: (dict) dictionary of alarms to be populated
+
     :return: (Experiment) the experiment described by the runcard
     """
 
     if instruments is None:
         instruments = {}
+
+    # If given a settings keyword argument, get settings from runcard and store it there
+    if 'Settings' in runcard and settings is not None:
+        settings.update(runcard['Settings'])
 
     for name, specs in runcard['Instruments'].items():
 
@@ -297,13 +709,14 @@ def build_experiment(runcard, instruments=None):
         adapter_kwargs = {}
         for kwarg in adapters.Adapter.kwargs:
             if kwarg.replace('_', ' ') in specs:
-                adapter_kwargs[kwarg] = specs.pop(kwargs)
+                adapter_kwargs[kwarg] = specs.pop(kwarg)
 
-        # Any remaining keywards are instrument presets
-        presets = specs
+        # Any remaining keywords are instrument presets
+        presets = specs.get('presets', {})
+        postsets = specs.get('postsets', {})
 
         instrument_class = instr.__dict__[instrument_name]
-        instruments[name] = instrument_class(address=address, presets=presets, **adapter_kwargs)
+        instruments[name] = instrument_class(address=address, presets=presets, postsets=postsets, **adapter_kwargs)
 
     variables = {}  # experiment variables, associated with the instruments above
     for name, specs in runcard['Variables'].items():
@@ -319,25 +732,26 @@ def build_experiment(runcard, instruments=None):
     routines = {}
     if 'Routines' in runcard:
         for name, specs in runcard['Routines'].items():
-
             specs = specs.copy()  # avoids modifying the runcard
-
             _type = specs.pop('type')
-            variable_name = specs.pop('variable')
+            specs['knobs'] = {name: variables[name] for name in np.array([specs['knobs']]).flatten()}
+            routines[name] = routines_dict[_type](**specs)
 
-            if 'feedback' in specs:
-                # Get the feedback variable
-                specs['feedback'] = variables[specs['feedback']]
+    # Set up any alarms
+    if 'Alarms' in runcard and alarms is not None:
+        alarms.update({
+            name: Alarm(
+                variables[specs['variable']], specs['condition'],
+                protocol=specs.get('protocol', None)
+            ) for name, specs in runcard['Alarms'].items()
+        })
 
-                if 'controller' in specs:
-                    # Initialize a controller based on the controller specs
-                    contr_type = specs['controller'].pop('type')
-                    contr_kwargs = specs['controller']
-                    specs['controller'] = controllers.__dict__[contr_type](**contr_kwargs)
+    experiment = Experiment(variables, routines=routines)
 
-            routines[name] = (variable_name, rout.__dict__[_type](**specs))
+    if 'end' in settings:
+        experiment.end = convert_time(settings['end'])
 
-    return Experiment(variables, routines=routines)
+    return experiment
 
 
 class Manager:
@@ -345,31 +759,42 @@ class Manager:
     Utility class which sets up and manages the above experiments
     """
 
-    @property
-    def runcard(self):
-        return self._runcard
+    def __init__(self, runcard=None):
+        """
 
-    @runcard.setter
-    def runcard(self, runcard):
+        :param runcard: (dict/str) runcard as a dictionary or path pointing to a runcard
+        """
 
-        if isinstance(runcard, str):  # runcard argument can be a path string
-            with open(runcard, 'rb') as runcard_file:
-                self._runcard = yaml.load(runcard_file)
-
-            os.chdir(os.path.dirname(runcard))
-        elif isinstance(runcard, dict):  # ... or a properly formatted dictionary
-            self._runcard = runcard
+        if not runcard:
+            # Have user locate runcard
+            root = tk.Tk()
+            root.withdraw()
+            self.runcard = askopenfilename(parent=root, title='Select Runcard', filetypes=[('YAML files', '*.yaml')])
         else:
-            raise ValueError('runcard not recognized!')
+            self.runcard = runcard
 
-        # Register settings
-        self.settings = self._runcard.get('Settings', {})
+        if type(self.runcard) == str:
 
+            os.chdir(os.path.dirname(self.runcard))  # go to runcard directory to put data in same location
+            yaml = YAML()
+            with open(self.runcard, 'rb') as runcard_file:
+                self.runcard = yaml.load(runcard_file)  # load the runcard
+
+        self.instruments = {}  # instruments will be stored here, so that they can be disconnected after the experiment
+        self.alarms = {}
+        self.settings = {}
+        self.experiment = build_experiment(self.runcard,
+                                           settings=self.settings,
+                                           instruments=self.instruments,
+                                           alarms=self.alarms)
+
+        # Unpack settings
         self.step_interval = self.settings.get('step interval', 0.1)
         self.save_interval = self.settings.get('save interval', 60)
+        self.plot_interval = self.settings.get('plot interval', 0)
         self.last_step = self.last_save = float('-inf')
 
-        self.followup = self.settings.get('follow-up', None)        # Register settings
+        self.followup = self.settings.get('follow-up', None)  # Register settings
         self.settings = self.runcard.get('Settings', {})
 
         self.step_interval = self.settings.get('step interval', 0.1)
@@ -378,35 +803,18 @@ class Manager:
 
         self.followup = self.settings.get('follow-up', None)
 
-        # Rebuild the experiment based on the new runcard
-        self.instruments = {}  # experiment instruments will be stored here
-        self.experiment = build_experiment(self._runcard, instruments=self.instruments)
-
-        # Set up any alarms
-        if 'Alarms' in self._runcard:
-            self.alarms = {
-                name: Alarm(
-                    self.experiment.variables[specs['variable']], specs['condition'],
-                    protocol=specs.get('protocol', None)
-                ) for name, specs in self._runcard['Alarms'].items()
-            }
-        else:
-            self.alarms = {}
-
-    def __init__(self, runcard=None):
-
-        if runcard:
-            self.runcard = runcard
-        else:
-            # Have user locate runcard
-            root = tk.Tk()
-            root.withdraw()
-            self.runcard = askopenfilename(parent=root, title='Select Runcard', filetypes=[('YAML files', '*.yaml')])
-
         # For use with alarms
         self.awaiting_alarms = False
 
     def run(self, directory=None):
+        """
+        Run the experiment defined by the runcard. A GUI shows experiment status, while the experiment is run in a
+        eparate thread.
+
+        :param directory: (path) (optional) directory in which to run the experiment if different from the working
+        directory
+        :return: None
+        """
 
         # Create a new directory for data storage
         if directory:
@@ -420,6 +828,8 @@ class Manager:
         os.chdir(working_dir)
 
         # Save executed runcard alongside data for record keeping
+        yaml = YAML()
+
         with open(f"{experiment_name}_{self.experiment.timestamp}.yaml", 'w') as runcard_file:
             yaml.dump(self.runcard, runcard_file)
 
@@ -433,7 +843,8 @@ class Manager:
                                           instruments=self.instruments,
                                           title=self.runcard['Description'].get('name', 'Experiment'),
                                           plots=self.runcard.get('Plots', None),
-                                          save_interval=self.save_interval)
+                                          save_interval=self.save_interval,
+                                          plot_interval=self.plot_interval)
 
         self.gui.run()
 
@@ -455,20 +866,22 @@ class Manager:
             self.__init__(self.runcard)
             self.run()
 
-
     def _run(self):
+        # Run in a separate thread
 
         for state in self.experiment:
 
+            step_start = time.time()
+
             # Save experimental data periodically
-            if time.time() >= self.last_save + self.save_interval:
+            if time.time() >= self.last_save + self.save_interval and Experiment.STOPPED not in self.experiment.status:
                 self.experiment.save()
 
             # Check if any alarms are triggered and handle them
             alarms_triggered = [alarm for alarm in self.alarms.values() if alarm.triggered]
             if len(alarms_triggered) > 0:
 
-                alarm = alarms_triggered[0]  # highest priority alarm goes first
+                alarm = alarms_triggered[0]  # highest priority alarm is handled first
 
                 if alarm.protocol:
                     if 'yaml' in alarm.protocol:
@@ -478,12 +891,27 @@ class Manager:
                         self.experiment.hold()  # stop routines but keep measuring, and wait for alarm to clear
                         self.awaiting_alarms = True
                     elif 'stop' in alarm.protocol:
-                        self.experiment.stop()  # stop routines and measurements, and wait for user action
+                        self.experiment.stop()  # stop routines and measurements, and wait for alarm to clear
                         self.awaiting_alarms = True
+                    elif 'check' in alarm.protocol:
+                        self.experiment.stop()
+                        self.experiment.status = self.experiment.STOPPED + ': waiting for alarm check'
+                        self.awaiting_alarms = 'check'
+                    elif 'terminate' in alarm.protocol:
+                        self.experiment.terminate()
+                        self.awaiting_alarms = True
+
+            elif self.awaiting_alarms == 'check':
+                if self.experiment.STOPPED not in self.experiment.status:
+                    self.awaiting_alarms = False
 
             elif self.awaiting_alarms:
                 # If no alarms are triggered, resume experiment if holding or stopped
                 self.awaiting_alarms = False
                 self.experiment.start()
 
-            time.sleep(self.step_interval)
+            step_end = time.time()
+
+            remaining_time = np.max([self.step_interval - (step_end - step_start), 0])
+
+            time.sleep(remaining_time)

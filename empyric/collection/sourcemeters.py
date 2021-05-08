@@ -128,6 +128,8 @@ class Keithley2400(Instrument):
 
         self.set_output('ON')
 
+        self.write(':TRIG:COUN 1')
+
         def validator(response):
             match = re.match('.\d\.\d+E.\d\d', response)
             return bool(match)
@@ -296,6 +298,7 @@ class Keithley2400(Instrument):
         self.adapter.timeout = normal_timeout  # put it back
 
         self.write(':SOUR:VOLT:MODE FIX')
+        self.write(':TRIG:COUN 1')
 
         return np.array(current_list)
 
