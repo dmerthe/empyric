@@ -102,7 +102,7 @@ class Plotter:
         for y in ys:
 
             if y not in self.data.columns:
-                raise AttributeError(f'Specified variable {var} is not in data set. Check variable names in plot specification.')
+                raise AttributeError(f'Specified variable {y} is not in data set. Check variable names in plot specification.')
 
             # If data points to a file, then generate a parametric plot
             y_is_path = bool( sum([ 'csv' in y_value for y_value in self.data[y] if isinstance(y_value, str)]))

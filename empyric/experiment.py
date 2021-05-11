@@ -709,7 +709,7 @@ def build_experiment(runcard, settings=None, instruments=None, alarms=None):
         adapter_kwargs = {}
         for kwarg in adapters.Adapter.kwargs:
             if kwarg.replace('_', ' ') in specs:
-                adapter_kwargs[kwarg] = specs.pop(kwarg)
+                adapter_kwargs[kwarg] = specs.pop(kwarg.replace('_', ' '))
 
         # Any remaining keywords are instrument presets
         presets = specs.get('presets', {})
