@@ -102,7 +102,7 @@ class Plotter:
         for y in ys:
 
             if y not in self.data.columns:
-                raise AttributeError(f'Specified variable {var} is not in data set. Check variable names in plot specification.')
+                raise AttributeError(f'Specified variable {y} is not in data set. Check variable names in plot specification.')
 
             # If data points to a file, then generate a parametric plot
             y_is_array = bool(sum([np.size(y_value) > 1 for y_value in self.data[y].iloc[:10]]))
@@ -696,7 +696,7 @@ class ConfigTestDialog(BasicDialog):
     def __init__(self, parent, instrument):
 
         self.instrument = instrument
-        BasicDialog.__init__(self, parent, title='Config/Test: '+instrument.name)
+        BasicDialog.__init__(self, parent, title='Config/Test: ' + instrument.name)
 
     def apply_knob_entry(self, knob):
         value = self.knob_entries[knob].get()
@@ -714,12 +714,6 @@ class ConfigTestDialog(BasicDialog):
 
     def body(self, master):
 
-        tk.Label(master, text = 'Instrument Name:').grid(row=0, column=0, sticky=tk.E)
-
-        self.name_entry = tk.Entry(master, state="readonly")
-        self.name_entry.grid(row=0, column = 1,sticky=tk.W)
-        self.name_entry.insert(0, self.instrument.name)
-
         knobs = self.instrument.knobs
         knob_values = {knob: getattr(self.instrument, knob.replace(' ','_')) for knob in knobs}
         self.knob_entries = {}
@@ -728,13 +722,13 @@ class ConfigTestDialog(BasicDialog):
         self.meter_entries = {}
 
         label = tk.Label(master, text='Knobs', font = ("Arial", 14, 'bold'))
-        label.grid(row=1, column=0, sticky=tk.W)
+        label.grid(row=0, column=0, sticky=tk.W)
 
         label = tk.Label(master, text='Meters', font = ("Arial", 14, 'bold'))
-        label.grid(row=1, column=3, sticky=tk.W)
+        label.grid(row=0, column=3, sticky=tk.W)
 
         self.set_buttons = {}
-        i = 2
+        i = 1
         for knob in knobs:
 
             formatted_name = ' '.join([word[0].upper()+word[1:] for word in knob.split(' ')])
@@ -752,7 +746,7 @@ class ConfigTestDialog(BasicDialog):
             i += 1
 
         self.measure_buttons = {}
-        i = 2
+        i = 1
         for meter in meters:
 
             formatted_name = ' '.join([word[0].upper() + word[1:] for word in meter.split(' ')])
