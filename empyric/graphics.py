@@ -513,9 +513,13 @@ class ExperimentGUI:
                 start_plot = time.perf_counter()
                 self.plotter.plot()
                 end_plot = time.perf_counter()
-
-                self.plot_interval = int(2*(end_plot - start_plot))  # increase plot interval, if plotting slows down
                 self.last_plot = time.time()
+
+                self.plot_interval = np.max([
+                    self.plot_interval,
+                    5*int(end_plot - start_plot)
+                ])  # adjust interval if drawing plots takes significant time
+
 
             # Save plots
             if time.time() > self.last_save + self.save_interval and self.experiment.timestamp:
@@ -523,9 +527,13 @@ class ExperimentGUI:
                 start_save = time.perf_counter()
                 self.plotter.save()
                 end_save = time.perf_counter()
-
-                self.save_interval = int(5*(end_save - start_save))
                 self.last_save = time.time()
+
+                self.save_interval = np.max([
+                    self.save_interval,
+                    5*int(end_save - start_save)
+                ])  # adjust interval if saving plots takes significant time
+
 
         if not self.quitted:
             self.root.after(50, self.update)
