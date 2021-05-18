@@ -598,17 +598,9 @@ class Experiment:
     def __iter__(self):
         return self
 
-    def _update_variable(self, name):
+    def _update_variable(self, name):  # used to update variables in separate threads
 
-        value = self.variables[name].value
-
-        if np.size(value) > 1:  # store array data as CSV files
-            dataframe = pd.DataFrame({name: value}, index=[self.state.name] * len(value))
-            path = name.replace(' ', '_') + '_' + self.state.name.strftime('%Y%m%d-%H%M%S') + '.csv'
-            dataframe.to_csv(path)
-            self.state[name] = path
-        else:
-            self.state[name] = value
+        self.state[name] = self.variables[name].value
 
     def save(self, directory=None):
         """

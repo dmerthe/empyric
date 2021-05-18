@@ -33,7 +33,7 @@ class Plotter:
         if settings:
             self.settings = settings
         else:
-            self.settings = {'Plot': {x:'time', y: data.columns}}
+            self.settings = {'Plot': {'x':'time', 'y': data.columns}}
 
         self.plots = {}
         for plot_name in settings:
@@ -105,8 +105,8 @@ class Plotter:
                 raise AttributeError(f'Specified variable {var} is not in data set. Check variable names in plot specification.')
 
             # If data points to a file, then generate a parametric plot
-            y_is_path = bool( sum([ 'csv' in y_value for y_value in self.data[y] if isinstance(y_value, str)]))
-            if y_is_path:
+            y_is_array = bool(sum([np.size(y_value) > 1 for y_value in self.data[y].iloc[:10]]))
+            if y_is_array:
                 return self._plot_parametric(name)
             else:
                 plt_kwargs = self.settings[name].get('options', {})
@@ -210,37 +210,23 @@ class Plotter:
             c_data = np.array(self.data[c].values, dtype=float)
             set_nums = np.array([1]*len(self.data))  # all the same data set
 
-        # Handle data stored in a file
-        y_is_path = bool( sum([ 'csv' in y_value for y_value in self.data[y] if isinstance(y_value, str)]))
-        if y_is_path:
+        # Handle array data
+        y_is_array = bool(sum([np.size(y_value) > 1 for y_value in self.data[y].iloc[:10]]))
+        if y_is_array:
 
-            x_data = []
-            y_data = []
-            c_data = []
-            set_nums = []  # used to distinguish between sets
+            x_data = np.concatenate([x_array for x_array in self.data[x].values])
+            y_data = np.concatenate([y_array for y_array in self.data[y].values])
+            set_nums = np.concatenate([[i] * len(x_array) for i, x_array in enumerate(self.data[x].values)])
 
-            for i, x_path, y_path in zip(range(len(self.data)), self.data[x].values, self.data[y].values):
-
-                x_file_data = pd.read_csv(x_path, index_col=0)
-                y_file_data = pd.read_csv(y_path, index_col=0)
-
-                if c == 'time':
-                    y_file_data.index = pd.to_datetime(y_file_data.index, infer_datetime_format=True)
-                    first_datetime = pd.date_range(start=self.data.index[0], end=self.data.index[0], periods=len(y_file_data))
-                    y_file_data[c] = (y_file_data.index - first_datetime).total_seconds()
-
-                else:
-                    y_file_data[c] = [self.data[c].values[i]] * len(y_file_data)
-
-                x_data.append(x_file_data[x].values)
-                y_data.append(y_file_data[y].values)
-                c_data.append(y_file_data[c].values)
-                set_nums.append(np.array([i]*len(x_file_data)))
-
-            x_data = np.concatenate(x_data)
-            y_data = np.concatenate(y_data)
-            c_data = np.concatenate(c_data)
-            set_nums = np.concatenate(set_nums)
+            if c == 'time':
+                first_time = self.data.index[0]
+                c_data = np.concatenate([
+                    [(_time - first_time).total_seconds()] * len(x_array) for _time, x_array in zip(self.data.index, self.data[x].values)
+                ])
+            else:
+                c_data = np.concatenate([
+                    [c_value] * len(x_array) for c_value, x_array in zip(self.data[c].values, self.data[x].values)
+                ])
 
         if c == 'time': # Rescale time if values are large
             units = 'seconds'
