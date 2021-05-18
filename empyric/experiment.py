@@ -717,6 +717,7 @@ def build_experiment(runcard, settings=None, instruments=None, alarms=None):
 
         instrument_class = instr.__dict__[instrument_name]
         instruments[name] = instrument_class(address=address, presets=presets, postsets=postsets, **adapter_kwargs)
+        instruments[name].name = name
 
     variables = {}  # experiment variables, associated with the instruments above
     for name, specs in runcard['Variables'].items():
