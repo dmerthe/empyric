@@ -2,76 +2,56 @@
 # To execute, run select_runcard.py in the examples directory, and then select this runcard from the file selection dialog
 
 Description:
- name: Name of experiment
- operator: Name of person running experiment
- platform: Location of experiment
- comments: Any additional useful information about the experiment
+ name:  # name of experiment
+ operator:  # name of person running experiment
+ platform:  # location of experiment
+ comments: # any additional useful information about the experiment
 
 Settings:
- follow-up: another_experiment.yaml  # runcard of experiment, if any, that comes after this one
- step interval: 1  # minimum time between steps in the experiment
- plot interval: 30  # minimum time between generation of plots, specified in the Plots section below
- save interval: 60  # minimum time between data saves
+ follow-up: # runcard of experiment, if any, that comes after this one
+ step interval: # minimum time between steps in the experiment
+ plot interval: # minimum time between generation of plots, specified in the Plots section below
+ save interval: # minimum time between data saves
 
 Instruments:
- Instrument 1:
-  type: InstrumentType  # class of instrument from the instruments module
-  address: 1  # unique address of the instrument
+ Instrument Name:
+  type: # class of instrument from the instruments module
+  address:  # unique address of the instrument
   presets:  # instrument knobs can be set before the experiment starts, usually for safety purposes
-   knob 1: 0
-   knob 2: 0
+   knob: # preset value for knob
   postsets:  # instruments knobs can be set after the experiment finishes, too
-   knob 1: 0
-   knob 2: 0
-  baud rate: 9600  # special properties of adapters can be set here, too
-  timeout: 1
-  dekay: 1
+   knob:  # postset value for knob
 
-Variables:
- Parameter a:
-  instrument: Henon Mapper
-  knob: a
- Parameter b:
-  instrument: Henon Mapper
-  knob: b
- Coordinate x:
-  instrument: Henon Mapper
-  meter: x
- Coordinate y:
-  instrument: Henon Mapper
-  meter: y
- Distance r:
-  expression: 'sqrt(x^2 + y^2)'
-  definitions:
-   x: Coordinate x
-   y: Coordinate y
+Variables:  # There are three types of variables:
+ Knob Variable Name:
+  instrument: # name of instrument that controls the variable
+  knob: # knob associated with the variable
+ Meter Variable Name:
+  instrument:  # name of instrument that controls the variable
+  meter:  # meter associated with the variable
+ Expression Variable Name:
+  expression: # mathematical expression of the variable in terms of above variables
+  definitions:  # dictionary mapping symbols in the above expression to the names of variables above
 
 Alarms:
- r > 1:
-  variable: Distance r
-  condition: '>1'
-  protocol: hold
+ Alarm Name:
+  variable: # name of variable to monitor
+  condition:  # condition in which alarm is triggered
+  protocol: # what to do when alarm is triggered
 
 Plots:
- Henon Map:
-  x: Coordinate x
-  y: Coordinate y
-  xlabel: 'X'
-  ylabel: 'Y'
-  style: parametric
-  marker: 'o'
- Y Plot:
-  x: Time
-  y: Coordinate y
+ Plot Name:
+  x:  # abcissa of the plot
+  y:  # ordinate(s) of the plot
+  xlabel:  # label for the x-axis
+  ylabel: # label for the y-axis
+  style:  # the kind of plot, e.g. 'log' or 'parametric'
+  marker:  # marker symbol(s) for points on the plot
 
 Routines:
- Ramp Parameter a:
-  type: Timecourse
-  knobs: Parameter a
-  times: [0, 3, 5.001, 60]
-  values: [0.0, 0.0, 1.4, 1.4]
- Ramp Parameter b:
-  type: Timecourse
-  knobs: Parameter b
-  times: [0, 3, 5.001, 60]
-  values: [0.0, 0.0, 0.3, 0.3]
+ Routine Name:
+  type:  # class of experimental routine
+  knobs: # name(s) of knob(s) to be modulated
+  meters:  # if required, names of meters to use for feedback
+  times:  # list (or array) of times where changes to the knobs are made
+  values:  # list (array) of values that are assigned to the knob(s)
