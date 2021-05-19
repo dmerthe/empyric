@@ -870,7 +870,8 @@ class Manager:
 
             # Save experimental data periodically
             if time.time() >= self.last_save + self.save_interval and Experiment.STOPPED not in self.experiment.status:
-                self.experiment.save()
+                save_thread = threading.Thread(target=self.experiment.save)
+                save_thread.start()
                 self.last_save = time.time()
 
             # Check if any alarms are triggered and handle them
@@ -881,24 +882,29 @@ class Manager:
 
                 if alarm.protocol:
                     if 'yaml' in alarm.protocol:
+                        # terminate the experiment and run another
                         self.experiment.terminate()
                         self.followup = alarm.protocol
                     elif 'hold' in alarm.protocol:
-                        self.experiment.hold()  # stop routines but keep measuring, and wait for alarm to clear
+                        # stop routines but keep measuring, and wait for alarm to clear
+                        self.experiment.hold()
                         self.awaiting_alarms = True
                     elif 'stop' in alarm.protocol:
-                        self.experiment.stop()  # stop routines and measurements, and wait for alarm to clear
+                        # stop routines and measurements, and wait for alarm to clear
+                        self.experiment.stop()
                         self.awaiting_alarms = True
                     elif 'check' in alarm.protocol:
+                        # stop routines and measurements, and wait for the user to resume
                         self.experiment.stop()
                         self.experiment.status = self.experiment.STOPPED + ': waiting for alarm check'
                         self.awaiting_alarms = 'check'
                     elif 'terminate' in alarm.protocol:
+                        # terminate the experiment
                         self.experiment.terminate()
                         self.awaiting_alarms = True
 
             elif self.awaiting_alarms == 'check':
-                if self.experiment.STOPPED not in self.experiment.status:
+                if self.experiment.STOPPED not in self.experiment.status:  # if user has resumed the experiment
                     self.awaiting_alarms = False
 
             elif self.awaiting_alarms:
