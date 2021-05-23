@@ -46,7 +46,7 @@ def chaperone(method):
                     return response
 
                 except BaseException as err:
-                    print(f'Encountered {err} while trying to talk to {self.instrument}')
+                    print(f'Encountered {err} while trying to talk to {self.instrument.name}')
                     print('Trying again...')
                     attempts += 1
 
@@ -60,7 +60,7 @@ def chaperone(method):
             reconnects += 1
 
         # Getting here means that both repeats and reconnects have been maxed out
-        raise ConnectionError(f'Unable to communicate with instrument at address {self.instrument.address}!')
+        raise ConnectionError(f'Unable to communicate with {self.instrument.name}!')
 
     wrapped_method.__doc__ = method.__doc__  # keep method doc string
 

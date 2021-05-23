@@ -1,0 +1,57 @@
+﻿# Basic runcard describing an experiment that measures the x and y values of a Henon Map, using the empyric library
+# To execute, run select_runcard.py in the examples directory, and then select this runcard from the file selection dialog
+
+Description:
+ name:  # name of experiment
+ operator:  # name of person running experiment
+ platform:  # location of experiment
+ comments: # any additional useful information about the experiment
+
+Settings:
+ follow-up: # runcard of experiment, if any, that comes after this one
+ step interval: # minimum time between steps in the experiment
+ plot interval: # minimum time between generation of plots, specified in the Plots section below
+ save interval: # minimum time between data saves
+
+Instruments:
+ Instrument Name:
+  type: # class of instrument from the instruments module
+  address:  # unique address of the instrument
+  presets:  # instrument knobs can be set before the experiment starts, usually for safety purposes
+   knob: # preset value for knob
+  postsets:  # instruments knobs can be set after the experiment finishes, too
+   knob:  # postset value for knob
+
+Variables:  # There are three types of variables:
+ Knob Variable Name:
+  instrument: # name of instrument that controls the variable
+  knob: # knob associated with the variable
+ Meter Variable Name:
+  instrument:  # name of instrument that controls the variable
+  meter:  # meter associated with the variable
+ Expression Variable Name:
+  expression: # mathematical expression of the variable in terms of above variables
+  definitions:  # dictionary mapping symbols in the above expression to the names of variables above
+
+Alarms:
+ Alarm Name:
+  variable: # name of variable to monitor
+  condition:  # condition in which alarm is triggered
+  protocol: # what to do when alarm is triggered
+
+Plots:
+ Plot Name:
+  x:  # abcissa of the plot
+  y:  # ordinate(s) of the plot
+  xlabel:  # label for the x-axis
+  ylabel: # label for the y-axis
+  style:  # the kind of plot, e.g. 'log' or 'parametric'
+  marker:  # marker symbol(s) for points on the plot
+
+Routines:
+ Routine Name:
+  type:  # class of experimental routine
+  knobs: # name(s) of knob(s) to be modulated
+  meters:  # if required, names of meters to use for feedback
+  times:  # list (or array) of times where changes to the knobs are made
+  values:  # list (array) of values that are assigned to the knob(s)

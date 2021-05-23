@@ -65,6 +65,11 @@ class Variable:
 
     # Some abbreviated functions that can be used to evaluate expression variables
     expression_functions = {
+        'sqrt': 'np.sqrt',
+        'exp': 'np.exp',
+        'sin': 'np.sin',
+        'cos': 'np.cos',
+        'tan': 'np.tan',
         'sum': 'np.nansum',
         'mean': 'np.nanmean',
         'rms': 'np.nanstd',
@@ -72,11 +77,7 @@ class Variable:
         'var': 'np.nanvar',
         'diff': 'np.diff',
         'max': 'np.nanmax',
-        'min': 'np.nanmin',
-        'exp': 'np.exp',
-        'sin': 'np.sin',
-        'cos': 'np.cos',
-        'tan': 'np.tan'
+        'min': 'np.nanmin'
     }
 
     def __init__(self, instrument=None, knob=None, meter=None, expression=None, definitions=None):
@@ -131,7 +132,7 @@ class Variable:
 
             for shorthand, longhand in self.expression_functions.items():
                 if shorthand in expression:
-                    expression.replace(shorthand, longhand)
+                    expression = expression.replace(shorthand, longhand)
 
             try:
                 self._value = eval(expression)
@@ -773,28 +774,21 @@ class Manager:
             with open(self.runcard, 'rb') as runcard_file:
                 self.runcard = yaml.load(runcard_file)  # load the runcard
 
-        self.instruments = {}  # instruments will be stored here, so that they can be disconnected after the experiment
-        self.alarms = {}
-        self.settings = {}
+        self.settings = {}  # placeholder for the experiment settings; populated by build_experiment below
+        self.instruments = {}  # placeholder for the experiment instruments; populated by build_experiment below
+        self.alarms = {}  # placeholder for the experiment alarms; populated by build_experiment below
+
         self.experiment = build_experiment(self.runcard,
                                            settings=self.settings,
                                            instruments=self.instruments,
                                            alarms=self.alarms)
 
         # Unpack settings
+        self.followup = self.settings.get('follow-up', None)
         self.step_interval = self.settings.get('step interval', 0.1)
         self.save_interval = self.settings.get('save interval', 60)
         self.plot_interval = self.settings.get('plot interval', 0)
         self.last_step = self.last_save = float('-inf')
-
-        self.followup = self.settings.get('follow-up', None)  # Register settings
-        self.settings = self.runcard.get('Settings', {})
-
-        self.step_interval = self.settings.get('step interval', 0.1)
-        self.save_interval = self.settings.get('save interval', 60)
-        self.last_step = self.last_save = float('-inf')
-
-        self.followup = self.settings.get('follow-up', None)
 
         # For use with alarms
         self.awaiting_alarms = False
@@ -868,7 +862,9 @@ class Manager:
 
             # Save experimental data periodically
             if time.time() >= self.last_save + self.save_interval and Experiment.STOPPED not in self.experiment.status:
-                self.experiment.save()
+                save_thread = threading.Thread(target=self.experiment.save)
+                save_thread.start()
+                self.last_save = time.time()
 
             # Check if any alarms are triggered and handle them
             alarms_triggered = [alarm for alarm in self.alarms.values() if alarm.triggered]
@@ -878,24 +874,29 @@ class Manager:
 
                 if alarm.protocol:
                     if 'yaml' in alarm.protocol:
+                        # terminate the experiment and run another
                         self.experiment.terminate()
                         self.followup = alarm.protocol
                     elif 'hold' in alarm.protocol:
-                        self.experiment.hold()  # stop routines but keep measuring, and wait for alarm to clear
+                        # stop routines but keep measuring, and wait for alarm to clear
+                        self.experiment.hold()
                         self.awaiting_alarms = True
                     elif 'stop' in alarm.protocol:
-                        self.experiment.stop()  # stop routines and measurements, and wait for alarm to clear
+                        # stop routines and measurements, and wait for alarm to clear
+                        self.experiment.stop()
                         self.awaiting_alarms = True
                     elif 'check' in alarm.protocol:
+                        # stop routines and measurements, and wait for the user to resume
                         self.experiment.stop()
                         self.experiment.status = self.experiment.STOPPED + ': waiting for alarm check'
                         self.awaiting_alarms = 'check'
                     elif 'terminate' in alarm.protocol:
+                        # terminate the experiment
                         self.experiment.terminate()
                         self.awaiting_alarms = True
 
             elif self.awaiting_alarms == 'check':
-                if self.experiment.STOPPED not in self.experiment.status:
+                if self.experiment.STOPPED not in self.experiment.status:  # if user has resumed the experiment
                     self.awaiting_alarms = False
 
             elif self.awaiting_alarms:
