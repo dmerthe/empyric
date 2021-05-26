@@ -106,6 +106,7 @@ class Variable:
             raise ValueError('variable object must have a specified knob, meter or expression!')
 
         self._value = None  # last known value of this variable
+        self.last_evaluation = np.nan  # time of last evaluation; used for expressions
 
         if hasattr(self, 'knob') or hasattr(self, 'meter'):
             if not instrument:
@@ -119,11 +120,25 @@ class Variable:
 
     @property
     def value(self):
+
         if hasattr(self, 'knob'):
             self._value = self.instrument.get(self.knob)
+            self.last_evaluation = time.time()
+
         elif hasattr(self, 'meter'):
             self._value = self.instrument.measure(self.meter)
+            self.last_evaluation = time.time()
+
         elif hasattr(self, 'expression'):
+
+            # Make sure all parents have been evaluated
+            waiting_on_parents = True
+            while waiting_on_parents:
+                waiting_on = [self.last_evaluation > parent.last_evaluation or np.isnan(parent.last_evaluation)
+                              for parent in self.definitions.values()]
+                waiting_on_parents = np.sum(waiting_on)
+                time.sleep(0.1)
+
             expression = self.expression
             expression = expression.replace('^', '**')  # carets represent exponents
 
@@ -139,6 +154,8 @@ class Variable:
             except BaseException as err:
                 print(f'Error while trying to evaluate expression {self.expression}:', err)
                 self._value = float('nan')
+
+            self.last_evaluation = time.time()
 
         return self._value
 
@@ -195,18 +212,18 @@ class Routine:
     def __init__(self, knobs=None, values=None, start=0, end=np.inf):
         """
 
-        :param knobs: (1D array) knobs to be controlled
-        :param values: (1D/2D array) array or list of values for each variable; can only be 1D if there is one variable
+        :param knobs: (Variable/1D array) knob variable(s) to be controlled
+        :param values: (1D/2D array) array or list of values for each variable; can be 1D iff there is one knob
         :param start: (float) time to start the routine
         :param end: (float) time to end the routine
         """
 
-        if knobs:
-            self.knobs = knobs
+        if knobs is not None:
+            self.knobs = knobs  # convert to 1D array
         else:
             raise AttributeError(f'{self.__name__} routine requires knobs!')
 
-        if values:
+        if values is not None:
 
             self.values = np.array(values, dtype=object).reshape((len(self.knobs), -1))
 
@@ -234,7 +251,7 @@ class Routine:
         pass
 
 
-class Hold(Routine):
+class Set(Routine):
     """
     Holds a fixed value
     """
@@ -244,8 +261,12 @@ class Hold(Routine):
         if state['time'] < self.start or state['time'] > self.end:
             return  # no change
 
-        for variable, value in zip(self.knobs.values(), self.values):
-            variable.value = value[0]
+        for knob, value in zip(self.knobs.values(), self.values):
+
+            if isinstance(value, Variable):
+                knob.value = value._value
+            else:
+                knob.value = value[0]
 
 
 class Timecourse(Routine):
@@ -265,10 +286,10 @@ class Timecourse(Routine):
         if times:
 
             if len(self.knobs) > 1:
-                if np.ndims(times) == 1:  # single list of times for all variables
-                    times = [times]*len(self.variables)
-                elif np.shape(times)[0] == 1: # array with one list of times for all variables
-                    times = [times[0]]*len(self.variables)
+                if np.ndims(times) == 1:  # single list of times for all knobs
+                    times = [times]*len(self.knobs)
+                elif np.shape(times)[0] == 1: # 1xN array with one N-element list of times for all knobs
+                    times = [times[0]]*len(self.knobs)
 
             self.times = np.array(times, dtype=object).reshape((len(self.knobs), -1))
 
@@ -284,8 +305,6 @@ class Timecourse(Routine):
         else:
             raise AttributeError('Timecourse routine requires times!')
 
-        self.interpolators = [interp1d(t, vals, bounds_error=False) for t, vals in zip(self.times, self.values)]
-
         self.start = np.min(self.times)
         self.end = np.max(self.times)
 
@@ -294,8 +313,26 @@ class Timecourse(Routine):
         if state['time'] < self.start or state['time'] > self.end:
             return  # no change
 
-        for variable, interpolator in zip(self.knobs.values(), self.interpolators):
-            value = interpolator(state['time'] - self.start)
+        for variable, times, values, i in zip(self.knobs.values(), self.times, self.values,  np.arange(len(self.times))):
+
+            j_last = np.argwhere(times <= state['time']).flatten()[-1]
+            j_next = np.argwhere(times > state['time']).flatten()[0]
+
+            last_time = times[j_last]
+            next_time = times[j_next]
+
+            last_value = values[j_last]
+            next_value = values[j_next]
+
+            if isinstance(last_value, Variable):
+                last_value = self.values[i, j_last] = last_value._value  # replace variable with value for past times
+
+            if isinstance(next_value, Variable):
+                value = last_value  # stay at last value until next time, when value variable will be evaluated
+            else:
+                # ramp linearly between numerical values
+                value = last_value + (next_value - last_value) * (state['time'] - last_time) / (next_time - last_time)
+
             variable.value = value
 
 
@@ -319,30 +356,6 @@ class Sequence(Routine):
             knob.value = value
 
         self.iteration = (self.iteration + 1) % len(self.values[0])
-
-
-class Feed(Routine):
-    """
-    Sets a knob based on the value of another variable
-    """
-
-    def __init__(self, meters=None, **kwargs):
-
-        Routine.__init__(self, **kwargs)
-
-        if meters:
-            self.meters = meters
-        else:
-            raise AttributeError('Set routine requires inputs!')
-
-    def update(self, state):
-
-        if state['time'] < self.start or state['time'] > self.end:
-            return  # no change
-
-        for variable, meter in zip(self.knobs.values(), self.meters):
-            value = state[meter]
-            variable.value = value
 
 
 class Minimize(Routine):
@@ -431,9 +444,6 @@ class Maximize(Minimize):
             return (change > 0) or (np.exp(change / self.T) > np.random.rand())
         else:
             return True
-
-
-
 
 
 class ModelPredictiveControl(Routine):
@@ -737,6 +747,13 @@ def build_experiment(runcard, settings=None, instruments=None, alarms=None):
             specs = specs.copy()  # avoids modifying the runcard
             _type = specs.pop('type')
             specs['knobs'] = {name: variables[name] for name in np.array([specs['knobs']]).flatten()}
+            specs['values'] = np.array(specs['values'], dtype=object)
+
+            # Routines can set knobs according to variables
+            for var_name in variables:
+                where_variable = (specs['values'] == var_name)  # locate names of variables
+                specs['values'][where_variable] = variables[var_name]  # replace variable names with variables
+
             routines[name] = routines_dict[_type](**specs)
 
     # Set up any alarms

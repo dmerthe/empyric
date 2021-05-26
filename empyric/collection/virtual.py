@@ -130,6 +130,8 @@ class HenonMapper(Instrument):
         :return: (float) current value of y
         """
 
+        time.sleep(0.25)  # make sure x is evaluated first
+
         return self.y
 
 

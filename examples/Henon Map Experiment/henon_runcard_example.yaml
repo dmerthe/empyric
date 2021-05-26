@@ -9,8 +9,8 @@ Description:
 
 Settings:
  follow-up: None
- step interval: 0.25
- plot interval: 10
+ step interval: 0.5
+ plot interval: 5
  save interval: 10
 
 Instruments:
