@@ -134,9 +134,10 @@ class Variable:
             # Make sure all parents have been evaluated
             waiting_on_parents = True
             while waiting_on_parents:
-                waiting_on = [self.last_evaluation > parent.last_evaluation or np.isnan(parent.last_evaluation)
-                              for parent in self.definitions.values()]
-                waiting_on_parents = np.sum(waiting_on)
+                waiting_on_parents = np.sum([
+                    self.last_evaluation > parent.last_evaluation
+                    or np.isnan(parent.last_evaluation)
+                    for parent in self.definitions.values()])
                 time.sleep(0.1)
 
             expression = self.expression
@@ -360,12 +361,10 @@ class Sequence(Routine):
 
 class Minimize(Routine):
     """
-    Minimize a set of meters (by some metric) influenced by a set of knobs, using simulated annealing
-
-    Possible metrics include 'sum', 'norm', 'prod' (product).
+    Minimize the sum of a set of meters/expressions influenced by a set of knobs, using simulated annealing.
     """
 
-    def __init__(self, meters=None, max_deltas=None, T0=0.1, T1=0, metric='sum', **kwargs):
+    def __init__(self, meters=None, max_deltas=None, T0=0.1, T1=0, **kwargs):
 
         Routine.__init__(self, **kwargs)
 
@@ -382,7 +381,6 @@ class Minimize(Routine):
         self.T = T0
         self.T0 = T0
         self.T1 = T1
-        self.metric = metric
         self.last_knobs = [np.nan]*len(self.knobs)
         self.last_meters = [np.nan]*len(self.meters)
 
@@ -412,38 +410,24 @@ class Minimize(Routine):
     def better(self, meter_values):
 
         if np.prod(self.last_meters) != np.nan:
-
-            if self.metric == 'norm':
-                change = np.linalg.norm(meter_values) - np.linalg.norm(self.last_meters)
-            elif self.metric == 'prod':
-                change = np.prod(meter_values) - np.prod(self.last_meters)
-            else:  # assume 'sum' metric
-                change = np.sum(meter_values) - np.sum(self.last_meters)
-
+            change = np.sum(meter_values) - np.sum(self.last_meters)
             return (change < 0) or (np.exp(-change/self.T) > np.random.rand())
         else:
-            return True
+            return False
 
 
 class Maximize(Minimize):
     """
-    Maximize a set of meters (by some metric) influenced by a set of knobs; works the same way as Minimize.
+    Maximize a set of meters/expressions influenced by a set of knobs; works the same way as Minimize.
     """
 
     def better(self, meter_values):
 
         if np.prod(self.last_meters) != np.nan:
-
-            if self.metric == 'norm':
-                change = np.linalg.norm(meter_values) - np.linalg.norm(self.last_meters)
-            elif self.metric == 'prod':
-                change = np.prod(meter_values) - np.prod(self.last_meters)
-            else:  # assume 'sum' metric
-                change = np.sum(meter_values) - np.sum(self.last_meters)
-
+            change = np.sum(meter_values) - np.sum(self.last_meters)
             return (change > 0) or (np.exp(change / self.T) > np.random.rand())
         else:
-            return True
+            return False
 
 
 class ModelPredictiveControl(Routine):
