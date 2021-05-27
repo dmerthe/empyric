@@ -114,6 +114,7 @@ class Instrument:
                 try:
                     self.adapter = _adapter(self, **settings)
                     adapter_connected = True
+                    break
                 except BaseException as error:
                     errors.append('in trying ' + _adapter.__name__ + ' adapter, got '
                                   + type(error).__name__ + ': ' + str(error))

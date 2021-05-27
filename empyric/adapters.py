@@ -431,6 +431,9 @@ class LinuxGPIB(Adapter):
         17: 1000
     }
 
+    delay = 0.05
+    _timeout = None
+
     @property
     def timeout(self):
         return self._timeout
