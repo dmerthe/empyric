@@ -319,7 +319,7 @@ class Timecourse(Routine):
             next_value = values[j_next]
 
             if isinstance(last_value, Variable):
-                last_value = self.values[i, j_last] = last_value._value  # replace variable with value for past times
+                last_value = self.values[i, j_last] = last_value.value  # replace variable with value for past times
 
             if isinstance(next_value, Variable):
                 value = last_value  # stay at last value until next time, when value variable will be evaluated
