@@ -724,26 +724,28 @@ def build_experiment(runcard, settings=None, instruments=None, alarms=None):
             specs = specs.copy()  # avoids modifying the runcard
             _type = specs.pop('type')
             specs['knobs'] = {name: variables[name] for name in np.array([specs['knobs']]).flatten()}
+            specs['values'] = np.array(specs['values'], dtype=object).reshape((len(specs['knobs']), -1))
 
-            # Values can be specified in a CSV file
-            if np.ndim(specs['values']) == 0:
-                if type(specs['values']) == str:
-                    if '.csv' in specs['values']:
-                        df = pd.read_csv(specs['values'])
-                        specs['values'] = df[list(specs['knobs'].keys())[0]].values.reshape(len(df))
-            elif np.ndim(specs['values']) == 1:
-                for i, val in enumerate(specs['values']):
-                    if type(val) == str:
-                        if '.csv' in val:
-                            df = pd.read_csv(val)
-                            specs['values'][i] = df[list(specs['knobs'].keys())[i]].values.reshape(len(df))
-
-            specs['values'] = np.array(specs['values'], dtype=object)
-
-            # Routines can set knobs according to variables
+            # Values can be variables, specified by their names
             for var_name in variables:
                 where_variable = (specs['values'] == var_name)  # locate names of variables
                 specs['values'][where_variable] = variables[var_name]  # replace variable names with variables
+
+            # Values can be specified in a CSV file
+            def is_csv(item):
+                if type(item) == str:
+                    return '.csv' in item
+                else:
+                    return False
+
+            def get_csv(path, column):
+                df = pd.read_csv(path)
+                return df[column].values.flatten()
+
+            specs['values'] = np.array([
+                get_csv(values[0], knob) if is_csv(values[0]) else values
+                for knob, values in zip(specs['knobs'].keys(), specs['values'])
+            ], dtype=object)
 
             routines[name] = routines_dict[_type](**specs)
 
