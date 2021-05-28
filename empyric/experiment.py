@@ -144,7 +144,7 @@ class Variable:
             expression = expression.replace('^', '**')  # carets represent exponents
 
             for symbol, variable in self.definitions.items():
-                expression = expression.replace(symbol, '(' + str(variable._value) + ')')
+                expression = expression.replace(symbol, '(' + str(variable) + ')')
 
             for shorthand, longhand in self.expression_functions.items():
                 if shorthand in expression:
@@ -169,6 +169,14 @@ class Variable:
         else:
             pass
 
+    def __str__(self):
+        # For evaluating expressions
+        if np.ndim(self._value) == 0:
+            return str(self._value)
+        elif np.ndim(self._value) == 1:
+            return '['+', '.join([str(value) for value in self._value]) + ']'
+        elif np.ndim(self._value) == 2:
+            return '[' + ', '.join(['[' + ', '.join([str(sub_value) for sub_value in value]) + ']' for value in self._value]) + ']'
 
 def convert_time(time_value):
     """

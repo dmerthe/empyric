@@ -285,7 +285,6 @@ class Keithley2400(Instrument):
         normal_timeout = self.adapter.timeout
         self.adapter.timeout = None  # the response times can be long
 
-        start = datetime.datetime.now()
         for voltage_list in sub_lists:
             voltage_str = ', '.join(['%.4E' % voltage for voltage in voltage_list])
             self.write(':SOUR:LIST:VOLT ' + voltage_str)
@@ -293,7 +292,6 @@ class Keithley2400(Instrument):
 
             raw_response = self.query(':READ?').strip()
             current_list += [float(current_str) for current_str in raw_response.split(',')]
-        end = datetime.datetime.now()
 
         self.adapter.timeout = normal_timeout  # put it back
 

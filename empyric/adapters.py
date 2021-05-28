@@ -475,11 +475,12 @@ class LinuxGPIB(Adapter):
         self.backend.write(self.descr, message)
         return "Success"
 
-    def _read(self, read_length=512):
+    def _read(self, read_length=2048):
         self.set_timeout(self.timeout)
-        return self.backend.read(self.descr, read_length).decode()
+        response = self.backend.read(self.descr, read_length).decode()
+        return response
 
-    def _query(self, question, read_length=512):
+    def _query(self, question, read_length=2048):
         self._write(question)
         time.sleep(self.delay)
         return self._read(read_length=read_length)
