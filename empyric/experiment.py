@@ -165,7 +165,7 @@ class Variable:
         # value property can only be set if variable is a knob; None value indicates no setting should be applied
         if hasattr(self, 'knob') and value is not None and value is not np.nan:
             self.instrument.set(self.knob, value)
-            self._value = self.instrument.__getattribute__(self.knob)
+            self._value = self.instrument.__getattribute__(self.knob.replace(' ', '_'))
         else:
             pass
 
@@ -220,20 +220,13 @@ class Routine:
         """
 
         if knobs is not None:
-            self.knobs = knobs  # convert to 1D array
+            self.knobs = knobs  # dictionary of the form, {..., name: variable, ...}
         else:
             raise AttributeError(f'{self.__name__} routine requires knobs!')
 
         if values is not None:
 
             self.values = np.array(values, dtype=object).reshape((len(self.knobs), -1))
-
-            # Values can be stored in a CSV file
-            for i, element in enumerate(self.values):
-                if type(element[0]) == str:
-                    if '.csv' in element[0]:
-                        df = pd.read_csv(element[0])
-                        self.values[i] = df[df.columns[-1]].values.reshape(len(df))
 
         else:
             raise AttributeError(f'{self.__name__} routine requires values')
@@ -731,6 +724,20 @@ def build_experiment(runcard, settings=None, instruments=None, alarms=None):
             specs = specs.copy()  # avoids modifying the runcard
             _type = specs.pop('type')
             specs['knobs'] = {name: variables[name] for name in np.array([specs['knobs']]).flatten()}
+
+            # Values can be specified in a CSV file
+            if np.ndim(specs['values']) == 0:
+                if type(specs['values']) == str:
+                    if '.csv' in specs['values']:
+                        df = pd.read_csv(specs['values'])
+                        specs['values'] = df[list(specs['knobs'].keys())[0]].values.reshape(len(df))
+            elif np.ndim(specs['values']) == 1:
+                for i, val in enumerate(specs['values']):
+                    if type(val) == str:
+                        if '.csv' in val:
+                            df = pd.read_csv(val)
+                            specs['values'][i] = df[list(specs['knobs'].keys())[i]].values.reshape(len(df))
+
             specs['values'] = np.array(specs['values'], dtype=object)
 
             # Routines can set knobs according to variables
@@ -794,9 +801,9 @@ class Manager:
 
         # Unpack settings
         self.followup = self.settings.get('follow-up', None)
-        self.step_interval = self.settings.get('step interval', 0.1)
-        self.save_interval = self.settings.get('save interval', 60)
-        self.plot_interval = self.settings.get('plot interval', 0)
+        self.step_interval = convert_time(self.settings.get('step interval', 0.1))
+        self.save_interval = convert_time(self.settings.get('save interval', 60))
+        self.plot_interval = convert_time(self.settings.get('plot interval', 0))
         self.last_step = self.last_save = float('-inf')
 
         # For use with alarms
