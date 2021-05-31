@@ -1,5 +1,7 @@
-﻿# Basic runcard describing an experiment that measures the x and y values of a Henon Map, using the empyric library
-# To execute, run select_runcard.py in the examples directory, and then select this runcard from the file selection dialog
+﻿# Basic runcard describing an experiment that measures the x and y values of a Henon Map, using the empyric library.
+# To execute, run select_runcard.py in the examples directory, and then select this runcard from the file selection dialog.
+# Any keys that include "Name" are completely arbitrary; they are only used for reference internally and in the GUI.
+# It is good practice to give unique and sensible names to all instruments, variables, alarms, plots and routines.
 
 Description:
  name:  # name of experiment
@@ -35,8 +37,8 @@ Variables:  # There are three types of variables:
 
 Alarms:
  Alarm Name:
-  variable: # name of variable to monitor
-  condition:  # condition in which alarm is triggered
+  variables: # (optional) dictionary of variables to monitor, of the form {..., symbol: variable name, ...}
+  condition:  # condition in which alarm is triggered, expressed using either symbols or explicit variable names
   protocol: # what to do when alarm is triggered
 
 Plots:
@@ -52,6 +54,6 @@ Routines:
  Routine Name:
   type:  # class of experimental routine
   knobs: # name(s) of knob(s) to be modulated
-  meters:  # if required, names of meters to use for feedback
-  times:  # list (or array) of times where changes to the knobs are made
+  meters:  # if required, name(s) of meter(s) to use for feedback
+  times:  # list (or array) of times when changes to the knobs are made
   values:  # list (array) of values that are assigned to the knob(s)

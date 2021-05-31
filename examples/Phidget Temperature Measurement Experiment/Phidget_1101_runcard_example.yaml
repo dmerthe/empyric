@@ -24,8 +24,7 @@ Variables:
 
 Alarms:
  T > 30 C:
-  variable: Temperature
-  condition: '>30'
+  condition: 'Temperature > 30'
 
 Plots:
  IV Curve:

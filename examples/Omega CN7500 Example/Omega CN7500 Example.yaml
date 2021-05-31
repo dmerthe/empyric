@@ -24,8 +24,7 @@ Variables:
 
 Alarms:
  T > 35 C:
-  variable: Temperature
-  condition: '>35'
+  condition: 'Temperature > 35'
 
 Plots:
  Temperature:

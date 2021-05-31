@@ -13,8 +13,9 @@ Instruments:
  Sourcemeter:
   type: Keithley2400
   address: 1
-  voltage range: 20
-  current range: 1
+  presets:
+   voltage range: 20
+   current range: 1
 
 Variables:
  Voltage:
@@ -26,11 +27,9 @@ Variables:
 
 Alarms:
  Voltage > 15 V:
-  variable: Voltage
-  condition: '>15'
+  condition: 'Voltage > 15'
  Current > 1 mA:
-  variable: Current
-  condition: '>1e-3'
+  condition: 'Current > 1e-3'
 
 Plots:
  IV Curve:
