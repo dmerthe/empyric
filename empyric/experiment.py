@@ -458,23 +458,16 @@ routines_dict = {
 
 class Alarm:
     """
-    Monitors a variable, triggers if a condition is met and indicates the response protocol
+    Triggers if a condition is met, among the given variables, and indicates the response protocol
     """
 
-    def __init__(self, variable, condition, protocol=None):
-        self.variable = variable  # variable being monitored
-        self.condition = condition  # condition which triggers the alarm
-        self.protocol = protocol  # what to do when the alarm is triggered
-
-        self._triggered = False
+    def __init__(self, variables, condition, protocol=None):
+        self.trigger_variable = Variable(expression=condition, definitions=variables)
+        self.protocol = protocol
 
     @property
     def triggered(self):
-        value = self.variable._value  # get last know variable value
-        if not (value is None or value == float('nan') or value == ''):
-            self._triggered = eval('value' + self.condition)
-
-        return self._triggered
+        return self.trigger_variable.value == True
 
 
 class Experiment:
@@ -759,12 +752,30 @@ def build_experiment(runcard, settings=None, instruments=None, alarms=None):
 
     # Set up any alarms
     if 'Alarms' in runcard and alarms is not None:
-        alarms.update({
-            name: Alarm(
-                variables[specs['variable']], specs['condition'],
-                protocol=specs.get('protocol', None)
-            ) for name, specs in runcard['Alarms'].items()
-        })
+
+        for name, specs in runcard['Alarms'].items():
+
+            alarm_variables = specs.copy().get('variables',{})
+            condition = specs.copy()['condition']
+
+            alphabet = 'abcdefghijklmnopqrstuvwxyz'
+            for name, variable in variables.items():
+
+                # Variables can be called by name in the condition
+                if name in condition:
+                    temp_name = ''.join([alphabet[np.random.randint(0, len(alphabet))] for i in range(3)])
+                    while temp_name in alarm_variables:  # make sure temp_name is not repeated
+                        temp_name = ''.join([alphabet[np.random.randint(0, len(alphabet))] for i in range(3)])
+
+                    alarm_variables.update({temp_name: name})
+                    condition = condition.replace(name, temp_name)
+
+                # Otherwise, they are defined in the alarm_variables
+                for symbol, alarm_variable_name in alarm_variables.items():
+                    if alarm_variable_name == name:
+                        alarm_variables[symbol] = variable
+
+            alarms.update({name: Alarm(alarm_variables, condition, protocol=specs.get('protocol', None))})
 
     experiment = Experiment(variables, routines=routines)
 

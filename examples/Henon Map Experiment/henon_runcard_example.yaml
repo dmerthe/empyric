@@ -43,8 +43,7 @@ Variables:
 
 Alarms:
  r > 1:
-  variable: Distance r
-  condition: '>1'
+  condition: 'Distance r > 1'
   protocol: hold
 
 Plots:
