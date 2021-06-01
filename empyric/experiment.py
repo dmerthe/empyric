@@ -114,9 +114,10 @@ class Variable:
             self.instrument = instrument
 
         elif hasattr(self, 'expression'):
-            if not definitions:
-                raise AttributeError('expression definition requires definitions!')
-            self.definitions = definitions
+            if definitions:
+                self.definitions = definitions
+            else:
+                self.definitions = {}
 
     @property
     def value(self):

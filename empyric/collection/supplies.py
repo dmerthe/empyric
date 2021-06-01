@@ -29,25 +29,27 @@ class Keithley2260B(Instrument):
 
     @measurer
     def measure_current(self):
-        return [float(self.query('MEAS:CURR?')) for i in range(3)][-1] # sometimes the first measurement is lagged
+
+        def validator(response):
+            return bool(re.match('\+\d\.\d\d\d', response))
+
+        return float(self.query('MEAS:CURR?',validator=validator))
 
     @measurer
     def measure_voltage(self):
-        return [float(self.query('MEAS:VOLT?')) for i in range(3)][-1] # sometimes the first measurement is lagged
+
+        def validator(response):
+            return bool(re.match('\+\d\.\d\d\d', response))
+
+        return float(self.query('MEAS:VOLT?', validator=validator))
 
     @setter
     def set_max_voltage(self, voltage):
-        if not self.max_current:
-            self.get_max_current()
-
-        self.write('APPL %.4f,%.4f' % (voltage, self.max_current))
+        self.write('VOLT %.4f' % voltage)
 
     @setter
     def set_max_current(self, current):
-        if not self.max_voltage:
-            self.get_max_voltage()
-
-        self.write('APPL %.4f,%.4f' % (self.max_voltage, current))
+        self.write('CURR %.4f' % current)
 
     @setter
     def set_output(self, output):
@@ -59,11 +61,19 @@ class Keithley2260B(Instrument):
 
     @getter
     def get_max_current(self):
-        return float(self.query('CURR?'))
+
+        def validator(response):
+            return bool(re.match('\+\d\.\d\d\d', response))
+
+        return float(self.query('CURR?', validator=validator()))
 
     @getter
     def get_max_voltage(self):
-        return float(self.query('VOLT?'))
+
+        def validator(response):
+            return bool(re.match('\+\d\.\d\d\d', response))
+
+        return float(self.query('VOLT?', validator=validator))
 
 
 class BK9183B(Instrument):
