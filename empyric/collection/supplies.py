@@ -65,7 +65,7 @@ class Keithley2260B(Instrument):
         def validator(response):
             return bool(re.match('\+\d\.\d\d\d', response))
 
-        return float(self.query('CURR?', validator=validator()))
+        return float(self.query('CURR?', validator=validator))
 
     @getter
     def get_max_voltage(self):
