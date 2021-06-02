@@ -343,7 +343,7 @@ class Keithley2460(Instrument):
         'current range': 1,
         'nplc': 1,
         'source delay': 0,
-        'remote sense': False
+        'remote sense': 'OFF'
     }
 
     postsets = {
@@ -593,14 +593,19 @@ class Keithley2460(Instrument):
 
     @setter
     def set_remote_sense(self, state):
-        if bool(state) or state == 'ON':
+        if bool(state) or state in ['ON', '1']:
             self.write('VOLT:RSEN ON')
         else:
             self.write('VOLT:RSEN OFF')
 
+        self.set_output('ON')
+
     @getter
     def get_remote_sense(self):
-        return self.query('VOLT:RSEN?')
+        if int(self.query('VOLT:RSEN?').strip()):
+            return 'ON'
+        else:
+            return 'OFF'
 
 
 class Keithley2651A(Instrument):
