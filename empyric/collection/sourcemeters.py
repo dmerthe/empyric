@@ -432,14 +432,6 @@ class Keithley2460(Instrument):
 
         self.write('SOUR:VOLT:LEV %.4E' % voltage)
 
-    @getter
-    def get_voltage(self):
-
-        if self.source == 'voltage':
-            return float(self.query('SOUR:VOLT?'))
-        else:
-            return self.measure_voltage()
-
     @setter
     def set_current(self, current):
 
@@ -449,14 +441,6 @@ class Keithley2460(Instrument):
             self.set_output('ON')  # output if automatically shut off when the source mode is changed
 
         self.write('SOUR:CURR:LEV %.4E' % current)
-
-    @getter
-    def get_current(self):
-
-        if self.source == 'current':
-            return float(self.query('SOUR:CURR?'))
-        else:
-            return self.measure_current()
 
     @setter
     def set_voltage_range(self, voltage_range):
