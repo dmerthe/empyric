@@ -330,6 +330,7 @@ class Keithley2460(Instrument):
         'output',
         'source',
         'meter',
+        'remote sense',
         'source delay'
     )
 
@@ -341,7 +342,8 @@ class Keithley2460(Instrument):
         'voltage range': 100,
         'current range': 1,
         'nplc': 1,
-        'source_delay': 0,
+        'source delay': 0,
+        'remote sense': False
     }
 
     postsets = {
@@ -430,6 +432,14 @@ class Keithley2460(Instrument):
 
         self.write('SOUR:VOLT:LEV %.4E' % voltage)
 
+    @getter
+    def get_voltage(self):
+
+        if self.source == 'voltage':
+            return float(self.query('SOUR:VOLT?'))
+        else:
+            return self.measure_voltage()
+
     @setter
     def set_current(self, current):
 
@@ -439,6 +449,14 @@ class Keithley2460(Instrument):
             self.set_output('ON')  # output if automatically shut off when the source mode is changed
 
         self.write('SOUR:CURR:LEV %.4E' % current)
+
+    @getter
+    def get_current(self):
+
+        if self.source == 'current':
+            return float(self.query('SOUR:CURR?'))
+        else:
+            return self.measure_current()
 
     @setter
     def set_voltage_range(self, voltage_range):
@@ -588,6 +606,17 @@ class Keithley2460(Instrument):
             self.write('SOUR:VOLT:DEL %.4e' % delay)
         else:
             self.write('SOUR:CURR:DEL %.4e' % delay)
+
+    @setter
+    def set_remote_sense(self, state):
+        if bool(state) or state == 'ON':
+            self.write('VOLT:RSEN ON')
+        else:
+            self.write('VOLT:RSEN OFF')
+
+    @getter
+    def get_remote_sense(self):
+        return self.query('VOLT:RSEN?')
 
 
 class Keithley2651A(Instrument):
