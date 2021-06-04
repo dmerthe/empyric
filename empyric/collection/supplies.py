@@ -31,7 +31,7 @@ class Keithley2260B(Instrument):
     def measure_current(self):
 
         def validator(response):
-            return bool(re.match('\+\d\.\d\d\d', response))
+            return bool(re.match('\+\d+\.\d\d\d', response))
 
         return float(self.query('MEAS:CURR?',validator=validator))
 
@@ -39,7 +39,7 @@ class Keithley2260B(Instrument):
     def measure_voltage(self):
 
         def validator(response):
-            return bool(re.match('\+\d\.\d\d\d', response))
+            return bool(re.match('\+\d+\.\d\d\d', response))
 
         return float(self.query('MEAS:VOLT?', validator=validator))
 
@@ -63,7 +63,7 @@ class Keithley2260B(Instrument):
     def get_max_current(self):
 
         def validator(response):
-            return bool(re.match('\+\d\.\d\d\d', response))
+            return bool(re.match('\+\d+\.\d\d\d', response))
 
         return float(self.query('CURR?', validator=validator))
 
@@ -71,7 +71,7 @@ class Keithley2260B(Instrument):
     def get_max_voltage(self):
 
         def validator(response):
-            return bool(re.match('\+\d\.\d\d\d', response))
+            return bool(re.match('\+\d+\.\d\d\d', response))
 
         return float(self.query('VOLT?', validator=validator))
 

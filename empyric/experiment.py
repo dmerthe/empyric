@@ -289,7 +289,7 @@ class Timecourse(Routine):
         if times:
 
             if len(self.knobs) > 1:
-                if np.ndims(times) == 1:  # single list of times for all knobs
+                if np.ndim(times) == 1:  # single list of times for all knobs
                     times = [times]*len(self.knobs)
                 elif np.shape(times)[0] == 1: # 1xN array with one N-element list of times for all knobs
                     times = [times[0]]*len(self.knobs)

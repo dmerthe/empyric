@@ -137,15 +137,14 @@ class Instrument:
 
         # Apply presets
         if presets:
-            self.presets.update(presets)
+            self.presets = {**self.presets, **presets}
 
         for knob, value in self.presets.items():
-
             self.set(knob, value)
 
         # Get postsets
         if postsets:
-            self.postsets.update(postsets)
+            self.postsets = {**self.postsets, **postsets}
 
     def __repr__(self):
         return self.name
@@ -194,8 +193,8 @@ class Instrument:
 
         try:
             set_method = getattr(self, 'set_' + knob.replace(' ', '_'))
-        except AttributeError:
-            raise AttributeError(f"{knob} cannot be set on {self.name}")
+        except AttributeError as err:
+            raise AttributeError(f"{knob} cannot be set on {self.name}\n{err}")
 
         set_method(value)
 

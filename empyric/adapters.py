@@ -629,7 +629,9 @@ class USBTMC(Adapter):
     """
     Handles communications with pure USB instruments through the USBTMC interface
     """
-
+    
+    delay = 0.1
+    
     def __repr__(self):
         return 'USBTMC'
 

@@ -10,23 +10,39 @@ class Keithley2110(Instrument):
     name = "Keithley2110"
 
     supported_adapters = (
-        (VISAUSB, {}),
-        (USBTMC, {})
+        (USBTMC, {}),
+        (VISAUSB, {})
     )
 
     knobs = (
-        'meter'
         'voltage range',
-        'current range',
-        'temperature mode'
+        'current range'
     )
-
+    
     meters = (
         'voltage',
         'current',
         'temperature'
     )
-
+    
+    _mode = None
+    
+    @property
+    def mode(self):
+        return self._mode
+    
+    @mode.setter
+    def mode(self, mode):
+        if mode == 'voltage':
+            self.write('FUNC "VOLT"')
+            self._mode = 'voltage'
+        if mode == 'current':
+            self.write('FUNC "CURR"')
+            self._mode = 'current'
+        if mode == 'temperature':
+            self.write('FUNC "TCO"')
+            self._mode = 'temperature'
+            
     @setter
     def set_voltage_range(self, voltage_range):
 
@@ -76,37 +92,21 @@ class Keithley2110(Instrument):
 
     @measurer
     def measure_voltage(self):
-
-        if self.meter != 'voltage':
-            self.set_meter('voltage')
-
+        if self.mode != 'voltage':
+            self.mode = 'voltage'
         return float(self.query('READ?'))
 
     @measurer
     def measure_current(self):
-
-        if self.meter != 'current':
-            self.set_meter('current')
-
+        if self.mode != 'current':
+            self.mode = 'current'
         return float(self.query('READ?'))
 
     @measurer
     def measure_temperature(self):
-
-        if self.meter != 'temperature':
-            self.set_meter('temperature')
-
+        if self.mode != 'temperature':
+            self.mode = 'temperature'
         return float(self.query('READ?'))
-
-    @setter
-    def set_meter(self, meter):
-
-        if meter == 'voltage':
-            self.write('FUNC "VOLT"')
-        if meter == 'current':
-            self.write('FUNC "CURR"')
-        if meter == 'temperature':
-            self.write('FUNC "TCO"')
 
 
 class LabJackU6(Instrument):
