@@ -545,7 +545,7 @@ class Experiment:
             # Update each routine in its own thread
             threads = {}
             for name, routine in self.routines.items():
-                threads[name] = threading.Thread(target=routine.update, args=(self.state,))
+                threads[name] = threading.Thread(target=self._update_routine, args=(name,))
                 threads[name].start()
 
             # Wait for all routine threads to finish
@@ -589,16 +589,30 @@ class Experiment:
         return self
 
     def _update_variable(self, name):
+        """Retrieve and store a variable value"""
 
-        value = self.variables[name].value
+        try:
+            value = self.variables[name].value
 
-        if np.size(value) > 1:  # store array data as CSV files
-            dataframe = pd.DataFrame({name: value}, index=[self.state.name] * len(value))
-            path = name.replace(' ', '_') + '_' + self.state.name.strftime('%Y%m%d-%H%M%S') + '.csv'
-            dataframe.to_csv(path)
-            self.state[name] = path
-        else:
-            self.state[name] = value
+            if np.size(value) > 1:  # store array data as CSV files
+                dataframe = pd.DataFrame({name: value}, index=[self.state.name] * len(value))
+                path = name.replace(' ', '_') + '_' + self.state.name.strftime('%Y%m%d-%H%M%S') + '.csv'
+                dataframe.to_csv(path)
+                self.state[name] = path
+            else:
+                self.state[name] = value
+        except BaseException as err:
+            self.terminate()
+            raise err
+
+    def _update_routine(self, name):
+        """Update a routine according to the current state"""
+
+        try:
+            self.routines[name].update(self.state)
+        except BaseException as err:
+            self.terminate()
+            raise err
 
     def save(self, directory=None):
         """
