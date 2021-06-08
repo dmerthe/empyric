@@ -136,7 +136,10 @@ class Variable:
             expression = expression.replace('^', '**')  # carets represent exponents
 
             for symbol, variable in self.definitions.items():
-                expression = expression.replace(symbol, '(' + str(variable._value) + ')')
+                if variable._value is not None:
+                    expression = expression.replace(symbol, '(' + str(variable._value) + ')') # take the last known value
+                else:
+                    expression = expression.replace(symbol, '(' + str(variable.value) + ')') # evaluate the parent variable
 
             for shorthand, longhand in self.expression_functions.items():
                 if shorthand in expression:
@@ -145,7 +148,6 @@ class Variable:
             try:
                 self._value = eval(expression)
             except BaseException as err:
-                print(self.definitions)
                 print(f'Error while trying to evaluate expression {self.expression}:', err)
                 self._value = float('nan')
 
@@ -761,8 +763,6 @@ def build_experiment(runcard, settings=None, instruments=None, alarms=None):
     if 'Alarms' in runcard and alarms is not None:
 
         for name, specs in runcard['Alarms'].items():
-
-            print(name, specs)
 
             alarm_variables = specs.copy().get('variables',{})
             condition = specs.copy()['condition']
