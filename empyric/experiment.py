@@ -132,20 +132,11 @@ class Variable:
 
         elif hasattr(self, 'expression'):
 
-            # Make sure all parents have been evaluated
-            waiting_on_parents = True
-            while waiting_on_parents:
-                waiting_on_parents = np.sum([
-                    self.last_evaluation > parent.last_evaluation
-                    or np.isnan(parent.last_evaluation)
-                    for parent in self.definitions.values()])
-                time.sleep(0.1)
-
             expression = self.expression
             expression = expression.replace('^', '**')  # carets represent exponents
 
             for symbol, variable in self.definitions.items():
-                expression = expression.replace(symbol, '(' + str(variable) + ')')
+                expression = expression.replace(symbol, '(' + str(variable._value) + ')')
 
             for shorthand, longhand in self.expression_functions.items():
                 if shorthand in expression:
@@ -154,6 +145,7 @@ class Variable:
             try:
                 self._value = eval(expression)
             except BaseException as err:
+                print(self.definitions)
                 print(f'Error while trying to evaluate expression {self.expression}:', err)
                 self._value = float('nan')
 
@@ -770,24 +762,26 @@ def build_experiment(runcard, settings=None, instruments=None, alarms=None):
 
         for name, specs in runcard['Alarms'].items():
 
+            print(name, specs)
+
             alarm_variables = specs.copy().get('variables',{})
             condition = specs.copy()['condition']
 
             alphabet = 'abcdefghijklmnopqrstuvwxyz'
-            for name, variable in variables.items():
+            for var_name, variable in variables.items():
 
                 # Variables can be called by name in the condition
-                if name in condition:
+                if var_name in condition:
                     temp_name = ''.join([alphabet[np.random.randint(0, len(alphabet))] for i in range(3)])
                     while temp_name in alarm_variables:  # make sure temp_name is not repeated
                         temp_name = ''.join([alphabet[np.random.randint(0, len(alphabet))] for i in range(3)])
 
-                    alarm_variables.update({temp_name: name})
-                    condition = condition.replace(name, temp_name)
+                    alarm_variables.update({temp_name: variable})
+                    condition = condition.replace(var_name, temp_name)
 
                 # Otherwise, they are defined in the alarm_variables
                 for symbol, alarm_variable_name in alarm_variables.items():
-                    if alarm_variable_name == name:
+                    if alarm_variable_name == var_name:
                         alarm_variables[symbol] = variable
 
             alarms.update({name: Alarm(alarm_variables, condition, protocol=specs.get('protocol', None))})
