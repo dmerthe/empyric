@@ -7,6 +7,8 @@ from empyric.instruments import *
 class ConsoleUser(Instrument):
     """
     Virtual instrument that simply queries a human operator via the Python console
+
+    The prompt is what the user is asked; the cooldown is the minimum time between input requests
     """
 
     name = 'ConsoleUser'

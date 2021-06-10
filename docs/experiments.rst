@@ -8,7 +8,7 @@ Variables, Routines & Experiments
 
 .. autoclass:: empyric.experiment.Routine
    :members:
-.. autoclass:: empyric.experiment.Hold
+.. autoclass:: empyric.experiment.Set
 .. autoclass:: empyric.experiment.Timecourse
 .. autoclass:: empyric.experiment.Sequence
 .. autoclass:: empyric.experiment.Set

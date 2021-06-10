@@ -66,7 +66,7 @@ class HenonMapper(Instrument):
 
     y_{n+1} = b x_n
 
-    It has two virtual knobs (a,b) and two virtual meters (x,y), useful for testing in the absence of actual instruments
+    It has two virtual knobs (a,b) and two virtual meters (x,y)
     """
 
     name = 'HenonMapper'
@@ -177,22 +177,27 @@ class PIDController(Instrument):
 
     @setter
     def set_setpoint(self, setpoint):
+        """Set the process setpoint"""
         pass
 
     @setter
     def set_proportional_gain(self, gain):
+        """Set the proportional gain"""
         pass
 
     @setter
     def set_derivative_time(self, _time):
+        """Set the derivative time"""
         pass
 
     @setter
     def set_integral_time(self, _time):
+        """Set the integral time"""
         pass
 
     @setter
     def set_input(self, input):
+        """Input the process value"""
 
         if len(self.times) == 0:
             self.clock.start()
@@ -204,7 +209,7 @@ class PIDController(Instrument):
 
     @measurer
     def measure_output(self):
-
+        """Get the controller output"""
         if self.setpoint is None:  # Don't output anything unless the setpoint is defined
             return None
 
