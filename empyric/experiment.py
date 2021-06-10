@@ -494,6 +494,7 @@ class Experiment:
     def __init__(self, variables, routines=None):
 
         self.variables = variables  # dict of the form {..., name: variable, ...}
+        self.eval_events = {name: threading.Event() for name in variables}
 
         if routines:
             self.routines = routines  # dictionary of the form {..., name: (variable_name, routine), ...}
@@ -552,6 +553,9 @@ class Experiment:
         # Get all variable values if experiment is running or holding
         if Experiment.RUNNING in self.status or Experiment.HOLDING in self.status:
 
+            for event in self.eval_events.values():
+                event.clear()
+
             # Run each measure / get operation in its own thread
             threads = {}
             for name in self.variables:
@@ -586,7 +590,15 @@ class Experiment:
         """Retrieve and store a variable value"""
 
         try:
+
+            if self.variables[name].type == 'expression':
+                for dependee in self.variables[name].definitions:
+                    event = self.eval_events[dependee]
+                    event.wait()  # wait for dependee to be evaluated
+
             value = self.variables[name].value
+
+            self.eval_events[name].set()
 
             if np.size(value) > 1:  # store array data as CSV files
                 dataframe = pd.DataFrame({name: value}, index=[self.state.name] * len(value))
@@ -724,9 +736,15 @@ def build_experiment(runcard, settings=None, instruments=None, alarms=None):
         elif 'knob' in specs:
             variables[name] = Variable(knob=specs['knob'], instrument=instruments[specs['instrument']])
         elif 'expression' in specs:
-            variables[name] = Variable(expression=specs['expression'],
-                                       definitions={symbol: variables[var_name]
-                                                    for symbol, var_name in specs['definitions'].items()})
+
+            expression = specs.copy()['expression']
+            definitions = {}
+
+            for symbol, var_name in specs['definitions'].items():
+                expression = expression.replace(symbol, var_name)
+                definitions[var_name] = variables[var_name]
+
+            variables[name] = Variable(expression=expression, definitions=definitions)
 
     routines = {}
     if 'Routines' in runcard:
