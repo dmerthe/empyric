@@ -650,7 +650,6 @@ class ExperimentGUI:
 
         variable.value = entry_value
         root.focus()
-        print(f'manually set {variable} to {entry_value} from {entry}')
 
     @staticmethod
     def _entry_esc(entry, variable, root):

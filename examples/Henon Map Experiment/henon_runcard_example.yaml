@@ -20,7 +20,9 @@ Instruments:
   address: 1
   presets:
    a: 0
+   b: 0
   postsets:
+   a: 0
    b: 0
 
 Variables:
@@ -63,10 +65,10 @@ Routines:
  Ramp Parameter a:
   type: Timecourse
   knobs: Parameter a
-  times: [0, 3, 5, 5.5]
-  values: [0.0, 0.0, 1.4, 1.4]
+  times: [3, 5]
+  values: [0.0, 1.4]
  Ramp Parameter b:
   type: Timecourse
   knobs: Parameter b
-  times: [0, 3, 5, 5.5]
-  values: [0.0, 0.0, 0.3, 0.3]
+  times: [3, 5]
+  values: [0.0, 0.3]

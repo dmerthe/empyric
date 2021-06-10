@@ -185,6 +185,7 @@ class Variable:
         else:
             pass
 
+
     def __str__(self):
         # For evaluating expressions
         if np.ndim(self._value) == 0:
@@ -245,10 +246,18 @@ class Routine:
 
         if knobs is not None:
             self.knobs = knobs  # dictionary of the form, {..., name: variable, ...}
+            for knob in self.knobs.values():
+                knob.controller = None  # for keeping track of which routines are controlling knobs
         else:
             raise AttributeError(f'{self.__name__} routine requires knobs!')
 
         if values is not None:
+
+            if len(self.knobs) > 1:
+                if np.ndim(values) == 1:  # single list of values for all knobs
+                    values = [values]*len(self.knobs)
+                elif np.shape(values)[0] == 1: # 1xN array with one N-element list of times for all knobs
+                    values = [values[0]]*len(self.knobs)
 
             self.values = np.array(values, dtype=object).reshape((len(self.knobs), -1))
 
@@ -325,11 +334,32 @@ class Timecourse(Routine):
 
         self.start = np.min(self.times)
         self.end = np.max(self.times)
+        self.finished = False
 
     def update(self, state):
 
-        if state['time'] < self.start or state['time'] > self.end:
-            return  # no change
+        if state['time'] < self.start:
+            return
+        elif state['time'] > self.end:
+            if not self.finished:
+                for knob, values in zip(self.knobs.values(), self.values):
+                    if knob.controller == self:
+                        knob.value = values[-1]  # make sure to set the end value
+
+                    knob.controller = None
+
+                self.finished = True
+
+            return
+        else:
+            for name, knob in self.knobs.items():
+
+                if isinstance(knob.controller, Routine) and knob.controller != self:
+                    controller = knob.controller
+                    if controller.start < state['time'] < controller.end:
+                        raise RuntimeError(f"Knob {name} has more than one controlling routine at time = {state['time']} seconds!")
+                else:
+                    knob.controller = self
 
         for variable, times, values, i in zip(self.knobs.values(), self.times, self.values,  np.arange(len(self.times))):
 
@@ -765,6 +795,8 @@ def build_experiment(runcard, settings=None, instruments=None, alarms=None):
                 definitions[var_name] = variables[var_name]
 
             variables[name] = Variable(expression=expression, definitions=definitions)
+        elif 'parameter' in specs:
+            variables[name] = Variable(parameter=specs['parameter'])
 
     routines = {}
     if 'Routines' in runcard:
