@@ -80,7 +80,7 @@ class Variable:
         'min': 'np.nanmin'
     }
 
-    def __init__(self, instrument=None, knob=None, meter=None, expression=None, definitions=None):
+    def __init__(self, instrument=None, knob=None, meter=None, expression=None, definitions=None, parameter=None):
         """
         One of either the knob, meter or expression keyword arguments must be supplied along with the respective
         instrument or definitions.
@@ -89,8 +89,9 @@ class Variable:
         :param knob: (str) instrument knob label, if variable is a knob
         :param meter: (str) instrument meter label, if variable is a meter
         :param expression: (str) expression for the variable in terms of other variables, if variable is an expression
-        :param definitions: (dict) dictionary of the form {..., symbol: variable, ...} mapping the symbols in the
-        expression to other variable objects; only used if type is 'expression'
+        :param definitions: (dict) dictionary of the form {..., symbol: variable, ...} mapping the symbols in the expression to other variable objects; only used if type is 'expression'
+        :param parameter (str) value of a user controlled parameter
+
         """
 
         if meter:
@@ -102,6 +103,9 @@ class Variable:
         elif expression:
             self.expression = expression
             self.type = 'expression'
+        elif parameter:
+            self.parameter = parameter
+            self.type = 'parameter'
         else:
             raise ValueError('variable object must have a specified knob, meter or expression!')
 
@@ -136,10 +140,13 @@ class Variable:
             expression = expression.replace('^', '**')  # carets represent exponents
 
             for symbol, variable in self.definitions.items():
-                if variable._value is not None:
-                    expression = expression.replace(symbol, '(' + str(variable._value) + ')') # take the last known value
+                if variable._value is None:
+                    expression = expression.replace(symbol, '(' + str(variable.value) + ')')  # evaluate the parent variable
+                elif 'nan' in str(variable._value):
+                    expression = 'np.nan'
+                    break
                 else:
-                    expression = expression.replace(symbol, '(' + str(variable.value) + ')') # evaluate the parent variable
+                    expression = expression.replace(symbol, '(' + str(variable._value) + ')') # take the last known value
 
             for shorthand, longhand in self.expression_functions.items():
                 if shorthand in expression:
@@ -153,6 +160,18 @@ class Variable:
 
             self.last_evaluation = time.time()
 
+        elif hasattr(self, 'parameter'):
+
+            try:
+                self._value = float(self.parameter)
+            except ValueError:
+                if self.parameter == 'True':
+                    self._value = True
+                elif self.parameter == 'False':
+                    self._value = False
+                else:
+                    self._value = self.parameter
+
         return self._value
 
     @value.setter
@@ -161,6 +180,8 @@ class Variable:
         if hasattr(self, 'knob') and value is not None and value is not np.nan:
             self.instrument.set(self.knob, value)
             self._value = self.instrument.__getattribute__(self.knob.replace(' ', '_'))
+        elif hasattr(self, 'parameter'):
+            self.parameter = value
         else:
             pass
 
@@ -736,8 +757,7 @@ def build_experiment(runcard, settings=None, instruments=None, alarms=None):
         elif 'knob' in specs:
             variables[name] = Variable(knob=specs['knob'], instrument=instruments[specs['instrument']])
         elif 'expression' in specs:
-
-            expression = specs.copy()['expression']
+            expression = specs['expression']
             definitions = {}
 
             for symbol, var_name in specs['definitions'].items():

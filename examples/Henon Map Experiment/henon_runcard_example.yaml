@@ -12,6 +12,7 @@ Settings:
  step interval: 0.5
  plot interval: 5
  save interval: 10
+ end: 60
 
 Instruments:
  Henon Mapper:
@@ -62,10 +63,10 @@ Routines:
  Ramp Parameter a:
   type: Timecourse
   knobs: Parameter a
-  times: [0, 3, 5.001, 60]
+  times: [0, 3, 5, 5.5]
   values: [0.0, 0.0, 1.4, 1.4]
  Ramp Parameter b:
   type: Timecourse
   knobs: Parameter b
-  times: [0, 3, 5.001, 60]
+  times: [0, 3, 5, 5.5]
   values: [0.0, 0.0, 0.3, 0.3]

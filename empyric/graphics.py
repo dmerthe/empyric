@@ -384,7 +384,9 @@ class ExperimentGUI:
         self.status_label.grid(row=i, column=1, sticky=tk.W, padx=10)
 
         # Table of variables shows most recently measured/set variable values
-        self.variable_status_labels = {}
+        self.variable_entries = {}
+        self._entry_enter_funcs = {}  # container for enter press event handlers
+        self._entry_esc_funcs = {}  # container for esc press event handlers
 
         i += 1
         tk.Label(self.status_frame, text='', font=("Arial", 14, 'bold')).grid(row=i, column=0, sticky=tk.E)
@@ -395,15 +397,28 @@ class ExperimentGUI:
         i += 1
         tk.Label(self.status_frame, text='Run Time', width=len('Run Time'), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
 
-        self.variable_status_labels['time'] = tk.Label(self.status_frame, text='', relief=tk.SUNKEN, width=30)
-        self.variable_status_labels['time'].grid(row=i, column=1, sticky=tk.W, padx=10)
+        self.variable_entries['time'] = tk.Entry(self.status_frame, state='readonly', disabledforeground='black', width=30)
+        self.variable_entries['time'].grid(row=i, column=1, sticky=tk.W, padx=10)
 
         i += 1
-        for variable in self.variables:
-            tk.Label(self.status_frame, text=variable, width=len(variable), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
+        for name in self.variables:
+            tk.Label(self.status_frame, text=name, width=len(name), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
 
-            self.variable_status_labels[variable] = tk.Label(self.status_frame, text='', relief=tk.SUNKEN, width=30)
-            self.variable_status_labels[variable].grid(row=i, column=1, sticky=tk.W, padx=10)
+            self.variable_entries[name] = tk.Entry(self.status_frame, state='readonly', disabledforeground='black', width=30)
+            self.variable_entries[name].grid(row=i, column=1, sticky=tk.W, padx=10)
+
+            if self.variables[name].type in ['knob', 'parameter']:
+                entry = self.variable_entries[name]
+                variable = self.variables[name]
+                root = self.status_frame
+
+                enter_func = lambda event, entry=entry, variable=variable, root=root : self._entry_enter(entry, variable, root)
+                self._entry_enter_funcs[name] = enter_func
+                self.variable_entries[name].bind('<Return>', self._entry_enter_funcs[name])
+
+                esc_func = lambda event, entry=entry, variable=variable, root=root : self._entry_esc(entry, variable, root)
+                self._entry_esc_funcs[name] = esc_func
+                self.variable_entries[name].bind('<Escape>', self._entry_esc_funcs[name])
 
             i += 1
 
@@ -460,24 +475,36 @@ class ExperimentGUI:
 
         # Check the state of the experiment
         state = self.experiment.state
-        for name, label in self.variable_status_labels.items():
+        for name, entry in self.variable_entries.items():
+
+            # If experiment stopped allow user to edit knobs or constant expressions
+            if 'Stopped' in self.experiment.status and name != 'time':
+                if self.variables[name].type in ['knob', 'parameter']:
+                    continue
+
+            def write_entry(_entry, text):
+                _entry.config(state=tk.NORMAL)
+                _entry.delete(0, tk.END)
+                _entry.insert(0, text)
+                _entry.config(state=tk.DISABLED)
+
             if state[name] is None:
-                label.config(text='none')
+                write_entry(entry, 'none')
             elif state[name] == np.nan:
-                label.config(text='nan')
+                write_entry(entry, 'nan')
             else:
                 if name.lower() == 'time':
-                    label.config(text=str(datetime.timedelta(seconds=state['time'])))
+                    write_entry(entry, str(datetime.timedelta(seconds=state['time'])))
                 else:
                     if type(state[name]) == float:
                         if state[name] == 0:
-                            label.config(text='0.0')
+                            write_entry(entry, '0.0')
                         elif np.abs(np.log10(np.abs(state[name]))) > 3:
-                            label.config(text='%.3e' % state[name])
+                            write_entry(entry, '%.3e' % state[name])
                         else:
-                            label.config(text='%.3f' % state[name])
+                            write_entry(entry, '%.3f' % state[name])
                     else:
-                        label.config(text=str(state[name]))
+                        write_entry(entry, str(state[name]))
 
         self.status_label.config(text=self.experiment.status)
 
@@ -493,14 +520,32 @@ class ExperimentGUI:
             self.dash_button.config(state=tk.NORMAL)
             self.hold_button.config(text='Resume')
             self.stop_button.config(text='Stop')
+
+            self.status_frame.focus()
+
+            for entry in self.variable_entries.values():
+                entry.config(state=tk.DISABLED)
+
         elif 'Stopped' in self.experiment.status:
             self.dash_button.config(state=tk.NORMAL)
             self.hold_button.config(text='Hold')
             self.stop_button.config(text='Resume')
+
+            for name, entry in self.variable_entries.items():
+                if name == 'time':
+                    continue
+                if self.variables[name].type in ['knob', 'parameter']:
+                    entry.config(state=tk.NORMAL)
+
         else:  # otherwise, experiment is running
             self.dash_button.config(state=tk.DISABLED)
             self.hold_button.config(text='Hold')
             self.stop_button.config(text='Stop')
+
+            self.status_frame.focus()
+
+            for entry in self.variable_entries.values():
+                entry.config(state=tk.DISABLED)
 
         # Quit if experiment has ended
         if 'Terminated' in self.experiment.status:
@@ -589,6 +634,47 @@ class ExperimentGUI:
 
         self.root.destroy()
         self.root.quit()
+
+    @staticmethod
+    def _entry_enter(entry, variable, root):
+
+        entry_value = entry.get()
+
+        try:
+            entry_value = float(entry_value)
+        except ValueError:
+            if entry_value == 'True':
+                entry_value = True
+            elif entry_value == 'False':
+                entry_value = False
+
+        variable.value = entry_value
+        root.focus()
+        print(f'manually set {variable} to {entry_value} from {entry}')
+
+    @staticmethod
+    def _entry_esc(entry, variable, root):
+        entry.delete(0, tk.END)
+
+        value = variable.value
+
+        try:
+            value = float(value)
+        except ValueError:
+            pass
+
+        if type(value) == float:
+            if value == 0:
+                entry.insert(0, '0.0')
+            elif np.abs(np.log10(np.abs(value))) > 3:
+                entry.insert(0, '%.3e' % value)
+            else:
+                entry.insert(0, '%.3f' % value)
+        else:
+            entry.insert(0, str(value))
+
+        root.focus()
+        print(f'Escaped {entry}')
 
 
 class BasicDialog(tk.Toplevel):
