@@ -74,9 +74,9 @@ class Plotter:
             if style == 'basic':
                 new_plots[name] = self._plot_basic(name)
             elif style == 'log':
-                new_plots[name] = self._plot_log(name)
+                new_plots[name] = self._plot_log(name, floor=settings.get('floor', None))
             elif style == 'symlog':
-                new_plots[name] = self._plot_symlog(name)
+                new_plots[name] = self._plot_symlog(name, linear_scale=settings.get('linear scale', None))
             elif style == 'averaged':
                 new_plots[name] = self._plot_averaged(name)
             elif style == 'errorbars':
@@ -112,9 +112,9 @@ class Plotter:
                 plt_kwargs = self.settings[name].get('options', {})
 
                 if x.lower() == 'time':
-                    self.data.plot(y=y,ax=ax, kind='line', **plt_kwargs)  # use index as time axis
+                    self.data.plot(y=y,ax=ax, kind='line', legend=len(ys)>1, **plt_kwargs)  # use index as time axis
                 else:
-                    self.data.plot(y=y, x=x, ax=ax, kind='line', **plt_kwargs)
+                    self.data.plot(y=y, x=x, ax=ax, kind='line', legend=len(ys)>1, **plt_kwargs)
 
         ax.set_title(name)
         ax.grid()
@@ -125,17 +125,21 @@ class Plotter:
 
         return fig, ax
 
-    def _plot_log(self, name):
+    def _plot_log(self, name, floor=None):
 
         fig, ax = self._plot_basic(name, linear=False)
         ax.set_yscale('log')
 
+        if floor is not None:
+            ylim = ax.get_ylim()
+            ax.set_ylim([floor, ylim[-1]])
+
         return fig, ax
 
-    def _plot_symlog(self, name):
+    def _plot_symlog(self, name, linear_scale=None):
 
         fig, ax = self._plot_basic(name, linear=False)
-        ax.set_yscale('symlog')
+        ax.set_yscale('symlog', linthresh=linear_scale)
 
         return fig, ax
 
@@ -283,33 +287,6 @@ class Plotter:
         ax.ticklabel_format(axis='y', style='sci', scilimits=(-2, 4))
         ax.set_xlabel(self.settings[name].get('xlabel', x))
         ax.set_ylabel(self.settings[name].get('ylabel', y))
-
-        return fig, ax
-
-    def _plot_order(self, name):
-
-        fig, ax = self._plot_all(name)
-
-        colors = [line.get_color() for line in ax.get_lines()]
-
-        x = self.settings[name]['x']
-        y = np.array([self.settings[name]['y']]).flatten()
-
-        # Show arrows pointing in the direction of the scan
-        num_points = len(self.data[x])
-        for yy, color in zip(y, colors):
-            for i in range(num_points - 1):
-                x1, x2 = self.data[x].iloc[i], self.data[x].iloc[i + 1]
-                y1, y2 = self.data[yy].iloc[i], self.data[yy].iloc[i + 1]
-                ax.annotate('', xytext=(x1, y1),
-                              xy=(0.5 * (x1 + x2), 0.5 * (y1+ y2)),
-                              arrowprops=dict(arrowstyle='->', color=color))
-
-        ax.set_title(name)
-        ax.grid(True)
-        ax.ticklabel_format(axis='y', style='sci', scilimits=(-2, 4))
-        ax.set_xlabel(self.settings[name].get('xlabel', x))
-        ax.set_ylabel(self.settings[name].get('ylabel', y[0]))
 
         return fig, ax
 

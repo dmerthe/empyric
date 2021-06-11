@@ -61,6 +61,9 @@ class Variable:
     An expression is a variable that is not directly measured, but is calculated based on other variables of the
     experiment. An example of an expression is the output power of a power supply, where voltage is a knob and current
     is a meter: power = voltage * current.
+
+    A parameter is a variable whose value is assigned directly by the user. An example is a unit conversion factor such
+    as 2.54 cm per inch, a numerical constant like pi or a setpoint for a control routine.
     """
 
     # Some abbreviated functions that can be used to evaluate expression variables
@@ -163,14 +166,14 @@ class Variable:
         elif hasattr(self, 'parameter'):
 
             try:
-                self._value = float(self.parameter)
+                self._value = float(self.parameter)  # try float type cast
             except ValueError:
-                if self.parameter == 'True':
+                if self.parameter == 'True':  # try boolean type cast
                     self._value = True
                 elif self.parameter == 'False':
                     self._value = False
                 else:
-                    self._value = self.parameter
+                    self._value = self.parameter # otherwise, keep as given
 
         return self._value
 
@@ -183,25 +186,15 @@ class Variable:
         elif hasattr(self, 'parameter'):
             self.parameter = value
         else:
-            pass
-
-
-    def __str__(self):
-        # For evaluating expressions
-        if np.ndim(self._value) == 0:
-            return str(self._value)
-        elif np.ndim(self._value) == 1:
-            return '['+', '.join([str(value) for value in self._value]) + ']'
-        elif np.ndim(self._value) == 2:
-            return '[' + ', '.join(['[' + ', '.join([str(sub_value) for sub_value in value]) + ']' for value in self._value]) + ']'
+            raise ValueError(f'Attempt to set {self.type}! Only knobs and parameters can be set.')
 
 def convert_time(time_value):
     """
-    If time_value is a string, converts a time of the form "number units" (e.g. "3.5 hours") to the time in seconds.
+    If time_value is a string, converts a time of the form "[number] [units]" (e.g. "3.5 hours") to the time in seconds.
     If time_value is a number, just returns the same number
     If time_value is an array, iterates through the array doing either of the previous two operations on every element.
 
-    :param time_value: (str/float) time value, possibly including units such as 'hours'
+    :param time_value: (str/float) time value, possibly including units such as "hours"
     :return: (int) time in seconds
     """
 
@@ -507,7 +500,7 @@ class Alarm:
     Triggers if a condition is met, among the given variables, and indicates the response protocol
     """
 
-    def __init__(self, variables, condition, protocol=None):
+    def __init__(self, condition, variables, protocol=None):
         self.trigger_variable = Variable(expression=condition, definitions=variables)
         self.protocol = protocol
 
@@ -854,7 +847,7 @@ def build_experiment(runcard, settings=None, instruments=None, alarms=None):
                     if alarm_variable_name == var_name:
                         alarm_variables[symbol] = variable
 
-            alarms.update({name: Alarm(alarm_variables, condition, protocol=specs.get('protocol', None))})
+            alarms.update({name: Alarm(condition, alarm_variables, protocol=specs.get('protocol', None))})
 
     experiment = Experiment(variables, routines=routines)
 
