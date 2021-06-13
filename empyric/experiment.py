@@ -571,11 +571,22 @@ class Experiment:
         self.state['time'] = self.clock.time
         self.state.name = datetime.datetime.now()
 
-        # If experiment is stopped, just return the last knob settings and nullify meter & expression values
+        # If experiment is stopped, just return the knob & parameter values, and nullify meter & expression values
         if Experiment.STOPPED in self.status:
+
+            threads = {}
             for name, variable in self.variables.items():
-                if variable.type in ['meter', 'expression']:
+                if variable.type in ['knob', 'parameter']:
+                    threads[name] = threading.Thread(target=self._update_variable, args=(name,))
+                    threads[name].start()
+                else:
                     self.state[name] = None
+
+            # Wait for all routine threads to finish
+            for name, thread in threads.items():
+                self.status = Experiment.RUNNING + f': retrieving {name}'
+                thread.join()
+
             return self.state
 
         # If the experiment is running, apply new settings to knobs according to the routines (if there are any)
@@ -642,7 +653,7 @@ class Experiment:
 
             value = self.variables[name].value
 
-            self.eval_events[name].set()
+            self.eval_events[name].set()  # unblock threads evaluating dependents
 
             if np.size(value) > 1:  # store array data as CSV files
                 dataframe = pd.DataFrame({name: value}, index=[self.state.name] * len(value))
