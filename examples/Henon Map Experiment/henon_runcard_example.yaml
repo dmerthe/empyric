@@ -63,13 +63,13 @@ Plots:
   y: Coordinate y
 
 Routines:
- Ramp Parameter a:
+ Ramp Knob a:
   type: Timecourse
-  knobs: Parameter a
+  knobs: Knob a
   times: [3, 5]
   values: [0.0, 1.4]
- Ramp Parameter b:
+ Ramp Knob b:
   type: Timecourse
-  knobs: Parameter b
+  knobs: Knob b
   times: [3, 5]
   values: [0.0, 0.3]

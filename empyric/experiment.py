@@ -793,8 +793,16 @@ def build_experiment(runcard, settings=None, instruments=None, alarms=None):
     variables = {}  # experiment variables, associated with the instruments above
     for name, specs in runcard['Variables'].items():
         if 'meter' in specs:
+
+            if specs['instrument'] not in instruments:
+                raise KeyError(f'instrument {specs["instrument"]} specificed for variable {name} not in Instruments!')
+
             variables[name] = Variable(meter=specs['meter'], instrument=instruments[specs['instrument']])
         elif 'knob' in specs:
+
+            if specs['instrument'] not in instruments:
+                raise KeyError(f'instrument {specs["instrument"]} specificed for variable {name} not in Instruments!')
+
             variables[name] = Variable(knob=specs['knob'], instrument=instruments[specs['instrument']])
         elif 'expression' in specs:
             expression = specs['expression']
@@ -813,8 +821,20 @@ def build_experiment(runcard, settings=None, instruments=None, alarms=None):
         for name, specs in runcard['Routines'].items():
             specs = specs.copy()  # avoids modifying the runcard
             _type = specs.pop('type')
+
+            for knob in np.array([specs['knobs']]).flatten():
+                if knob not in variables:
+                    raise KeyError(f'knob {knob} specified for routine {name} is not in Variables!')
+
             specs['knobs'] = {name: variables[name] for name in np.array([specs['knobs']]).flatten()}
             specs['values'] = np.array(specs['values'], dtype=object).reshape((len(specs['knobs']), -1))
+
+            if 'meters' in specs:
+                for meter in np.array([specs['meters']]).flatten():
+                    if meter not in variables:
+                        raise KeyError(f'meter {meter} specified for routine {name} is not in Variables!')
+
+                specs['meters'] = {name: variables[name] for name in np.array([specs['meters']]).flatten()}
 
             # Values can be variables, specified by their names
             for var_name in variables:
@@ -846,6 +866,10 @@ def build_experiment(runcard, settings=None, instruments=None, alarms=None):
 
             alarm_variables = specs.copy().get('variables',{})
             condition = specs.copy()['condition']
+            
+            for variable in specs.get('variables', {}):
+                if variable not in variables:
+                    raise KeyError(f'variable {variable} specified for alarm {name} is not in Variables!')
 
             alphabet = 'abcdefghijklmnopqrstuvwxyz'
             for var_name, variable in variables.items():
@@ -978,7 +1002,6 @@ class Manager:
         if self.followup in [None, 'None'] or 'user terminated' in self.experiment.status:
             return
         elif 'yaml' in self.followup:
-            print('follow up:', self.followup)
             self.__init__(self.followup)
             self.run()
         elif 'repeat' in self.followup:
