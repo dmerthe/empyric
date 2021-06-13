@@ -17,12 +17,21 @@ from matplotlib.cm import ScalarMappable
 
 class Plotter:
     """
-    Handler for plotting data based on the runcard plotting settings and data context
+    Handler for plotting data based on the runcard plotting settings and data context.
+
+    Argument must be a pandas DataFrame with a 'time' column and datetime indices.
+
+    The optional settings keyword argument is given in the form,
+
+    {..., plot_name: {'x': x_name, 'y': [y_name1, y_name2,...], 'style': plot_style, ...} ,...}
+
+    where plot_name is the user designated title for the plot, x_name, y_name_1, y_name2, etc. are columns in the DataFrame, and
+    plot_style is either 'basic' (default), 'log', 'symlog', 'averaged', 'errorbars' or 'parametric'.
     """
 
     def __init__(self, data, settings=None):
         """
-        PLot data based on settings
+        Plot data based on settings
 
         :param data: (pandas.Dataframe) data to be plotted.
         :param settings: (dict) dictionary of plot settings
@@ -40,6 +49,7 @@ class Plotter:
             self.plots[plot_name] = plt.subplots()
 
     def save(self, plot_name=None, save_as=None):
+        """Save the plots to PNG files in the working directory"""
 
         if plot_name:
             fig, ax = self.plots[plot_name]
@@ -53,6 +63,7 @@ class Plotter:
                 fig.savefig(name + '.png')
 
     def close(self, plot_name=None):
+        """If the plot_name keyword argument is specified, close the corresponding plot. Otherwise, close all plots"""
 
         self.save()
 
@@ -63,6 +74,7 @@ class Plotter:
             plt.close('all')
 
     def plot(self):
+        """Plot all plots"""
 
         # Make the plots, by name and style
         new_plots = {}
@@ -83,8 +95,6 @@ class Plotter:
                 new_plots[name] = self._plot_errorbars(name)
             elif style == 'parametric':
                 new_plots[name] = self._plot_parametric(name)
-            elif style == 'order':
-                new_plots[name] = self._plot_order(name)
             else:
                 raise AttributeError(f"Plotting style '{style}' not recognized!")
 
@@ -92,6 +102,7 @@ class Plotter:
         return new_plots
 
     def _plot_basic(self, name, linear=True):
+        """Make a simple plot using the plot method of pandas.DataFrame"""
 
         fig, ax = self.plots[name]
         ax.clear()
@@ -126,6 +137,7 @@ class Plotter:
         return fig, ax
 
     def _plot_log(self, name, floor=None):
+        """Make a simple plot using the plot method of pandas.DataFrame, but with a log scale y axis"""
 
         fig, ax = self._plot_basic(name, linear=False)
         ax.set_yscale('log')
@@ -137,13 +149,18 @@ class Plotter:
         return fig, ax
 
     def _plot_symlog(self, name, linear_scale=None):
+        """Make a simple plot using the plot method of pandas.DataFrame, but with a symmetric log scale y axis"""
 
         fig, ax = self._plot_basic(name, linear=False)
-        ax.set_yscale('symlog', linthresh=linear_scale)
+        if linear_scale:
+            ax.set_yscale('symlog', linthresh=linear_scale)
+        else:
+            ax.set_yscale('symlog')
 
         return fig, ax
 
     def _plot_averaged(self, name):
+        """Make a plot collecting all identical x values and averaging together the corresponding y values"""
 
         fig, ax = self.plots[name]
         ax.clear()
@@ -166,6 +183,7 @@ class Plotter:
         return fig, ax
 
     def _plot_errorbars(self, name):
+        """Same as the averaged plot, but with error bars for each averaged y value"""
 
         fig, ax = self.plots[name]
         ax.clear()
@@ -186,6 +204,7 @@ class Plotter:
         return fig, ax
 
     def _plot_parametric(self, name):
+        """Make a parametric plot of x and y against a third parameter"""
 
         fig, ax = self.plots[name]
         ax.clear()
@@ -440,11 +459,12 @@ class ExperimentGUI:
         self.terminate_button.grid(row=i, column=1, sticky=tk.E, rowspan=3)
 
     def run(self):
+        """Starts the Tkinter mainloop and the experiment update loop"""
         self.update()
         self.root.mainloop()
 
     def update(self):
-        # Updates the GUI based on the state of the experiment
+        """Updates the GUI based on the state of the experiment"""
 
         if self.closed:
             return  # don't update GUI if it no longer exists
@@ -565,7 +585,9 @@ class ExperimentGUI:
             self.root.after(50, self.update)
 
     def open_dashboard(self):
-        # Opens a window which allows the user to change variable values while the experiment is stopped
+        """Upon user hitting the Dashboard button, opens a window which allows the user to interact with instruments
+        while the experiment is stopped"""
+
         prior_status = self.experiment.status
 
         self.experiment.stop()  # stop routines and measurements to avoid communication conflicts while dashboard is open
@@ -579,7 +601,7 @@ class ExperimentGUI:
             self.experiment.start()
 
     def toggle_hold(self):
-        # User pauses/resumes the experiment
+        """User pauses/resumes the experiment through the Hold/Resume button"""
 
         if 'Holding' in  self.experiment.status:
             self.experiment.start()
@@ -587,7 +609,7 @@ class ExperimentGUI:
             self.experiment.hold()
 
     def toggle_stop(self):
-        # User stops the experiment
+        """User stops the experiment through the Stop button"""
 
         if 'Stopped' in self.experiment.status:
             self.experiment.start()
@@ -595,13 +617,12 @@ class ExperimentGUI:
             self.experiment.stop()
 
     def end(self):
-        # User ends the experiment
+        """User terminates the experiment and closes the GUI with the Terminate button; cancels any experiment follow-ups"""
 
         self.experiment.terminate(reason='user terminated')
         self.quit()
 
     def quit(self):
-        # Closes the GUI and plots
 
         if hasattr(self, 'plotter'):
             self.plotter.close()

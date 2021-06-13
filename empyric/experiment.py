@@ -866,7 +866,7 @@ def build_experiment(runcard, settings=None, instruments=None, alarms=None):
 
             alarm_variables = specs.copy().get('variables',{})
             condition = specs.copy()['condition']
-            
+
             for variable in specs.get('variables', {}):
                 if variable not in variables:
                     raise KeyError(f'variable {variable} specified for alarm {name} is not in Variables!')
