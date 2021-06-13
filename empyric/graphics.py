@@ -297,14 +297,15 @@ class ExperimentGUI:
     Also, manages plotting data via the Plotter class
 
     This GUI allows the user to hold, stop and terminate the experiment.
-    When paused, the user can also directly interact with instruments through the Dashboard.
+    When stopped, the user can change the values of knob and parameter variables, and also directly interact with
+    instruments through the Dashboard.
     """
 
     def __init__(self, experiment, alarms=None, instruments=None, title=None, plots=None, save_interval=None, plot_interval=0):
 
         self.experiment = experiment
 
-        self.quitted = False  # has the GUI been closed?
+        self.closed = False  # has the GUI been closed?
 
         self.variables = experiment.variables
 
@@ -445,7 +446,7 @@ class ExperimentGUI:
     def update(self):
         # Updates the GUI based on the state of the experiment
 
-        if self.quitted:
+        if self.closed:
             return  # don't update GUI if it no longer exists
 
         self.root.wm_attributes('-topmost', False)  # Allow window to fall back once things get started
@@ -473,7 +474,7 @@ class ExperimentGUI:
                 if name.lower() == 'time':
                     write_entry(entry, str(datetime.timedelta(seconds=state['time'])))
                 else:
-                    if type(state[name]) == float:
+                    if state[name]*0 == 0:  # check if number
                         if state[name] == 0:
                             write_entry(entry, '0.0')
                         elif np.abs(np.log10(np.abs(state[name]))) > 3:
@@ -500,8 +501,11 @@ class ExperimentGUI:
 
             self.status_frame.focus()
 
-            for entry in self.variable_entries.values():
-                entry.config(state=tk.DISABLED)
+            for name, entry in self.variable_entries.items():
+                if name == 'time':
+                    continue
+                if self.variables[name].type in ['knob', 'parameter']:
+                    entry.config(state=tk.NORMAL)
 
         elif 'Stopped' in self.experiment.status:
             self.dash_button.config(state=tk.NORMAL)
@@ -557,7 +561,7 @@ class ExperimentGUI:
                 ])  # adjust interval if saving plots takes significant time
 
 
-        if not self.quitted:
+        if not self.closed:
             self.root.after(50, self.update)
 
     def open_dashboard(self):
@@ -593,9 +597,8 @@ class ExperimentGUI:
     def end(self):
         # User ends the experiment
 
-        self.experiment.terminate()
+        self.experiment.terminate(reason='user terminated')
         self.quit()
-        self.terminated = True
 
     def quit(self):
         # Closes the GUI and plots
@@ -605,7 +608,7 @@ class ExperimentGUI:
 
         self.status_label.config(text=self.experiment.TERMINATED)
 
-        self.quitted = True
+        self.closed = True
         plt.pause(0.1)  # give GUI and plotter enough time to wrap up
         self.root.update()
 
@@ -614,6 +617,7 @@ class ExperimentGUI:
 
     @staticmethod
     def _entry_enter(entry, variable, root):
+        """Assigns the value to a variable if entered by the user"""
 
         entry_value = entry.get()
 
@@ -630,6 +634,7 @@ class ExperimentGUI:
 
     @staticmethod
     def _entry_esc(entry, variable, root):
+        """Restores the value of a variable to an entry if user escapes entry"""
         entry.delete(0, tk.END)
 
         value = variable.value
@@ -650,7 +655,6 @@ class ExperimentGUI:
             entry.insert(0, str(value))
 
         root.focus()
-        print(f'Escaped {entry}')
 
 
 class BasicDialog(tk.Toplevel):

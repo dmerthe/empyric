@@ -8,10 +8,11 @@ Description:
  comments: Who is Mike? There is no Test Stand 1
 
 Settings:
- follow-up: None
+ follow-up: henon_runcard_example.yaml
  step interval: 0.5
  plot interval: 5
  save interval: 10
+ split interval: 30
  end: 60
 
 Instruments:
@@ -26,10 +27,10 @@ Instruments:
    b: 0
 
 Variables:
- Parameter a:
+ Knob a:
   instrument: Henon Mapper
   knob: a
- Parameter b:
+ Knob b:
   instrument: Henon Mapper
   knob: b
  Coordinate x:

@@ -706,7 +706,7 @@ class Experiment:
         self.status = Experiment.RUNNING
         self.status_locked = True
 
-    def hold(self):
+    def hold(self, reason=None):
         """
         Hold the experiment: clock stops, routines stop, measurements continue
 
@@ -716,9 +716,11 @@ class Experiment:
 
         self.status_locked = False
         self.status = Experiment.HOLDING
+        if reason:
+            self.status = self.status + ': ' + reason
         self.status_locked = True
 
-    def stop(self):
+    def stop(self, reason=None):
         """
         Stop the experiment: clock stops, routines stop, measurements stop
 
@@ -728,9 +730,11 @@ class Experiment:
 
         self.status_locked = False
         self.status = Experiment.STOPPED
+        if reason:
+            self.status = self.status + ': ' + reason
         self.status_locked = True
 
-    def terminate(self):
+    def terminate(self, reason=None):
         """
         Terminate the experiment: clock, routines and measurements stop, data is saved and StopIteration is raised
 
@@ -741,6 +745,8 @@ class Experiment:
 
         self.status_locked = False
         self.status = Experiment.TERMINATED
+        if reason:
+            self.status = self.status + ': ' + reason
         self.status_locked = True
 
 
@@ -889,7 +895,10 @@ class Manager:
 
         if type(self.runcard) == str:
 
-            os.chdir(os.path.dirname(self.runcard))  # go to runcard directory to put data in same location
+            dirname = os.path.dirname(self.runcard)
+            if dirname != '':
+                os.chdir(os.path.dirname(self.runcard))  # go to runcard directory to put data in same location
+
             yaml = YAML()
             with open(self.runcard, 'rb') as runcard_file:
                 self.runcard = yaml.load(runcard_file)  # load the runcard
@@ -908,7 +917,9 @@ class Manager:
         self.step_interval = convert_time(self.settings.get('step interval', 0.1))
         self.save_interval = convert_time(self.settings.get('save interval', 60))
         self.plot_interval = convert_time(self.settings.get('plot interval', 0))
-        self.last_step = self.last_save = float('-inf')
+        self.split_interval = convert_time(self.settings.get('split interval', np.inf))
+
+        self.last_save = self.last_split = 0
 
         # For use with alarms
         self.awaiting_alarms = False
@@ -964,9 +975,10 @@ class Manager:
         os.chdir(top_dir)  # return to the parent directory
 
         # Execute the follow-up experiment if there is one
-        if self.followup in [None, 'None'] or self.gui.terminated:
+        if self.followup in [None, 'None'] or 'user terminated' in self.experiment.status:
             return
         elif 'yaml' in self.followup:
+            print('follow up:', self.followup)
             self.__init__(self.followup)
             self.run()
         elif 'repeat' in self.followup:
@@ -981,10 +993,20 @@ class Manager:
             step_start = time.time()
 
             # Save experimental data periodically
-            if time.time() >= self.last_save + self.save_interval and Experiment.STOPPED not in self.experiment.status:
+            if self.experiment.clock.time >= self.last_save + self.save_interval:
                 save_thread = threading.Thread(target=self.experiment.save)
                 save_thread.start()
+                self.last_save = self.experiment.clock.time
+
+            # If split interval is given, save and reset the data
+            if self.experiment.clock.time > self.last_split + self.split_interval:
+
+                self.experiment.save()
                 self.last_save = time.time()
+
+                self.experiment.timestamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
+                self.experiment.data = pd.DataFrame(columns=['time'] + list(self.experiment.variables.keys()))
+                self.last_split = self.experiment.clock.time
 
             # Check if any alarms are triggered and handle them
             alarms_triggered = [alarm for alarm in self.alarms.values() if alarm.triggered]
