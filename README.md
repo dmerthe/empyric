@@ -12,7 +12,7 @@ Empyric contains a number of *instruments* with various associated methods of co
 ```
 from empyric.instruments import Keithley2400
 
-keithley2400 = Keithley2400('GPIB0::1::INSTR')
+keithley2400 = Keithley2400(1)  # if GPIB address is 1
 
 kiethley2400.set('voltage', 10)
 current = keithley2400.measure('current')
@@ -60,7 +60,7 @@ Here is an example showing how to define and use experiment variables in Empyric
 from empyric.experiment import Variable
 from empyric.instruments import Keithley2400
 
-keithley2400 = Keithley2400('GPIB0::1::INSTR')
+keithley2400 = Keithley2400(1)
 
 voltage = Variable(instrument=keithley2400, knob='voltage')
 current = Variable(instrument=keithley2400, meter='current')
@@ -77,28 +77,28 @@ Assigning a value to the `value` property of a knob-type variable commands the c
 ```
 import time
 
-# ... define variable1 and variable2 as instances of Variable from above
+# ... define knob1 and knob2 as instances of Variable from above
 
-variables = {'Variable 1':variable1, 'Variable 2':variable2}
+knobs = {'Knob 1': knob1, 'Knob 2': knob2}
 values = [10, 20]
 
-# Hold variable1 at a value of 10, and variable2 at a value of 20 for 60 seconds
-hold = Hold(variables, values, start=0, end=60)
+# Keep knob1 at a value of 10, and knob2 at a value of 20 for 60 seconds
+set_routine = Set(knobs, values, start=0, end=60)
 
 start_time = time.time()
 
-state = {'time': 0, 'Variable 1': None, 'Variable 2': None} # define a process state
+state = {'time': 0, 'Knob 1': None, 'Knob 2': None} # define a process state
 
 while state['time'] <= 60:
 	
 	state['time'] = time.time() - start_time  # update process time
 	
-	hold.update(state) # update process state, based on the hold routine
+	set_routine.update(state) # update process state, based on the set routine
 	
-	state['Variable 1] = variable1.value
-	state['Variable 2] = variable2.value
+	state['Knob 1] = knob1.value
+	state['Knob 2] = knob2.value
 	
-	print(state)  # prints "{'time': ..., 'Variable 1': 10, 'Variable 2': 20}"
+	print(state)  # prints "{'time': ..., 'Knob 1': 10, 'Knob 2': 20}"
 ```
 
 An *Experiment* monitors a set of variables as a set of routines takes action on them. In Empyric, the `Experiment` object is an iterable that updates routines and records data on each iteration. It also has `start`, `hold` and `stop` methods which initiate/resume the experiment, holds routines while continuing to measure meters, and stops all routines and measurements, respectively. The `terminate` method saves the collected data to a file in the working directory and raises the `StopIteration` exception. An experiment will terminate automatically when all routines are finished. See henon_python_eaxmple.py in the 'examples/Henon Map Experiment' directory to see how a basic experiment is set up as a python script. This particular example uses a virtual instrument (`HenonMapper`), so the only requirement to run it is having Python installed along with the usual packages (numpy, scipy, pandas and matplotlib). Try it!
