@@ -310,6 +310,107 @@ class Plotter:
         return fig, ax
 
 
+class Plotter2:
+
+    """
+    Handler for plotting data based on the runcard plotting settings and data context.
+
+    Argument must be a pandas DataFrame with a 'time' column and datetime indices.
+
+    The optional settings keyword argument is given in the form,
+
+    {..., plot_name: {'x': x_name, 'y': [y_name1, y_name2,...], 'style': plot_style, ...} ,...}
+
+    where plot_name is the user designated title for the plot, x_name, y_name_1, y_name2, etc. are columns in the DataFrame, and
+    plot_style is either 'basic' (default), 'log', 'symlog', 'averaged', 'errorbars' or 'parametric'.
+    """
+
+    def __init__(self, data, settings=None):
+        """
+        Plot data based on settings
+
+        :param data: (pandas.Dataframe) data to be plotted.
+        :param settings: (dict) dictionary of plot settings
+        """
+
+        self.data = data
+
+        if settings:
+            self.settings = settings
+        else:
+            self.settings = {'Plot': {x:'time', y: data.columns}}
+
+        self.plots = {}
+        for plot_name in settings:
+            self.plots[plot_name] = plt.subplots(constrained_layout=True)
+
+    def save(self, plot_name=None, save_as=None):
+        """Save the plots to PNG files in the working directory"""
+
+        if plot_name:
+            fig, ax = self.plots[plot_name]
+            if save_as:
+                fig.savefig(save_as + '.png')
+            else:
+                fig.savefig(plot_name + '.png')
+        else:
+            for name, plot in self.plots.items():
+                fig, ax = plot
+                fig.savefig(name + '.png')
+
+    def close(self, plot_name=None):
+        """If the plot_name keyword argument is specified, close the corresponding plot. Otherwise, close all plots"""
+
+        self.save()
+
+        if plot_name:
+            fig, _ = self.plots[plot_name]
+            plt.close(fig)
+        else:
+            plt.close('all')
+
+    def plot(self):
+        """Plot all plots"""
+
+        # Make the plots, by name and style
+        new_plots = {}
+
+        for name, settings in self.settings.items():
+
+            style = settings.get('style', 'basic')
+
+            if style == 'basic':
+                new_plots[name] = self._plot_basic(name)
+            elif style == 'log':
+                new_plots[name] = self._plot_log(name, floor=settings.get('floor', None))
+            elif style == 'symlog':
+                new_plots[name] = self._plot_symlog(name, linear_scale=settings.get('linear scale', None))
+            elif style == 'averaged':
+                new_plots[name] = self._plot_averaged(name)
+            elif style == 'errorbars':
+                new_plots[name] = self._plot_errorbars(name)
+            elif style == 'parametric':
+                new_plots[name] = self._plot_parametric(name)
+            else:
+                raise AttributeError(f"Plotting style '{style}' not recognized!")
+
+        plt.pause(0.01)
+        return new_plots
+
+    def _plot_basic(self):
+        return
+
+    def _plot_averaged(self):
+        return
+
+    def _plot_errorbars(self):
+        return
+
+    def _plot_parametric(self):
+        return
+
+
+
 class ExperimentGUI:
     """
     GUI showing experimental progress, values of all experiment variables, any alarms.
