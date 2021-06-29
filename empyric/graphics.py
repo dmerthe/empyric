@@ -537,11 +537,11 @@ class ExperimentGUI:
                 _entry.config(state=tk.DISABLED)
 
             if state[name] is None:
-                write_entry(entry, 'none')
+                write_entry(entry, 'None')
             elif state[name] == np.nan:
-                write_entry(entry, 'nan')
+                write_entry(entry, 'NaN')
             else:
-                if name.lower() == 'Time':
+                if name == 'Time':
                     write_entry(entry, str(datetime.timedelta(seconds=state['Time'])))
                 else:
                     if state[name]*0 == 0:  # check if number

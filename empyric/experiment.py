@@ -956,7 +956,6 @@ class Manager:
         self.step_interval = convert_time(self.settings.get('step interval', 0.1))
         self.save_interval = convert_time(self.settings.get('save interval', 60))
         self.plot_interval = convert_time(self.settings.get('plot interval', 0))
-        self.split_interval = convert_time(self.settings.get('split interval', np.inf))
 
         self.last_save = self.last_split = 0
 
@@ -1035,16 +1034,6 @@ class Manager:
                 save_thread = threading.Thread(target=self.experiment.save)
                 save_thread.start()
                 self.last_save = self.experiment.clock.time
-
-            # If split interval is given, save and reset the data
-            if self.experiment.clock.time > self.last_split + self.split_interval:
-
-                self.experiment.save()
-                self.last_save = time.time()
-
-                self.experiment.timestamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
-                self.experiment.data = pd.DataFrame(columns=['Time'] + list(self.experiment.variables.keys()))
-                self.last_split = self.experiment.clock.time
 
             # Check if any alarms are triggered and handle them
             alarms_triggered = [alarm for alarm in self.alarms.values() if alarm.triggered]

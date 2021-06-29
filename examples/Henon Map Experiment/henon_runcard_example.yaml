@@ -12,7 +12,6 @@ Settings:
  step interval: 0.5
  plot interval: 5
  save interval: 10
- split interval: 30
  end: 60
 
 Instruments:
