@@ -278,7 +278,7 @@ class Set(Routine):
 
     def update(self, state):
 
-        if state['time'] < self.start or state['time'] > self.end:
+        if state['Time'] < self.start or state['Time'] > self.end:
             return  # no change
 
         for knob, value in zip(self.knobs.values(), self.values):
@@ -331,9 +331,9 @@ class Timecourse(Routine):
 
     def update(self, state):
 
-        if state['time'] < self.start:
+        if state['Time'] < self.start:
             return
-        elif state['time'] > self.end:
+        elif state['Time'] > self.end:
             if not self.finished:
                 for knob, values in zip(self.knobs.values(), self.values):
                     if knob.controller == self:
@@ -349,15 +349,15 @@ class Timecourse(Routine):
 
                 if isinstance(knob.controller, Routine) and knob.controller != self:
                     controller = knob.controller
-                    if controller.start < state['time'] < controller.end:
-                        raise RuntimeError(f"Knob {name} has more than one controlling routine at time = {state['time']} seconds!")
+                    if controller.start < state['Time'] < controller.end:
+                        raise RuntimeError(f"Knob {name} has more than one controlling routine at time = {state['Time']} seconds!")
                 else:
                     knob.controller = self
 
         for variable, times, values, i in zip(self.knobs.values(), self.times, self.values,  np.arange(len(self.times))):
 
-            j_last = np.argwhere(times <= state['time']).flatten()[-1]
-            j_next = np.argwhere(times > state['time']).flatten()[0]
+            j_last = np.argwhere(times <= state['Time']).flatten()[-1]
+            j_next = np.argwhere(times > state['Time']).flatten()[0]
 
             last_time = times[j_last]
             next_time = times[j_next]
@@ -372,7 +372,7 @@ class Timecourse(Routine):
                 value = last_value  # stay at last value until next time, when value variable will be evaluated
             else:
                 # ramp linearly between numerical values
-                value = last_value + (next_value - last_value) * (state['time'] - last_time) / (next_time - last_time)
+                value = last_value + (next_value - last_value) * (state['Time'] - last_time) / (next_time - last_time)
 
             variable.value = value
 
@@ -389,7 +389,7 @@ class Sequence(Routine):
 
     def update(self, state):
 
-        if state['time'] < self.start or state['time'] > self.end:
+        if state['Time'] < self.start or state['Time'] > self.end:
             return  # no change
 
         for knob, values in zip(self.knobs.values(), self.values):
@@ -430,7 +430,7 @@ class Minimize(Routine):
         meter_values = np.array([state[meter] for meter in self.meters])
 
         # Update temperature
-        self.T = self.T0 + self.T1*(state['time'] - self.start)/(self.end - self.start)
+        self.T = self.T0 + self.T1*(state['Time'] - self.start)/(self.end - self.start)
 
         if self.better(meter_values):
 
@@ -552,10 +552,10 @@ class Experiment:
 
         self.timestamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
 
-        self.data = pd.DataFrame(columns=['time'] + list(variables.keys()))
+        self.data = pd.DataFrame(columns=['Time'] + list(variables.keys()))
 
         self.state = pd.Series({column: None for column in self.data.columns})
-        self.state['time'] = 0
+        self.state['Time'] = 0
 
         self._status = Experiment.READY
         self.status_locked = True  # can only be unlocked by the start, hold, stop and terminate methods
@@ -568,7 +568,7 @@ class Experiment:
             self.status = Experiment.RUNNING + ': initializing...'
 
         # Update time
-        self.state['time'] = self.clock.time
+        self.state['Time'] = self.clock.time
         self.state.name = datetime.datetime.now()
 
         # If experiment is stopped, just return the knob & parameter values, and nullify meter & expression values
@@ -1028,7 +1028,7 @@ class Manager:
                 self.last_save = time.time()
 
                 self.experiment.timestamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
-                self.experiment.data = pd.DataFrame(columns=['time'] + list(self.experiment.variables.keys()))
+                self.experiment.data = pd.DataFrame(columns=['Time'] + list(self.experiment.variables.keys()))
                 self.last_split = self.experiment.clock.time
 
             # Check if any alarms are triggered and handle them

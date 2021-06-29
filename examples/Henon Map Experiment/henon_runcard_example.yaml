@@ -57,7 +57,11 @@ Plots:
   xlabel: 'X'
   ylabel: 'Y'
   style: parametric
-  marker: 'o'
+  line:
+   linestyle: None
+   marker: 'o'
+   markersize: 3
+
  Y Plot:
   x: Time
   y: Coordinate y

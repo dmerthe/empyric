@@ -1,3 +1,4 @@
+import os.path
 import time
 import sys
 import threading
@@ -14,6 +15,7 @@ if sys.platform == 'darwin':
 
 import matplotlib.pyplot as plt
 from matplotlib.cm import ScalarMappable
+import matplotlib.dates as mdates
 
 class Plotter:
     """
@@ -29,301 +31,9 @@ class Plotter:
     plot_style is either 'basic' (default), 'log', 'symlog', 'averaged', 'errorbars' or 'parametric'.
     """
 
-    def __init__(self, data, settings=None):
-        """
-        Plot data based on settings
-
-        :param data: (pandas.Dataframe) data to be plotted.
-        :param settings: (dict) dictionary of plot settings
-        """
-
-        self.data = data
-
-        if settings:
-            self.settings = settings
-        else:
-            self.settings = {'Plot': {x:'time', y: data.columns}}
-
-        self.plots = {}
-        for plot_name in settings:
-            self.plots[plot_name] = plt.subplots()
-
-    def save(self, plot_name=None, save_as=None):
-        """Save the plots to PNG files in the working directory"""
-
-        if plot_name:
-            fig, ax = self.plots[plot_name]
-            if save_as:
-                fig.savefig(save_as + '.png')
-            else:
-                fig.savefig(plot_name + '.png')
-        else:
-            for name, plot in self.plots.items():
-                fig, ax = plot
-                fig.savefig(name + '.png')
-
-    def close(self, plot_name=None):
-        """If the plot_name keyword argument is specified, close the corresponding plot. Otherwise, close all plots"""
-
-        self.save()
-
-        if plot_name:
-            fig, _ = self.plots[plot_name]
-            plt.close(fig)
-        else:
-            plt.close('all')
-
-    def plot(self):
-        """Plot all plots"""
-
-        # Make the plots, by name and style
-        new_plots = {}
-
-        for name, settings in self.settings.items():
-
-            style = settings.get('style', 'basic')
-
-            if style == 'basic':
-                new_plots[name] = self._plot_basic(name)
-            elif style == 'log':
-                new_plots[name] = self._plot_log(name, floor=settings.get('floor', None))
-            elif style == 'symlog':
-                new_plots[name] = self._plot_symlog(name, linear_scale=settings.get('linear scale', None))
-            elif style == 'averaged':
-                new_plots[name] = self._plot_averaged(name)
-            elif style == 'errorbars':
-                new_plots[name] = self._plot_errorbars(name)
-            elif style == 'parametric':
-                new_plots[name] = self._plot_parametric(name)
-            else:
-                raise AttributeError(f"Plotting style '{style}' not recognized!")
-
-        plt.pause(0.01)
-        return new_plots
-
-    def _plot_basic(self, name, linear=True):
-        """Make a simple plot using the plot method of pandas.DataFrame"""
-
-        fig, ax = self.plots[name]
-        ax.clear()
-
-        x = self.settings[name]['x']
-        ys = np.array([self.settings[name]['y']]).flatten()
-
-        for y in ys:
-
-            if y not in self.data.columns:
-                raise AttributeError(f'Specified variable {y} is not in data set. Check variable names in plot specification.')
-
-            # If data points to a file, then generate a parametric plot
-            y_is_path = bool( sum([ 'csv' in y_value for y_value in self.data[y] if isinstance(y_value, str)]))
-            if y_is_path:
-                return self._plot_parametric(name)
-            else:
-                plt_kwargs = self.settings[name].get('options', {})
-
-                if x.lower() == 'time':
-                    self.data.plot(y=y,ax=ax, kind='line', legend=len(ys)>1, **plt_kwargs)  # use index as time axis
-                else:
-                    self.data.plot(y=y, x=x, ax=ax, kind='line', legend=len(ys)>1, **plt_kwargs)
-
-        ax.set_title(name)
-        ax.grid()
-        if linear:
-            ax.ticklabel_format(axis='y', style='sci', scilimits=(-2, 4))
-        ax.set_xlabel(self.settings[name].get('xlabel', x))
-        ax.set_ylabel(self.settings[name].get('ylabel', ys[0]))
-
-        return fig, ax
-
-    def _plot_log(self, name, floor=None):
-        """Make a simple plot using the plot method of pandas.DataFrame, but with a log scale y axis"""
-
-        fig, ax = self._plot_basic(name, linear=False)
-        ax.set_yscale('log')
-
-        if floor is not None:
-            ylim = ax.get_ylim()
-            ax.set_ylim([floor, ylim[-1]])
-
-        return fig, ax
-
-    def _plot_symlog(self, name, linear_scale=None):
-        """Make a simple plot using the plot method of pandas.DataFrame, but with a symmetric log scale y axis"""
-
-        fig, ax = self._plot_basic(name, linear=False)
-        if linear_scale:
-            ax.set_yscale('symlog', linthresh=linear_scale)
-        else:
-            ax.set_yscale('symlog')
-
-        return fig, ax
-
-    def _plot_averaged(self, name):
-        """Make a plot collecting all identical x values and averaging together the corresponding y values"""
-
-        fig, ax = self.plots[name]
-        ax.clear()
-
-        x = self.settings[name]['x']
-        y = np.array([self.settings[name]['y']]).flatten()
-
-        plt_kwargs = self.settings[name].get('options',{})
-
-        averaged_data = self.data.groupby(x).mean()
-
-        averaged_data.plot(y=y, ax=ax, kind='line', **plt_kwargs)
-
-        ax.set_title(name)
-        ax.grid(True)
-        ax.ticklabel_format(axis='y', style='sci', scilimits=(-2, 4))
-        ax.set_xlabel(self.settings[name].get('xlabel', x))
-        ax.set_ylabel(self.settings[name].get('ylabel', y[0]))
-
-        return fig, ax
-
-    def _plot_errorbars(self, name):
-        """Same as the averaged plot, but with error bars for each averaged y value"""
-
-        fig, ax = self.plots[name]
-        ax.clear()
-
-        x = self.settings[name]['x']
-        y = np.array([self.settings[name]['y']]).flatten()
-
-        plt_kwargs = self.settings[name].get('options',{})
-
-        self.data.boxplot(column=y[0], by=x, ax=ax, **plt_kwargs)
-
-        ax.set_title(name)
-        ax.grid(True)
-        ax.ticklabel_format(axis='y', style='sci', scilimits=(-2, 4))
-        ax.set_xlabel(self.settings[name].get('xlabel', x))
-        ax.set_ylabel(self.settings[name].get('ylabel', y[0]))
-
-        return fig, ax
-
-    def _plot_parametric(self, name):
-        """Make a parametric plot of x and y against a third parameter"""
-
-        fig, ax = self.plots[name]
-        ax.clear()
-
-        marker = self.settings[name].get('marker', 'None')
-        if marker.lower() == 'none':
-            marker = None
-
-        colormap = 'viridis'
-        plt.rcParams['image.cmap'] = colormap
-        cmap = plt.get_cmap('viridis')
-
-        x = self.settings[name]['x']
-        y = np.array([self.settings[name]['y']]).flatten()[0]
-        c = self.settings[name].get('parameter', 'time')
-
-        if c not in self.data.columns:
-            raise PlotError(f'Parameter {c} not in data!')
-
-        # Handle simple numeric data
-        y_is_numeric = bool( sum([isinstance(y_value, numbers.Number) for y_value in self.data[y]]) )
-        if y_is_numeric:
-
-            x_data = np.array(self.data[x].values, dtype=float)
-            y_data = np.array(self.data[y].values, dtype=float)
-            c_data = np.array(self.data[c].values, dtype=float)
-            set_nums = np.array([1]*len(self.data))  # all the same data set
-
-        # Handle data stored in a file
-        y_is_path = bool( sum([ 'csv' in y_value for y_value in self.data[y] if isinstance(y_value, str)]))
-        if y_is_path:
-
-            x_data = []
-            y_data = []
-            c_data = []
-            set_nums = []  # used to distinguish between sets
-
-            for i, x_path, y_path in zip(range(len(self.data)), self.data[x].values, self.data[y].values):
-
-                x_file_data = pd.read_csv(x_path, index_col=0)
-                y_file_data = pd.read_csv(y_path, index_col=0)
-
-                if c == 'time':
-                    y_file_data.index = pd.to_datetime(y_file_data.index, infer_datetime_format=True)
-                    first_datetime = pd.date_range(start=self.data.index[0], end=self.data.index[0], periods=len(y_file_data))
-                    y_file_data[c] = (y_file_data.index - first_datetime).total_seconds()
-
-                else:
-                    y_file_data[c] = [self.data[c].values[i]] * len(y_file_data)
-
-                x_data.append(x_file_data[x].values)
-                y_data.append(y_file_data[y].values)
-                c_data.append(y_file_data[c].values)
-                set_nums.append(np.array([i]*len(x_file_data)))
-
-            x_data = np.concatenate(x_data)
-            y_data = np.concatenate(y_data)
-            c_data = np.concatenate(c_data)
-            set_nums = np.concatenate(set_nums)
-
-        if c == 'time': # Rescale time if values are large
-            units = 'seconds'
-            if np.max(c_data) > 60:
-                units = 'minutes'
-                c_data = c_data / 60
-                if np.max(c_data) > 60:
-                    units = 'hours'
-                    c_data = c_data / 60
-
-        c_min, c_max = np.min(c_data), np.max(c_data)
-        norm = plt.Normalize(vmin=c_min, vmax=c_max)
-
-        # Add the colorbar, if the figure doesn't already have one
-        try:
-            fig.has_colorbar
-            fig.scalarmappable.set_clim(vmin=c_min, vmax=c_max)
-            fig.cbar.update_normal(fig.scalarmappable)
-        except AttributeError:
-            fig.scalarmappable = ScalarMappable(cmap=cmap, norm=norm)
-            fig.scalarmappable.set_array(np.linspace(c_min, c_max, 1000))
-            fig.cbar = plt.colorbar(fig.scalarmappable, ax=ax)
-            fig.cbar.ax.set_ylabel(self.settings[name].get('clabel', c))
-            fig.has_colorbar = True
-
-        if c == 'time':
-            fig.cbar.ax.set_ylabel('Time ' + f" ({units})")
-
-        # Draw the plot
-        if marker:
-            for i in range(x_data.shape[0]):
-                ax.plot([x_data[i]], [y_data[i]], marker=marker, markersize=3, color=cmap(norm(np.mean(c_data[i]))))
-        else:
-            for i in range(x_data.shape[0] - 1):
-                if set_nums[i] == set_nums[i+1]:
-                    ax.plot(x_data[i: i + 2], y_data[i: i + 2], color=cmap(norm(np.mean(c_data[i: i + 2]))))
-
-        ax.set_title(name)
-        ax.grid(True)
-        ax.ticklabel_format(axis='y', style='sci', scilimits=(-2, 4))
-        ax.set_xlabel(self.settings[name].get('xlabel', x))
-        ax.set_ylabel(self.settings[name].get('ylabel', y))
-
-        return fig, ax
-
-
-class Plotter2:
-
-    """
-    Handler for plotting data based on the runcard plotting settings and data context.
-
-    Argument must be a pandas DataFrame with a 'time' column and datetime indices.
-
-    The optional settings keyword argument is given in the form,
-
-    {..., plot_name: {'x': x_name, 'y': [y_name1, y_name2,...], 'style': plot_style, ...} ,...}
-
-    where plot_name is the user designated title for the plot, x_name, y_name_1, y_name2, etc. are columns in the DataFrame, and
-    plot_style is either 'basic' (default), 'log', 'symlog', 'averaged', 'errorbars' or 'parametric'.
-    """
+    # For using datetimes on x-axis
+    date_locator = mdates.AutoDateLocator()
+    date_formatter = mdates.ConciseDateFormatter(date_locator)
 
     def __init__(self, data, settings=None):
         """
@@ -334,11 +44,14 @@ class Plotter2:
         """
 
         self.data = data
+        self.full_data = self.numericize(data)
+
+        self.plotted = []
 
         if settings:
             self.settings = settings
         else:
-            self.settings = {'Plot': {x:'time', y: data.columns}}
+            self.settings = {'Plot': {x:'Time', y: data.columns}}
 
         self.plots = {}
         for plot_name in settings:
@@ -372,6 +85,10 @@ class Plotter2:
     def plot(self):
         """Plot all plots"""
 
+        # Update full data
+        new_indices = np.setdiff1d(self.data.index, self.full_data.index)
+        self.full_data = self.full_data.append(self.numericize(self.data.loc[new_indices]))
+
         # Make the plots, by name and style
         new_plots = {}
 
@@ -380,34 +97,266 @@ class Plotter2:
             style = settings.get('style', 'basic')
 
             if style == 'basic':
-                new_plots[name] = self._plot_basic(name)
-            elif style == 'log':
-                new_plots[name] = self._plot_log(name, floor=settings.get('floor', None))
-            elif style == 'symlog':
-                new_plots[name] = self._plot_symlog(name, linear_scale=settings.get('linear scale', None))
+                self._plot_basic(name)
             elif style == 'averaged':
-                new_plots[name] = self._plot_averaged(name)
+                self._plot_basic(name, averaged=True)
             elif style == 'errorbars':
-                new_plots[name] = self._plot_errorbars(name)
+                self._plot_basis(name, errorbars=True)
             elif style == 'parametric':
-                new_plots[name] = self._plot_parametric(name)
+                self._plot_parametric(name)
             else:
                 raise AttributeError(f"Plotting style '{style}' not recognized!")
 
         plt.pause(0.01)
-        return new_plots
 
-    def _plot_basic(self):
-        return
+    def _plot_basic(self, name, averaged=False, errorbars=False):
+        """Make a simple plot, (possibly multiple) y vs. x"""
 
-    def _plot_averaged(self):
-        return
+        fig, ax = self.plots[name]
 
-    def _plot_errorbars(self):
-        return
+        x = self.settings[name].get('x', 'Time')
+        ys = np.array([self.settings[name]['y']]).flatten()
 
-    def _plot_parametric(self):
-        return
+        not_in_data = np.setdiff1d(np.concatenate([[x], ys]), self.data.columns)
+        if not_in_data:
+            raise AttributeError(
+                f'{", ".join(not_in_data)} specified for plotting, but not in variables!')
+
+        if averaged or errorbars:
+
+            averaged_data = self.full_data.groupby(x).mean()
+            xdata = averaged_data[x]
+            ydata = averaged_data[ys]
+
+            if errorbars:
+                std_data = self.full_data.groupby(x).std()
+                ystddata = std_data[ys]
+
+        else:
+
+            if x == 'Time':
+                xdata = self.full_data.index
+            else:
+                xdata = self.full_data[x]
+
+            ydata = self.full_data[ys]
+
+        if ax.lines and not errorbars:
+        # For simple plots (i.e. not error bar plots), if already plotted, simply update the plot data and axes
+
+            for line, y in zip(ax.lines, ys):
+                line.set_data(xdata, ydata[y])
+                ax.draw_artist(line)
+
+            ax.relim()
+            ax.autoscale_view()
+
+        else:  # draw a new plot
+
+            plot_kwargs = self.settings[name].get('line', {})  # kwargs for matplotlib
+            plot_kwargs = {key: np.array([value]).flatten() for key, value in plot_kwargs.items()}
+
+            if len(ys) > 1:  # a legend will be made
+                plot_kwargs['label'] = ys
+
+            xscale = self.settings[name].get('x scale', 'linear')
+            yscale = self.settings[name].get('y scale', 'linear')
+
+            if x == 'Time':
+                ax.xaxis.set_major_locator(self.date_locator)
+                ax.xaxis.set_major_formatter(self.date_formatter)
+
+            for i, y in enumerate(ys):
+
+                if errorbars:
+                    ax.errorbar(xdata, ydata[y], yerr=ystddata[y], **{key: value[i] for key, value in plot_kwargs.items()})
+                else:
+                    ax.plot(xdata, ydata[y], **{key: value[i] for key, value in plot_kwargs.items()})
+
+            if x == 'Time':
+                pass  # axis is automatically configured for datetimes; do not modify
+            elif xscale == 'linear':
+                ax.ticklabel_format(axis='x', style='sci', scilimits=(-2, 4))
+            elif type(xscale) == dict:
+                for scale, options in xscale.items():
+                    ax.set_xscale(scale, **options)
+            else:
+                ax.set_xscale(xscale)
+
+            if yscale == 'linear':
+                ax.ticklabel_format(axis='y', style='sci', scilimits=(-2, 4))
+            elif type(yscale) == dict:
+                for scale, options in yscale.items():
+                    ax.set_yscale(scale, **options)
+            else:
+                ax.set_yscale(yscale)
+
+            ax.set_title(name)
+            ax.grid()
+
+            if len(ys) > 1:
+                ax.legend()
+
+            if x != 'Time':
+                ax.set_xlabel(self.settings[name].get('xlabel', x))
+            ax.set_ylabel(self.settings[name].get('ylabel', ys[0]))
+
+            plt.pause(0.001)
+
+    def _plot_parametric(self, name):
+        """Make a parametric plot of x and y against a third parameter"""
+
+        fig, ax = self.plots[name]
+
+        x = self.settings[name]['x']
+        y = np.array([self.settings[name]['y']]).flatten()[0]
+        s = self.settings[name].get('s', 'Time')
+
+        not_in_data = np.setdiff1d([x,y,s], self.data.columns)
+        if not_in_data:
+            raise AttributeError(
+                f'{", ".join(not_in_data)} specified for plotting, but not in variables!')
+
+        xdata = self.full_data[x]
+        ydata = self.full_data[y]
+        sdata = self.full_data[s]
+
+        if s == 'Time':  # Rescale time if values are large
+            units = 'seconds'
+            if np.max(sdata) > 60:
+                units = 'minutes'
+                sdata = sdata / 60
+                if np.max(sdata) > 60:
+                    units = 'hours'
+                    sdata = sdata / 60
+
+        s_min, s_max = np.min(sdata), np.max(sdata)
+        norm = plt.Normalize(vmin=s_min, vmax=s_max)
+
+        colormap = 'viridis'
+        plt.rcParams['image.cmap'] = colormap
+        cmap = plt.get_cmap('viridis')
+
+        plot_kwargs = self.settings[name].get('line', {})  # kwargs for matplotlib
+
+        if not hasattr(fig, 'cbar'):  # draw a new plot
+
+            for i in range(len(xdata) - 1):
+                ax.plot(xdata[i: i + 2], ydata[i: i + 2], color=cmap(norm(sdata[i])), **plot_kwargs)
+
+            fig.scalarmappable = ScalarMappable(cmap=cmap, norm=norm)
+            fig.scalarmappable.set_array(np.linspace(s_min, s_max, 1000))
+            fig.cbar = plt.colorbar(fig.scalarmappable, ax=ax)
+
+            xscale = self.settings[name].get('x scale', 'linear')
+            yscale = self.settings[name].get('y scale', 'linear')
+
+            if xscale == 'linear':
+                ax.ticklabel_format(axis='x', style='sci', scilimits=(-2, 4))
+            elif type(xscale) == dict:
+                for scale, options in xscale.items():
+                    ax.set_xscale(scale, **options)
+            else:
+                ax.set_xscale(xscale)
+
+            if yscale == 'linear':
+                ax.ticklabel_format(axis='y', style='sci', scilimits=(-2, 4))
+            elif type(yscale) == dict:
+                for scale, options in yscale.items():
+                    ax.set_yscale(scale, **options)
+            else:
+                ax.set_yscale(yscale)
+
+            ax.set_title(name)
+            ax.grid(True)
+            ax.set_xlabel(self.settings[name].get('xlabel', x))
+            ax.set_ylabel(self.settings[name].get('ylabel', y))
+            if s == 'Time':
+                fig.cbar.ax.set_ylabel('Time ' + f" ({units})")
+            else:
+                fig.cbar.ax.set_ylabel(s)
+
+            fig.execute_constrained_layout()
+
+            plt.pause(0.001)
+
+        else:  # if already plotted, update the plot data and axes
+
+            # update color bar
+            fig.scalarmappable.set_clim(vmin=s_min, vmax=s_max)
+            fig.cbar.update_normal(fig.scalarmappable)
+
+            # update_normal method above removes the colorbar's ylabel; redraw it
+            if s == 'Time':
+                fig.cbar.ax.set_ylabel('Time ' + f" ({units})")
+            else:
+                fig.cbar.ax.set_ylabel(s)
+
+            # update colors of existing line segments
+            for i, line in enumerate(ax.lines):
+                line.set_color(cmap(norm(sdata[i])))
+                ax.draw_artist(line)
+
+            # plot new line segments
+            for i in range(len(ax.lines)-1, len(xdata)-1):
+                ax.plot(xdata[i: i + 2], ydata[i: i + 2], color=cmap(norm(sdata[i])), **plot_kwargs)
+
+            ax.relim()
+            ax.autoscale_view()
+
+    @staticmethod
+    def numericize(data):
+        """
+        Convert a DataFrame, possibly containing lists or paths, such that all elements are numeric
+        """
+
+        indices = data.index
+        labels = data.columns
+
+        data_array = data.values
+
+        numerical_indices = []
+        numerical_array = [[]]*len(labels)
+
+        # Iterate each of data and expand any files or lists into columns
+        for index, row in zip(indices, data_array):
+
+            columns = []
+            max_len = 0  # maximum length of columns
+            for i, element in enumerate(row):
+
+                if type(element) == str and os.path.isfile(element):
+                    expanded_element = list(pd.read_csv(element)[labels[i]].values)
+                if np.ndim(element) == 1:
+                    expanded_element = list(element)
+                else:
+                    expanded_element = [float(element)]
+
+                max_len = np.max([len(expanded_element), max_len])
+
+                columns.append(expanded_element)
+
+            numerical_indices = numerical_indices + [index] * max_len
+            for i, column in enumerate(columns):
+                numerical_array[i] = numerical_array[i] + column + [np.nan]*(max_len - len(column))
+
+        numerical_data = pd.DataFrame(
+            data= np.array(numerical_array, dtype=float).T,
+            columns=labels,
+            index=numerical_indices
+        )
+
+        return numerical_data
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -495,8 +444,8 @@ class ExperimentGUI:
         i += 1
         tk.Label(self.status_frame, text='Run Time', width=len('Run Time'), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
 
-        self.variable_entries['time'] = tk.Entry(self.status_frame, state='readonly', disabledforeground='black', width=30)
-        self.variable_entries['time'].grid(row=i, column=1, sticky=tk.W, padx=10)
+        self.variable_entries['Time'] = tk.Entry(self.status_frame, state='readonly', disabledforeground='black', width=30)
+        self.variable_entries['Time'].grid(row=i, column=1, sticky=tk.W, padx=10)
 
         i += 1
         for name in self.variables:
@@ -577,7 +526,7 @@ class ExperimentGUI:
         for name, entry in self.variable_entries.items():
 
             # If experiment stopped allow user to edit knobs or constant expressions
-            if 'Stopped' in self.experiment.status and name != 'time':
+            if 'Stopped' in self.experiment.status and name != 'Time':
                 if self.variables[name].type in ['knob', 'parameter']:
                     continue
 
@@ -592,8 +541,8 @@ class ExperimentGUI:
             elif state[name] == np.nan:
                 write_entry(entry, 'nan')
             else:
-                if name.lower() == 'time':
-                    write_entry(entry, str(datetime.timedelta(seconds=state['time'])))
+                if name.lower() == 'Time':
+                    write_entry(entry, str(datetime.timedelta(seconds=state['Time'])))
                 else:
                     if state[name]*0 == 0:  # check if number
                         if state[name] == 0:
@@ -623,7 +572,7 @@ class ExperimentGUI:
             self.status_frame.focus()
 
             for name, entry in self.variable_entries.items():
-                if name == 'time':
+                if name == 'Time':
                     continue
                 if self.variables[name].type in ['knob', 'parameter']:
                     entry.config(state=tk.NORMAL)
@@ -634,7 +583,7 @@ class ExperimentGUI:
             self.stop_button.config(text='Resume')
 
             for name, entry in self.variable_entries.items():
-                if name == 'time':
+                if name == 'Time':
                     continue
                 if self.variables[name].type in ['knob', 'parameter']:
                     entry.config(state=tk.NORMAL)
