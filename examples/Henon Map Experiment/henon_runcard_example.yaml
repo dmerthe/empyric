@@ -8,7 +8,7 @@ Description:
  comments: Who is Mike? There is no Test Stand 1
 
 Settings:
- follow-up: henon_runcard_example.yaml
+ follow-up: henon_runcard_example.yaml  # experiment repeats ad infinitum
  step interval: 0.5
  plot interval: 5
  save interval: 10

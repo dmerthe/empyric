@@ -691,7 +691,22 @@ class Experiment:
         if directory:
             path = os.path.join(directory, path)
 
-        self.data.to_csv(path)
+        if not hasattr(self, 'saved'):
+            self.saved = []
+
+        if not os.path.exists(path):  # if this is a new file, write column headers
+            with open(path, 'a') as data_file:
+                data_file.write(','+','.join(self.data.columns) +'\n')
+
+        unsaved = np.setdiff1d(self.data.index, self.saved)
+
+        with open(path, 'a') as data_file:
+            for line in unsaved:
+                line_data = ','.join(map(str, list(self.data.loc[line])))
+                data_file.write(str(line)+','+line_data+'\n')
+
+        self.saved = self.saved + list(unsaved)
+
         self.status = base_status
 
     def start(self):
