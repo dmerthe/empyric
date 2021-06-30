@@ -318,7 +318,7 @@ class Plotter:
         numerical_indices = []
         numerical_array = [[]]*len(labels)
 
-        # Iterate each of data and expand any files or lists into columns
+        # Iterate through each row of data and expand any files or lists into columns
         for index, row in zip(indices, data_array):
 
             columns = []
@@ -349,25 +349,13 @@ class Plotter:
         return numerical_data
 
 
-
-
-
-
-
-
-
-
-
-
-
 class ExperimentGUI:
     """
-    GUI showing experimental progress, values of all experiment variables, any alarms.
-    Also, manages plotting data via the Plotter class
+    GUI showing experimental progress, values of all experiment variables and any alarms, and managing plotting data
+    via the Plotter class.
 
-    This GUI allows the user to hold, stop and terminate the experiment.
-    When stopped, the user can change the values of knob and parameter variables, and also directly interact with
-    instruments through the Dashboard.
+    This GUI allows the user to hold, stop and terminate the experiment. When stopped, the user can change the values
+    of knob and parameter variables, and also directly interact with instruments through the Dashboard.
     """
 
     def __init__(self, experiment, alarms=None, instruments=None, title=None, plots=None, save_interval=None, plot_interval=0):
@@ -731,7 +719,6 @@ class ExperimentGUI:
 class BasicDialog(tk.Toplevel):
     """
     General purpose dialog window
-
     """
 
     def __init__(self, parent, title=None):
@@ -849,7 +836,6 @@ class ConfigTestDialog(BasicDialog):
     """
     Dialog box for setting knobs and checking meters.
     Allows the user to quickly access basic instrument functionality as well as configure instrument for an experiment
-
     """
 
     def __init__(self, parent, instrument):

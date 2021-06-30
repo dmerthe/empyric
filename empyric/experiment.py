@@ -166,7 +166,7 @@ class Variable:
         elif hasattr(self, 'parameter'):
 
             try:
-                self._value = float(self.parameter)  # try float type cast
+                self._value = float(self.parameter)  # try cast to float
             except ValueError:
                 if self.parameter == 'True':  # try boolean type cast
                     self._value = True
@@ -497,7 +497,7 @@ routines_dict = {
 
 class Alarm:
     """
-    Triggers if a condition is met, among the given variables, and indicates the response protocol
+    Triggers if a condition among variables is met and indicates the response protocol
     """
 
     def __init__(self, condition, variables, protocol=None):
@@ -915,7 +915,7 @@ def build_experiment(runcard, settings=None, instruments=None, alarms=None):
 
 class Manager:
     """
-    Utility class which sets up and manages the above experiments
+    Utility class which sets up and manages experiments, based on runcards
     """
 
     def __init__(self, runcard=None):
@@ -965,7 +965,7 @@ class Manager:
     def run(self, directory=None):
         """
         Run the experiment defined by the runcard. A GUI shows experiment status, while the experiment is run in a
-        eparate thread.
+        separate thread.
 
         :param directory: (path) (optional) directory in which to run the experiment if different from the working
         directory
