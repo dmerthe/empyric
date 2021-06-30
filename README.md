@@ -52,7 +52,7 @@ meter_value = instrument.measure_meter()  # take a measurement
 
 The real purpose of Empyric is to simplify and standardize construction of an experiment, and automate its execution. The two main elements of an experiment are its *variables* which are controlled and/or measured by your instruments, and *routines* which are the various processes that you run on your controllable variables.
 
-*Variables* come in three flavors: knobs, meters and expressions. A knob is a variable that you can directly control through an instrument, such as voltage from a power supply. A meter is a variable that you directly measure through an instrument, such as temperature from a thermocouple. In some cases, a meter can be controlled indirectly through a feedback loop. For example, PID temperature controllers provide a temperature knob (the setpoint) as well as a temperature meter (the actual temperature measured with a thermocouple or RTD). An expression is a variable that is evaluated in terms of other experiment variables, such as the power delivered by a power supply being the product of the voltage knob value and the current meter value.
+*Variables* come in four flavors: knobs, meters, expressions and parameters. A knob is a variable that you can directly control through an instrument, such as voltage from a power supply. A meter is a variable that you directly measure through an instrument, such as temperature from a thermocouple. In some cases, a meter can be controlled indirectly through a feedback loop. For example, PID temperature controllers provide a temperature knob (the setpoint) as well as a temperature meter (the actual temperature measured with a thermocouple or RTD). An expression is a variable that is evaluated in terms of other experiment variables, such as the power delivered by a power supply being the product of the voltage knob value and the current meter value. A parameter is a user-defined value that is relevant to the experiment, such as a unit conversion factor, a variable setpoint (e.g. used in a routine) or a quantity that must be manually logged.
 
 Here is an example showing how to define and use experiment variables in Empyric:
 ```
@@ -63,12 +63,13 @@ keithley2400 = Keithley2400(1)
 
 voltage = Variable(instrument=keithley2400, knob='voltage')
 current = Variable(instrument=keithley2400, meter='current')
-power = Variable(expression='V * I', definitions={'V':voltage, 'I':current})
+milliwatt = Variable(parameter = 1e-3)
+power = Variable(expression='V * I / mW', definitions={'V':voltage, 'I':current, 'mW':milliwatt})
 
 voltage.value = 10 # sets the voltage of the Keithley 2400 to 10 V
 
-# Obtain 10 measurements of current and power sourced by the Keithley 2400
-measurements = [[current.value, power.value] for i in range(10)]
+# Obtain 10 measurements of current, voltage and power sourced by a Keithley 2400
+measurements = [[current.value, voltage.value, power.value] for i in range(10)]
 ```
 Assigning a value to the `value` property of a knob-type variable commands the corresponding instrument to set the associated knob accordingly, and the value is stored in the corresponding attribute of the instrument (`[instrument].[knob]`). Calling the `value` property of a meter-type variable commands the corresponding instrument to record a measurement of the associated meter, and then return the value as well as store it as an attribute of the instrument  (`[instrument].measured_[meter]`). Calling the `value` property of an expression-type variable retrieves the values of the variables that define it from the stored attributes of the corresponding knobs, meters and other expressions; it does not trigger any new measurements. Therefore, for repeated calls, be sure to trigger measurements or retrievals of the values of any defining variables prior to each evaluation of the expression.
 
