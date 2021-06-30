@@ -42,10 +42,9 @@ class MyInstrument(Instrument):
 	def measure_meter(self):
 		# ... measure your meter
 	
-instrument = MyInstrument('COM5::1')
-adapter = Modbus(instrument)  # adapter connects to your instrument
+instrument = MyInstrument('COM5::1')  # connect to your instrument
 
-meter_value = instr.measure_meter()
+meter_value = instrument.measure_meter()  # take a measurement
 
 ```
 
@@ -87,18 +86,18 @@ set_routine = Set(knobs, values, start=0, end=60)
 
 start_time = time.time()
 
-state = {'time': 0, 'Knob 1': None, 'Knob 2': None} # define a process state
+state = {'Time': 0, 'Knob 1': None, 'Knob 2': None} # define a process state
 
-while state['time'] <= 60:
+while state['Time'] <= 60:
 	
-	state['time'] = time.time() - start_time  # update process time
+	state['Time'] = time.time() - start_time  # update process time
 	
 	set_routine.update(state) # update process state, based on the set routine
 	
 	state['Knob 1] = knob1.value
 	state['Knob 2] = knob2.value
 	
-	print(state)  # prints "{'time': ..., 'Knob 1': 10, 'Knob 2': 20}"
+	print(state)  # prints "{'Time': ..., 'Knob 1': 10, 'Knob 2': 20}"
 ```
 
-An *Experiment* monitors a set of variables as a set of routines takes action on them. In Empyric, the `Experiment` object is an iterable that updates routines and records data on each iteration. It also has `start`, `hold` and `stop` methods which initiate/resume the experiment, holds routines while continuing to measure meters, and stops all routines and measurements, respectively. The `terminate` method saves the collected data to a file in the working directory and raises the `StopIteration` exception. An experiment will terminate automatically when all routines are finished. See henon_python_eaxmple.py in the 'examples/Henon Map Experiment' directory to see how a basic experiment is set up as a python script. This particular example uses a virtual instrument (`HenonMapper`), so the only requirement to run it is having Python installed along with the usual packages (numpy, scipy, pandas and matplotlib). Try it!
+An *Experiment* monitors a set of variables as a set of routines takes action on them. In Empyric, the `Experiment` object is an iterable that updates routines and records data on each iteration. It also has `start`, `hold` and `stop` methods which initiate/resume the experiment, holds routines while continuing to measure meters, and stops all routines and measurements, respectively. The `terminate` method saves the collected data to a file in the working directory and raises the `StopIteration` exception. An experiment will terminate automatically when all routines are finished. See henon_python_eaxmple.py in the 'examples/Henon Map Experiment' directory to see how a basic experiment is set up as a python script. This particular example uses a virtual instrument (`HenonMapper`), so the only requirement to run it is having Python installed along with the usual scientific packages (numpy, scipy, pandas and matplotlib).
