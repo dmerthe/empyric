@@ -51,7 +51,11 @@ class Clock(Instrument):
 
         elif state == 'RESET':
 
-            self.__init__()
+            self.start_time = time.time()
+            self.stoppage = 0
+
+            if self.stop_time:
+                self.stop_time = self.start_time
 
     @measurer
     def measure_time(self):
@@ -309,26 +313,32 @@ class SimpleProcess(Instrument):
              'noise level',
              'response time')
 
-    meters = ('value',)
+    presets = {
+        'setpoint': 0,
+        'noise level': 0.1,
+        'response time': 10
+    }
 
+    meters = ('value',)
 
     def __init__(self, *args, **kwargs):
 
         Instrument.__init__(self, *args, **kwargs)
 
-        self.time = 0
-        self.value = 0
-        self.setpoint = 0
         self.noise_level = 0.1
         self.response_time = 10
 
-        self.clock = Clock()
-        self.clock.set_state('START')
-        self.time = self.clock.measure_time()
+        self._clock = Clock()
+        self._clock.set_state('START')
+        self._time = self._clock.measure_time()
 
     @setter
     def set_setpoint(self, setpoint):
-        self.measure_value()  # update process time and value
+        if hasattr(self, '_time'):
+            self.measure_value()
+            self._clock.set_state('RESET')
+        else:
+            self._value = setpoint
 
     @setter
     def set_noise_level(self, noise_level):
@@ -341,13 +351,8 @@ class SimpleProcess(Instrument):
     @measurer
     def measure_value(self):
 
-        t0 = self.time
-        last_value = self.value
+        last_value = self._value
+        t = self._clock.measure_time()  # time since last setpoint change
+        self._value = self.setpoint + (last_value - self.setpoint)*np.exp(-t / self.response_time)
 
-        t = self.clock.measure_time()
-        new_value = self.setpoint + (last_value - self.setpoint)*np.exp(-(t-t0) / self.response_time)
-
-        self.time = t
-        self.value = new_value
-
-        return new_value
+        return self._value
