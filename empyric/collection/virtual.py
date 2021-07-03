@@ -309,28 +309,26 @@ class SimpleProcess(Instrument):
              'noise level',
              'response time')
 
-    presets ={
-        'setpoint': 10,
-        'noise level': 0.1,
-        'response time': 10
-    }
-
     meters = ('value',)
+
 
     def __init__(self, *args, **kwargs):
 
         Instrument.__init__(self, *args, **kwargs)
 
+        self.time = 0
         self.value = 0
+        self.setpoint = 0
+        self.noise_level = 0.1
+        self.response_time = 10
 
         self.clock = Clock()
         self.clock.set_state('START')
-
         self.time = self.clock.measure_time()
 
     @setter
     def set_setpoint(self, setpoint):
-        pass
+        self.measure_value()  # update process time and value
 
     @setter
     def set_noise_level(self, noise_level):
@@ -343,12 +341,13 @@ class SimpleProcess(Instrument):
     @measurer
     def measure_value(self):
 
-        t = self.clock.measure_time()
         t0 = self.time
+        last_value = self.value
 
-        old_value = self.value
-        new_value = self.setpoint + (old_value + self.setpoint)*np.exp(-(t-t0) / self.response_time)
+        t = self.clock.measure_time()
+        new_value = self.setpoint + (last_value - self.setpoint)*np.exp(-(t-t0) / self.response_time)
 
         self.time = t
+        self.value = new_value
 
         return new_value

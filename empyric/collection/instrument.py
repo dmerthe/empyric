@@ -14,10 +14,10 @@ def setter(method):
 
     @wraps(method)
     def wrapped_method(*args, **kwargs):
+        method(*args, **kwargs)
         self = args[0]
         value = args[1]
         self.__setattr__(knob, value)
-        method(*args, **kwargs)
 
     return wrapped_method
 
