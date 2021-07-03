@@ -292,3 +292,63 @@ class RandomWalk(Instrument):
     def measure_value(self):
         self.value += np.random.choice([-self.step, self.step]) + self.affinity*(self.mean - self.value)
         return self.value
+
+
+class SimpleProcess(Instrument):
+    """
+    Virtual process that mimics the behavior of a heating process
+    """
+
+    name = 'SimpleProcess'
+
+    supported_adapters = (
+        (Adapter, {}),
+    )
+
+    knobs = ('setpoint',
+             'noise level',
+             'response time')
+
+    presets ={
+        'setpoint': 10,
+        'noise level': 0.1,
+        'response time': 10
+    }
+
+    meters = ('value',)
+
+    def __init__(self, *args, **kwargs):
+
+        Instrument.__init__(self, *args, **kwargs)
+
+        self.value = 0
+
+        self.clock = Clock()
+        self.clock.set_state('START')
+
+        self.time = self.clock.measure_time()
+
+    @setter
+    def set_setpoint(self, setpoint):
+        pass
+
+    @setter
+    def set_noise_level(self, noise_level):
+        pass
+
+    @setter
+    def set_response_time(self, response_time):
+        pass
+
+    @measurer
+    def measure_value(self):
+
+        t = self.clock.measure_time()
+        t0 = self.time
+
+        old_value = self.value
+        new_value = self.setpoint + (old_value + self.setpoint)*np.exp(-(t-t0) / self.response_time)
+
+        self.time = t
+
+        return new_value
