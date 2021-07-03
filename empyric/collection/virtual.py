@@ -325,9 +325,6 @@ class SimpleProcess(Instrument):
 
         Instrument.__init__(self, *args, **kwargs)
 
-        self.noise_level = 0.1
-        self.response_time = 10
-
         self._clock = Clock()
         self._clock.set_state('START')
         self._time = self._clock.measure_time()
@@ -354,5 +351,6 @@ class SimpleProcess(Instrument):
         last_value = self._value
         t = self._clock.measure_time()  # time since last setpoint change
         self._value = self.setpoint + (last_value - self.setpoint)*np.exp(-t / self.response_time)
+        self._value += self.noise_level*np.random.rand()
 
         return self._value
