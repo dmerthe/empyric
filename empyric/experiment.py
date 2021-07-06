@@ -470,24 +470,84 @@ class Maximize(Minimize):
             return False
 
 
-class ModelPredictiveControl(Routine):
+class PredictiveControl(Routine):
     """
-    (NOT IMPLEMENTED)
     Simple model predictive control; learns the relationship between knob x and meter y, assuming a linear model,
 
-    y(t) = y0 + int_{-inf}^{t} dt' m(t-t') x(t')
+    y(t) = y_0 + int_{-inf}^{t} dt' m(t-t') x(t')
 
     then sets x to minimize the error in y relative to setpoint, over some time interval defined by cutoff.
-
     """
 
-    def __init__(self, meters=None, **kwargs):
+    @property
+    def certain(self):
+        # Determine if model is certain enough to make predictions
+        return False
+
+    def __init__(self, meters=None, response_time='10 minutes', learning_time=None, horizon=None, tolerance=0.1, offset=0, **kwargs):
 
         Routine.__init__(self, **kwargs)
-        self.meters = meters
+        self.meters = meters  # output variables
+
+        self.response_time = convert_time(response_time)  # time after which the transfer function is negligible
+
+        if learning_time:  # duration of data to use for estimating the transfer function (>response time)
+            self.learning_time = convert_time(learning_time)
+        else:
+            self.learning_time = 10*self.response_time
+
+        if horizon:  # time for which a prediction is considered reliable
+            self.horizon = horizon
+        else:
+            self.horizon = self.response_time
+
+        self.tolerance = tolerance
+        self.y0 = offset
+
+        self.t = []  # times
+        self.x = []  # control values
+        self.y = []  # process values
+
+        self.model = None
 
     def update(self, state):
-        pass
+
+        if state['Time'] < self.start or state['Time'] > self.end:
+            return
+        else:
+
+            self.t.append(state['Time'])
+            self.x.append(state[self.knobs[0]])
+            self.y.append(state[self.meters[0]])
+
+            if self.certain:
+                self.t = self.t[1:]
+                self.x = self.x[1:]
+                self.y = self.y[1:]
+
+                if not self.predictions:
+                    self._update_model()
+                    self._predict()
+
+                self.knobs[0].value = self.predictions.pop(0)
+            else:
+                self._wiggle()
+
+
+    def _update_model(self):
+        # Estimate the transfer function m(t)
+
+        return
+
+    def _predict(self):
+        # Estimate future optimal settings for x(t)
+
+        return
+
+    def _wiggle(self):
+        # Vary x to learn response of y
+
+        return
 
 
 routines_dict = {
