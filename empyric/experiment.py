@@ -4,6 +4,7 @@ import os
 import time
 import datetime
 import numbers
+from collections import deque
 from scipy.interpolate import interp1d
 import numpy as np
 import pandas as pd
@@ -482,6 +483,9 @@ class PredictiveControl(Routine):
     @property
     def certain(self):
         # Determine if model is certain enough to make predictions
+
+
+
         return False
 
     def __init__(self, meters=None, response_time='10 minutes', learning_time=None, horizon=None, tolerance=0.1, offset=0, **kwargs):
@@ -504,11 +508,12 @@ class PredictiveControl(Routine):
         self.tolerance = tolerance
         self.y0 = offset
 
-        self.t = []  # times
-        self.x = []  # control values
-        self.y = []  # process values
+        self.t = deque()  # times
+        self.x = deque()  # control values
+        self.y = deque()  # process values
 
-        self.model = None
+        self.model = {'m': None, 'var_m':None, 'b':None, 'var_b':None}
+        self.predictions = deque()
 
     def update(self, state):
 
@@ -520,24 +525,33 @@ class PredictiveControl(Routine):
             self.x.append(state[self.knobs[0]])
             self.y.append(state[self.meters[0]])
 
+            # Trim excess data
+            while self.t[-1] - self.t[0] > self.learning_time:
+                self.t.popleft()
+                self.x.popleft()
+                self.y.popleft()
+
+            if not self.predictions():
+                self._update_model()
+                self._predict()
+
             if self.certain:
-                self.t = self.t[1:]
-                self.x = self.x[1:]
-                self.y = self.y[1:]
-
-                if not self.predictions:
-                    self._update_model()
-                    self._predict()
-
-                self.knobs[0].value = self.predictions.pop(0)
+                self.knobs[0].value = self.predictions.popleft()
             else:
                 self._wiggle()
 
-
     def _update_model(self):
-        # Estimate the transfer function m(t)
+        # Estimate the transfer function m(t) and y0
 
-        return
+        if self.t[-1] - self.t[0] < self.learning_time:
+            return
+
+        # Homogenize data
+        t = np.linspace(self.t[0], self.t[-1], len(self.t))
+        y = interp1d(self.t, self.y)(t)
+        x = interp1d(self.t, self.x)(t)
+
+        N = len(t[t[-1] - t >= self.response_time])
 
     def _predict(self):
         # Estimate future optimal settings for x(t)
