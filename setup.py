@@ -4,8 +4,8 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="empyric-dmerthe", # Replace with your own username
-    version="0.0.1",
+    name="empyric-dmerthe",
+    version="0.1",
     author="Daniel Merthe",
     author_email="dmerthe@gmail.com",
     description="A package for experiment automation",
