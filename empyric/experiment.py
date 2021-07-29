@@ -4,6 +4,7 @@ import os
 import time
 import datetime
 import numbers
+import shutil
 from scipy.interpolate import interp1d
 import numpy as np
 import pandas as pd
@@ -968,14 +969,14 @@ class Manager:
         :return: None
         """
 
-        # Create a new directory for data storage
+        top_dir = os.getcwd()
+
         if directory:
             os.chdir(directory)
 
+        # Create a new directory for data storage
         experiment_name = self.runcard['Description'].get('name', 'Experiment')
-        timestamp = self.experiment.timestamp
-        top_dir = os.getcwd()
-        working_dir = os.path.join(top_dir, experiment_name + '-' + timestamp)
+        working_dir = experiment_name + '-' + self.experiment.timestamp
         os.mkdir(working_dir)
         os.chdir(working_dir)
 
@@ -1013,10 +1014,10 @@ class Manager:
             return
         elif 'yaml' in self.followup:
             self.__init__(self.followup)
-            self.run()
+            self.run(directory=directory)
         elif 'repeat' in self.followup:
             self.__init__(self.runcard)
-            self.run()
+            self.run(directory=directory)
 
     def _run(self):
         # Run in a separate thread
