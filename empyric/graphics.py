@@ -17,6 +17,9 @@ import matplotlib.pyplot as plt
 from matplotlib.cm import ScalarMappable
 import matplotlib.dates as mdates
 
+from pandas.plotting import register_matplotlib_converters
+register_matplotlib_converters()  # needed for converting Pandas datetimes for matplotlib
+
 class Plotter:
     """
     Handler for plotting data based on the runcard plotting settings and data context.
@@ -90,7 +93,6 @@ class Plotter:
         self.full_data = self.full_data.append(self.numericize(self.data.loc[new_indices]))
 
         # Make the plots, by name and style
-        new_plots = {}
 
         for name, settings in self.settings.items():
 
@@ -107,7 +109,7 @@ class Plotter:
             else:
                 raise AttributeError(f"Plotting style '{style}' not recognized!")
 
-        plt.pause(0.01)
+        # plt.pause(0.01)  # update all plots
 
     def _plot_basic(self, name, averaged=False, errorbars=False):
         """Make a simple plot, (possibly multiple) y vs. x"""
@@ -150,6 +152,9 @@ class Plotter:
 
             ax.relim()
             ax.autoscale_view()
+
+            fig.canvas.draw_idle()
+            fig.canvas.start_event_loop(0.01)
 
         else:  # draw a new plot
 
@@ -201,7 +206,7 @@ class Plotter:
                 ax.set_xlabel(self.settings[name].get('xlabel', x))
             ax.set_ylabel(self.settings[name].get('ylabel', ys[0]))
 
-            plt.pause(0.001)
+            plt.pause(0.01)
 
     def _plot_parametric(self, name):
         """Make a parametric plot of x and y against a third parameter"""
@@ -278,7 +283,7 @@ class Plotter:
 
             fig.execute_constrained_layout()
 
-            plt.pause(0.001)
+            plt.pause(0.01)
 
         else:  # if already plotted, update the plot data and axes
 
@@ -303,6 +308,9 @@ class Plotter:
 
             ax.relim()
             ax.autoscale_view()
+
+            fig.canvas.draw_idle()
+            fig.canvas.start_event_loop(0.01)
 
     @staticmethod
     def numericize(data):
@@ -401,6 +409,7 @@ class ExperimentGUI:
         self.root.protocol("WM_DELETE_WINDOW", self.end)
 
         self.root.title('Empyric')
+        self.root.resizable(False, False)
 
         self.status_frame = tk.Frame(self.root)
         self.status_frame.grid(row=0, column=0, columnspan=2)

@@ -16,6 +16,40 @@ from empyric import instruments as instr
 from empyric import adapters, graphics
 
 
+def convert_time(time_value):
+    """
+    If time_value is a string, converts a time of the form "[number] [units]" (e.g. "3.5 hours") to the time in seconds.
+    If time_value is a number, just returns the same number
+    If time_value is an array, iterates through the array doing either of the previous two operations on every element.
+
+    :param time_value: (str/float) time value, possibly including units such as "hours"
+    :return: (int) time in seconds
+    """
+
+    if np.size(time_value) > 1:
+        return [convert_time(t) for t in time_value]
+
+    if isinstance(time_value, numbers.Number):
+        return time_value
+    elif isinstance(time_value, str):
+        # times can be specified in the runcard with units, such as minutes, hours or days, e.g.  "6 hours"
+        time_parts = time_value.split(' ')
+
+        if len(time_parts) == 1:
+            return float(time_parts[0])
+        elif len(time_parts) == 2:
+            value, unit = time_parts
+            value = float(value)
+            return value * {
+                'seconds': 1, 'second': 1,
+                'minutes': 60, 'minute': 60,
+                'hours': 3600, 'hour': 3600,
+                'days': 86400, 'day': 86400
+            }[unit]
+        else:
+            raise ValueError(f'Unrecognized time format for {time_value}!')
+
+
 class Clock:
     """
     Clock for keeping time in an experiment; works like a standard stopwatch
@@ -187,39 +221,6 @@ class Variable:
             self.parameter = value
         else:
             raise ValueError(f'Attempt to set {self.type}! Only knobs and parameters can be set.')
-
-def convert_time(time_value):
-    """
-    If time_value is a string, converts a time of the form "[number] [units]" (e.g. "3.5 hours") to the time in seconds.
-    If time_value is a number, just returns the same number
-    If time_value is an array, iterates through the array doing either of the previous two operations on every element.
-
-    :param time_value: (str/float) time value, possibly including units such as "hours"
-    :return: (int) time in seconds
-    """
-
-    if np.size(time_value) > 1:
-        return [convert_time(t) for t in time_value]
-
-    if isinstance(time_value, numbers.Number):
-        return time_value
-    elif isinstance(time_value, str):
-        # times can be specified in the runcard with units, such as minutes, hours or days, e.g.  "6 hours"
-        time_parts = time_value.split(' ')
-
-        if len(time_parts) == 1:
-            return float(time_parts[0])
-        elif len(time_parts) == 2:
-            value, unit = time_parts
-            value = float(value)
-            return value * {
-                'seconds': 1, 'second': 1,
-                'minutes': 60, 'minute': 60,
-                'hours': 3600, 'hour': 3600,
-                'days': 86400, 'day': 86400
-            }[unit]
-        else:
-            raise ValueError(f'Unrecognized time format for {time_value}!')
 
 
 # Routines
@@ -488,11 +489,6 @@ class ModelPredictiveControl(Routine):
 
     def update(self, state):
         pass
-
-
-routines_dict = {
-    routine.__name__: routine for routine in Routine.__subclasses__()
-}
 
 
 class Alarm:
@@ -764,153 +760,153 @@ class Experiment:
             self.status = self.status + ': ' + reason
         self.status_locked = True
 
+    @staticmethod
+    def build(runcard, settings=None, instruments=None, alarms=None):
+        """
+        Build an Experiment object based on a runcard, in the form of a .yaml file or a dictionary
 
-def build_experiment(runcard, settings=None, instruments=None, alarms=None):
-    """
-    Build an Experiment object based on a runcard, in the form of a .yaml file or a dictionary
+        :param runcard: (dict/str) description of the experiment in the runcard format
+        :param settings: (dict) dictionary of settings to be populated
+        :param instruments: (dict) dictionary instruments to be populated
+        :param alarms: (dict) dictionary of alarms to be populated
 
-    :param runcard: (dict/str) description of the experiment in the runcard format
-    :param settings: (dict) dictionary of settings to be populated
-    :param instruments: (dict) dictionary instruments to be populated
-    :param alarms: (dict) dictionary of alarms to be populated
+        :return: (Experiment) the experiment described by the runcard
+        """
 
-    :return: (Experiment) the experiment described by the runcard
-    """
+        if instruments is None:
+            instruments = {}
 
-    if instruments is None:
-        instruments = {}
+        # If given a settings keyword argument, get settings from runcard and store it there
+        if 'Settings' in runcard and settings is not None:
+            settings.update(runcard['Settings'])
 
-    # If given a settings keyword argument, get settings from runcard and store it there
-    if 'Settings' in runcard and settings is not None:
-        settings.update(runcard['Settings'])
+        for name, specs in runcard['Instruments'].items():
 
-    for name, specs in runcard['Instruments'].items():
-
-        specs = specs.copy()  # avoids modifying the runcard
-
-        instrument_name = specs.pop('type')
-        address = specs.pop('address')
-
-        # Grab any keyword arguments for the adapter
-        adapter_kwargs = {}
-        for kwarg in adapters.Adapter.kwargs:
-            if kwarg.replace('_', ' ') in specs:
-                adapter_kwargs[kwarg] = specs.pop(kwarg.replace('_', ' '))
-
-        # Any remaining keywords are instrument presets
-        presets = specs.get('presets', {})
-        postsets = specs.get('postsets', {})
-
-        instrument_class = instr.__dict__[instrument_name]
-        instruments[name] = instrument_class(address=address, presets=presets, postsets=postsets, **adapter_kwargs)
-        instruments[name].name = name
-
-    variables = {}  # experiment variables, associated with the instruments above
-    for name, specs in runcard['Variables'].items():
-        if 'meter' in specs:
-
-            if specs['instrument'] not in instruments:
-                raise KeyError(f'instrument {specs["instrument"]} specificed for variable {name} not in Instruments!')
-
-            variables[name] = Variable(meter=specs['meter'], instrument=instruments[specs['instrument']])
-        elif 'knob' in specs:
-
-            if specs['instrument'] not in instruments:
-                raise KeyError(f'instrument {specs["instrument"]} specificed for variable {name} not in Instruments!')
-
-            variables[name] = Variable(knob=specs['knob'], instrument=instruments[specs['instrument']])
-        elif 'expression' in specs:
-            expression = specs['expression']
-            definitions = {}
-
-            for symbol, var_name in specs['definitions'].items():
-                expression = expression.replace(symbol, var_name)
-                definitions[var_name] = variables[var_name]
-
-            variables[name] = Variable(expression=expression, definitions=definitions)
-        elif 'parameter' in specs:
-            variables[name] = Variable(parameter=specs['parameter'])
-
-    routines = {}
-    if 'Routines' in runcard:
-        for name, specs in runcard['Routines'].items():
             specs = specs.copy()  # avoids modifying the runcard
-            _type = specs.pop('type')
 
-            for knob in np.array([specs['knobs']]).flatten():
-                if knob not in variables:
-                    raise KeyError(f'knob {knob} specified for routine {name} is not in Variables!')
+            instrument_name = specs.pop('type')
+            address = specs.pop('address')
 
-            specs['knobs'] = {name: variables[name] for name in np.array([specs['knobs']]).flatten()}
-            specs['values'] = np.array(specs['values'], dtype=object).reshape((len(specs['knobs']), -1))
+            # Grab any keyword arguments for the adapter
+            adapter_kwargs = {}
+            for kwarg in adapters.Adapter.kwargs:
+                if kwarg.replace('_', ' ') in specs:
+                    adapter_kwargs[kwarg] = specs.pop(kwarg.replace('_', ' '))
 
-            if 'meters' in specs:
-                for meter in np.array([specs['meters']]).flatten():
-                    if meter not in variables:
-                        raise KeyError(f'meter {meter} specified for routine {name} is not in Variables!')
+            # Any remaining keywords are instrument presets
+            presets = specs.get('presets', {})
+            postsets = specs.get('postsets', {})
 
-                specs['meters'] = {name: variables[name] for name in np.array([specs['meters']]).flatten()}
+            instrument_class = instr.__dict__[instrument_name]
+            instruments[name] = instrument_class(address=address, presets=presets, postsets=postsets, **adapter_kwargs)
+            instruments[name].name = name
 
-            # Values can be variables, specified by their names
-            for var_name in variables:
-                where_variable = (specs['values'] == var_name)  # locate names of variables
-                specs['values'][where_variable] = variables[var_name]  # replace variable names with variables
+        variables = {}  # experiment variables, associated with the instruments above
+        for name, specs in runcard['Variables'].items():
+            if 'meter' in specs:
 
-            # Values can be specified in a CSV file
-            def is_csv(item):
-                if type(item) == str:
-                    return '.csv' in item
-                else:
-                    return False
+                if specs['instrument'] not in instruments:
+                    raise KeyError(f'instrument {specs["instrument"]} specificed for variable {name} not in Instruments!')
 
-            def get_csv(path, column):
-                df = pd.read_csv(path)
-                return df[column].values.flatten()
+                variables[name] = Variable(meter=specs['meter'], instrument=instruments[specs['instrument']])
+            elif 'knob' in specs:
 
-            specs['values'] = np.array([
-                get_csv(values[0], knob) if is_csv(values[0]) else values
-                for knob, values in zip(specs['knobs'].keys(), specs['values'])
-            ], dtype=object)
+                if specs['instrument'] not in instruments:
+                    raise KeyError(f'instrument {specs["instrument"]} specificed for variable {name} not in Instruments!')
 
-            routines[name] = routines_dict[_type](**specs)
+                variables[name] = Variable(knob=specs['knob'], instrument=instruments[specs['instrument']])
+            elif 'expression' in specs:
+                expression = specs['expression']
+                definitions = {}
 
-    # Set up any alarms
-    if 'Alarms' in runcard and alarms is not None:
+                for symbol, var_name in specs['definitions'].items():
+                    expression = expression.replace(symbol, var_name)
+                    definitions[var_name] = variables[var_name]
 
-        for name, specs in runcard['Alarms'].items():
+                variables[name] = Variable(expression=expression, definitions=definitions)
+            elif 'parameter' in specs:
+                variables[name] = Variable(parameter=specs['parameter'])
 
-            alarm_variables = specs.copy().get('variables',{})
-            condition = specs.copy()['condition']
+        routines = {}
+        if 'Routines' in runcard:
+            for name, specs in runcard['Routines'].items():
+                specs = specs.copy()  # avoids modifying the runcard
+                _type = specs.pop('type')
 
-            for variable in specs.get('variables', {}):
-                if variable not in variables:
-                    raise KeyError(f'variable {variable} specified for alarm {name} is not in Variables!')
+                for knob in np.array([specs['knobs']]).flatten():
+                    if knob not in variables:
+                        raise KeyError(f'knob {knob} specified for routine {name} is not in Variables!')
 
-            alphabet = 'abcdefghijklmnopqrstuvwxyz'
-            for var_name, variable in variables.items():
+                specs['knobs'] = {name: variables[name] for name in np.array([specs['knobs']]).flatten()}
+                specs['values'] = np.array(specs['values'], dtype=object).reshape((len(specs['knobs']), -1))
 
-                # Variables can be called by name in the condition
-                if var_name in condition:
-                    temp_name = ''.join([alphabet[np.random.randint(0, len(alphabet))] for i in range(3)])
-                    while temp_name in alarm_variables:  # make sure temp_name is not repeated
+                if 'meters' in specs:
+                    for meter in np.array([specs['meters']]).flatten():
+                        if meter not in variables:
+                            raise KeyError(f'meter {meter} specified for routine {name} is not in Variables!')
+
+                    specs['meters'] = {name: variables[name] for name in np.array([specs['meters']]).flatten()}
+
+                # Values can be variables, specified by their names
+                for var_name in variables:
+                    where_variable = (specs['values'] == var_name)  # locate names of variables
+                    specs['values'][where_variable] = variables[var_name]  # replace variable names with variables
+
+                # Values can be specified in a CSV file
+                def is_csv(item):
+                    if type(item) == str:
+                        return '.csv' in item
+                    else:
+                        return False
+
+                def get_csv(path, column):
+                    df = pd.read_csv(path)
+                    return df[column].values.flatten()
+
+                specs['values'] = np.array([
+                    get_csv(values[0], knob) if is_csv(values[0]) else values
+                    for knob, values in zip(specs['knobs'].keys(), specs['values'])
+                ], dtype=object)
+
+                routines[name] = {routine.__name__: routine for routine in Routine.__subclasses__()}[_type](**specs)
+
+        # Set up any alarms
+        if 'Alarms' in runcard and alarms is not None:
+
+            for name, specs in runcard['Alarms'].items():
+
+                alarm_variables = specs.copy().get('variables',{})
+                condition = specs.copy()['condition']
+
+                for variable in specs.get('variables', {}):
+                    if variable not in variables:
+                        raise KeyError(f'variable {variable} specified for alarm {name} is not in Variables!')
+
+                alphabet = 'abcdefghijklmnopqrstuvwxyz'
+                for var_name, variable in variables.items():
+
+                    # Variables can be called by name in the condition
+                    if var_name in condition:
                         temp_name = ''.join([alphabet[np.random.randint(0, len(alphabet))] for i in range(3)])
+                        while temp_name in alarm_variables:  # make sure temp_name is not repeated
+                            temp_name = ''.join([alphabet[np.random.randint(0, len(alphabet))] for i in range(3)])
 
-                    alarm_variables.update({temp_name: variable})
-                    condition = condition.replace(var_name, temp_name)
+                        alarm_variables.update({temp_name: variable})
+                        condition = condition.replace(var_name, temp_name)
 
-                # Otherwise, they are defined in the alarm_variables
-                for symbol, alarm_variable_name in alarm_variables.items():
-                    if alarm_variable_name == var_name:
-                        alarm_variables[symbol] = variable
+                    # Otherwise, they are defined in the alarm_variables
+                    for symbol, alarm_variable_name in alarm_variables.items():
+                        if alarm_variable_name == var_name:
+                            alarm_variables[symbol] = variable
 
-            alarms.update({name: Alarm(condition, alarm_variables, protocol=specs.get('protocol', None))})
+                alarms.update({name: Alarm(condition, alarm_variables, protocol=specs.get('protocol', None))})
 
-    experiment = Experiment(variables, routines=routines)
+        experiment = Experiment(variables, routines=routines)
 
-    if 'end' in settings:
-        experiment.end = convert_time(settings['end'])
+        if 'end' in settings:
+            experiment.end = convert_time(settings['end'])
 
-    return experiment
+        return experiment
 
 
 class Manager:
@@ -946,7 +942,7 @@ class Manager:
         self.instruments = {}  # placeholder for the experiment instruments; populated by build_experiment below
         self.alarms = {}  # placeholder for the experiment alarms; populated by build_experiment below
 
-        self.experiment = build_experiment(self.runcard,
+        self.experiment = Experiment.build(self.runcard,
                                            settings=self.settings,
                                            instruments=self.instruments,
                                            alarms=self.alarms)
