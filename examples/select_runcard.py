@@ -1,4 +1,4 @@
-import os, sys
+import os
 from empyric.experiment import Manager
 
 run_directory = os.path.expanduser('~/Desktop')

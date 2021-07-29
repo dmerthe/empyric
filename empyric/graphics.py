@@ -58,7 +58,7 @@ class Plotter:
 
         self.plots = {}
         for plot_name in settings:
-            self.plots[plot_name] = plt.subplots(constrained_layout=True)
+            self.plots[plot_name] = plt.subplots(constrained_layout=True, figsize=(5, 4))
 
     def save(self, plot_name=None, save_as=None):
         """Save the plots to PNG files in the working directory"""
@@ -108,8 +108,6 @@ class Plotter:
                 self._plot_parametric(name)
             else:
                 raise AttributeError(f"Plotting style '{style}' not recognized!")
-
-        # plt.pause(0.01)  # update all plots
 
     def _plot_basic(self, name, averaged=False, errorbars=False):
         """Make a simple plot, (possibly multiple) y vs. x"""
@@ -197,6 +195,7 @@ class Plotter:
                 ax.set_yscale(yscale)
 
             ax.set_title(name)
+            ax.tick_params(labelsize='small')
             ax.grid()
 
             if len(ys) > 1:
@@ -274,12 +273,15 @@ class Plotter:
 
             ax.set_title(name)
             ax.grid(True)
+            ax.tick_params(labelsize='small')
             ax.set_xlabel(self.settings[name].get('xlabel', x))
             ax.set_ylabel(self.settings[name].get('ylabel', y))
             if s == 'Time':
                 fig.cbar.ax.set_ylabel('Time ' + f" ({units})")
             else:
                 fig.cbar.ax.set_ylabel(s)
+
+            fig.cbar.ax.tick_params(labelsize='small')
 
             fig.execute_constrained_layout()
 
