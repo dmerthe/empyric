@@ -14,7 +14,7 @@ The instruments listed in the collection below are supported by the empyric modu
 .. autoclass:: empyric.collection.instrument.Instrument
    :members:
 
-An instance on an instrument from the collection below can be initialized by importing from ``empyric.instruments``. For example, instantiating a Keithley 2400 20 W sourcemeter is done with the command sequence,
+An instance on an instrument from the collection below can be initialized by importing from ``empyric.instruments``. For example, instantiating a Keithley 2400 sourcemeter is done with the command sequence,
 
 .. code-block::
 

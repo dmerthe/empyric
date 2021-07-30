@@ -6,7 +6,7 @@
 Empyric: Experiment Automation
 ===================================
 
-Empyric is an instrument control and experiment automation library. Many of its basic features are still being developed and tested, so bear with me!
+Empyric is an instrument control and experiment automation library. It offers easy access to instruments connected to a computer for custom Python scripting, as well as tools for building, executing and monitoring experiments in a very general framework.
 
 .. toctree::
    :maxdepth: 2

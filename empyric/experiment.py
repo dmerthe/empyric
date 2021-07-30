@@ -85,8 +85,7 @@ class Clock:
 
 class Variable:
     """
-    Basic representation of an experimental variable; comes in 3 kinds: knob, meter and expression.
-    Knobs can be set, meters can be measured and expressions can be calculated.
+    Basic representation of an experimental variable that comes in 4 kinds: knob, meter, expression and parameter.
 
     A knob is a variable that can be directly controlled by an instrument, e.g. the voltage of a power supply.
 
@@ -275,7 +274,7 @@ class Routine:
 
 class Set(Routine):
     """
-    Holds a fixed value
+    Sets and keeps knobs at fixed values
     """
 
     def update(self, state):
@@ -381,7 +380,7 @@ class Timecourse(Routine):
 
 class Sequence(Routine):
     """
-    Passes knobs through series of values regardless of time; each series for each knob must have the same length
+    Passes knobs through a series of values regardless of time; each series for each knob must have the same length
     """
 
     def __init__(self, **kwargs):
@@ -964,9 +963,9 @@ class Manager:
         Run the experiment defined by the runcard. A GUI shows experiment status, while the experiment is run in a
         separate thread.
 
-        :param directory: (path) (optional) directory in which to run the experiment if different from the working
-        directory
+        :param directory: (path) (optional) directory in which to run the experiment if different from the working directory
         :return: None
+
         """
 
         top_dir = os.getcwd()
