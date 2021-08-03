@@ -124,13 +124,13 @@ class Plotter:
 
         if averaged or errorbars:
 
-            averaged_data = self.full_data.groupby(x).mean()
+            grouped_data = self.full_data.groupby(x)
+            averaged_data = grouped_data.mean()
             xdata = averaged_data[x]
             ydata = averaged_data[ys]
 
             if errorbars:
-                std_data = self.full_data.groupby(x).std()
-                ystddata = std_data[ys]
+                ystddata = grouped_data.std()[ys]
 
         else:
 
@@ -171,10 +171,12 @@ class Plotter:
 
             for i, y in enumerate(ys):
 
+                plot_kwargs_i = {key: value[i] for key, value in plot_kwargs.items()}
+
                 if errorbars:
-                    ax.errorbar(xdata, ydata[y], yerr=ystddata[y], **{key: value[i] for key, value in plot_kwargs.items()})
+                    ax.errorbar(xdata, ydata[y], yerr=ystddata[y], **plot_kwargs_i)
                 else:
-                    ax.plot(xdata, ydata[y], **{key: value[i] for key, value in plot_kwargs.items()})
+                    ax.plot(xdata, ydata[y], **plot_kwargs_i)
 
             if x == 'Time':
                 pass  # axis is automatically configured for datetimes; do not modify
