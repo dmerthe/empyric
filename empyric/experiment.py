@@ -1,14 +1,9 @@
 # This submodule defines the basic behavior of the key features of the empyric package
 
-import os
-import time
-import datetime
-import numbers
-import shutil
+import os, sys, shutil, importlib, threading, time, datetime, numbers
 from scipy.interpolate import interp1d
 import numpy as np
 import pandas as pd
-import threading
 import tkinter as tk
 from tkinter.filedialog import askopenfilename
 from ruamel.yaml import YAML
@@ -242,8 +237,6 @@ class Routine:
             self.knobs = knobs  # dictionary of the form, {..., name: variable, ...}
             for knob in self.knobs.values():
                 knob.controller = None  # for keeping track of which routines are controlling knobs
-        else:
-            raise AttributeError(f'{self.__name__} routine requires knobs!')
 
         if values is not None:
 
@@ -254,9 +247,6 @@ class Routine:
                     values = [values[0]]*len(self.knobs)
 
             self.values = np.array(values, dtype=object).reshape((len(self.knobs), -1))
-
-        else:
-            raise AttributeError(f'{self.__name__} routine requires values')
 
         self.start = convert_time(start)
         self.end = convert_time(end)
@@ -827,48 +817,68 @@ class Experiment:
             elif 'parameter' in specs:
                 variables[name] = Variable(parameter=specs['parameter'])
 
-        routines = {}
+        routines = {}  # experiment routines
+
+        builtin_routines = {routine.__name__: routine for routine in Routine.__subclasses__()} # standard routines
+
+        if 'custom.py' in os.listdir(): # user can define custom routines in the runcard directory
+            sys.path.insert(1, os.getcwd())
+            cust_rout = importlib.import_module('custom')
+            custom_routines = {
+                routine.__name__: routine for routine in cust_rout.__dict__.values()
+                if type(routine) is type and issubclass(routine, Routine)
+            }
+        else:
+            custom_routines = {}
+
+        available_routines = {**builtin_routines, **custom_routines}
+
         if 'Routines' in runcard:
             for name, specs in runcard['Routines'].items():
                 specs = specs.copy()  # avoids modifying the runcard
                 _type = specs.pop('type')
 
-                for knob in np.array([specs['knobs']]).flatten():
-                    if knob not in variables:
-                        raise KeyError(f'knob {knob} specified for routine {name} is not in Variables!')
+                knobs = np.array([specs.get('knobs', [])]).flatten()
+                if knobs:
+                    for knob in knobs:
+                        if knob not in variables:
+                            raise KeyError(f'knob {knob} specified for routine {name} is not in Variables!')
 
-                specs['knobs'] = {name: variables[name] for name in np.array([specs['knobs']]).flatten()}
-                specs['values'] = np.array(specs['values'], dtype=object).reshape((len(specs['knobs']), -1))
+                    specs['knobs'] = {name: variables[name] for name in knobs}
 
-                if 'meters' in specs:
-                    for meter in np.array([specs['meters']]).flatten():
+                meters = np.array([specs.get('meters',[])]).flatten()
+                if meters:
+                    for meter in meters:
                         if meter not in variables:
                             raise KeyError(f'meter {meter} specified for routine {name} is not in Variables!')
 
-                    specs['meters'] = {name: variables[name] for name in np.array([specs['meters']]).flatten()}
+                    specs['meters'] = {name: variables[name] for name in meters}
 
-                # Values can be variables, specified by their names
-                for var_name in variables:
-                    where_variable = (specs['values'] == var_name)  # locate names of variables
-                    specs['values'][where_variable] = variables[var_name]  # replace variable names with variables
+                if 'values' in specs:
+                    specs['values'] = np.array(specs['values'], dtype=object).reshape((len(knobs), -1))
 
-                # Values can be specified in a CSV file
-                def is_csv(item):
-                    if type(item) == str:
-                        return '.csv' in item
-                    else:
-                        return False
+                    # Values can be variables, specified by their names
+                    for var_name in variables:
+                        where_variable = (specs['values'] == var_name)  # locate names of variables
+                        specs['values'][where_variable] = variables[var_name]  # replace variable names with variables
 
-                def get_csv(path, column):
-                    df = pd.read_csv(path)
-                    return df[column].values.flatten()
+                    # Values can be specified in a CSV file
+                    def is_csv(item):
+                        if type(item) == str:
+                            return '.csv' in item
+                        else:
+                            return False
 
-                specs['values'] = np.array([
-                    get_csv(values[0], knob) if is_csv(values[0]) else values
-                    for knob, values in zip(specs['knobs'].keys(), specs['values'])
-                ], dtype=object)
+                    def get_csv(path, column):
+                        df = pd.read_csv(path)
+                        return df[column].values.flatten()
 
-                routines[name] = {routine.__name__: routine for routine in Routine.__subclasses__()}[_type](**specs)
+                    specs['values'] = np.array([
+                        get_csv(values[0], knob) if is_csv(values[0]) else values
+                        for knob, values in zip(specs['knobs'].keys(), specs['values'])
+                    ], dtype=object)
+
+                routines[name] = available_routines[_type](**specs)
 
         # Set up any alarms
         if 'Alarms' in runcard and alarms is not None:
@@ -938,9 +948,10 @@ class Manager:
             with open(self.runcard, 'rb') as runcard_file:
                 self.runcard = yaml.load(runcard_file)  # load the runcard
 
-        self.settings = {}  # placeholder for the experiment settings; populated by build_experiment below
-        self.instruments = {}  # placeholder for the experiment instruments; populated by build_experiment below
-        self.alarms = {}  # placeholder for the experiment alarms; populated by build_experiment below
+        # Build experiment
+        self.settings = {}  # placeholder for the experiment settings; populated by Experiment.build below
+        self.instruments = {}  # placeholder for the experiment instruments; populated below
+        self.alarms = {}  # placeholder for the experiment alarms; populated below
 
         self.experiment = Experiment.build(self.runcard,
                                            settings=self.settings,
