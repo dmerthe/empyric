@@ -527,7 +527,7 @@ class ExperimentGUI:
         for name, entry in self.variable_entries.items():
 
             # If experiment stopped allow user to edit knobs or constant expressions
-            if 'Stopped' in self.experiment.status and name != 'Time':
+            if self.experiment.stopped and name != 'Time':
                 if self.variables[name].type in ['knob', 'parameter']:
                     continue
 
@@ -565,7 +565,7 @@ class ExperimentGUI:
                 label.config(text="CLEAR", bg='green')
 
         # Update hold, stop and dashboard buttons
-        if 'Holding' in self.experiment.status:
+        if self.experiment.holding:
             self.dash_button.config(state=tk.NORMAL)
             self.hold_button.config(text='Resume')
             self.stop_button.config(text='Stop')
@@ -578,7 +578,7 @@ class ExperimentGUI:
                 if self.variables[name].type in ['knob', 'parameter']:
                     entry.config(state=tk.NORMAL)
 
-        elif 'Stopped' in self.experiment.status:
+        elif self.experiment.stopped:
             self.dash_button.config(state=tk.NORMAL)
             self.hold_button.config(text='Hold')
             self.stop_button.config(text='Resume')
@@ -600,11 +600,11 @@ class ExperimentGUI:
                 entry.config(state=tk.DISABLED)
 
         # Quit if experiment has ended
-        if 'Terminated' in self.experiment.status:
+        if self.experiment.terminated:
             self.quit()
 
         # Plot data
-        if hasattr(self, 'plotter') and len(self.experiment.data) > 0 and 'Stopped' not in self.experiment.status:
+        if hasattr(self, 'plotter') and len(self.experiment.data) > 0 and not self.experiment.stopped:
             if time.time() > self.last_plot + self.plot_interval:
 
                 start_plot = time.perf_counter()
@@ -654,7 +654,7 @@ class ExperimentGUI:
     def toggle_hold(self):
         """User pauses/resumes the experiment through the Hold/Resume button"""
 
-        if 'Holding' in  self.experiment.status:
+        if self.experiment.holding:
             self.experiment.start()
         else:
             self.experiment.hold()
@@ -662,7 +662,7 @@ class ExperimentGUI:
     def toggle_stop(self):
         """User stops the experiment through the Stop button"""
 
-        if 'Stopped' in self.experiment.status:
+        if self.experiment.stopped:
             self.experiment.start()
         else:
             self.experiment.stop()
