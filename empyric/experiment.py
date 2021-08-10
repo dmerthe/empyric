@@ -521,6 +521,26 @@ class Experiment:
         if not self.status_locked or new_base_status == prior_base_status:
             self._status = status
 
+    @property
+    def ready(self):
+        return 'Ready' in self.status
+
+    @property
+    def running(self):
+        return 'Running' in self.status
+
+    @property
+    def holding(self):
+        return 'Holding' in self.status
+
+    @property
+    def stopped(self):
+        return 'Stopped' in self.status
+
+    @property
+    def terminated(self):
+        return 'Terminated' in self.status
+
     def __init__(self, variables, routines=None):
 
         self.variables = variables  # dict of the form {..., name: variable, ...}
@@ -967,7 +987,7 @@ class Manager:
         self.last_save = self.last_split = 0
 
         # For use with alarms
-        self.awaiting_alarms = False
+        self.awaiting_alarms = {}
 
     def run(self, directory=None):
         """
@@ -1043,42 +1063,50 @@ class Manager:
                 self.last_save = self.experiment.clock.time
 
             # Check if any alarms are triggered and handle them
-            alarms_triggered = [alarm for alarm in self.alarms.values() if alarm.triggered]
-            if len(alarms_triggered) > 0:
+            for name, alarm in self.alarms.items():
+                if alarm.triggered:
 
-                alarm = alarms_triggered[0]  # highest priority alarm is handled first
+                    if name not in self.awaiting_alarms:
+                        self.awaiting_alarms[name] = self.experiment.status  # stored value is the status to return to when alarm clears
 
-                if alarm.protocol:
-                    if 'yaml' in alarm.protocol:
-                        # terminate the experiment and run another
-                        self.experiment.terminate()
-                        self.followup = alarm.protocol
-                    elif 'hold' in alarm.protocol:
+                    if 'hold' in alarm.protocol:
                         # stop routines but keep measuring, and wait for alarm to clear
-                        self.experiment.hold()
-                        self.awaiting_alarms = True
+                        self.experiment.hold(reason=name)
+                        break
                     elif 'stop' in alarm.protocol:
                         # stop routines and measurements, and wait for alarm to clear
-                        self.experiment.stop()
-                        self.awaiting_alarms = True
-                    elif 'check' in alarm.protocol:
-                        # stop routines and measurements, and wait for the user to resume
-                        self.experiment.stop()
-                        self.experiment.status = self.experiment.STOPPED + ': waiting for alarm check'
-                        self.awaiting_alarms = 'check'
+                        self.experiment.stop(reason=name)
+                        break
                     elif 'terminate' in alarm.protocol:
                         # terminate the experiment
-                        self.experiment.terminate()
+                        self.experiment.terminate(reason=name)
                         self.awaiting_alarms = True
+                        break
+                    elif 'yaml' in alarm.protocol:
+                        # terminate the experiment and run another
+                        self.experiment.terminate(reason=name)
+                        self.followup = alarm.protocol
+                        break
+                    elif 'check' in alarm.protocol:
+                        # stop routines and measurements, and wait for the user to resume
+                        self.experiment.stop(reason=name)
+                        self.awaiting_alarms = 'check'
+                        break
+                    else:
+                        # terminate the experiment
+                        self.experiment.terminate(reason=name)
+                        break
+                else:
+                    if name in self.awaiting_alarms and 'check' not in alarm.protocol:
 
-            elif self.awaiting_alarms == 'check':
-                if self.experiment.STOPPED not in self.experiment.status:  # if user has resumed the experiment
-                    self.awaiting_alarms = False
+                        prior_status = self.awaiting_alarms.pop(name)
 
-            elif self.awaiting_alarms:
-                # If no alarms are triggered, resume experiment if holding or stopped
-                self.awaiting_alarms = False
-                self.experiment.start()
+                        if 'Running' in prior_status:
+                            self.experiment.start()
+                        if 'Holding' in prior_status:
+                            self.experiment.hold(reason=name+' cleared')
+                        if 'Stopped' in prior_status:
+                            self.experiment.stop(reason=name+' cleared')
 
             step_end = time.time()
 
