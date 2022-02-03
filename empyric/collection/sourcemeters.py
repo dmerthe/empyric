@@ -27,7 +27,9 @@ class Keithley2400(Instrument):
         'fast voltages',
         'current',
         'voltage range',
+        'voltage limit',
         'current range',
+        'current limit',
         'nplc',
         'delay',
         'output',
@@ -60,6 +62,10 @@ class Keithley2400(Instrument):
     )
 
     fast_voltages = None
+
+    current_ranges = (1e-6, 10e-6, 100e-6, 1e-3, 10e-3, 100e-3, 1, 'AUTO')  # allowed current range settings
+    voltage_ranges = (0.2, 2, 20, 200, 'AUTO')  # allowed voltage range settings
+    ovp_levels = (20, 40, 60, 80, 100, 120, 140, 160, 210)  # over-voltage protection level settings
 
     @setter
     def set_source(self, variable):
@@ -140,7 +146,7 @@ class Keithley2400(Instrument):
     def set_voltage(self, voltage):
 
         if self.source != 'voltage':
-            Warning(f'Switching sourcing mode!')
+            Warning(f'Switching source mode to voltage!')
             self.set_source('voltage')
 
         self.set_output('ON')
@@ -151,7 +157,7 @@ class Keithley2400(Instrument):
     def set_current(self, current):
 
         if self.source != 'current':
-            Warning(f'Switching sourcing mode!')
+            Warning(f'Switching source mode to current!')
             self.set_source('current')
 
         self.set_output('ON')
@@ -161,68 +167,51 @@ class Keithley2400(Instrument):
     @setter
     def set_voltage_range(self, voltage_range):
 
-        allowed_voltage_ranges = (0.2, 2, 20, 200) # allowable voltage ranges
-
-        if voltage_range in allowed_voltage_ranges:
-
+        if voltage_range in self.voltage_ranges:
             if self.source == 'voltage':
-                self.write(':SOUR:VOLT:PROT %.2E' % voltage_range)
-                self.write(':SOUR:VOLT:RANG %.2E' % voltage_range)
+                self.write(':SOUR:VOLT:RANGE %.2E' % voltage_range)
             else:
-                self.write(':SENS:VOLT:RANG %.2E' % voltage_range)
-
-        elif isinstance(voltage_range, numbers.Number):
-
-            # Find nearest encapsulating voltage range
-            try:
-                nearest = np.argwhere( voltage_range <= np.array(allowed_voltage_ranges) ).flatten()[0]
-            except IndexError:
-                nearest = -1
-
-            self.set_voltage_range(allowed_voltage_ranges[nearest])
-
+                if voltage_range == 'AUTO':
+                    self.write(':SENS:VOLT:RANGE AUTO')
+                else:
+                    self.write(':SENS:VOLT:RANGE %.2E' % voltage_range)
         else:
-            if self.source == 'voltage':
-                self.write(':SOUR:VOLT:RANG:AUTO 1')
-            else:
-                self.write(':SENS:VOLT:PROT MAX')
-                self.write(':SENS:VOLT:RANG:AUTO 1')
+            first_line = f'Given voltage range {voltage_range} is not a valid value for {self.name}\n'
+            second_line = f'Valid values are {self.voltage_ranges}'
+            raise ValueError(first_line + second_line)
 
-            Warning('given voltage range is not permitted; set to auto-range.')
+    @setter
+    def set_voltage_limit(self, voltage_limit):
+
+        if self.source == 'voltage':
+            if int(voltage_limit) in self.ovp_levels:
+                self.write(':SOUR:VOLT:PROT %d' % int(voltage_limit))
+            else:
+                first_line = f'{self.name} is sourcing voltage, but given voltage limit {voltage_limit} is not a valid value\n'
+                second_line = f'Valid values are {self.ovp_levels}'
+                raise ValueError(first_line + second_line)
+        else:
+            self.write(':SENS:VOLT:PROT %.2E' % voltage_limit)
 
     @setter
     def set_current_range(self, current_range):
 
-        allowed_current_ranges = (1e-6, 10e-6, 100e-6, 1e-3, 10e-3, 100e-3, 1)
-
-        if current_range in allowed_current_ranges:
-
+        if current_range in self.current_ranges:
             if self.source == 'current':
-                self.write(':SOUR:CURR:RANG %.2E' % current_range)
+                self.write(':SOUR:CURR:RANGE %.2E' % current_range)
             else:
-                self.write(':SENS:CURR:PROT %.2E' % current_range)
-                self.write(':SENS:CURR:RANG %.2E' % current_range)
-
-        elif isinstance(current_range, numbers.Number):
-
-            # Find nearest encapsulating current range
-            try:
-                nearest = np.argwhere( current_range <= np.array(allowed_current_ranges) ).flatten()[0]
-            except IndexError:
-                nearest = -1
-
-            Warning(f'Given current range not an option, setting to {allowed_current_ranges[nearest]} A instead')
-            self.set_current_range(allowed_current_ranges[nearest])
-
+                if current_range == 'AUTO':
+                    self.write(':SENS:CURR:RANGE AUTO')
+                else:
+                    self.write(':SENS:CURR:RANGE %.2E' % current_range)
         else:
+            first_line = f'Given current range {current_range} is not a valid value for {self.name}\n'
+            second_line = f'Valid values are {self.current_ranges}'
+            raise ValueError(first_line + second_line)
 
-            if self.source == 'current':
-                self.write(':SOUR:CURR:RANG:AUTO 1')
-            else:
-                self.write(':SENS:CURR:PROT MAX')
-                self.write(':SENS:CURR:RANG:AUTO 1')
-
-            Warning('given current range is not permitted; set to auto-range.')
+    @setter
+    def set_current_limit(self, current_limit):
+        self.write(':SENS:CURR:PROT %.2E' %  current_limit)
 
     @setter
     def set_nplc(self, nplc):
@@ -324,7 +313,9 @@ class Keithley2460(Instrument):
         'fast voltages',
         'current',
         'voltage range',
+        'voltage limit',
         'current range',
+        'current limit',
         'nplc',
         'delay',
         'output',
@@ -339,8 +330,6 @@ class Keithley2460(Instrument):
         'meter': 'current',
         'voltage':0,
         'output': 'ON',
-        'voltage range': 100,
-        'current range': 1,
         'nplc': 1,
         'source delay': 0,
         'remote sense': 'OFF'
@@ -359,6 +348,10 @@ class Keithley2460(Instrument):
     )
 
     fast_voltages = None
+
+    current_ranges = (1e-6, 10e-6, 100e-6, 1e-3, 10e-3, 100e-3, 1, 4, 5, 7)
+    voltage_ranges = (0.2, 2, 7, 10, 20, 100)
+    ovp_levels = (2, 5, 10, 20, 40, 60, 80, 100, 120, 140, 160, 180)
 
     @setter
     def set_source(self, variable):
@@ -445,69 +438,51 @@ class Keithley2460(Instrument):
     @setter
     def set_voltage_range(self, voltage_range):
 
-        allowed_voltage_ranges = (0.2, 2, 7, 10, 20, 100)
-
-        if voltage_range in allowed_voltage_ranges:
-
+        if voltage_range in self.voltage_ranges:
             if self.source == 'voltage':
-                self.write('SOUR:VOLT:RANG %.2e' % voltage_range)
+                self.write(':SOUR:VOLT:RANGE %.2E' % voltage_range)
             else:
-                self.write('SOUR:CURR:VLIM %.2e' % voltage_range)
-                self.write('SENS:VOLT:RANG %.2e' % voltage_range)
-
-        elif isinstance(voltage_range, numbers.Number):
-
-            # Find nearest encapsulating voltage range
-            try:
-                nearest = np.argwhere( voltage_range <= np.array(allowed_voltage_ranges) ).flatten()[0]
-            except IndexError:
-                nearest = -1
-
-            self.set_voltage_range(allowed_voltage_ranges[nearest])
-
-        elif voltage_range == 'AUTO':
-
-            if self.source == 'voltage':
-                self.write(':SOUR:VOLT:RANG:AUTO ON')
-            else:
-                self.write(':SOUR:CURR:VLIM MAX')
-                self.write(':SENS:VOLT:RANG:AUTO ON')
-
+                if voltage_range == 'AUTO':
+                    self.write(':SENS:VOLT:RANGE:AUTO ON')
+                else:
+                    self.write(':SENS:VOLT:RANGE %.2E' % voltage_range)
         else:
-            Warning('given voltage range is not permitted; voltage range unchanged')
+            first_line = f'Given voltage range {voltage_range} is not a valid value for {self.name}\n'
+            second_line = f'Valid values are {self.voltage_ranges}'
+            raise ValueError(first_line + second_line)
+
+    @setter
+    def set_voltage_limit(self, voltage_limit):
+
+        if self.source == 'voltage':
+            if int(voltage_limit) in self.ovp_levels:
+                self.write(':SOUR:VOLT:PROT PROT%d' % int(voltage_limit))
+            else:
+                first_line = f'{self.name} is sourcing voltage, but given voltage limit {voltage_limit} is not a valid value\n'
+                second_line = f'Valid values are {self.ovp_levels}'
+                raise ValueError(first_line + second_line)
+        else:
+            self.write(':SOUR:CURR:VLIM %.2E' % voltage_limit)
 
     @setter
     def set_current_range(self, current_range):
 
-        allowed_current_ranges = (1e-6, 10e-6, 100e-6, 1e-3, 10e-3, 100e-3, 1, 4, 5, 7)
-
-        if current_range in allowed_current_ranges:
-
+        if current_range in self.current_ranges:
             if self.source == 'current':
-                self.write('SOUR:CURR:RANG %.2E' % current_range)
+                self.write(':SOUR:CURR:RANGE %.2E' % current_range)
             else:
-                self.write('SOUR:VOLT:ILIM %.2e' % current_range)
-                self.write('SENS:CURR:RANG %.2E' % current_range)
-
-        elif isinstance(current_range, numbers.Number):
-
-            # Find nearest encapsulating current range
-            try:
-                nearest = np.argwhere(current_range <= np.array(allowed_current_ranges)).flatten()[0]
-            except IndexError:
-                nearest = -1
-
-            self.set_current_range(allowed_current_ranges[nearest])
-
-        elif current_range == 'AUTO':
-
-            if self.source == 'current':
-                self.write('SOUR:CURR:RANG:AUTO 1')
-            else:
-                self.write('SOUR:VOLT:ILIM MAX')
-                self.write('SENS:CURR:RANG:AUTO 1')
+                if current_range == 'AUTO':
+                    self.write(':SENS:CURR:RANGE:AUTO ON')
+                else:
+                    self.write(':SENS:CURR:RANGE %.2E' % current_range)
         else:
-            Warning('given current range is not permitted; current range unchanged')
+            first_line = f'Given current range {current_range} is not a valid value for {self.name}\n'
+            second_line = f'Valid values are {self.current_ranges}'
+            raise ValueError(first_line + second_line)
+
+    @setter
+    def set_current_limit(self, current_limit):
+        self.write(':SOUR:VOLT:ILIM %.2E' % current_limit)
 
     @setter
     def set_nplc(self, nplc):
@@ -627,7 +602,9 @@ class Keithley2651A(Instrument):
         'fast voltages',
         'current',
         'voltage range',
+        'voltage limit',
         'current range',
+        'current limit',
         'nplc',
         'output',
         'source',
@@ -742,7 +719,10 @@ class Keithley2651A(Instrument):
             self.write('smua.source.autorangev = smua.AUTORANGE_ON')
         else:
             self.write(f'smua.source.rangev = {voltage_range}')
-            self.write(f'smua.source.limitv = {voltage_range}')
+
+    @setter
+    def set_voltage_limit(self, voltage_limit):
+        self.write(f'smua.source.limitv = {voltage_limit}')
 
     @setter
     def set_current_range(self, current_range):
@@ -751,7 +731,10 @@ class Keithley2651A(Instrument):
             self.write('smua.source.autorangei = smua.AUTORANGE_ON')
         else:
             self.write(f'smua.source.rangei = {current_range}')
-            self.write(f'smua.source.limiti = {current_range}')
+
+    @setter
+    def set_current_limt(self, current_limit):
+        self.write(f'smua.source.limiti = {current_limit}')
 
     @setter
     def set_nplc(self, nplc):
