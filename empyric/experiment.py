@@ -488,7 +488,11 @@ class Alarm:
 
     def __init__(self, condition, variables, protocol=None):
         self.trigger_variable = Variable(expression=condition, definitions=variables)
-        self.protocol = protocol
+        
+        if protocol:
+            self.protocol = protocol
+        else:
+            self.protocol = 'none'
 
     @property
     def triggered(self):
@@ -1068,7 +1072,10 @@ class Manager:
 
                     if name not in self.awaiting_alarms:
                         self.awaiting_alarms[name] = self.experiment.status  # stored value is the status to return to when alarm clears
-
+                    
+                    if 'none' in alarm.protocol:
+                        # do nothing (but GUI will indicate that alarm is triggered)
+                        break
                     if 'hold' in alarm.protocol:
                         # stop routines but keep measuring, and wait for alarm to clear
                         self.experiment.hold(reason=name)

@@ -210,7 +210,7 @@ class Keithley2400(Instrument):
             raise ValueError(first_line + second_line)
 
     @setter
-    def set_current_limt(self, current_limit):
+    def set_current_limit(self, current_limit):
         self.write(':SENS:CURR:PROT %.2E' %  current_limit)
 
     @setter
@@ -330,8 +330,6 @@ class Keithley2460(Instrument):
         'meter': 'current',
         'voltage':0,
         'output': 'ON',
-        'voltage range': 100,
-        'current range': 1,
         'nplc': 1,
         'source delay': 0,
         'remote sense': 'OFF'
@@ -351,7 +349,7 @@ class Keithley2460(Instrument):
 
     fast_voltages = None
 
-    current_range = (1e-6, 10e-6, 100e-6, 1e-3, 10e-3, 100e-3, 1, 4, 5, 7)
+    current_ranges = (1e-6, 10e-6, 100e-6, 1e-3, 10e-3, 100e-3, 1, 4, 5, 7)
     voltage_ranges = (0.2, 2, 7, 10, 20, 100)
     ovp_levels = (2, 5, 10, 20, 40, 60, 80, 100, 120, 140, 160, 180)
 
@@ -458,7 +456,7 @@ class Keithley2460(Instrument):
 
         if self.source == 'voltage':
             if int(voltage_limit) in self.ovp_levels:
-                self.write(':SOUR:VOLT:PROT %d' % int(voltage_limit))
+                self.write(':SOUR:VOLT:PROT PROT%d' % int(voltage_limit))
             else:
                 first_line = f'{self.name} is sourcing voltage, but given voltage limit {voltage_limit} is not a valid value\n'
                 second_line = f'Valid values are {self.ovp_levels}'
