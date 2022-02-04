@@ -139,7 +139,7 @@ class Variable:
             self.parameter = parameter
             self.type = 'parameter'
         else:
-            raise ValueError('variable object must have a specified knob, meter or expression!')
+            raise ValueError('variable object must have a specified knob, meter or expression, or assigned a value if a parameter!')
 
         self._value = None  # last known value of this variable
         self.last_evaluation = np.nan  # time of last evaluation; used for expressions
@@ -208,7 +208,7 @@ class Variable:
 
     @value.setter
     def value(self, value):
-        # value property can only be set if variable is a knob; None value indicates no setting should be applied
+        # value property can only be set if variable is a knob; None or nan value indicates no setting should be applied
         if hasattr(self, 'knob') and value is not None and value is not np.nan:
             self.instrument.set(self.knob, value)
             self._value = self.instrument.__getattribute__(self.knob.replace(' ', '_'))
@@ -777,7 +777,7 @@ class Experiment:
     @staticmethod
     def build(runcard, settings=None, instruments=None, alarms=None):
         """
-        Build an Experiment object based on a runcard, in the form of a .yaml file or a dictionary
+        Build an Experiment object based on a runcard, in the form of a YAML file or a dictionary
 
         :param runcard: (dict/str) description of the experiment in the runcard format
         :param settings: (dict) dictionary of settings to be populated
@@ -789,6 +789,16 @@ class Experiment:
 
         if instruments is None:
             instruments = {}
+
+        if type(runcard) == str:  # if runcard argument is a path to a YAML file
+
+            dirname = os.path.dirname(runcard)
+            if dirname != '':
+                os.chdir(os.path.dirname(runcard))  # go to runcard directory to put data in same location
+
+            yaml = YAML()
+            with open(runcard, 'rb') as runcard_file:
+                runcard = yaml.load(runcard_file)  # load the runcard into a dictionary
 
         # If given a settings keyword argument, get settings from runcard and store it there
         if 'Settings' in runcard and settings is not None:
@@ -951,7 +961,7 @@ class Manager:
     def __init__(self, runcard=None):
         """
 
-        :param runcard: (dict/str) runcard as a dictionary or path pointing to a runcard
+        :param runcard: (dict/str) runcard as a dictionary or path pointing to a YAML file
         """
 
         if not runcard:
@@ -959,6 +969,9 @@ class Manager:
             root = tk.Tk()
             root.withdraw()
             self.runcard = askopenfilename(parent=root, title='Select Runcard', filetypes=[('YAML files', '*.yaml')])
+
+            if self.runcard == '':
+                raise ValueError('a valid runcard was not selected!')
         else:
             self.runcard = runcard
 
