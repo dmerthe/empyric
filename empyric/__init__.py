@@ -10,6 +10,9 @@ def run_experiment():  # Run an experiment with a runcard
     if len(args) > 0:
         runcard = args[0]
 
+        if runcard == '.':
+            runcard = [path for path in os.listdir() if '.yaml' in path][0]
+
     directory = None
     if len(args) > 1:
         directory = args[1]
