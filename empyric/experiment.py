@@ -955,7 +955,9 @@ class Experiment:
 
 class Manager:
     """
-    Utility class which sets up and manages experiments, based on runcards
+    Utility class which sets up and manages experiments, based on runcards. When initallized, it uses the given runcard
+    to construct an experiment and run it in a separate thread. The Manager also handles alarms as specified by the
+    runcard.
     """
 
     def __init__(self, runcard=None):
@@ -964,18 +966,18 @@ class Manager:
         :param runcard: (dict/str) runcard as a dictionary or path pointing to a YAML file
         """
 
-        if not runcard:
-            # Have user locate runcard
+        if runcard:
+            self.runcard = runcard
+        else:
+            # Have user locate runcard, if none given
             root = tk.Tk()
             root.withdraw()
             self.runcard = askopenfilename(parent=root, title='Select Runcard', filetypes=[('YAML files', '*.yaml')])
 
             if self.runcard == '':
                 raise ValueError('a valid runcard was not selected!')
-        else:
-            self.runcard = runcard
 
-        if type(self.runcard) == str:
+        if isinstance(self.runcard, str) and os.path.exists(self.runcard):
 
             dirname = os.path.dirname(self.runcard)
             if dirname != '':
@@ -984,6 +986,12 @@ class Manager:
             yaml = YAML()
             with open(self.runcard, 'rb') as runcard_file:
                 self.runcard = yaml.load(runcard_file)  # load the runcard
+
+        elif isinstance(self.runcard, dict):
+            pass
+        else:
+            raise TypeError(f'runcard given to Manager must be a path to a YAML file or a dictionary, ' +
+                            f'not {type(self.runcard)}!')
 
         # Build experiment
         self.settings = {}  # placeholder for the experiment settings; populated by Experiment.build below
@@ -1003,8 +1011,7 @@ class Manager:
 
         self.last_save = self.last_split = 0
 
-        # For use with alarms
-        self.awaiting_alarms = {}
+        self.awaiting_alarms = {} # dictionary of alarms that are triggered
 
     def run(self, directory=None):
         """
@@ -1083,8 +1090,11 @@ class Manager:
             for name, alarm in self.alarms.items():
                 if alarm.triggered:
 
-                    if name not in self.awaiting_alarms:
-                        self.awaiting_alarms[name] = self.experiment.status  # stored value is the status to return to when alarm clears
+                    # Add to dictionary of triggered alarms
+                    self.awaiting_alarms[name] = {
+                        'time': self.experiment.data['Time'],
+                        'status': self.experiment.status,
+                    }
                     
                     if 'none' in alarm.protocol:
                         # do nothing (but GUI will indicate that alarm is triggered)
@@ -1100,7 +1110,6 @@ class Manager:
                     elif 'terminate' in alarm.protocol:
                         # terminate the experiment
                         self.experiment.terminate(reason=name)
-                        self.awaiting_alarms = True
                         break
                     elif 'yaml' in alarm.protocol:
                         # terminate the experiment and run another
@@ -1110,26 +1119,29 @@ class Manager:
                     elif 'check' in alarm.protocol:
                         # stop routines and measurements, and wait for the user to resume
                         self.experiment.stop(reason=name)
-                        self.awaiting_alarms = 'check'
                         break
                     else:
                         # terminate the experiment
                         self.experiment.terminate(reason=name)
                         break
-                else:
-                    if name in self.awaiting_alarms and 'check' not in alarm.protocol:
 
-                        prior_status = self.awaiting_alarms.pop(name)
+                elif name in self.awaiting_alarms:
+                    # Alarm was previously triggered but is now clear
 
-                        if 'Running' in prior_status:
-                            self.experiment.start()
-                        if 'Holding' in prior_status:
-                            self.experiment.hold(reason=name+' cleared')
-                        if 'Stopped' in prior_status:
-                            self.experiment.stop(reason=name+' cleared')
+                    if 'check' not in alarm.protocol: # alarm is not waiting for user to check
+
+                        info = self.awaiting_alarms.pop(name)  # remove from dictionary of triggered alarms
+                        prior_status = info['status']
+
+                        if len(self.awaiting_alarms) == 0:
+                            # there are no more triggered alarms; return to state of experiment prior to trigger
+                            if 'Running' in prior_status:
+                                self.experiment.start()
+                            if 'Holding' in prior_status:
+                                self.experiment.hold(reason=name+' cleared')
+                            if 'Stopped' in prior_status:
+                                self.experiment.stop(reason=name+' cleared')
 
             step_end = time.time()
-
             remaining_time = np.max([self.step_interval - (step_end - step_start), 0])
-
             time.sleep(remaining_time)
