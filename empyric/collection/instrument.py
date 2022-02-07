@@ -1,3 +1,5 @@
+import numpy as np
+from numbers import Number
 from functools import wraps
 from empyric.adapters import *
 
@@ -62,6 +64,36 @@ def measurer(method):
         return value
 
     return wrapped_method
+
+# Utility functions that help interpret values
+def is_on(value):
+
+    on_values = [1, '1', 'ON', 'On', 'on']
+
+    if value in on_values:
+        return True
+    else:
+        return False
+
+def is_off(value):
+
+    off_values = [0, '0', 'OFF', 'Off', 'off']
+
+    if value in off_values:
+        return True
+    else:
+        return False
+
+def to_number(value):
+
+    if isinstance(value, Number):
+        return value
+    elif isinstance(str):
+        return float(value)
+    elif isinstance(np.ndarray) and len(value) == 0:
+        return float(value)
+    else:
+        return np.nan
 
 
 class Instrument:

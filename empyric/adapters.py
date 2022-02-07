@@ -186,8 +186,8 @@ class Serial(Adapter):
     delay = 0.1
     parity = 'N'
     stop_bits = 1
-    input_termination = '\n'
-    output_termination = '\r'
+    read_termination = '\n'
+    write_termination = '\r'
 
     def __repr__(self):
         return 'Serial'
@@ -208,7 +208,7 @@ class Serial(Adapter):
 
     def _write(self, message):
 
-        self.backend.write((message + self.output_termination).encode())
+        self.backend.write((message + self.write_termination).encode())
 
         return "Success"
 
@@ -221,7 +221,7 @@ class Serial(Adapter):
         elif until:
             response = self.backend.read_until(until)
         else:
-            response = self.backend.read_until(self.input_termination.encode())
+            response = self.backend.read_until(self.read_termination.encode())
 
         self.backend.reset_input_buffer()
 

@@ -10,7 +10,7 @@ class BRAX3000(Instrument):
     name = "BRAX3000"
 
     supported_adapters = (
-        (Serial, {'baud_rate': 19200, 'input_termination':'\r', 'timeout': 1}),
+        (Serial, {'baud_rate': 19200, 'read_termination':'\r', 'timeout': 1}),
         (VISASerial, {'baud_rate': 19200, 'timeout': 1})
     )
 

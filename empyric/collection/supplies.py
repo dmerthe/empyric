@@ -10,7 +10,7 @@ class Keithley2260B(Instrument):
     name = 'Keithley2260B'
 
     supported_adapters = (
-        (Serial, {'baud_rate': 115200, 'output_termination': '\r\n'}),
+        (Serial, {'baud_rate': 115200, 'write_termination': '\r\n'}),
         (VISASerial, {'baud_rate': 115200})
     )
 
@@ -132,3 +132,68 @@ class BK9183B(Instrument):
     @getter
     def get_max_voltage(self):
         return float(self.query('SOUR:VOLT?'))
+
+class UltraflexInductionHeater(Instrument):
+    """UltraFlex Ultraheat S2 (or similar) 2 kW induction heater"""
+
+    name = "UltraflexInductionHeater"
+
+    supported_adapters = (
+        (Serial, {})
+    )
+
+    knobs = (
+        'power',
+        'output',
+        'mode'
+    )
+
+    meters = (
+        'voltage',
+        'current',
+        'frequency',
+    )
+
+    @measurer
+    def measure_current(self):
+        return 0.1 * float(self.query('S3i11K')[3:-3], 16)
+
+    @measurer
+    def measure_voltage(self):
+        return float(self.query('S3v04K')[3:-3], 16)
+
+    @measurer
+    def measure_frequency(self):
+        return 1e3 * float(self.query('S3f14K')[3:-3], 16)
+
+    @setter
+    def set_power(self, percent_of_max):
+
+        if percent_of_max < 0 or percent_of_max > 100:
+            raise ValueError('power setting must be a percentage value between 0 and 100')
+
+        ascii_command = 'S34'
+        ascii_command += hex(int(round(percent_of_max)))[-2:].upper()
+        ascii_command += hex(512 - sum(ascii_command.encode()))[-2:].upper()
+        self.query(ascii_command + 'K')
+
+    @getter
+    def get_power(self):
+        return float(self.query('S3B38K')[3:5], 16)
+
+    @setter
+    def set_output(self, output):
+        if is_on(output):
+            self.query('S3200E8K')
+        elif is_off(output):
+            self.query('S3347K')
+
+    @setter
+    def set_mode(self, mode):
+        if mode.lower() == 'manual':
+            self.query('S3L01CDK')
+        elif mode.lower() == 'remote':
+            self.query('S3L00CEK')
+        else:
+            raise ValueError(f'{self.name}: Unsupported control mode {mode}. '
+                             'Allowed values are "manual" and "remote".')

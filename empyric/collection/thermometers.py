@@ -44,3 +44,37 @@ class Phidget1101(Instrument):
     @measurer
     def measure_temperature(self):
         return self.query('Temperature')
+
+
+class WilliamsonPyrometer(Instrument):
+    """
+    Williamson Pro Series 2-color pyrometer.
+    """
+
+    supported_adapters = (
+        (Serial, {
+            'read_termination': b'\n\r',
+            'write_termination': b'\r\n',
+            'baud_rate': 38400
+        }),
+    )
+
+    meters = (
+        'temperature',
+        'unfiltered temperature',
+        'signal strength',
+    )
+
+    @measurer
+    def measure_temperature(self):
+        # temp returned in in F, convert to C
+        return (to_number(self.query('FT')) - 32) / 1.8
+
+    @measurer
+    def measure_unfiltered_temperature(self):
+        # temp returned in in F, convert to C
+        return (to_number(self.query('UT')) - 32) / 1.8
+
+    @measurer
+    def measure_signal_strength(self):
+        return to_number(self.query('SS'))
