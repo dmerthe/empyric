@@ -20,7 +20,7 @@ class Clock(Instrument):
     meters = ('time', )
 
     @property
-    def time(self):
+    def _time(self):
         if self.stop_time:
             elapsed_time = self.stop_time - self.start_time - self.stoppage
         else:
@@ -37,6 +37,13 @@ class Clock(Instrument):
 
     @setter
     def set_state(self, state):
+        """
+        Set the clock state:
+
+        * 'START': setting to this state starts the clock, if it is stopped.
+        * 'STOP': setting to this state stops the clock, if it is running.
+        * 'RESET': setting to this state resets the clock time to zero.
+        """
 
         if state == 'START':
 
@@ -59,16 +66,17 @@ class Clock(Instrument):
 
     @measurer
     def measure_time(self):
-        return self.time
+        """Measure the clock time"""
+        return self._time
 
 
 class HenonMapper(Instrument):
     """
     Virtual instrument based on the behavior of a 2D Henon Map:
 
-    x_{n+1} = 1 - a x_n^2 + y_n
+    x_{n+1} = 1 - a * x_n^2 + y_n
 
-    y_{n+1} = b x_n
+    y_{n+1} = b * x_n
 
     It has two virtual knobs (a,b) and two virtual meters (x,y)
     """
@@ -113,7 +121,8 @@ class HenonMapper(Instrument):
     def measure_x(self):
         """
         Measure the coordinate x.
-        Each call triggers a new iteration, with new values set for x and y based on the Henon Map
+        Each call triggers a new iteration, with new values set for x and y based on the Henon Map. Therefore, each call
+        to ``measure_x`` should be followed by a call to ``measure_y``.
 
         :return: (float) current value of x
         """
@@ -129,7 +138,8 @@ class HenonMapper(Instrument):
     @measurer
     def measure_y(self):
         """
-        Measure the coordinate y
+        Measure the coordinate y.
+        Each call to ``measure_y`` should be preceded by a call to ``measure_x``.
 
         :return: (float) current value of y
         """

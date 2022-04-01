@@ -243,7 +243,7 @@ class Plotter:
         plt.rcParams['image.cmap'] = colormap
         cmap = plt.get_cmap('viridis')
 
-        plot_kwargs = self.settings[name].get('line', {})  # kwargs for matplotlib
+        plot_kwargs = self.settings[name].get('options', {})  # kwargs for matplotlib
 
         if not hasattr(fig, 'cbar'):  # draw a new plot
 
@@ -640,8 +640,8 @@ class ExperimentGUI:
             self.root.after(50, self.update)
 
     def open_dashboard(self):
-        """Upon user hitting the Dashboard button, opens a window which allows the user to interact with instruments
-        while the experiment is stopped"""
+        """When the user hits the Dashboard button, open a window which allows the user to interact with
+        instruments while the experiment is paused or stopped"""
 
         prior_status = self.experiment.status
 

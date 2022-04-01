@@ -7,6 +7,7 @@ class OmegaCN7500(Instrument):
     Omega model CN7500 PID temperature controller
     """
 
+    #:
     name = 'OmegaCN7500'
 
     supported_adapters = (

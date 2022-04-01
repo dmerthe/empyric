@@ -3,18 +3,19 @@
 Instruments
 ===========
 
-An instrument is generally a collection of knobs and meters that you set and measure, respectively, through an adapter (see :ref:`adapters-section`). The methods for setting knobs are of the format, ``set_knob`` or ``set('knob')``, where ``knob`` is the name of the knob. Similarly, measuring a meter is done by calling the instrument's ``measure_meter`` or ``measure('meter')`` methods, where ``meter`` is the name of the meter.
+An instrument, both physically and within Empyric, is essentially an ensemble of knobs that you set and meters that you measure. Commands to perform these actions are mediated by an adapter (see :ref:`adapters-section`). The methods for setting knobs are of the format, ``set_knob`` or ``set('knob')``, where ``knob`` is the name of the knob. Similarly, measuring a meter is done by calling the instrument's ``measure_meter`` or ``measure('meter')`` methods, where ``meter`` is the name of the meter.
 
-It is also possible to read a knob value from an instrument by calling the ``get_knob`` method of the instrument, if it has one. Otherwise, the last known value of the knob can obtained by retrieving the corresponding attribute of the instrument, e.g. ``power_supply.voltage`` to get the last known setpoint of knob ``voltage`` on the instrument ``power_supply``.
+It is also possible to read a knob value from an instrument by calling the ``get_knob`` method of the instrument, if it has one. Otherwise, the last known value of the knob can obtained by retrieving the corresponding attribute of the instrument, e.g. ``instrument.knob`` to get the last known setpoint of ``knob`` on the ``instrument``.
 
-Each instrument has a one or more supported adapters, found by retrieving the ``supported_adapters`` attribute of the class.
+Each instrument has a one or more supported adapters, found by retrieving the ``supported_adapters`` attribute of the class; each element of this tuple contains the adapter class and any non-default settings of that adapter required to communicate with this  instrument.
 
-The instruments listed in the collection below are supported by the empyric module, and are subclasses of the ``Instrument`` class:
+The supported instruments listed below are subclasses of the ``Instrument`` class:
 
 .. autoclass:: empyric.collection.instrument.Instrument
    :members:
+   :undoc-members:
 
-An instance on an instrument from the collection below can be initialized by importing from ``empyric.instruments``. For example, instantiating a Keithley 2400 sourcemeter is done with the command sequence,
+An instance of an instrument from the collection of instruments below can be initialized by importing from ``empyric.instruments``. For example, instantiating a Keithley 2400 sourcemeter is done with the command sequence,
 
 .. code-block::
 
@@ -23,12 +24,13 @@ An instance on an instrument from the collection below can be initialized by imp
 
 .. _collection-section:
 
-The Collection
---------------
+Supported Instruments
+---------------------
 
 .. toctree::
    :maxdepth: 2
-	
+   
+   instruments/virtual
    instruments/humans
    instruments/controllers
    instruments/supplies
@@ -38,15 +40,4 @@ The Collection
    instruments/barometers
    instruments/spectrometers
    instruments/scopes
-
-
-The ``HenonMapper`` is a virtual instrument that is useful for testing in the absense of a physical instrument:
-   
-.. autoclass:: empyric.collection.virtual.HenonMapper
-   :members:
-
-A basic virtual PID controller is provided:
-
-.. autoclass:: empyric.collection.virtual.PIDController
-   :members:
 

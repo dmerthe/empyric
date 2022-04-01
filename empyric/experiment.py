@@ -202,7 +202,7 @@ class Variable:
                 elif self.parameter == 'False':
                     self._value = False
                 else:
-                    self._value = self.parameter # otherwise, keep as given
+                    self._value = self.parameter  # otherwise, keep as given
 
         return self._value
 
@@ -390,7 +390,7 @@ class Sequence(Routine):
         self.iteration = (self.iteration + 1) % len(self.values[0])
 
 
-class Minimize(Routine):
+class Minimization(Routine):
     """
     Minimize the sum of a set of meters/expressions influenced by a set of knobs, using simulated annealing.
     """
@@ -447,7 +447,7 @@ class Minimize(Routine):
             return False
 
 
-class Maximize(Minimize):
+class Maximization(Minimization):
     """
     Maximize a set of meters/expressions influenced by a set of knobs; works the same way as Minimize.
     """
@@ -880,7 +880,7 @@ class Experiment:
 
                     specs['knobs'] = {name: variables[name] for name in knobs}
 
-                meters = np.array([specs.get('meters',[])]).flatten()
+                meters = np.array([specs.get('meters', [])]).flatten()
                 if meters:
                     for meter in meters:
                         if meter not in variables:
@@ -1007,11 +1007,11 @@ class Manager:
         self.followup = self.settings.get('follow-up', None)
         self.step_interval = convert_time(self.settings.get('step interval', 0.1))
         self.save_interval = convert_time(self.settings.get('save interval', 60))
-        self.plot_interval = convert_time(self.settings.get('plot interval', 0))
+        self.plot_interval = convert_time(self.settings.get('plot interval', 0.1))
 
-        self.last_save = self.last_split = 0
+        self.last_save = 0
 
-        self.awaiting_alarms = {} # dictionary of alarms that are triggered
+        self.awaiting_alarms = {}  # dictionary of alarms that are triggered
 
     def run(self, directory=None):
         """

@@ -99,26 +99,33 @@ def to_number(value):
 class Instrument:
     """
     Basic representation of an instrument, essentially a set of knobs and meters
+
+    Each instrument has the following attributes:
+
+    * ``name``: the name of the instrument. Once connected via  an adapter, this is converted to
+      ``name + '@' + address``.
+    * ``supported adapters``: tuple of 2-element tuples. Each 2-element tuple contains an adapter class that the
+      instrument can be used with and a dictionary of adapter settings.
+    * ``knobs``: tuple of the names of all knobs that can be set on the instrument.
+    * ``presets``: dictionary of knob settings to apply when the instrument is instantiated.
+      The keys are the names of the knobs and the values are the knob values.
+    * ``postsets``: dictionary of knob settings (same format as ``presets``) to apply when the instrument is deleted.
+    * ``meters``: tuple of the names of all meters that can be measured on this instrument.
+
     """
 
-    #: Once connected via an adapter, the name of the instrument is converted to ``self.name + '@' + self.address``
     name = 'Instrument'
 
-    #: Each instrument has a set of supported adapters, e.g. serial, GPIB or USB
     supported_adapters = (
         (Adapter, {}),
     )
 
-    #: Each instrument has a set of knobs
     knobs = tuple()
 
-    #: The presets attribute indicate how the instrument should be configured upon connection
     presets = {}
 
-    #: The postsets attribute indicate how the instrument should be configured upon disconnection
-    postsets = {}  # values knobs should be when instrument is disconnected
+    postsets = {}
 
-    #: Each instrument has a set of meters
     meters = tuple()
 
     def __init__(self, address=None, adapter=None, presets=None, postsets=None, **kwargs):
@@ -207,16 +214,16 @@ class Instrument:
         """
         Alias for the adapter's query method, if it has one
 
-        :param args: any arguments for the adapter's read method, usually including a query string
-        :param kwargs: any arguments for the adapter's write method
-        :return: whatever is returned by the adapter's write method, usually a response string
+        :param args: any arguments for the adapter's query method, usually including a query string
+        :param kwargs: any arguments for the adapter's query method
+        :return: whatever is returned by the adapter's query method, usually a response string
         """
 
         return self.adapter.query(*args, **kwargs)
 
     def set(self, knob, value):
         """
-        Set the value of a variable associated with the instrument
+        Set the value of a knob on the instrument
 
         :param knob: (string) name of variable to be set
         :param value: (float/string) value of new variable setting
@@ -231,6 +238,13 @@ class Instrument:
         set_method(value)
 
     def get(self, knob):
+        """
+        Get the value of a knob on the instrument. If the instrument has a get method for the knob, a command will be
+        sent to the instrument to retrieve the actual value of the knob. If it does not have a get method for the knob,
+        the last known value, stored as an instance attribute, will be return (possibly being ``nan`` if no value has
+        yet been set)
+
+        """
 
         if hasattr(self, 'get_'+knob.replace(' ', '_')):
             return getattr(self, 'get_'+knob.replace(' ', '_'))()

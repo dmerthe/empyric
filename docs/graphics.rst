@@ -1,3 +1,5 @@
+.. _gui-section:
+
 The Experiment GUI and Plotting 
 ===============================
 
@@ -7,7 +9,7 @@ and interact with an experiment, and the ``Plotter`` class which
 provides some shortcuts for generating plots of experiment data.
 
 
-The ``Plotter`` class takes a pandas DataFrame is its only required
+The ``Plotter`` class takes a pandas DataFrame as its only required
 argument, and plot settings are defined by the optional ``settings``
 keyword argument. The given DataFrame must have a 'time' column and
 datetime indices. If no plot settings are specified, it is assumed that

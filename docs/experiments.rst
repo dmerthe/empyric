@@ -17,9 +17,9 @@ Variables, Routines & Experiments
 
 .. autoclass:: empyric.experiment.Sequence
 
-.. autoclass:: empyric.experiment.Minimize
+.. autoclass:: empyric.experiment.Minimization
 
-.. autoclass:: empyric.experiment.Maximize
+.. autoclass:: empyric.experiment.Maximization
 
 .. autoclass:: empyric.experiment.Alarm
    :members:
