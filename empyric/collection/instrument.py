@@ -16,10 +16,15 @@ def setter(method):
 
     @wraps(method)
     def wrapped_method(*args, **kwargs):
-        method(*args, **kwargs)
+        returned_value = method(*args, **kwargs)
         self = args[0]
         value = args[1]
-        self.__setattr__(knob, value)
+
+        # The knob attribute is set to the returned value of the method, or the value argument if returned value is None
+        if returned_value is not None:
+            self.__setattr__(knob, returned_value)
+        else:
+            self.__setattr__(knob, value)
 
     return wrapped_method
 

@@ -64,6 +64,8 @@ class Clock(Instrument):
             if self.stop_time:
                 self.stop_time = self.start_time
 
+            return self.state  # return to either the START or STOP state once reset
+
     @measurer
     def measure_time(self):
         """Measure the clock time"""

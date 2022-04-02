@@ -69,7 +69,7 @@ def chaperone(method):
 
 class Adapter:
     """
-    Adapters connect instruments to the appropriate communication backends.
+    Base class for all adapters
     """
 
     #: Maximum number of attempts to read from a port/channel, in the event of a communication error
