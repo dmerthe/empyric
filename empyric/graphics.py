@@ -20,6 +20,7 @@ import matplotlib.dates as mdates
 from pandas.plotting import register_matplotlib_converters
 register_matplotlib_converters()  # needed for converting Pandas datetimes for matplotlib
 
+
 class Plotter:
     """
     Handler for plotting data based on the runcard plotting settings and data context.
@@ -54,7 +55,7 @@ class Plotter:
         if settings:
             self.settings = settings
         else:
-            self.settings = {'Plot': {x:'Time', y: data.columns}}
+            self.settings = {'Plot': {'x': 'Time', 'y': data.columns}}
 
         self.plots = {}
         for plot_name in settings:
