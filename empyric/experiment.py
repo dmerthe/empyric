@@ -874,12 +874,12 @@ def convert_runcard(runcard):
     converted_runcard = runcard.copy()
 
     # Load any custom components
+    custom_routines = {}
+    custom_instruments = {}
+
     if 'custom.py' in os.listdir():
         sys.path.insert(1, os.getcwd())
         custom = importlib.import_module('custom')
-
-        custom_routines = {}
-        custom_instruments = {}
 
         for name, attribute in custom.__dict__.items():
             if type(attribute) == type:
