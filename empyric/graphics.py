@@ -371,7 +371,7 @@ class ExperimentGUI:
     of knob and parameter variables, and also directly interact with instruments through the Dashboard.
     """
 
-    def __init__(self, experiment, alarms=None, instruments=None, title=None, plots=None, save_interval=None, plot_interval=0):
+    def __init__(self, experiment, alarms=None, instruments=None, title=None, plots=None, plotter=None, save_interval=None, plot_interval=0):
 
         self.experiment = experiment
 
@@ -395,8 +395,11 @@ class ExperimentGUI:
                     if instrument.name not in self.instruments:
                         self.instruments[instrument.name] = instrument
 
-        if plots:
-            self.plotter = Plotter(experiment.data, plots)
+        if plots or plotter:
+            if plotter:
+                self.plotter = plotter
+            else:
+                self.plotter = Plotter(experiment.data, plots)
 
             self.plot_interval = plot_interval  # grows if plotting takes longer
             self.last_plot = float('-inf')

@@ -545,17 +545,23 @@ class Experiment:
     def terminated(self):
         return 'Terminated' in self.status
 
-    def __init__(self, variables, routines=None):
+    def __init__(self, variables, routines=None, end=None):
 
         self.variables = variables  # dict of the form {..., name: variable, ...}
         self.eval_events = {name: threading.Event() for name in variables}
 
         if routines:
             self.routines = routines  # dictionary of the form {..., name: (variable_name, routine), ...}
-            self.end = max([routine.end for routine in routines.values()])  # time at which all routines are exhausted
         else:
             self.routines = {}
-            self.end = float('inf')
+
+        if end:
+            self.end = end
+        else:
+            if routines:  # infer end from routines
+                self.end = max([routine.end for routine in routines.values()])
+            else:
+                self.end = np.inf
 
         self.clock = Clock()
         self.clock.start()
@@ -774,184 +780,6 @@ class Experiment:
             self.status = self.status + ': ' + reason
         self.status_locked = True
 
-    @staticmethod
-    def build(runcard, settings=None, instruments=None, alarms=None):
-        """
-        Build an Experiment object based on a runcard, in the form of a YAML file or a dictionary
-
-        :param runcard: (dict/str) description of the experiment in the runcard format
-        :param settings: (dict) dictionary of settings to be populated
-        :param instruments: (dict) dictionary instruments to be populated
-        :param alarms: (dict) dictionary of alarms to be populated
-
-        :return: (Experiment) the experiment described by the runcard
-        """
-
-        if instruments is None:
-            instruments = {}
-
-        if type(runcard) == str:  # if runcard argument is a path to a YAML file
-
-            dirname = os.path.dirname(runcard)
-            if dirname != '':
-                os.chdir(os.path.dirname(runcard))  # go to runcard directory to put data in same location
-
-            yaml = YAML()
-            with open(runcard, 'rb') as runcard_file:
-                runcard = yaml.load(runcard_file)  # load the runcard into a dictionary
-
-        # If given a settings keyword argument, get settings from runcard and store it there
-        if 'Settings' in runcard and settings is not None:
-            settings.update(runcard['Settings'])
-
-        for name, specs in runcard['Instruments'].items():
-
-            specs = specs.copy()  # avoids modifying the runcard
-
-            instrument_name = specs.pop('type')
-            address = specs.pop('address')
-
-            # Grab any keyword arguments for the adapter
-            adapter_kwargs = {}
-            for kwarg in adapters.Adapter.kwargs:
-                if kwarg.replace('_', ' ') in specs:
-                    adapter_kwargs[kwarg] = specs.pop(kwarg.replace('_', ' '))
-
-            # Any remaining keywords are instrument presets
-            presets = specs.get('presets', {})
-            postsets = specs.get('postsets', {})
-
-            instrument_class = instr.__dict__[instrument_name]
-            instruments[name] = instrument_class(address=address, presets=presets, postsets=postsets, **adapter_kwargs)
-            instruments[name].name = name
-
-        variables = {}  # experiment variables, associated with the instruments above
-        for name, specs in runcard['Variables'].items():
-            if 'meter' in specs:
-
-                if specs['instrument'] not in instruments:
-                    raise KeyError(f'instrument {specs["instrument"]} specificed for variable {name} not in Instruments!')
-
-                variables[name] = Variable(meter=specs['meter'], instrument=instruments[specs['instrument']])
-            elif 'knob' in specs:
-
-                if specs['instrument'] not in instruments:
-                    raise KeyError(f'instrument {specs["instrument"]} specificed for variable {name} not in Instruments!')
-
-                variables[name] = Variable(knob=specs['knob'], instrument=instruments[specs['instrument']])
-            elif 'expression' in specs:
-                expression = specs['expression']
-                definitions = {}
-
-                for symbol, var_name in specs['definitions'].items():
-                    expression = expression.replace(symbol, var_name)
-                    definitions[var_name] = variables[var_name]
-
-                variables[name] = Variable(expression=expression, definitions=definitions)
-            elif 'parameter' in specs:
-                variables[name] = Variable(parameter=specs['parameter'])
-
-        routines = {}  # experiment routines
-
-        builtin_routines = {routine.__name__: routine for routine in Routine.__subclasses__()} # standard routines
-
-        if 'custom.py' in os.listdir(): # user can define custom routines in the runcard directory
-            sys.path.insert(1, os.getcwd())
-            cust_rout = importlib.import_module('custom')
-            custom_routines = {
-                routine.__name__: routine for routine in cust_rout.__dict__.values()
-                if type(routine) is type and issubclass(routine, Routine)
-            }
-        else:
-            custom_routines = {}
-
-        available_routines = {**builtin_routines, **custom_routines}
-
-        if 'Routines' in runcard:
-            for name, specs in runcard['Routines'].items():
-                specs = specs.copy()  # avoids modifying the runcard
-                _type = specs.pop('type')
-
-                knobs = np.array([specs.get('knobs', [])]).flatten()
-                if knobs:
-                    for knob in knobs:
-                        if knob not in variables:
-                            raise KeyError(f'knob {knob} specified for routine {name} is not in Variables!')
-
-                    specs['knobs'] = {name: variables[name] for name in knobs}
-
-                meters = np.array([specs.get('meters', [])]).flatten()
-                if meters:
-                    for meter in meters:
-                        if meter not in variables:
-                            raise KeyError(f'meter {meter} specified for routine {name} is not in Variables!')
-
-                    specs['meters'] = {name: variables[name] for name in meters}
-
-                if 'values' in specs:
-                    specs['values'] = np.array(specs['values'], dtype=object).reshape((len(knobs), -1))
-
-                    # Values can be variables, specified by their names
-                    for var_name in variables:
-                        where_variable = (specs['values'] == var_name)  # locate names of variables
-                        specs['values'][where_variable] = variables[var_name]  # replace variable names with variables
-
-                    # Values can be specified in a CSV file
-                    def is_csv(item):
-                        if type(item) == str:
-                            return '.csv' in item
-                        else:
-                            return False
-
-                    def get_csv(path, column):
-                        df = pd.read_csv(path)
-                        return df[column].values.flatten()
-
-                    specs['values'] = np.array([
-                        get_csv(values[0], knob) if is_csv(values[0]) else values
-                        for knob, values in zip(specs['knobs'].keys(), specs['values'])
-                    ], dtype=object)
-
-                routines[name] = available_routines[_type](**specs)
-
-        # Set up any alarms
-        if 'Alarms' in runcard and alarms is not None:
-
-            for name, specs in runcard['Alarms'].items():
-
-                alarm_variables = specs.copy().get('variables',{})
-                condition = specs.copy()['condition']
-
-                for variable in specs.get('variables', {}):
-                    if variable not in variables:
-                        raise KeyError(f'variable {variable} specified for alarm {name} is not in Variables!')
-
-                alphabet = 'abcdefghijklmnopqrstuvwxyz'
-                for var_name, variable in variables.items():
-
-                    # Variables can be called by name in the condition
-                    if var_name in condition:
-                        temp_name = ''.join([alphabet[np.random.randint(0, len(alphabet))] for i in range(3)])
-                        while temp_name in alarm_variables:  # make sure temp_name is not repeated
-                            temp_name = ''.join([alphabet[np.random.randint(0, len(alphabet))] for i in range(3)])
-
-                        alarm_variables.update({temp_name: variable})
-                        condition = condition.replace(var_name, temp_name)
-
-                    # Otherwise, they are defined in the alarm_variables
-                    for symbol, alarm_variable_name in alarm_variables.items():
-                        if alarm_variable_name == var_name:
-                            alarm_variables[symbol] = variable
-
-                alarms.update({name: Alarm(condition, alarm_variables, protocol=specs.get('protocol', None))})
-
-        experiment = Experiment(variables, routines=routines)
-
-        if 'end' in settings:
-            experiment.end = convert_time(settings['end'])
-
-        return experiment
-
 
 def validate_runcard(runcard):
     """
@@ -970,11 +798,10 @@ def validate_runcard(runcard):
     validate_keys(runcard, 'Description', ['name', 'operator', 'platform', 'comments'])
 
     # Check Settings
-    validate_keys(runcard, 'Settings', ['follow-up', 'step interval', 'save interval', 'plot interval'])
+    validate_keys(runcard, 'Settings', ['follow-up', 'step interval', 'save interval', 'plot interval', 'end'])
 
     # Check Instruments
-    supported_instruments = {name: _class for name, _class in instr.__dict__.items()
-                             if issubclass(_class, instr.Instrument)}
+    supported_instruments = instr.__dict__
 
     valid_instr_keys = ['type', 'address', 'presets', 'postsets']
     valid_instr_keys += adapters.Adapter.kwargs  # include adapter kwargs
@@ -993,18 +820,22 @@ def validate_runcard(runcard):
 
         validate_keys(runcard['Variables'], variable, valid_var_keys)
 
-        instrument = specs['instrument']
-        if instrument not in runcard['Instruments']:
-            raise ValueError(f'{instrument} is not defined in Instruments section')
+        if "instrument" in specs:
+            instrument = specs['instrument']
 
-        if 'knob' in specs:
-            valid_knobs = supported_instruments[instrument].knobs
-            if specs['knob'] not in valid_knobs:
-                raise ValueError(f'{specs["knob"]} is not a valid knob for {instrument}')
-        elif 'meter' in specs:
-            valid_meters = supported_instruments[instrument].meters
-            if specs['meter'] not in valid_meters:
-                raise ValueError(f'{specs["meter"]} is not a valid meter for {instrument}')
+            if instrument not in runcard['Instruments']:
+                raise ValueError(f'{instrument} is not defined in Instruments section')
+
+            instr_type = runcard['Instruments'][instrument]['type']
+
+            if 'knob' in specs:
+                valid_knobs = supported_instruments[instr_type].knobs
+                if specs['knob'] not in valid_knobs:
+                    raise ValueError(f'{specs["knob"]} is not a valid knob for {instrument}')
+            elif 'meter' in specs:
+                valid_meters = supported_instruments[instr_type].meters
+                if specs['meter'] not in valid_meters:
+                    raise ValueError(f'{specs["meter"]} is not a valid meter for {instrument}')
 
     # Check Alarms
 
@@ -1185,9 +1016,9 @@ def convert_runcard(runcard):
 
     # Plots
     if 'Plots' in runcard:
-        converted_runcard['Plots'] = graphics.Plotter(converted_runcard['Experiment'].data, settings=runcard['Plots'])
+        converted_runcard['Plotter'] = graphics.Plotter(converted_runcard['Experiment'].data, settings=runcard['Plots'])
     else:
-        converted_runcard['Plots'] = None
+        converted_runcard['Plotter'] = None
 
     return converted_runcard
 
@@ -1232,7 +1063,7 @@ class Manager:
             raise TypeError(f'runcard given to Manager must be a path to a YAML file or a dictionary, ' +
                             f'not {type(self.runcard)}!')
 
-        converted_runcard = convert_runcard(runcard)
+        converted_runcard = convert_runcard(self.runcard)
 
         for key in converted_runcard:
             self.__setattr__(key.lower(), converted_runcard[key])
@@ -1242,6 +1073,9 @@ class Manager:
         self.step_interval = convert_time(self.settings.get('step interval', 0.1))
         self.save_interval = convert_time(self.settings.get('save interval', 60))
         self.plot_interval = convert_time(self.settings.get('plot interval', 0.1))
+        self.end = convert_time(self.settings.get('end', np.inf))
+
+        self.experiment.end = self.end
 
         self.last_save = 0
 
@@ -1283,7 +1117,7 @@ class Manager:
                                           alarms=self.alarms,
                                           instruments=self.instruments,
                                           title=self.description.get('name', 'Experiment'),
-                                          plots=self.plots,
+                                          plotter=self.plotter,
                                           save_interval=self.save_interval,
                                           plot_interval=self.plot_interval)
 
