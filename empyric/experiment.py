@@ -556,12 +556,12 @@ class Experiment:
             self.routines = {}
 
         if end:
-            self.end = end
-        else:
-            if routines:  # infer end from routines
+            if end.lower() == 'with routines':
                 self.end = max([routine.end for routine in routines.values()])
             else:
-                self.end = np.inf
+                self.end = end
+        else:
+            self.end = np.inf
 
         self.clock = Clock()
         self.clock.start()
@@ -862,16 +862,33 @@ def convert_runcard(runcard):
 
     """
 
-    if type(runcard) == str:  # if runcard argument is a path to a YAML file
+    # if runcard argument is a path to a YAML file, load into a dictionary
+    if type(runcard) == str:
         yaml = YAML()
         with open(runcard, 'rb') as runcard_file:
-            runcard = yaml.load(runcard_file)  # load the runcard into a dictionary
+            runcard = yaml.load(runcard_file)
 
+    # Validate runcard format and contents
     validate_runcard(runcard)
 
     converted_runcard = runcard.copy()
 
-    # Instruments
+    # Load any custom components
+    if 'custom.py' in os.listdir():
+        sys.path.insert(1, os.getcwd())
+        custom = importlib.import_module('custom')
+
+        custom_routines = {}
+        custom_instruments = {}
+
+        for name, attribute in custom.__dict__.items():
+            if type(attribute) == type:
+                if issubclass(attribute, instr.Instrument):
+                    custom_instruments[name] = attribute
+                if issubclass(attribute, Routine):
+                    custom_routines[name] = attribute
+
+    # Instruments section
     instruments = {}
     for name, specs in runcard['Instruments'].items():
 
@@ -889,13 +906,13 @@ def convert_runcard(runcard):
         presets = specs.get('presets', {})
         postsets = specs.get('postsets', {})
 
-        instrument_class = instr.__dict__[_type]
+        instrument_class = {**instr.__dict__, **custom_instruments}[_type]
         instruments[name] = instrument_class(address=address, presets=presets, postsets=postsets, **adapter_kwargs)
         instruments[name].name = name
 
     converted_runcard['Instruments'] = instruments
 
-    # Variables
+    # Variables section
     variables = {}
     for name, specs in runcard['Variables'].items():
         if 'meter' in specs:
@@ -916,19 +933,8 @@ def convert_runcard(runcard):
         elif 'parameter' in specs:
             variables[name] = Variable(parameter=specs['parameter'])
 
-    # Routines
+    # Routines section
     builtin_routines = {routine.__name__: routine for routine in Routine.__subclasses__()}  # standard routines
-
-    if 'custom.py' in os.listdir(): # user can define custom routines in the runcard directory
-        sys.path.insert(1, os.getcwd())
-        cust_rout = importlib.import_module('custom')
-        custom_routines = {
-            routine.__name__: routine for routine in cust_rout.__dict__.values()
-            if type(routine) is type and issubclass(routine, Routine)
-        }
-    else:
-        custom_routines = {}
-
     available_routines = {**builtin_routines, **custom_routines}
 
     routines = {}
@@ -981,7 +987,7 @@ def convert_runcard(runcard):
 
     converted_runcard['Experiment'] = Experiment(variables, routines=routines)
 
-    # Alarms
+    # Alarms section
     alarms = {}
     if 'Alarms' in runcard:
         for name, specs in runcard['Alarms'].items():
@@ -1014,7 +1020,7 @@ def convert_runcard(runcard):
 
     converted_runcard['Alarms'] = alarms
 
-    # Plots
+    # Plots section
     if 'Plots' in runcard:
         converted_runcard['Plotter'] = graphics.Plotter(converted_runcard['Experiment'].data, settings=runcard['Plots'])
     else:

@@ -20,7 +20,7 @@ The ``Description`` section contains the name of the experiment, name of the ope
     platform: (Name of experimental apparatus)
     comments: (Contextual information for the experiment)
 
-The optional ``Settings`` section contains some global settings for the experiment. The ``follow-up`` entry allows one to chain experiments; simply give the path name to another experiment runcard here. The ``step interval`` defines the minimum time to take between experiment iterations. The ``save interval`` specifies how often to save the acquired experimental data. The ``plot interval`` sets a minimum time between updates to the plots specified in the ``Plots`` section.
+The optional ``Settings`` section contains some global settings for the experiment. The ``follow-up`` entry allows one to chain experiments; simply give the path name to another experiment runcard here. The ``step interval`` defines the minimum time to take between experiment iterations. The ``save interval`` specifies how often to save the acquired experimental data. The ``plot interval`` sets a minimum time between updates to the plots specified in the ``Plots`` section. The ``end`` specifies when the experiment should terminate. if ``end`` is set to 'with routines', the experiment will terminate when the last routine finishes.
 
 .. code-block:: yaml
    
@@ -29,8 +29,9 @@ The optional ``Settings`` section contains some global settings for the experime
     step interval: (minimum time between experiment steps; default = 0.1 seconds)
     save interval: (minimum time between data saves to file; default = 60 seconds)
     plot interval: (minimum time between plotting operations; default = 0.1 seconds)
+    end: (maximum run time of the experiment; default = infinity)
     
-The ``Instruments`` section is where you specify which instruments from Empyric's collection the experiment will use (see :ref:`instruments-section` for the full set of supported instruments). For each specification dictionary, the top level key is the name that you endow upon the instrument. Every instrument must have a unique name. The ``type`` is the type of instrument and the ``address`` is the properly formatted address of the instrument (something like "COM3" for a serial instrument at port 3 on a Windows machine). It is also possible to alter the instrument presets by assigning values to the corresponding variable names in the ``presets`` dictionary, as well as set the postsets in a similar way.
+The ``Instruments`` section is where you specify which instruments from Empyric's collection the experiment will use (see :ref:`instruments-section` for the full set of supported instruments). For each specification dictionary, the top level key is the name that you endow upon the instrument. Every instrument must have a unique name. The ``type`` is the type of instrument and the ``address`` is the properly formatted address of the instrument (something like "COM3" for a serial instrument at port 3 on a Windows machine). It is also possible to alter the instrument presets by assigning values to the corresponding variable names in the ``presets`` dictionary, as well as set the postsets in a similar way. Any additional entries are assumed to refer to adapter settings. For example, to change the baud rate of an instrument with a serial adapter to 19200, simply specify ```baud rate: 19200``.
 
 .. code-block:: yaml
 
@@ -42,6 +43,7 @@ The ``Instruments`` section is where you specify which instruments from Empyric'
       (knob name): (setting to apply to knob upon initialization of the instrument)
      postsets: # optional
       (knob name): (setting to apply to knob upon disconnection of the instrument)
+     (adapter parameter: value)
     
 The ``Variables`` section defines the experiment variables in relation to the instruments. Each variable must have a unique name. The knob and meter type variables must be assigned an instrument as well as the name of the knob or meter of that instrument. The expression type variables are defined by a mathematical ``expression``, using algebraic operations (``+``, ``-``, ``*``, ``/``, ``^``) and the common functions (sin, exp, log, sum, etc.) that are built into or in the math module of Python. The symbols in the expression are defined by the ``definitions`` entry which maps those symbols to any variables defined above.
 
@@ -59,6 +61,7 @@ The ``Variables`` section defines the experiment variables in relation to the in
      definitions:
       a: (Name of Other Variable)
       b: (Name of Another Variable)
+      (character/string in the expression: referenced variable)
     (Unique Name for a Parameter Variable):
      parameter: (value, e.g. '3.141592653589793')
 
@@ -73,6 +76,7 @@ The optional ``Alarms`` section contains alarms which can monitor any of the var
      definitions:
       a: (Name of Other Variable)
       b: (Name of Another Variable)
+      (character/string in the condition: referenced variable)
 
 The optional ``Plots`` section defines how to present collected data. Each plot specification requires a ``y`` entry. If no ``x`` entry is given, it assumed that the x-axis will be time. The optional ``xlabel`` and ``ylabel`` entries specify how to label the corresponding axes. A ``style`` can be selected from 'basic' (default simple plot), 'log' (logarithmic y-axis), 'symlog' (logarithmic y-axis for positive and negative values), 'averaged' (y values at the same x value are averaged together), 'errorbars' (same as averaged, but with error bars for the y values at the same x value), 'parametric' (parametric plot with a third parametric variable specified by an optional 'parameter' entry; if no parameter is specified, time will be assumed), 'order' (plot with arrows showing the order in which data was collected).
 
