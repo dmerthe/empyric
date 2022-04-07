@@ -1090,11 +1090,12 @@ class Manager:
             for name, alarm in self.alarms.items():
                 if alarm.triggered:
 
-                    # Add to dictionary of triggered alarms
-                    self.awaiting_alarms[name] = {
-                        'time': self.experiment.data['Time'],
-                        'status': self.experiment.status,
-                    }
+                    # Add to dictionary of triggered alarms, if newly triggered
+                    if name not in self.awaiting_alarms:
+                        self.awaiting_alarms[name] = {
+                            'time': self.experiment.data['Time'].iloc[-1],
+                            'status': self.experiment.status,
+                        }
                     
                     if 'none' in alarm.protocol:
                         # do nothing (but GUI will indicate that alarm is triggered)
@@ -1128,7 +1129,7 @@ class Manager:
                 elif name in self.awaiting_alarms:
                     # Alarm was previously triggered but is now clear
 
-                    if 'check' not in alarm.protocol: # alarm is not waiting for user to check
+                    if 'check' not in alarm.protocol:  # alarm is not waiting for user to check
 
                         info = self.awaiting_alarms.pop(name)  # remove from dictionary of triggered alarms
                         prior_status = info['status']
