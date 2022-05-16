@@ -1,6 +1,6 @@
 .. _gui-section:
 
-The Experiment GUI and Plotting 
+GUI and Plotting 
 ===============================
 
 The ``graphics`` module of empyric provides a graphical user interface
@@ -20,7 +20,6 @@ the ``plot`` method based on the plot settings.
 
  .. autoclass:: empyric.graphics.Plotter
     :members:
-    :private-members:
 
 
 The ``ExperimentGUI`` class takes an instance of ``Experiment`` as its

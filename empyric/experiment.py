@@ -1,81 +1,18 @@
 # This submodule defines the basic behavior of the key features of the empyric package
 
-import os, sys, shutil, importlib, threading, time, datetime, numbers
-from scipy.interpolate import interp1d
+import os, sys, importlib, threading, time, datetime, numbers
 import numpy as np
 import pandas as pd
 import tkinter as tk
 from tkinter.filedialog import askopenfilename
 from ruamel.yaml import YAML
 
-from empyric import instruments as instr
-from empyric import adapters, graphics
+from empyric import routines as _routines
+from empyric import instruments as _instruments
+from empyric import adapters as _adapters
+from empyric import graphics as _graphics
 
-
-def convert_time(time_value):
-    """
-    If time_value is a string, converts a time of the form "[number] [units]" (e.g. "3.5 hours") to the time in seconds.
-    If time_value is a number, just returns the same number
-    If time_value is an array, iterates through the array doing either of the previous two operations on every element.
-
-    :param time_value: (str/float) time value, possibly including units such as "hours"
-    :return: (int) time in seconds
-    """
-
-    if np.size(time_value) > 1:
-        return [convert_time(t) for t in time_value]
-
-    if isinstance(time_value, numbers.Number):
-        return time_value
-    elif isinstance(time_value, str):
-        # times can be specified in the runcard with units, such as minutes, hours or days, e.g.  "6 hours"
-        time_parts = time_value.split(' ')
-
-        if len(time_parts) == 1:
-            return float(time_parts[0])
-        elif len(time_parts) == 2:
-            value, unit = time_parts
-            value = float(value)
-            return value * {
-                'seconds': 1, 'second': 1,
-                'minutes': 60, 'minute': 60,
-                'hours': 3600, 'hour': 3600,
-                'days': 86400, 'day': 86400
-            }[unit]
-        else:
-            raise ValueError(f'Unrecognized time format for {time_value}!')
-
-
-class Clock:
-    """
-    Clock for keeping time in an experiment; works like a standard stopwatch
-    """
-
-    def __init__(self):
-
-        self.start_time = self.stop_time = time.time()  # clock is initially stopped
-        self.stoppage = 0  # total time during which the clock has been stopped
-
-    def start(self):
-        if self.stop_time:
-            self.stoppage += time.time() - self.stop_time
-            self.stop_time = False
-
-    def stop(self):
-        if not self.stop_time:
-            self.stop_time = time.time()
-
-    def reset(self):
-        self.__init__()
-
-    @property
-    def time(self):
-        if self.stop_time:
-            elapsed_time = self.stop_time - self.start_time - self.stoppage
-        else:
-            elapsed_time = time.time() - self.start_time - self.stoppage
-
-        return elapsed_time
+from empyric.tools import convert_time, Clock
 
 
 class Variable:
@@ -172,23 +109,20 @@ class Variable:
             expression = expression.replace('^', '**')  # carets represent exponents
 
             for symbol, variable in self.definitions.items():
-                if variable._value is None:
-                    expression = expression.replace(symbol, '(' + str(variable.value) + ')')  # evaluate the parent variable
-                elif 'nan' in str(variable._value):
-                    expression = 'np.nan'
-                    break
-                else:
-                    expression = expression.replace(symbol, '(' + str(variable._value) + ')') # take the last known value
+                expression = expression.replace(symbol, '(' + str(variable._value) + ')')  # take last known value
 
             for shorthand, longhand in self.expression_functions.items():
                 if shorthand in expression:
                     expression = expression.replace(shorthand, longhand)
 
             try:
-                self._value = eval(expression)
+                if 'None' not in expression and 'nan' not in expression:
+                    self._value = eval(expression)
+                else:
+                    self._value = None
             except BaseException as err:
-                print(f'Error while trying to evaluate expression {self.expression}:', err)
-                self._value = float('nan')
+                print(f'Unable to evaluate expression {self.expression}:', err)
+                self._value = None
 
             self.last_evaluation = time.time()
 
@@ -217,286 +151,8 @@ class Variable:
         else:
             raise ValueError(f'Attempt to set {self.type}! Only knobs and parameters can be set.')
 
-
-# Routines
-class Routine:
-    """
-    Base class for all routines
-    """
-
-    def __init__(self, knobs=None, values=None, start=0, end=np.inf):
-        """
-
-        :param knobs: (Variable/1D array) knob variable(s) to be controlled
-        :param values: (1D/2D array) array or list of values for each variable; can be 1D iff there is one knob
-        :param start: (float) time to start the routine
-        :param end: (float) time to end the routine
-        """
-
-        if knobs is not None:
-            self.knobs = knobs  # dictionary of the form, {..., name: variable, ...}
-            for knob in self.knobs.values():
-                knob.controller = None  # for keeping track of which routines are controlling knobs
-
-        if values is not None:
-
-            if len(self.knobs) > 1:
-                if np.ndim(values) == 1:  # single list of values for all knobs
-                    values = [values]*len(self.knobs)
-                elif np.shape(values)[0] == 1: # 1xN array with one N-element list of times for all knobs
-                    values = [values[0]]*len(self.knobs)
-
-            self.values = np.array(values, dtype=object).reshape((len(self.knobs), -1))
-
-        self.start = convert_time(start)
-        self.end = convert_time(end)
-
-    def update(self, state):
-        """
-        Updates the knobs controlled by the routine
-
-        :param state: (dict/Series) state of the calling experiment or process in the form, {..., variable: value, ...}
-        :return: None
-        """
-
-        pass
-
-
-class Set(Routine):
-    """
-    Sets and keeps knobs at fixed values
-    """
-
-    def update(self, state):
-
-        if state['Time'] < self.start or state['Time'] > self.end:
-            return  # no change
-
-        for knob, value in zip(self.knobs.values(), self.values):
-
-            if isinstance(value, Variable):
-                knob.value = value._value
-            else:
-                knob.value = value[0]
-
-
-class Timecourse(Routine):
-    """
-    Ramps linearly through a series of values at given times
-    """
-
-    def __init__(self, times=None, **kwargs):
-        """
-
-        :param times: (1D/2D array) array or list of times relative to the start time
-        :param kwargs: keyword arguments for Routine
-        """
-
-        Routine.__init__(self, **kwargs)
-
-        if times:
-
-            if len(self.knobs) > 1:
-                if np.ndim(times) == 1:  # single list of times for all knobs
-                    times = [times]*len(self.knobs)
-                elif np.shape(times)[0] == 1: # 1xN array with one N-element list of times for all knobs
-                    times = [times[0]]*len(self.knobs)
-
-            self.times = np.array(times, dtype=object).reshape((len(self.knobs), -1))
-
-            # Values can be stored in a CSV file
-            for i, element in enumerate(self.times):
-                if type(element[0]) == str:
-                    if '.csv' in element[0]:
-                        df = pd.read_csv(element[0])
-                        self.times[i] = df[df.columns[0]].values.reshape(len(df))
-
-            self.times = np.array(convert_time(self.times)).astype(float)
-
-        else:
-            raise AttributeError('Timecourse routine requires times!')
-
-        self.start = np.min(self.times)
-        self.end = np.max(self.times)
-        self.finished = False
-
-    def update(self, state):
-
-        if state['Time'] < self.start:
-            return
-        elif state['Time'] > self.end:
-            if not self.finished:
-                for knob, values in zip(self.knobs.values(), self.values):
-                    if knob.controller == self:
-                        knob.value = values[-1]  # make sure to set the end value
-
-                    knob.controller = None
-
-                self.finished = True
-
-            return
-        else:
-            for name, knob in self.knobs.items():
-
-                if isinstance(knob.controller, Routine) and knob.controller != self:
-                    controller = knob.controller
-                    if controller.start < state['Time'] < controller.end:
-                        raise RuntimeError(f"Knob {name} has more than one controlling routine at time = {state['Time']} seconds!")
-                else:
-                    knob.controller = self
-
-        for variable, times, values, i in zip(self.knobs.values(), self.times, self.values,  np.arange(len(self.times))):
-
-            j_last = np.argwhere(times <= state['Time']).flatten()[-1]
-            j_next = np.argwhere(times > state['Time']).flatten()[0]
-
-            last_time = times[j_last]
-            next_time = times[j_next]
-
-            last_value = values[j_last]
-            next_value = values[j_next]
-
-            if isinstance(last_value, Variable):
-                last_value = self.values[i, j_last] = last_value.value  # replace variable with value for past times
-
-            if isinstance(next_value, Variable):
-                value = last_value  # stay at last value until next time, when value variable will be evaluated
-            else:
-                # ramp linearly between numerical values
-                value = last_value + (next_value - last_value) * (state['Time'] - last_time) / (next_time - last_time)
-
-            variable.value = value
-
-
-class Sequence(Routine):
-    """
-    Passes knobs through a series of values regardless of time; each series for each knob must have the same length
-    """
-
-    def __init__(self, **kwargs):
-        Routine.__init__(self, **kwargs)
-
-        self.iteration = 0
-
-    def update(self, state):
-
-        if state['Time'] < self.start or state['Time'] > self.end:
-            return  # no change
-
-        for knob, values in zip(self.knobs.values(), self.values):
-            value = values[self.iteration]
-            knob.value = value
-
-        self.iteration = (self.iteration + 1) % len(self.values[0])
-
-
-class Minimization(Routine):
-    """
-    Minimize the sum of a set of meters/expressions influenced by a set of knobs, using simulated annealing.
-    """
-
-    def __init__(self, meters=None, max_deltas=None, T0=0.1, T1=0, **kwargs):
-
-        Routine.__init__(self, **kwargs)
-
-        if meters:
-            self.meters = np.array([meters]).flatten()
-        else:
-            raise AttributeError(f'{self.__name__} routine requires meters for feedback')
-
-        if max_deltas:
-            self.max_deltas = np.array([max_deltas]).flatten()
-        else:
-            self.max_deltas = np.ones(len(self.knobs))
-
-        self.T = T0
-        self.T0 = T0
-        self.T1 = T1
-        self.last_knobs = [np.nan]*len(self.knobs)
-        self.last_meters = [np.nan]*len(self.meters)
-
-    def update(self, state):
-
-        # Get meter values
-        meter_values = np.array([state[meter] for meter in self.meters])
-
-        # Update temperature
-        self.T = self.T0 + self.T1*(state['Time'] - self.start)/(self.end - self.start)
-
-        if self.better(meter_values):
-
-            # Record this new optimal state
-            self.last_knobs = [state[knob] for knob in self.knobs]
-            self.last_meters = [state[meter] for meter in self.meters]
-
-            # Generate and apply new knob settings
-            new_knobs = self.last_knobs + self.max_deltas*np.random.rand(len(self.knobs))
-            for knob, new_value in zip(self.knobs.values(), new_knobs):
-                knob.value = new_value
-
-        else:  # go back
-            for knob, last_value in zip(self.knobs.values(), self.last_knobs):
-                knob.value = last_value
-
-    def better(self, meter_values):
-
-        if np.prod(self.last_meters) != np.nan:
-            change = np.sum(meter_values) - np.sum(self.last_meters)
-            return (change < 0) or (np.exp(-change/self.T) > np.random.rand())
-        else:
-            return False
-
-
-class Maximization(Minimization):
-    """
-    Maximize a set of meters/expressions influenced by a set of knobs; works the same way as Minimize.
-    """
-
-    def better(self, meter_values):
-
-        if np.prod(self.last_meters) != np.nan:
-            change = np.sum(meter_values) - np.sum(self.last_meters)
-            return (change > 0) or (np.exp(change / self.T) > np.random.rand())
-        else:
-            return False
-
-
-class ModelPredictiveControl(Routine):
-    """
-    (NOT IMPLEMENTED)
-    Simple model predictive control; learns the relationship between knob x and meter y, assuming a linear model,
-
-    y(t) = y0 + int_{-inf}^{t} dt' m(t-t') x(t')
-
-    then sets x to minimize the error in y relative to setpoint, over some time interval defined by cutoff.
-
-    """
-
-    def __init__(self, meters=None, **kwargs):
-
-        Routine.__init__(self, **kwargs)
-        self.meters = meters
-
-    def update(self, state):
-        pass
-
-
-class Alarm:
-    """
-    Triggers if a condition among variables is met and indicates the response protocol
-    """
-
-    def __init__(self, condition, variables, protocol=None):
-        self.trigger_variable = Variable(expression=condition, definitions=variables)
-        
-        if protocol:
-            self.protocol = protocol
-        else:
-            self.protocol = 'none'
-
-    @property
-    def triggered(self):
-        return self.trigger_variable.value == True
+    def __repr__(self):
+        return self.type[0].upper() + self.type[1:] + 'Variable'
 
 
 class Experiment:
@@ -780,6 +436,9 @@ class Experiment:
             self.status = self.status + ': ' + reason
         self.status_locked = True
 
+    def __repr__(self):
+        return 'Experiment'
+
 
 def validate_runcard(runcard):
     """
@@ -801,17 +460,15 @@ def validate_runcard(runcard):
     validate_keys(runcard, 'Settings', ['follow-up', 'step interval', 'save interval', 'plot interval', 'end'])
 
     # Check Instruments
-    supported_instruments = instr.__dict__
-
     valid_instr_keys = ['type', 'address', 'presets', 'postsets']
-    valid_instr_keys += adapters.Adapter.kwargs  # include adapter kwargs
+    valid_instr_keys += _adapters.Adapter.kwargs  # include adapter kwargs
     for instrument, specs in runcard['Instruments'].items():
 
         validate_keys(runcard['Instruments'], instrument, valid_instr_keys)
 
         # Check that the instrument is supported
         instr_type = specs['type']
-        if instr_type not in supported_instruments:
+        if instr_type not in _instruments.supported:
             raise KeyError(f'{instr_type} is not a supported instrument.')
 
     # Check Variables
@@ -820,7 +477,8 @@ def validate_runcard(runcard):
 
         validate_keys(runcard['Variables'], variable, valid_var_keys)
 
-        if "instrument" in specs:
+        if "instrument" in specs:  # knob and meter variables
+
             instrument = specs['instrument']
 
             if instrument not in runcard['Instruments']:
@@ -829,17 +487,48 @@ def validate_runcard(runcard):
             instr_type = runcard['Instruments'][instrument]['type']
 
             if 'knob' in specs:
-                valid_knobs = supported_instruments[instr_type].knobs
+                valid_knobs = _instruments.supported[instr_type].knobs
                 if specs['knob'] not in valid_knobs:
                     raise ValueError(f'{specs["knob"]} is not a valid knob for {instrument}')
             elif 'meter' in specs:
-                valid_meters = supported_instruments[instr_type].meters
+                valid_meters = _instruments.supported[instr_type].meters
                 if specs['meter'] not in valid_meters:
                     raise ValueError(f'{specs["meter"]} is not a valid meter for {instrument}')
 
+        elif 'expression' in specs:  # expression variables
+
+            expression = specs['expression']
+
+            definitions = specs.get('definitions', {})
+
+            for symbol, other_var in definitions.items():
+                if symbol not in expression:
+                    raise ReferenceError(f'{symbol} is referenced in definitions for expression variable {variable}, '
+                                         + f'but does not appear in the expression.')
+                if other_var not in runcard['Variables'].keys():
+                    raise NameError(f'variable {other_var} is referenced in definitions for expression variable '
+                                    + f'{variable}, but is not defined.')
+
     # Check Alarms
+    valid_alarm_keys = ['condition', 'variables', 'protocol']
+    for alarm, specs in runcard['Alarms'].items():
+
+        validate_keys(runcard['Alarms'], alarm, valid_alarm_keys)
+
+        condition = specs['condition']
+
+        variables = specs.get('variables', {})
+
+        for symbol, variable in variables.items():
+            if symbol not in condition:
+                raise ReferenceError(f'{symbol} is referenced in the variable definitions for alarm {alarm}, '
+                                     + f'but does not appear in the condition.')
+            if variable not in runcard['Variables'].keys():
+                raise NameError(f'variable {variable} is referenced in condition for alarm {alarm}, '
+                                + 'but is not defined.')
 
     # Check Routines
+
 
     # Check Plots
 
@@ -881,14 +570,16 @@ def convert_runcard(runcard):
         sys.path.insert(1, os.getcwd())
         custom = importlib.import_module('custom')
 
-        for name, attribute in custom.__dict__.items():
-            if type(attribute) == type:
-                if issubclass(attribute, instr.Instrument):
-                    custom_instruments[name] = attribute
-                if issubclass(attribute, Routine):
-                    custom_routines[name] = attribute
+        for name, thing in custom.__dict__.items():
+            if type(thing) == type:
+                if issubclass(thing, _routines.Routine):
+                    custom_routines[name] = thing
+                if issubclass(thing, _instruments.Instrument):
+                    custom_instruments[name] = thing
 
     # Instruments section
+    available_instruments = {**_instruments.supported, **custom_instruments}
+
     instruments = {}
     for name, specs in runcard['Instruments'].items():
 
@@ -898,7 +589,7 @@ def convert_runcard(runcard):
 
         # Grab any keyword arguments for the adapter
         adapter_kwargs = {}
-        for kwarg in adapters.Adapter.kwargs:
+        for kwarg in _adapters.Adapter.kwargs:
             if kwarg.replace('_', ' ') in specs:
                 adapter_kwargs[kwarg] = specs.pop(kwarg.replace('_', ' '))
 
@@ -906,7 +597,7 @@ def convert_runcard(runcard):
         presets = specs.get('presets', {})
         postsets = specs.get('postsets', {})
 
-        instrument_class = {**instr.__dict__, **custom_instruments}[_type]
+        instrument_class = available_instruments[_type]
         instruments[name] = instrument_class(address=address, presets=presets, postsets=postsets, **adapter_kwargs)
         instruments[name].name = name
 
@@ -934,8 +625,7 @@ def convert_runcard(runcard):
             variables[name] = Variable(parameter=specs['parameter'])
 
     # Routines section
-    builtin_routines = {routine.__name__: routine for routine in Routine.__subclasses__()}  # standard routines
-    available_routines = {**builtin_routines, **custom_routines}
+    available_routines = {**_routines.supported, **custom_routines}
 
     routines = {}
     if 'Routines' in runcard:
@@ -1022,11 +712,32 @@ def convert_runcard(runcard):
 
     # Plots section
     if 'Plots' in runcard:
-        converted_runcard['Plotter'] = graphics.Plotter(converted_runcard['Experiment'].data, settings=runcard['Plots'])
+        converted_runcard['Plotter'] = _graphics.Plotter(converted_runcard['Experiment'].data, settings=runcard['Plots'])
     else:
         converted_runcard['Plotter'] = None
 
     return converted_runcard
+
+
+class Alarm:
+    """
+    Triggers if a condition among variables is met and indicates the response protocol
+    """
+
+    def __init__(self, condition, variables, protocol=None):
+        self.trigger_variable = Variable(expression=condition, definitions=variables)
+
+        if protocol:
+            self.protocol = protocol
+        else:
+            self.protocol = 'none'
+
+    @property
+    def triggered(self):
+        return self.trigger_variable.value is True
+
+    def __repr__(self):
+        return 'Alarm'
 
 
 class Manager:
@@ -1119,7 +830,7 @@ class Manager:
         experiment_thread.start()
 
         # Set up the GUI for user interaction
-        self.gui = graphics.ExperimentGUI(self.experiment,
+        self.gui = _graphics.ExperimentGUI(self.experiment,
                                           alarms=self.alarms,
                                           instruments=self.instruments,
                                           title=self.description.get('name', 'Experiment'),
@@ -1220,3 +931,6 @@ class Manager:
             step_end = time.time()
             remaining_time = np.max([self.step_interval - (step_end - step_start), 0])
             time.sleep(remaining_time)
+
+    def __repr__(self):
+        return 'Manager'

@@ -1,25 +1,12 @@
 .. _experiment-section:
 
-Variables, Routines & Experiments
+Variables & Experiments
 =================================
 
 .. autoclass:: empyric.experiment.Variable
    :members:
 
 |
-
-.. autoclass:: empyric.experiment.Routine
-   :members:
-
-.. autoclass:: empyric.experiment.Set
-
-.. autoclass:: empyric.experiment.Timecourse
-
-.. autoclass:: empyric.experiment.Sequence
-
-.. autoclass:: empyric.experiment.Minimization
-
-.. autoclass:: empyric.experiment.Maximization
 
 .. autoclass:: empyric.experiment.Alarm
    :members:

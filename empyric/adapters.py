@@ -807,3 +807,7 @@ class Phidget(Adapter):
     def disconnect(self):
         self.backend.close()
         self.connected = True
+
+
+supported = {key: value for key, value in vars().items()
+             if type(value) is type and issubclass(value, Adapter)}

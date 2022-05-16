@@ -1,6 +1,6 @@
 .. _scopes-section:
 
-Oscilloscopes
+Scopes
 =============
 
 .. automodule:: empyric.collection.scopes

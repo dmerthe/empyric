@@ -1,12 +1,9 @@
 import os.path
 import time
 import sys
-import threading
-import queue
 import numpy as np
 import datetime
 import tkinter as tk
-import numbers
 import pandas as pd
 
 if sys.platform == 'darwin':
