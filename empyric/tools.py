@@ -20,7 +20,7 @@ def convert_time(time_value):
     if isinstance(time_value, numbers.Number):
         return time_value
     elif isinstance(time_value, str):
-        # times can be specified in the runcard with units, such as minutes, hours or days, e.g.  "6 hours"
+        # times can be specified in the runcard with units, such as minutes, hours or days, e.g. "6 hours"
         time_parts = time_value.split(' ')
 
         if len(time_parts) == 1:

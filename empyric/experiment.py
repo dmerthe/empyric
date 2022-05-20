@@ -30,6 +30,9 @@ class Variable:
 
     A parameter is a variable whose value is assigned directly by the user. An example is a unit conversion factor such
     as 2.54 cm per inch, a numerical constant like pi or a setpoint for a control routine.
+
+    The value types of variables are either numbers (floats or integers), booleans, strings or arrays (containing some
+    combination of there previous three types).
     """
 
     # Some abbreviated functions that can be used to evaluate expression variables
@@ -204,6 +207,8 @@ class Experiment:
     def __init__(self, variables, routines=None, end=None):
 
         self.variables = variables  # dict of the form {..., name: variable, ...}
+
+        # This is used to block evaluation of expressions until their dependee variables are evaluated
         self.eval_events = {name: threading.Event() for name in variables}
 
         if routines:
@@ -231,6 +236,8 @@ class Experiment:
 
         self._status = Experiment.READY
         self.status_locked = True  # can only be unlocked by the start, hold, stop and terminate methods
+
+        self.saved = []  # list of saved data entries
 
     def __next__(self):
 
@@ -362,9 +369,6 @@ class Experiment:
 
         if directory:
             path = os.path.join(directory, path)
-
-        if not hasattr(self, 'saved'):
-            self.saved = []
 
         if not os.path.exists(path):  # if this is a new file, write column headers
             with open(path, 'a') as data_file:

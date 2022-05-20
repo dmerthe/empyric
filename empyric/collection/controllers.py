@@ -1,4 +1,5 @@
 from empyric.adapters import *
+from empyric.tools import is_on, is_off
 from empyric.collection.instrument import *
 
 
@@ -75,6 +76,105 @@ class OmegaCN7500(Instrument):
     @measurer
     def measure_power(self):
         return self.read(0x1000) / 10
+
+
+class OmegaPlatinum(Instrument):
+    """
+    Omega Platinum series PID controller
+    """
+
+    name = "OmegaPlatinum"
+
+    supported_adapters = (
+        (Modbus, {
+            'baud_rate': 19200,
+            'parity': 'O'
+        }),
+    )
+
+    knobs = (
+        'setpoint',
+        'autotune',
+        'output',
+        'tc type',
+    )
+
+    meters = (
+        'temperature',
+        'power'
+    )
+
+    TC_map = {
+        'K': 1,
+        'J': 0,
+        'T': 2,
+        'E': 3,
+        'N': 4,
+        'R': 6,
+        'S': 7,
+        'B': 8,
+        'C': 9,
+    }
+
+    inverse_TC_map = {v: k for k, v in TC_map.items()}
+
+    @measurer
+    def measure_temperature(self):
+        return self.read(0x0280, dtype='float')
+
+    @measurer
+    def measure_power(self):
+        return self.read(0x022A, dtype='float')
+
+    @setter
+    def set_setpoint(self, setpoint):
+        self.write(0x02E2, setpoint, dtype='float')
+
+    @getter
+    def get_setpoint(self):
+        return self.read(0x02E2, dtype='float')
+
+    @setter
+    def set_autotune(self, state):
+        if is_on(state):
+            self.write(0x0243, 1)
+        elif is_off(state):
+            self.write(0x0243, 0)
+
+    @setter
+    def set_output(self, state):
+        if is_on(state):
+            self.write(0x0240, 6)
+        elif is_off(state):
+            self.write(0x0240, 8)
+
+    @getter
+    def get_output(self):
+        state = self.read(0x0240)
+        if state == 6 or state == 4:
+            return 'ON'
+        elif state == 8:
+            return 'OFF'
+        elif state == 1:
+            return 'IDLE'
+        elif state == 10:
+            return 'ALARM'
+        else:
+            return float('nan')
+
+    @setter
+    def set_tc_type(self, _type):
+        try:
+            self.write(0x0283, OmegaPlatinum.TC_map[_type.upper()])
+        except (KeyError, AttributeError):
+            raise ValueError(f'{self.name}: Invalid thermocouple type {_type}')
+
+    @getter
+    def get_tc_type(self):
+        try:
+            return self.inverse_TC_map[self.read(0x0283)]
+        except KeyError:
+            return None
 
 
 class RedLionPXU(Instrument):
