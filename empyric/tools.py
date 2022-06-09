@@ -101,3 +101,24 @@ def to_number(value):
         return float(value)
     else:
         return np.nan
+
+def find_nearest(allowed, value, overestimate=False, underestimate=False):
+    """
+    Find the closest in a list of allowed values to a given value.
+
+    In some cases it might be beneficial to overestimate (choose nearest higher value)
+    or underestimate (choose the nearest lower value)
+    """
+
+    if overestimate:
+        diffs = np.array([abs(np.ceil(value - _value)) for _value in allowed])
+        nearest = np.argwhere(diffs == np.min(diffs)).flatten()
+    elif underestimate:
+        diffs = np.array([abs(np.floor(value - _value)) for _value in allowed])
+        nearest = np.argwhere(diffs == np.min(diffs)).flatten()
+    else:
+        diffs = np.array([abs(value - _value) for _value in allowed])
+        nearest = np.argwhere(diffs == np.min(diffs)).flatten()
+
+    if len(nearest) > 0:
+        return allowed[nearest[0]]
