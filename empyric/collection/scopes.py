@@ -11,8 +11,7 @@ class TekScope(Instrument):
     name = 'TekScope'
 
     supported_adapters = (
-        (VISAUSB, {'timeout': 10}),  # acquisitions can take a long time
-        (USBTMC, {'timeout': 10})
+        (USB, {'timeout': 10}),  # acquisitions can take a long time
     )
 
     knobs = (
