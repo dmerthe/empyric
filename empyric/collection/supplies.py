@@ -11,7 +11,6 @@ class Keithley2260B(Instrument):
 
     supported_adapters = (
         (Serial, {'baud_rate': 115200, 'write_termination': '\r\n'}),
-        (VISASerial, {'baud_rate': 115200})
     )
 
     knobs = (
@@ -85,7 +84,6 @@ class BK9183B(Instrument):
 
     supported_adapters = (
         (Serial, {'baud_rate': 57600}),
-        (VISASerial, {'baud_rate': 57600})
     )
     
     knobs = (

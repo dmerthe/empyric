@@ -16,9 +16,7 @@ class Keithley2400(Instrument):
     name = 'Keithley2400'
 
     supported_adapters = (
-        (LinuxGPIB, {}),
-        (PrologixGPIB, {}),
-        (VISAGPIB, {})
+        (GPIB, {}),
     )
 
     # Available knobs
@@ -302,9 +300,7 @@ class Keithley2460(Instrument):
     name = 'Keithley2460'
 
     supported_adapters = (
-        (LinuxGPIB, {}),
-        (PrologixGPIB, {}),
-        (VISAGPIB, {})
+        (GPIB, {}),
     )
 
     # Available knobs
@@ -591,9 +587,7 @@ class Keithley2651A(Instrument):
     name = 'Keithley2651A'
 
     supported_adapters = (
-        (LinuxGPIB, {}),
-        (PrologixGPIB, {}),
-        (VISAGPIB, {})
+        (GPIB, {}),
     )
 
     # Available knobs

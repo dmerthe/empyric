@@ -11,7 +11,6 @@ class BRAX3000(Instrument):
 
     supported_adapters = (
         (Serial, {'baud_rate': 19200, 'read_termination':'\r', 'timeout': 1}),
-        (VISASerial, {'baud_rate': 19200, 'timeout': 1})
     )
 
     knobs = (
