@@ -1,0 +1,1 @@
+- Change PrologixGPIBUSB backend to PyVISA

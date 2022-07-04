@@ -5,7 +5,8 @@ import re
 
 def chaperone(method):
     """
-    Wraps all write, read and query methods of the adapters; monitors and handles communication issues
+    Wraps all write, read and query methods of the adapters; monitors and
+    handles communication issues.
 
     :param method: (callable) method to be wrapped
     :return: (callable) wrapped method
@@ -14,14 +15,18 @@ def chaperone(method):
     def wrapped_method(self, *args, validator=None, **kwargs):
 
         if not self.connected:
-            raise AdapterError(f'Adapter is not connected for instrument at address {self.instrument.address}')
+            raise AdapterError(
+                'Adapter is not connected for instrument '
+                f'at address {self.instrument.address}'
+            )
 
         while self.busy:  # wait for turn to talk to the instrument
             time.sleep(0.05)
 
         self.busy = True  # block other methods from talking to the instrument
 
-        # Catch communication errors and either try to repeat communication or reset the connection
+        # Catch communication errors and either try to repeat communication
+        # or reset the connection
         attempts = 0
         reconnects = 0
 
@@ -32,13 +37,13 @@ def chaperone(method):
 
                     response = method(self, *args, **kwargs)
 
-                    if validator:
-                        valid_response = validator(response)
-                    else:
-                        valid_response = (response != '') * (response != float('nan')) * (response is not None)
+                    if validator and not validator(response):
 
-                    if not valid_response:
-                        raise ValueError(f'invalid response, {response}, from {method.__name__} method')
+                        raise ValueError(
+                            f'invalid response, {response}, '
+                            f'from {method.__name__} method'
+                        )
+
                     elif attempts > 0 or reconnects > 0:
                         print('Resolved')
 
@@ -46,8 +51,11 @@ def chaperone(method):
                     return response
 
                 except BaseException as err:
-                    print(f'Encountered {err} while trying to talk to {self.instrument.name}')
-                    print('Trying again...')
+                    print(
+                        f'Encountered {err} while trying '
+                        f'to talk to {self.instrument.name}'
+                        '\nRetrying...'
+                    )
                     attempts += 1
 
             # repeats have maxed out, so try reconnecting with the instrument
@@ -59,8 +67,11 @@ def chaperone(method):
             attempts = 0
             reconnects += 1
 
-        # Getting here means that both repeats and reconnects have been maxed out
-        raise AdapterError(f'Unable to communicate with {self.instrument.name}!')
+        # Getting here means that both repeats
+        # and reconnects have been maxed out
+        raise AdapterError(
+            f'Unable to communicate with {self.instrument.name}!'
+        )
 
     wrapped_method.__doc__ = method.__doc__  # keep method doc string
 
@@ -76,14 +87,18 @@ class Adapter:
     Base class for all adapters
     """
 
-    #: Maximum number of attempts to read from a port/channel, in the event of a communication error
+    #: Maximum number of attempts to read from a port/channel,
+    # in the event of a communication error
     max_attempts = 3
 
-    #: Maximum number of times to try to reset communications, in the event of a communication error
+    #: Maximum number of times to try to reset communications,
+    # in the event of a communication error
     max_reconnects = 1
 
-    kwargs = ['baud_rate', 'timeout', 'delay', 'byte_size', 'parity', 'stop_bits', 'close_port_after_each_call',
-              'slave_mode', 'byte_order']
+    kwargs = [
+        'baud_rate', 'timeout', 'delay', 'byte_size', 'parity', 'stop_bits',
+        'close_port_after_each_call', 'slave_mode', 'byte_order'
+    ]
 
     def __init__(self, instrument, **kwargs):
 
@@ -118,7 +133,8 @@ class Adapter:
 
     def connect(self):
         """
-        Establishes communications with the instrument through the appropriate backend
+        Establishes communications with the instrument through the appropriate
+        backend.
 
         :return: None
         """
@@ -130,7 +146,8 @@ class Adapter:
         Write a command.
 
         :param args: any arguments for the write method
-        :param validator: (callable) function that returns True if its input looks right or False if it does not
+        :param validator: (callable) function that returns True if its input
+        looks right or False if it does not
         :param kwargs: any keyword arguments for the write method
         :return: (str/float/int/bool) instrument response, if valid
         """
@@ -146,7 +163,8 @@ class Adapter:
         Read an awaiting message.
 
         :param args: any arguments for the read method
-        :param validator: (callable) function that returns True if its input looks right or False if it does not
+        :param validator: (callable) function that returns True if its input
+        looks right or False if it does not
         :param kwargs: any keyword arguments for the read method
         :return: (str/float/int/bool) instrument response, if valid
         """
@@ -162,7 +180,8 @@ class Adapter:
         Submit a query.
 
         :param args: any arguments for the query method
-        :param validator: (callable) function that returns True if its input looks right or False if it does not
+        :param validator: (callable) function that returns True if its input
+        looks right or False if it does not
         :param kwargs: any keyword arguments for the query method
         :return: (str/float/int/bool) instrument response, if valid
         """
@@ -170,7 +189,9 @@ class Adapter:
         if hasattr(self, '_query'):
             return self._query(*args, **kwargs)
         else:
-            raise AttributeError(self.__name__ + " adapter has no _query method")
+            raise AttributeError(
+                self.__name__ + " adapter has no _query method"
+            )
 
     def disconnect(self):
         """
@@ -183,8 +204,8 @@ class Adapter:
 
 class Serial(Adapter):
     """
-    Handles communications with serial instruments through either PyVISA or PySerial. If both are
-    installed, it defaults to PyVISA.
+    Handles communications with serial instruments through either PyVISA or
+    PySerial. If both are installed, it defaults to PyVISA.
     """
 
     baud_rate = 9600
@@ -197,47 +218,58 @@ class Serial(Adapter):
 
     def connect(self):
 
+        # List of errors that gets reported in unable to connect
         errors = []
 
+        # First try connecting with PyVISA
         try:
             pyvisa = importlib.import_module('pyvisa')
 
             self.lib = 'pyvisa'
 
-            self.backend = pyvisa.open_resource(self.instrument.address,
-                                                baud_rate=self.baud_rate,
-                                                stop_bits=self.stop_bits,
-                                                parity=self.parity,
-                                                timeout=self.timeout,
-                                                write_termination=self.write_termination,
-                                                read_terimation=self.read_termination)
+            self.backend = pyvisa.open_resource(
+                self.instrument.address,
+                baud_rate=self.baud_rate,
+                stop_bits=self.stop_bits,
+                parity=self.parity,
+                timeout=self.timeout,
+                write_termination=self.write_termination,
+                read_terimation=self.read_termination
+            )
 
         except BaseException as error:
             errors.append(error)
             pass
 
+        # Then try connecting with PySerial
         try:
             serial = importlib.import_module('serial')
 
             self.lib = 'pyserial'
 
-            self.backend = serial.Serial(port=self.instrument.address,
-                                         baudrate=self.baud_rate,
-                                         stopbits=self.stop_bits,
-                                         parity=self.parity,
-                                         timeout=self.timeout)
+            self.backend = serial.Serial(
+                port=self.instrument.address,
+                baudrate=self.baud_rate,
+                stopbits=self.stop_bits,
+                parity=self.parity,
+                timeout=self.timeout
+            )
 
         except BaseException as error:
             errors.append(error)
             pass
 
         if not self.lib:
-            raise AdapterError('No serial library was found! Please install either PySerial or PyVISA.')
+            raise AdapterError(
+                'No serial library was found! '
+                'Please install either PySerial or PyVISA.'
+            )
 
         if not self.backend:
             raise AdapterError(
-                f'Unable to initialize Serial adapter for {instrument} @ {instrument.address}; '
-                'the following errors were encountered:\n'
+                'Unable to initialize Serial adapter for'
+                f'{self.instrument} at {self.instrument.address}; '
+                'the following errors were incurred:\n'
                 '\n'.join([str(error) for error in errors])
             )
 
@@ -255,14 +287,14 @@ class Serial(Adapter):
     def _read(self, bytes=None, until=None, decode=True):
 
         if self.lib == 'pyvisa':
-            if num_bytes:
+            if bytes:
                 response = self.backend.read_bytes(bytes)
             elif until:
                 response = b''
                 while until.encode() not in response:
                     response = response + self.backend.read_raw(1)
             else:
-                response = self._read(until=self.read_termination, decode=False)
+                return self.backend.read(decode=False)  # decoded below
 
         elif self.lib == 'pyserial':
             if bytes:
@@ -270,18 +302,23 @@ class Serial(Adapter):
             elif until:
                 response = self.backend.read_until(until)
             else:
-                response = self.backend.read_until(self.read_termination.encode())
+                response = self.backend.read_until(
+                    self.read_termination.encode()
+                )
+
+        else:
+            response = b''
 
         if decode:
-            return response.decode().strip()
-        else:
-            return response
+            response = response.decode().strip()
 
-    def _query(self, question, until=None, bytes=None, decode=True):
+        return response
+
+    def _query(self, question, bytes=None, until=None, decode=True):
 
         self._write(question)
         time.sleep(self.delay)
-        return self._read(until=until, bytes=bytes, decode=decode)
+        return self._read(bytes=bytes, until=until, decode=decode)
 
     def disconnect(self):
 
@@ -295,38 +332,36 @@ class Serial(Adapter):
 
         self.connected = False
 
-
     def __repr__(self):
         return 'Serial'
 
     @staticmethod
     def locate():
         """
-        Determine the address of a serial instrument via the "unplug-it-then-plug-it-back-in" method.
+        Determine the address of a serial instrument via the
+        "unplug-it-then-plug-it-back-in" method.
 
         :return: None (address is printed to console)
         """
 
-        if self.lib == 'pyserial':
-            list_ports = importlib.import_module('serial.tools.list_ports').comports
+        lib = None
 
-            input('Press enter when the instrument is disconnected')
-            other_ports = list_ports()
-            input('Press enter when the instrument is connected')
-            all_ports = list_ports()
+        try:
+            importlib.import_module('pyvisa')
+            lib = 'pyvisa'
+        except ImportError:
+            pass
 
-            try:
-                instrument_address = [port.device for port in all_ports if port not in other_ports][0]
-                print(f'Address: {instrument_address}')
-                again = 'y' in input('Again? [y/n]').lower()
-                if again:
-                    Serial.locate()
-            except IndexError:
-                raise AdapterError('Instrument not found!')
+        try:
+            importlib.import_module('pyserial')
+            lib = 'pyserial'
+        except ImportError:
+            pass
 
-        if self.lib == 'pyvisa':
+        if lib == 'pyvisa':
 
-            resource_manager = importlib.import_module('pyserial').ResourceManager()
+            pyvisa = importlib.import_module('pyserial')
+            resource_manager = pyvisa.ResourceManager()
 
             input('Press enter when the instrument is disconnected')
             other_ports = resource_manager.list_resources()
@@ -334,13 +369,46 @@ class Serial(Adapter):
             all_ports = resource_manager.list_resources()
 
             try:
-                instrument_address = [port for port in all_ports if port not in other_ports][0]
+
+                instrument_address = [
+                    port for port in all_ports if port not in other_ports
+                ][0]
+
                 print(f'Address: {instrument_address}')
                 again = 'y' in input('Again? [y/n]').lower()
                 if again:
                     Serial.locate()
             except IndexError:
                 raise AdapterError('Instrument not found!')
+
+        elif lib == 'pyserial':
+
+            list_ports = importlib.import_module(
+                'serial.tools.list_ports'
+            ).comports
+
+            input('Press enter when the instrument is disconnected')
+            other_ports = list_ports()
+            input('Press enter when the instrument is connected')
+            all_ports = list_ports()
+
+            try:
+
+                instrument_address = [
+                    port.device for port in all_ports if port not in other_ports
+                ][0]
+
+                print(f'Address: {instrument_address}')
+                again = 'y' in input('Again? [y/n]').lower()
+                if again:
+                    Serial.locate()
+            except IndexError:
+                raise AdapterError('Instrument not found!')
+        else:
+            raise ImportError(
+                'Either PyVISA or PySerial must be installed'
+                'to locate serial instruments.'
+            )
 
 
 class GPIB(Adapter):
@@ -407,13 +475,29 @@ class GPIB(Adapter):
 
             full_address = None
             for address in manager.list_resources():
-                if re.match('GPIB[0-9]::' + str(self.instrument.address) + '::INSTR', address):
+
+                instrument_address = str(self.instrument.address)
+
+                address_format = 'GPIB[0-9]::' + instrument_address + '::INSTR'
+
+                address_match = re.match(
+                    address_format,
+                    address
+                )
+
+                if address_match:
                     full_address = address
 
             if full_address:
-                self.backend = manager.open_resource(full_address, open_timeout=self.timeout)
+                self.backend = manager.open_resource(
+                    full_address,
+                    open_timeout=self.timeout
+                )
             else:
-                AdapterError(f'GPIB device at address {self.instrument.address} not found!')
+                AdapterError(
+                    'GPIB device at address '
+                    f'{self.instrument.address} not found!'
+                )
 
         except BaseException as error:
             errors.append(error)
@@ -424,8 +508,9 @@ class GPIB(Adapter):
 
             self.lib = 'linux-gpib'
 
-            self.descr = self.backend.dev(0, self.instrument.address, 0, 9, 1,
-                                          0)  # integer corresponding to the device descriptor
+            self.descr = self.backend.dev(
+                0, self.instrument.address, 0, 9, 1, 0
+            )
 
         except BaseException as error:
             errors.append(error)
@@ -436,9 +521,9 @@ class GPIB(Adapter):
             if not GPIB.prologix_controller:
                 GPIB.prologix_controller = PrologixGPIBUSB()
 
-            self.lib == 'prologix gpib-usb'
+            self.lib = 'prologix-gpib'
 
-            PrologixGPIB.controller.devices.append(self.instrument.address)
+            GPIB.prologix_controller.devices.append(self.instrument.address)
 
             self.backend = GPIB.prologix_controller
 
@@ -447,19 +532,23 @@ class GPIB(Adapter):
             pass
 
         if not self.lib:
-            raise AdapterError('No GPIB library was found! For Windows or Mac, please install PyVISA.\n'
-                                  'For Linux please install either PyVISA or LinuxGPIB.\n'
-                                  'Prologix GPIB-USB adapters are also supported and require either PyVISA or PySerial.')
+            raise AdapterError(
+                'No GPIB library was found! '
+                'For Windows or Mac, please install PyVISA.\n'
+                'For Linux please install either PyVISA or LinuxGPIB.\n'
+                'Prologix GPIB-USB adapters are also supported '
+                'and require either PyVISA or PySerial.'
+            )
 
         if not self.backend:
             raise AdapterError(
-                f'Unable to initialize GPIB adapter for {instrument} @ {instrument.address}; '
+                'Unable to initialize GPIB adapter for '
+                f'{self.instrument} at address {self.instrument.address}; '
                 'the following errors were encountered:\n'
                 '\n'.join([str(error) for error in errors])
             )
 
         self.connected = True
-
 
     def _write(self, message):
 
@@ -467,18 +556,18 @@ class GPIB(Adapter):
             self.backend.write(message)
         elif self.lib == 'linux-gpib':
             self.backend.write(self.descr, message)
-        elif self.lib == 'prologix gpib-usb':
+        elif self.lib == 'prologix-gpib':
             self.backend.write(message, address=self.instrument.address)
 
         return "Success"
 
-    def _read(self):
+    def _read(self, bytes=1024):
 
         if self.lib == 'pyvisa':
             return self.backend.read()
         elif self.lib == 'linux-gpib':
-            return self.backend.read(self.descr, read_length).decode()
-        elif self.lib == 'prologix gpib-usb':
+            return self.backend.read(self.descr, bytes).decode()
+        elif self.lib == 'prologix-gpib':
             return self.backend.read(address=self.instrument.address)
 
     def _query(self, question):
@@ -507,11 +596,14 @@ class GPIB(Adapter):
         elif self.lib == 'linux-gpib':
             self.backend.clear(self.descr)
             self.backend.close(self.descr)
-        elif self.lib == 'prologix gpib-usb':
+        elif self.lib == 'prologix-gpib':
 
+            # clear the instrument buffers
             self.backend.write('clr', to_controller=True,
-                               address=self.instrument.address)  # clear the instrument buffers
-            self.backend.write('loc', to_controller=True)  # return instrument to local control
+                               address=self.instrument.address)
+
+            # return instrument to local control
+            self.backend.write('loc', to_controller=True)
 
             self.backend.devices.remove(self.instrument.address)
 
@@ -546,7 +638,10 @@ class PrologixGPIBUSB:
             serial = importlib.import_module('serial')
 
         except ImportError:
-            raise AdapterError('Please install the PySerial library to connect a Prologix GPIB-USB adapter.')
+            raise AdapterError(
+                'Please install the PySerial library '
+                'to connect a Prologix GPIB-USB adapter.'
+            )
 
         list_ports = importlib.import_module('serial.tools.list_ports')
 
@@ -557,7 +652,7 @@ class PrologixGPIBUSB:
 
         if port:
             self.serial_port = serial.Serial(port=port, timeout=1)
-            # communications with this controller are a bit slow, so timeout should be set high
+            # communications with this controller are a bit slow
         else:
             raise AdapterError(f'Prologix GPIB-USB adapter not found!')
 
@@ -573,7 +668,9 @@ class PrologixGPIBUSB:
             if address in self.devices:
                 self.write(f'addr {address}', to_controller=True)
             else:
-                raise AttributeError(f"GPIB device at address {address} is not connected!")
+                raise AttributeError(
+                    f"GPIB device at address {address} is not connected!"
+                )
 
         proper_message = message.encode() + b'\r'
 
@@ -590,7 +687,9 @@ class PrologixGPIBUSB:
             if address in self.devices:
                 self.write(f'addr {address}', to_controller=True)
             else:
-                raise AttributeError(f"GPIB device at address {address} is not connected!")
+                raise AttributeError(
+                    f"GPIB device at address {address} is not connected!"
+                )
 
         self.write('read eoi', to_controller=True)
 
@@ -604,6 +703,8 @@ class USB(Adapter):
     """
     Handles communications with pure USB instruments through PyVISA or USBTMC.
     """
+
+    timeout = 0.5
 
     def connect(self):
 
@@ -620,8 +721,10 @@ class USB(Adapter):
 
             for address in manager.list_resources():
                 if serial_number in address:
-                    self.backend = manager.open_resource(address,
-                                                         open_timeout=self.timeout)
+                    self.backend = manager.open_resource(
+                        address,
+                        open_timeout=self.timeout
+                    )
                     self.backend.timeout = self.timeout
 
         except BaseException as error:
@@ -633,7 +736,9 @@ class USB(Adapter):
 
             self.lib = 'usbtmc'
 
-            self.backend = usbtmc.Instrument('USB::' + self.instrument.address + '::INSTR')
+            self.backend = usbtmc.Instrument(
+                'USB::' + self.instrument.address + '::INSTR'
+            )
 
         except BaseException as error:
             errors.append(error)
@@ -641,12 +746,14 @@ class USB(Adapter):
 
         if not self.lib:
             raise AdapterError(
-                'No USB library was found! Please install either the PyVISA or USBTMC libraries.'
+                'No USB library was found! '
+                'Please install either the PyVISA or USBTMC libraries.'
             )
 
         if not self.backend:
             raise AdapterError(
-                f'Unable to initialize USB adapter for {instrument} @ {instrument.address}; '
+                'Unable to initialize USB adapter for '
+                f'{self.instrument} @ {self.instrument.address}; '
                 'the following errors were encountered:\n'
                 '\n'.join([str(error) for error in errors])
             )
@@ -678,7 +785,8 @@ class USB(Adapter):
 
 class Modbus(Adapter):
     """
-    Handles communications with modbus serial instruments through the Minimal Modbus package
+    Handles communications with modbus serial instruments through the
+    Minimal Modbus package
     """
 
     # Common defaults
@@ -690,13 +798,16 @@ class Modbus(Adapter):
     parity = 'N'
     delay = 0.05
 
-    adapters = {}  # modbus adapters using the same serial port; for traffic control
+    # For traffic control of modbus adapters using the same serial ports
+    adapters = {}
 
     _busy = False
 
     @property
     def busy(self):
-        return bool(sum([adapter._busy for adapter in Modbus.adapters.get(self.port, [])]))
+        return bool(sum([
+            adapter._busy for adapter in Modbus.adapters.get(self.port, [])
+        ]))
 
     @busy.setter
     def busy(self, busy):
@@ -715,7 +826,9 @@ class Modbus(Adapter):
 
         except ImportError:
 
-            raise AdapterError('Modbus adapters require the minimalmodbus library')
+            raise AdapterError(
+                'Modbus adapters require the minimalmodbus library'
+            )
 
         # Get port and channel
         self.port, self.channel = self.instrument.address.split('::')
@@ -726,7 +839,12 @@ class Modbus(Adapter):
             Modbus.adapters[self.port] = [self]
 
         # Handshake with instrument
-        self.backend = minimal_modbus.Instrument(self.port, int(self.channel), mode=self.slave_mode)
+        self.backend = minimal_modbus.Instrument(
+            self.port,
+            int(self.channel),
+            mode=self.slave_mode
+        )
+
         self.backend.serial.baudrate = self.baud_rate
         self.backend.serial.timeout = self.timeout
         self.backend.serial.bytesize = self.byte_size
@@ -784,9 +902,13 @@ class Phidget(Adapter):
         serial_number = address_parts[0]
 
         try:
-            self.PhidgetException = importlib.import_module("Phidget22.PhidgetException").PhidgetException
+            self.PhidgetException = importlib.import_module(
+                "Phidget22.PhidgetException"
+            ).PhidgetException
         except ImportError:
-            raise AdapterError('Phidget instruments require the Phidget22 library')
+            raise AdapterError(
+                'Phidget instruments require the Phidget22 library'
+            )
 
         self.backend = self.instrument.device_class()
 

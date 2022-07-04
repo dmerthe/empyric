@@ -1,3 +1,5 @@
+import struct
+from empyric.tools import find_nearest
 from empyric.adapters import *
 from empyric.collection.instrument import *
 
@@ -41,7 +43,7 @@ class TekScope(Instrument):
 
     @setter
     def set_horz_position(self, position):
-        self.write('HOR:POS %.3e' % scale)
+        self.write('HOR:POS %.3e' % position)
 
     @setter
     def set_ch1_scale(self, scale):
@@ -94,7 +96,9 @@ class TekScope(Instrument):
             time.sleep(1)  # wait for acquisition to complete
 
         str_data = self.query('CURVE?').split(' ')[1].split(',')
-        return np.array([ ( float(datum) - offset )*scale_factor + zero for datum in str_data ])
+        return np.array([
+            (float(datum) - offset)*scale_factor + zero for datum in str_data
+        ])
 
     @measurer
     def measure_channel_1(self):
