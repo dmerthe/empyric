@@ -115,6 +115,8 @@ class Adapter:
 
         self.connect()
 
+        self.instrument.adapter = self
+
         self.busy = False  # indicator for multithreading
 
     def __del__(self):
