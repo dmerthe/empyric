@@ -774,7 +774,6 @@ class USB(Adapter):
 
     def disconnect(self):
 
-        self.backend.clear()
         self.backend.close()
 
         self.connected = False
