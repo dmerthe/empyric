@@ -115,6 +115,8 @@ class Adapter:
 
         self.connect()
 
+        self.instrument.adapter = self
+
         self.busy = False  # indicator for multithreading
 
     def __del__(self):
@@ -710,14 +712,14 @@ class USB(Adapter):
 
         errors = []
 
+        serial_number = str(self.instrument.address)
+
         try:
             visa = importlib.import_module('pyvisa')
 
             self.lib = 'pyvisa'
 
             manager = visa.ResourceManager()
-
-            serial_number = str(self.instrument.address)
 
             for address in manager.list_resources():
                 if serial_number in address:
@@ -737,7 +739,7 @@ class USB(Adapter):
             self.lib = 'usbtmc'
 
             self.backend = usbtmc.Instrument(
-                'USB::' + self.instrument.address + '::INSTR'
+                'USB::' + serial_number + '::INSTR'
             )
 
         except BaseException as error:
@@ -774,7 +776,6 @@ class USB(Adapter):
 
     def disconnect(self):
 
-        self.backend.clear()
         self.backend.close()
 
         self.connected = False
