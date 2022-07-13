@@ -15,21 +15,27 @@ from matplotlib.cm import ScalarMappable
 import matplotlib.dates as mdates
 
 from pandas.plotting import register_matplotlib_converters
-register_matplotlib_converters()  # needed for converting Pandas datetimes for matplotlib
+register_matplotlib_converters()
+# needed for converting Pandas datetimes for matplotlib
 
 
 class Plotter:
     """
-    Handler for plotting data based on the runcard plotting settings and data context.
+    Handler for plotting data based on the runcard plotting settings and data
+    context.
 
-    Argument must be a pandas DataFrame with a 'time' column and datetime indices.
+    Argument must be a pandas DataFrame with a 'time' column and datetime
+    indices.
 
     The optional settings keyword argument is given in the form,
+    {...,
+    plot_name:
+    {'x': x_name, 'y': [y_name1, y_name2,...], 'style': plot_style, ...} ,
+    ...}
 
-    {..., plot_name: {'x': x_name, 'y': [y_name1, y_name2,...], 'style': plot_style, ...} ,...}
-
-    where plot_name is the user designated title for the plot, x_name, y_name_1, y_name2, etc. are columns in the DataFrame, and
-    plot_style is either 'basic' (default), 'log', 'symlog', 'averaged', 'errorbars' or 'parametric'.
+    where plot_name is the user designated title for the plot, x_name, y_name_1,
+    y_name2, etc. are columns in the DataFrame, and plot_style is either 'basic'
+    (default), 'log', 'symlog', 'averaged', 'errorbars' or 'parametric'.
     """
 
     # For using datetimes on x-axis
@@ -56,7 +62,9 @@ class Plotter:
 
         self.plots = {}
         for plot_name in settings:
-            self.plots[plot_name] = plt.subplots(constrained_layout=True, figsize=(5, 4))
+            self.plots[plot_name] = plt.subplots(
+                constrained_layout=True, figsize=(5, 4)
+            )
 
     def save(self, plot_name=None, save_as=None):
         """Save the plots to PNG files in the working directory"""
@@ -73,7 +81,10 @@ class Plotter:
                 fig.savefig(name + '.png')
 
     def close(self, plot_name=None):
-        """If the plot_name keyword argument is specified, close the corresponding plot. Otherwise, close all plots"""
+        """
+        If the plot_name keyword argument is specified, close the corresponding
+        plot. Otherwise, close all plots.
+        """
 
         self.save()
 
@@ -105,7 +116,9 @@ class Plotter:
             elif style == 'parametric':
                 self._plot_parametric(name)
             else:
-                raise AttributeError(f"Plotting style '{style}' not recognized!")
+                raise AttributeError(
+                    f"Plotting style '{style}' not recognized!"
+                )
 
     def _plot_basic(self, name, averaged=False, errorbars=False):
         """Make a simple plot, (possibly multiple) y vs. x"""
@@ -118,7 +131,9 @@ class Plotter:
         not_in_data = np.setdiff1d(np.concatenate([[x], ys]), self.data.columns)
         if not_in_data:
             raise AttributeError(
-                f'{", ".join(not_in_data)} specified for plotting, but not in variables!')
+                f'{", ".join(not_in_data)} specified for plotting, '
+                'but not in variables!'
+            )
 
         if averaged or errorbars:
 
@@ -140,7 +155,8 @@ class Plotter:
             ydata = self.full_data[ys]
 
         if ax.lines and not errorbars:
-        # For simple plots (i.e. not error bar plots), if already plotted, simply update the plot data and axes
+        # For simple plots (i.e. not error bar plots), if already plotted,
+        # simply update the plot data and axes
 
             for line, y in zip(ax.lines, ys):
                 line.set_data(xdata, ydata[y])
@@ -154,8 +170,13 @@ class Plotter:
 
         else:  # draw a new plot
 
-            plot_kwargs = self.settings[name].get('line', {})  # kwargs for matplotlib
-            plot_kwargs = {key: np.array([value]).flatten() for key, value in plot_kwargs.items()}
+            plot_kwargs = self.settings[name].get('line', {})
+            # kwargs for matplotlib
+
+            plot_kwargs = {
+                key: np.array([value]).flatten()
+                for key, value in plot_kwargs.items()
+            }
 
             if len(ys) > 1:  # a legend will be made
                 plot_kwargs['label'] = ys
@@ -169,15 +190,20 @@ class Plotter:
 
             for i, y in enumerate(ys):
 
-                plot_kwargs_i = {key: value[i] for key, value in plot_kwargs.items()}
+                plot_kwargs_i = {
+                    key: value[i] for key, value in plot_kwargs.items()
+                }
 
                 if errorbars:
-                    ax.errorbar(xdata, ydata[y], yerr=ystddata[y], **plot_kwargs_i)
+                    ax.errorbar(
+                        xdata, ydata[y], yerr=ystddata[y], **plot_kwargs_i
+                    )
                 else:
                     ax.plot(xdata, ydata[y], **plot_kwargs_i)
 
             if x == 'Time':
-                pass  # axis is automatically configured for datetimes; do not modify
+                pass
+                # axis is automatically configured for datetimes; do not modify
             elif xscale == 'linear':
                 ax.ticklabel_format(axis='x', style='sci', scilimits=(-2, 4))
             elif type(xscale) == dict:
@@ -219,7 +245,9 @@ class Plotter:
         not_in_data = np.setdiff1d([x,y,s], self.data.columns)
         if not_in_data:
             raise AttributeError(
-                f'{", ".join(not_in_data)} specified for plotting, but not in variables!')
+                f'{", ".join(not_in_data)} specified for plotting, '
+                'but not in variables!'
+            )
 
         xdata = self.full_data[x]
         ydata = self.full_data[y]
@@ -241,12 +269,17 @@ class Plotter:
         plt.rcParams['image.cmap'] = colormap
         cmap = plt.get_cmap('viridis')
 
-        plot_kwargs = self.settings[name].get('options', {})  # kwargs for matplotlib
+        plot_kwargs = self.settings[name].get('options', {})
+        # kwargs for matplotlib
 
         if not hasattr(fig, 'cbar'):  # draw a new plot
 
             for i in range(len(xdata) - 1):
-                ax.plot(xdata[i: i + 2], ydata[i: i + 2], color=cmap(norm(sdata[i])), **plot_kwargs)
+                ax.plot(
+                    xdata[i: i + 2], ydata[i: i + 2],
+                    color=cmap(norm(sdata[i])),
+                    **plot_kwargs
+                )
 
             fig.scalarmappable = ScalarMappable(cmap=cmap, norm=norm)
             fig.scalarmappable.set_array(np.linspace(s_min, s_max, 1000))
@@ -293,7 +326,8 @@ class Plotter:
             fig.scalarmappable.set_clim(vmin=s_min, vmax=s_max)
             fig.cbar.update_normal(fig.scalarmappable)
 
-            # update_normal method above removes the colorbar's ylabel; redraw it
+            # update_normal method above removes the colorbar's ylabel;
+            # redraw it
             if s == 'Time':
                 fig.cbar.ax.set_ylabel('Time ' + f" ({units})")
             else:
@@ -306,7 +340,11 @@ class Plotter:
 
             # plot new line segments
             for i in range(len(ax.lines)-1, len(xdata)-1):
-                ax.plot(xdata[i: i + 2], ydata[i: i + 2], color=cmap(norm(sdata[i])), **plot_kwargs)
+                ax.plot(
+                    xdata[i: i + 2], ydata[i: i + 2],
+                    color=cmap(norm(sdata[i])),
+                    **plot_kwargs
+                )
 
             ax.relim()
             ax.autoscale_view()
@@ -317,7 +355,8 @@ class Plotter:
     @staticmethod
     def numericize(data):
         """
-        Convert a DataFrame, possibly containing lists or paths, such that all elements are numeric
+        Convert a DataFrame, possibly containing lists or paths,
+        such that all elements are numeric
         """
 
         indices = data.index
@@ -328,7 +367,7 @@ class Plotter:
         numerical_indices = []
         numerical_array = [[]]*len(labels)
 
-        # Iterate through each row of data and expand any files or lists into columns
+        # Iterate through each row and expand any files or lists into columns
         for index, row in zip(indices, data_array):
 
             columns = []
@@ -336,7 +375,9 @@ class Plotter:
             for i, element in enumerate(row):
 
                 if type(element) == str and os.path.isfile(element):
-                    expanded_element = list(pd.read_csv(element)[labels[i]].values)
+                    expanded_element = list(
+                        pd.read_csv(element)[labels[i]].values
+                    )
                 if np.ndim(element) == 1:
                     expanded_element = list(element)
                 else:
@@ -348,7 +389,8 @@ class Plotter:
 
             numerical_indices = numerical_indices + [index] * max_len
             for i, column in enumerate(columns):
-                numerical_array[i] = numerical_array[i] + column + [np.nan]*(max_len - len(column))
+                new_elements = column + [np.nan]*(max_len - len(column))
+                numerical_array[i] = numerical_array[i] + new_elements
 
         numerical_data = pd.DataFrame(
             data= np.array(numerical_array, dtype=float).T,
@@ -361,14 +403,15 @@ class Plotter:
 
 class ExperimentGUI:
     """
-    GUI showing experimental progress, values of all experiment variables and any alarms, and managing plotting data
-    via the Plotter class.
+    GUI showing experimental progress, values of all experiment variables and
+    any alarms, and managing plotting data via the Plotter class.
 
-    This GUI allows the user to hold, stop and terminate the experiment. When stopped, the user can change the values
-    of knob and parameter variables, and also directly interact with instruments through the Dashboard.
+    This GUI allows the user to hold, stop and terminate the experiment. When
+    stopped, the user can change the values of knob and parameter variables,
+    and also directly interact with instruments through the Dashboard.
     """
 
-    def __init__(self, experiment, alarms=None, instruments=None, title=None, plots=None, plotter=None, save_interval=None, plot_interval=0):
+    def __init__(self, experiment, title=None, **kwargs):
 
         self.experiment = experiment
 
@@ -376,15 +419,16 @@ class ExperimentGUI:
 
         self.variables = experiment.variables
 
-        if alarms is None:
+        if 'alarms' is kwargs:
             self.alarms = {}
         else:
-            self.alarms = alarms
+            self.alarms = kwargs['alarms']
 
-        if instruments:
-            self.instruments = instruments
+        if 'instruments' in kwargs:
+            self.instruments = kwargs['instruments']
         else:
-            # If instruments are not specified, get them from the experiment variables
+            # If instruments are not specified,
+            # get them from the experiment variables
             self.instruments = {}
             for variable in self.experiment.variables.values():
                 if variable.type in ['meter', 'knob']:
@@ -392,20 +436,20 @@ class ExperimentGUI:
                     if instrument.name not in self.instruments:
                         self.instruments[instrument.name] = instrument
 
-        if plots or plotter:
-            if plotter:
-                self.plotter = plotter
+        if 'plots' in kwargs or 'plotter' in kwargs:
+            if 'plotter' in kwargs:
+                self.plotter = kwargs['plotter']
             else:
-                self.plotter = Plotter(experiment.data, plots)
+                self.plotter = Plotter(experiment.data, kwargs['plots'])
 
-            self.plot_interval = plot_interval  # grows if plotting takes longer
+            self.plot_interval = kwargs.get('plot_interval', 0)
+            # grows if plotting takes longer
+
             self.last_plot = float('-inf')
 
             # Set interval for saving plots
-            if save_interval:
-                self.save_interval = save_interval
-            else:
-                self.save_interval = 0
+            self.save_interval = kwargs.get('save_interval', 0)
+
             self.last_save = time.time()
 
         self.root = tk.Tk()
@@ -420,16 +464,21 @@ class ExperimentGUI:
         self.status_frame.grid(row=0, column=0, columnspan=2)
 
         i = 0
-        if title:
-            tk.Label(self.status_frame, text=f'{title}', font=("Arial", 14, 'bold')).grid(row=i, column=1)
-        else:
-            tk.Label(self.status_frame, text=f'Experiment', font=("Arial", 14, 'bold')).grid(row=i, column=1)
+        title = kwargs.get('title', 'Experiment')
+
+        tk.Label(
+            self.status_frame, text=title, font=("Arial", 14, 'bold')
+        ).grid(row=i, column=1)
 
         # Status field shows current experiment status
         i += 1
-        tk.Label(self.status_frame, text='Status', width=len('Status'), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
+        tk.Label(
+            self.status_frame, text='Status', width=len('Status'), anchor=tk.E
+        ).grid(row=i, column=0, sticky=tk.E)
 
-        self.status_label = tk.Label(self.status_frame, text='', width=30, relief=tk.SUNKEN)
+        self.status_label = tk.Label(
+            self.status_frame, text='', width=30, relief=tk.SUNKEN
+        )
         self.status_label.grid(row=i, column=1, sticky=tk.W, padx=10)
 
         # Table of variables shows most recently measured/set variable values
@@ -438,76 +487,127 @@ class ExperimentGUI:
         self._entry_esc_funcs = {}  # container for esc press event handlers
 
         i += 1
-        tk.Label(self.status_frame, text='', font=("Arial", 14, 'bold')).grid(row=i, column=0, sticky=tk.E)
+        tk.Label(
+            self.status_frame, text='', font=("Arial", 14, 'bold')
+        ).grid(row=i, column=0, sticky=tk.E)
 
         i += 1
-        tk.Label(self.status_frame, text='Variables', font=("Arial", 14, 'bold')).grid(row=i, column=1)
+        tk.Label(
+            self.status_frame, text='Variables', font=("Arial", 14, 'bold')
+        ).grid(row=i, column=1)
 
         i += 1
-        tk.Label(self.status_frame, text='Run Time', width=len('Run Time'), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
+        tk.Label(
+            self.status_frame, text='Run Time', width=len('Run Time'),
+            anchor=tk.E
+        ).grid(row=i, column=0, sticky=tk.E)
 
-        self.variable_entries['Time'] = tk.Entry(self.status_frame, state='readonly', disabledforeground='black', width=30)
-        self.variable_entries['Time'].grid(row=i, column=1, sticky=tk.W, padx=10)
+        self.variable_entries['Time'] = tk.Entry(
+            self.status_frame, state='readonly', disabledforeground='black',
+            width=30
+        )
+        self.variable_entries['Time'].grid(
+            row=i, column=1, sticky=tk.W, padx=10
+        )
 
         i += 1
         for name in self.variables:
-            tk.Label(self.status_frame, text=name, width=len(name), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
+            tk.Label(
+                self.status_frame, text=name, width=len(name), anchor=tk.E
+            ).grid(row=i, column=0, sticky=tk.E)
 
-            self.variable_entries[name] = tk.Entry(self.status_frame, state='readonly', disabledforeground='black', width=30)
-            self.variable_entries[name].grid(row=i, column=1, sticky=tk.W, padx=10)
+            self.variable_entries[name] = tk.Entry(
+                self.status_frame, state='readonly', disabledforeground='black',
+                width=30
+            )
+            self.variable_entries[name].grid(
+                row=i, column=1, sticky=tk.W, padx=10
+            )
 
             if self.variables[name].type in ['knob', 'parameter']:
                 entry = self.variable_entries[name]
                 variable = self.variables[name]
                 root = self.status_frame
 
-                enter_func = lambda event, entry=entry, variable=variable, root=root : self._entry_enter(entry, variable, root)
-                self._entry_enter_funcs[name] = enter_func
-                self.variable_entries[name].bind('<Return>', self._entry_enter_funcs[name])
+                enter_func = \
+                    lambda event, entry=entry, variable=variable, root=root : \
+                        self._entry_enter(entry, variable, root)
 
-                esc_func = lambda event, entry=entry, variable=variable, root=root : self._entry_esc(entry, variable, root)
+                self._entry_enter_funcs[name] = enter_func
+                self.variable_entries[name].bind(
+                    '<Return>', self._entry_enter_funcs[name]
+                )
+
+                esc_func = \
+                    lambda event, entry=entry, variable=variable, root=root : \
+                        self._entry_esc(entry, variable, root)
+
                 self._entry_esc_funcs[name] = esc_func
-                self.variable_entries[name].bind('<Escape>', self._entry_esc_funcs[name])
+                self.variable_entries[name].bind(
+                    '<Escape>', self._entry_esc_funcs[name]
+                )
 
             i += 1
 
-        tk.Label(self.status_frame, text='', font=("Arial", 14, 'bold')).grid(row=i, column=0, sticky=tk.E)
+        tk.Label(
+            self.status_frame, text='', font=("Arial", 14, 'bold')
+        ).grid(row=i, column=0, sticky=tk.E)
 
-        # Table of alarm indicators shows the status of any alarms being monitored
+        # Table of alarm indicators shows the status of any alarms monitored
         self.alarm_status_labels = {}
 
-        if len(alarms) > 0:
+        if len(self.alarms) > 0:
 
             i += 1
-            tk.Label(self.status_frame, text='Alarms', font=("Arial", 14, 'bold')).grid(row=i, column=1)
+            tk.Label(
+                self.status_frame, text='Alarms', font=("Arial", 14, 'bold')
+            ).grid(row=i, column=1)
 
             i += 1
             for alarm in self.alarms:
-                tk.Label(self.status_frame, text=alarm, width=len(alarm), anchor=tk.E).grid(row=i, column=0, sticky=tk.E)
 
-                self.alarm_status_labels[alarm] = tk.Label(self.status_frame, text='Clear', relief=tk.SUNKEN, width=30)
-                self.alarm_status_labels[alarm].grid(row=i, column=1, sticky=tk.W, padx=10)
+                tk.Label(
+                    self.status_frame, text=alarm, width=len(alarm),
+                    anchor=tk.E
+                ).grid(row=i, column=0, sticky=tk.E)
+
+                self.alarm_status_labels[alarm] = tk.Label(
+                    self.status_frame, text='Clear', relief=tk.SUNKEN, width=30
+                )
+                self.alarm_status_labels[alarm].grid(
+                    row=i, column=1, sticky=tk.W, padx=10
+                )
 
                 i += 1
 
-            tk.Label(self.status_frame, text='', font=("Arial", 14, 'bold')).grid(row=i, column=0, sticky=tk.E)
+            tk.Label(
+                self.status_frame, text='', font=("Arial", 14, 'bold')
+            ).grid(row=i, column=0, sticky=tk.E)
 
 
         i = 1
-        self.dash_button = tk.Button(self.root, text='Dashboard', font=("Arial", 14, 'bold'), width=10,
-                                     command=self.open_dashboard, state=tk.DISABLED)
+        self.dash_button = tk.Button(
+            self.root, text='Dashboard', font=("Arial", 14, 'bold'), width=10,
+            command=self.open_dashboard, state=tk.DISABLED
+        )
         self.dash_button.grid(row=i, column=0, sticky=tk.W)
 
-        self.hold_button = tk.Button(self.root, text='Hold', font=("Arial", 14, 'bold'), width=10,
-                                      command=self.toggle_hold)
+        self.hold_button = tk.Button(
+            self.root, text='Hold', font=("Arial", 14, 'bold'), width=10,
+            command=self.toggle_hold
+        )
         self.hold_button.grid(row=i + 1, column=0, sticky=tk.W)
 
-        self.stop_button = tk.Button(self.root, text='Stop', font=("Arial", 14, 'bold'), width=10,
-                                      command=self.toggle_stop)
+        self.stop_button = tk.Button(
+            self.root, text='Stop', font=("Arial", 14, 'bold'), width=10,
+            command=self.toggle_stop
+        )
         self.stop_button.grid(row=i + 2, column=0, sticky=tk.W)
 
-        self.terminate_button = tk.Button(self.root, text='Terminate', font=("Arial", 14, 'bold'), width=10, fg='red', bg='gray87',
-                                          command=self.end, height=5)
+        self.terminate_button = tk.Button(
+            self.root, text='Terminate', font=("Arial", 14, 'bold'), width=10,
+            fg='red', bg='gray87', command=self.end, height=5
+        )
         self.terminate_button.grid(row=i, column=1, sticky=tk.E, rowspan=3)
 
     def run(self):
@@ -521,13 +621,14 @@ class ExperimentGUI:
         if self.closed:
             return  # don't update GUI if it no longer exists
 
-        self.root.wm_attributes('-topmost', False)  # Allow window to fall back once things get started
+        self.root.wm_attributes('-topmost', False)
+        # Allow window to fall back once things get started
 
         # Check the state of the experiment
         state = self.experiment.state
         for name, entry in self.variable_entries.items():
 
-            # If experiment stopped allow user to edit knobs or constant expressions
+            # If experiment stopped allow user to edit knobs or parameters
             if self.experiment.stopped and name != 'Time':
                 if self.variables[name].type in ['knob', 'parameter']:
                     continue
@@ -544,7 +645,9 @@ class ExperimentGUI:
                 write_entry(entry, 'NaN')
             else:
                 if name == 'Time':
-                    write_entry(entry, str(datetime.timedelta(seconds=state['Time'])))
+                    write_entry(
+                        entry, str(datetime.timedelta(seconds=state['Time']))
+                    )
                 else:
                     if state[name]*0 == 0:  # check if number
                         if state[name] == 0:
@@ -565,7 +668,9 @@ class ExperimentGUI:
                 if protocol == 'none':
                     label.config(text='TRIGGERED: NO PROTOCOL', bg='red')
                 else:
-                    label.config(text='TRIGGERED' + f': {protocol.upper()}', bg='red')
+                    label.config(
+                        text='TRIGGERED' + f': {protocol.upper()}', bg='red'
+                    )
             else:
                 label.config(text="CLEAR", bg='green')
 
@@ -609,7 +714,10 @@ class ExperimentGUI:
             self.quit()
 
         # Plot data
-        if hasattr(self, 'plotter') and len(self.experiment.data) > 0 and not self.experiment.stopped:
+        has_plotter = hasattr(self, 'plotter')
+        has_data = len(self.experiment.data) > 0
+        not_stopped = not self.experiment.stopped
+        if has_plotter and has_data and not_stopped:
             if time.time() > self.last_plot + self.plot_interval:
 
                 start_plot = time.perf_counter()
@@ -624,7 +732,8 @@ class ExperimentGUI:
 
 
             # Save plots
-            if time.time() > self.last_save + self.save_interval and self.experiment.timestamp:
+            saving_needed = time.time() > self.last_save + self.save_interval
+            if saving_needed and self.experiment.timestamp:
 
                 start_save = time.perf_counter()
                 self.plotter.save()
@@ -641,12 +750,17 @@ class ExperimentGUI:
             self.root.after(50, self.update)
 
     def open_dashboard(self):
-        """When the user hits the Dashboard button, open a window which allows the user to interact with
-        instruments while the experiment is paused or stopped"""
+        """
+        When the user hits the Dashboard button, open a window which allows
+        the user to interact with instruments while the experiment is paused or
+        stopped.
+        """
 
         prior_status = self.experiment.status
 
-        self.experiment.stop()  # stop routines and measurements to avoid communication conflicts while dashboard is open
+        self.experiment.stop()
+        # stop routines and measurements to avoid communication conflicts
+        # while dashboard is open
 
         Dashboard(self.root, self.instruments)
 
@@ -657,7 +771,7 @@ class ExperimentGUI:
             self.experiment.start()
 
     def toggle_hold(self):
-        """User pauses/resumes the experiment through the Hold/Resume button"""
+        """User pauses/resumes the experiment through the Hold/Resume button."""
 
         if self.experiment.holding:
             self.experiment.start()
@@ -665,7 +779,7 @@ class ExperimentGUI:
             self.experiment.hold()
 
     def toggle_stop(self):
-        """User stops the experiment through the Stop button"""
+        """User stops the experiment through the Stop button."""
 
         if self.experiment.stopped:
             self.experiment.start()
@@ -673,7 +787,10 @@ class ExperimentGUI:
             self.experiment.stop()
 
     def end(self):
-        """User terminates the experiment and closes the GUI with the Terminate button; cancels any experiment follow-ups"""
+        """
+        User terminates the experiment and closes the GUI with the Terminate
+        button; cancels any experiment follow-ups.
+        """
 
         self.experiment.terminate(reason='user terminated')
         self.quit()
@@ -785,7 +902,9 @@ class BasicDialog(tk.Toplevel):
 
         box = tk.Frame(self)
 
-        w = tk.Button(box, text="OK", width=10, command=self.ok, default=tk.ACTIVE)
+        w = tk.Button(
+            box, text="OK", width=10, command=self.ok, default=tk.ACTIVE
+        )
         w.pack(side=tk.LEFT, padx=5, pady=5)
 
         self.bind("<Return>", self.ok)
@@ -824,7 +943,9 @@ class Dashboard(BasicDialog):
 
     def body(self, master):
 
-        tk.Label(master, text='Instruments:', font=('Arial', 14), justify=tk.LEFT).grid(row=0, column=0, sticky=tk.W)
+        tk.Label(
+            master, text='Instruments:', font=('Arial', 14), justify=tk.LEFT
+        ).grid(row=0, column=0, sticky=tk.W)
 
         i = 1
 
@@ -838,7 +959,10 @@ class Dashboard(BasicDialog):
 
             self.instrument_labels[name] = instrument_label
 
-            config_button = tk.Button(master, text = 'Config/Test', command = lambda instr = instrument: self.config(instr))
+            config_button = tk.Button(
+                master, text = 'Config/Test',
+                command = lambda instr = instrument: self.config(instr)
+            )
             config_button.grid(row=i,column=1)
 
             self.config_buttons[name] = config_button
@@ -853,13 +977,16 @@ class Dashboard(BasicDialog):
 class ConfigTestDialog(BasicDialog):
     """
     Dialog box for setting knobs and checking meters.
-    Allows the user to quickly access basic instrument functionality as well as configure instrument for an experiment
+    Allows the user to quickly access basic instrument functionality as well as
+    configure instrument for an experiment.
     """
 
     def __init__(self, parent, instrument):
 
         self.instrument = instrument
-        BasicDialog.__init__(self, parent, title='Config/Test: ' + instrument.name)
+        BasicDialog.__init__(
+            self, parent, title='Config/Test: ' + instrument.name
+        )
 
     def apply_knob_entry(self, knob):
         value = self.knob_entries[knob].get()
@@ -878,7 +1005,10 @@ class ConfigTestDialog(BasicDialog):
     def body(self, master):
 
         knobs = self.instrument.knobs
-        knob_values = {knob: getattr(self.instrument, knob.replace(' ','_')) for knob in knobs}
+        knob_values = {
+            knob: getattr(self.instrument, knob.replace(' ','_'))
+            for knob in knobs
+        }
         self.knob_entries = {}
 
         meters = self.instrument.meters
@@ -894,7 +1024,9 @@ class ConfigTestDialog(BasicDialog):
         i = 1
         for knob in knobs:
 
-            formatted_name = ' '.join([word[0].upper()+word[1:] for word in knob.split(' ')])
+            formatted_name = ' '.join(
+                [word[0].upper()+word[1:] for word in knob.split(' ')]
+            )
 
             label = tk.Label(master, text = formatted_name)
             label.grid(row = i, column = 0, sticky=tk.W)
@@ -903,7 +1035,10 @@ class ConfigTestDialog(BasicDialog):
             self.knob_entries[knob].grid(row = i, column = 1)
             self.knob_entries[knob].insert(0, str(knob_values[knob]))
 
-            self.set_buttons[knob] = tk.Button(master, text='Set', command = lambda knob = knob : self.apply_knob_entry(knob))
+            self.set_buttons[knob] = tk.Button(
+                master, text='Set',
+                command = lambda knob = knob : self.apply_knob_entry(knob)
+            )
             self.set_buttons[knob].grid(row=i, column=2)
 
             i += 1
@@ -912,7 +1047,9 @@ class ConfigTestDialog(BasicDialog):
         i = 1
         for meter in meters:
 
-            formatted_name = ' '.join([word[0].upper() + word[1:] for word in meter.split(' ')])
+            formatted_name = ' '.join(
+                [word[0].upper() + word[1:] for word in meter.split(' ')]
+            )
 
             label = tk.Label(master, text=formatted_name)
             label.grid(row=i, column=3, sticky=tk.W)
@@ -922,7 +1059,10 @@ class ConfigTestDialog(BasicDialog):
             self.meter_entries[meter].insert(0, '???')
             self.meter_entries[meter].config(state='readonly')
 
-            self.measure_buttons[meter] =  tk.Button(master, text='Measure', command = lambda meter = meter: self.update_meter_entry(meter))
+            self.measure_buttons[meter] =  tk.Button(
+                master, text='Measure',
+                command = lambda meter = meter: self.update_meter_entry(meter)
+            )
             self.measure_buttons[meter].grid(row=i, column=5)
 
             i += 1
