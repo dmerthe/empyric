@@ -57,7 +57,7 @@ Plots:
   xlabel: 'X'
   ylabel: 'Y'
   style: parametric
-  options:
+  configure:
    linestyle: None
    marker: 'o'
    markersize: 3

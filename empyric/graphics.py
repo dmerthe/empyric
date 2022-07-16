@@ -99,7 +99,9 @@ class Plotter:
 
         # Update full data
         new_indices = np.setdiff1d(self.data.index, self.full_data.index)
-        self.full_data = self.full_data.append(self.numericize(self.data.loc[new_indices]))
+        self.full_data = self.full_data.append(
+            self.numericize(self.data.loc[new_indices])
+        )
 
         # Make the plots, by name and style
 
@@ -162,7 +164,7 @@ class Plotter:
                 line.set_data(xdata, ydata[y])
                 ax.draw_artist(line)
 
-            ax.relim()
+            ax.relim()  # reset plot limits based on data
             ax.autoscale_view()
 
             fig.canvas.draw_idle()
@@ -170,7 +172,7 @@ class Plotter:
 
         else:  # draw a new plot
 
-            plot_kwargs = self.settings[name].get('line', {})
+            plot_kwargs = self.settings[name].get('configure', {})
             # kwargs for matplotlib
 
             plot_kwargs = {
@@ -269,7 +271,7 @@ class Plotter:
         plt.rcParams['image.cmap'] = colormap
         cmap = plt.get_cmap('viridis')
 
-        plot_kwargs = self.settings[name].get('options', {})
+        plot_kwargs = self.settings[name].get('configure', {})
         # kwargs for matplotlib
 
         if not hasattr(fig, 'cbar'):  # draw a new plot
