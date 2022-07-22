@@ -103,8 +103,7 @@ class Plotter:
             self.numericize(self.data.loc[new_indices])
         )
 
-        # Make the plots, by name and style
-
+        # Make the plots by name and style
         for name, settings in self.settings.items():
 
             style = settings.get('style', 'basic')
@@ -114,7 +113,7 @@ class Plotter:
             elif style == 'averaged':
                 self._plot_basic(name, averaged=True)
             elif style == 'errorbars':
-                self._plot_basis(name, errorbars=True)
+                self._plot_basic(name, errorbars=True)
             elif style == 'parametric':
                 self._plot_parametric(name)
             else:
@@ -401,6 +400,30 @@ class Plotter:
         )
 
         return numerical_data
+
+
+class Imager:
+    """
+    Handles the display of images and video from specified instruments
+
+    The required argument must be either a list of variables or a dictionary,
+    whose values are the variables and whose keys are the variables' names.
+
+    The optional keyword argument ``settings`` should be a dictionary
+    """
+
+    def __init__(self, feeds):
+        """
+
+
+        """
+
+        self.feeds = feeds
+
+
+    def image(self):
+
+        pass
 
 
 class ExperimentGUI:

@@ -99,7 +99,7 @@ class Variable:
 
         self._value = None  # last known value of this variable
 
-        # time of last evaluation; used for expressions
+        # time of last evaluation
         self.last_evaluation = np.nan
 
         if hasattr(self, 'knob') or hasattr(self, 'meter'):
@@ -615,8 +615,9 @@ def validate_runcard(runcard):
 
     # Check Routines
 
-
     # Check Plots
+
+    # Check Images
 
     return True
 
@@ -849,6 +850,32 @@ def convert_runcard(runcard):
         )
     else:
         converted_runcard['Plotter'] = None
+
+    # Images section
+    if 'Images' in runcard:
+
+        feeds = {}
+
+        for feed in converted_runcard['Images']:
+
+            if type(feed) is str:
+
+                feeds[feed] = {
+                    'variable': variables[feed],
+                    'frame rate': None  # TBD,
+                    # more options to come
+                    }
+
+            elif type(feed) is dict:
+
+                name = list(feed.keys())[0]
+
+                feeds[name] = {
+                    'variable': variables[name],
+                    **feed[name]
+                }
+
+        converted_runcard['Imager'] = _graphics.Imager(feeds)
 
     return converted_runcard
 
