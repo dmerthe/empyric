@@ -99,8 +99,8 @@ class Plotter:
 
         # Update full data
         new_indices = np.setdiff1d(self.data.index, self.full_data.index)
-        self.full_data = self.full_data.append(
-            self.numericize(self.data.loc[new_indices])
+        self.full_data = pd.concat(
+            [self.full_data, self.numericize(self.data.loc[new_indices])]
         )
 
         # Make the plots, by name and style
