@@ -458,10 +458,14 @@ def validate_runcard(runcard):
                 raise KeyError(f'"{key}" is not a valid key for {name}')
 
     # Check Description
-    validate_keys(runcard, 'Description', ['name', 'operator', 'platform', 'comments'])
+    valid_desciptions = ['name', 'operator', 'platform', 'comments']
+    validate_keys(runcard, 'Description', valid_desciptions)
 
     # Check Settings
-    validate_keys(runcard, 'Settings', ['follow-up', 'step interval', 'save interval', 'plot interval', 'end'])
+    valid_settings = [
+        'follow-up', 'step interval', 'save interval', 'plot interval', 'end'
+    ]
+    validate_keys(runcard, 'Settings', valid_settings)
 
     # Check Instruments
     valid_instr_keys = ['type', 'address', 'presets', 'postsets']
@@ -476,7 +480,10 @@ def validate_runcard(runcard):
             raise KeyError(f'{instr_type} is not a supported instrument.')
 
     # Check Variables
-    valid_var_keys = ['instrument', 'knob', 'meter', 'expression', 'definitions', 'parameter']
+    valid_var_keys = [
+        'instrument', 'knob', 'meter', 'expression', 'definitions', 'parameter'
+    ]
+
     for variable, specs in runcard['Variables'].items():
 
         validate_keys(runcard['Variables'], variable, valid_var_keys)
@@ -486,18 +493,25 @@ def validate_runcard(runcard):
             instrument = specs['instrument']
 
             if instrument not in runcard['Instruments']:
-                raise ValueError(f'{instrument} is not defined in Instruments section')
+                raise ValueError(
+                    f'{instrument} is not defined in Instruments section'
+                )
 
             instr_type = runcard['Instruments'][instrument]['type']
 
             if 'knob' in specs:
                 valid_knobs = _instruments.supported[instr_type].knobs
                 if specs['knob'] not in valid_knobs:
-                    raise ValueError(f'{specs["knob"]} is not a valid knob for {instrument}')
+                    raise ValueError(
+                        f'{specs["knob"]} is not a valid knob for {instrument}'
+                    )
             elif 'meter' in specs:
                 valid_meters = _instruments.supported[instr_type].meters
                 if specs['meter'] not in valid_meters:
-                    raise ValueError(f'{specs["meter"]} is not a valid meter for {instrument}')
+                    raise ValueError(
+                        f'{specs["meter"]} is not a valid meter'
+                        f'for {instrument}'
+                    )
 
         elif 'expression' in specs:  # expression variables
 
@@ -507,32 +521,42 @@ def validate_runcard(runcard):
 
             for symbol, other_var in definitions.items():
                 if symbol not in expression:
-                    raise ReferenceError(f'{symbol} is referenced in definitions for expression variable {variable}, '
-                                         + f'but does not appear in the expression.')
+                    raise ReferenceError(
+                        f'{symbol} is referenced in definitions '
+                        f'for expression variable {variable}, '
+                        f'but does not appear in the expression.'
+                    )
                 if other_var not in runcard['Variables'].keys():
-                    raise NameError(f'variable {other_var} is referenced in definitions for expression variable '
-                                    + f'{variable}, but is not defined.')
+                    raise NameError(
+                        f'variable {other_var} is referenced '
+                        f'in definitions for expression variable '
+                        f'{variable}, but is not defined.'
+                    )
 
     # Check Alarms
-    valid_alarm_keys = ['condition', 'variables', 'protocol']
-    for alarm, specs in runcard['Alarms'].items():
+    if 'Alarms' in runcard:
+        valid_alarm_keys = ['condition', 'variables', 'protocol']
+        for alarm, specs in runcard['Alarms'].items():
 
-        validate_keys(runcard['Alarms'], alarm, valid_alarm_keys)
+            validate_keys(runcard['Alarms'], alarm, valid_alarm_keys)
 
-        condition = specs['condition']
+            condition = specs['condition']
 
-        variables = specs.get('variables', {})
+            variables = specs.get('variables', {})
 
-        for symbol, variable in variables.items():
-            if symbol not in condition:
-                raise ReferenceError(f'{symbol} is referenced in the variable definitions for alarm {alarm}, '
-                                     + f'but does not appear in the condition.')
-            if variable not in runcard['Variables'].keys():
-                raise NameError(f'variable {variable} is referenced in condition for alarm {alarm}, '
-                                + 'but is not defined.')
+            for symbol, variable in variables.items():
+                if symbol not in condition:
+                    raise ReferenceError(
+                        f'{symbol} is referenced in the variable definitions'
+                        f'for alarm {alarm}, but does not appear '
+                        f'in the condition.'
+                        )
+                if variable not in runcard['Variables'].keys():
+                    raise NameError(
+                        f'variable {variable} is referenced in condition '
+                        f'for alarm {alarm}, but is not defined.')
 
     # Check Routines
-
 
     # Check Plots
 

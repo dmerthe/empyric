@@ -10,6 +10,7 @@ from empyric.collection.controllers import *
 from empyric.collection.humans import *
 from empyric.collection.spectrometers import *
 from empyric.collection.virtual import *
+from empyric.collection.scopes import *
 
 supported = {key: value for key, value in vars().items()
              if type(value) is type and issubclass(value, Instrument)}

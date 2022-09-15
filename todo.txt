@@ -1,1 +1,3 @@
 - Change PrologixGPIBUSB backend to PyVISA
+- Expand runcard verification function in experiments.py
+- Refactor all code to comform to PEP 80 (80 chars per line, specifically)
