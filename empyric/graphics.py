@@ -421,7 +421,7 @@ class ExperimentGUI:
 
         self.variables = experiment.variables
 
-        if 'alarms' is kwargs:
+        if 'alarms' in kwargs:
             self.alarms = {}
         else:
             self.alarms = kwargs['alarms']
