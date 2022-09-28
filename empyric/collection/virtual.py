@@ -32,7 +32,10 @@ class Clock(Instrument):
 
         Instrument.__init__(self, *args, **kwargs)
 
-        self.start_time = self.stop_time = time.time()  # clock is initially stopped
+        # Initially stopped
+        self.state = 'STOP'
+        self.start_time = self.stop_time = time.time()
+
         self.stoppage = 0  # total time during which the clock has been stopped
 
     @setter
@@ -51,10 +54,14 @@ class Clock(Instrument):
                 self.stoppage += time.time() - self.stop_time
                 self.stop_time = False
 
+            self.state = 'START'
+
         elif state == 'STOP':
 
             if not self.stop_time:
                 self.stop_time = time.time()
+
+            self.state = 'START'
 
         elif state == 'RESET':
 
@@ -64,12 +71,40 @@ class Clock(Instrument):
             if self.stop_time:
                 self.stop_time = self.start_time
 
-            return self.state  # return to either the START or STOP state once reset
+            return self.state  # return to START or STOP state once reset
 
     @measurer
     def measure_time(self):
         """Measure the clock time"""
         return self._time
+
+
+class Echo(Instrument):
+    """
+    Virtual instrument with a single knob "input" and single meter "output",
+    useful for testing.
+
+    The "output" meter simply returns the value of the "input" knob.
+    """
+
+    name = 'Echo'
+
+    supported_adapters = (
+        (Adapter, {}),
+    )
+
+    knobs = ('input',)
+    presets = {'input': 0}
+
+    meters = ('output',)
+
+    @setter
+    def set_input(self, input):
+        pass
+
+    @measurer
+    def measure_output(self):
+        return self.input
 
 
 class HenonMapper(Instrument):

@@ -1,6 +1,6 @@
 # This submodule defines the basic behavior of the key features of the empyric package
 
-import os, sys, importlib, threading, time, datetime, numbers
+import os, sys, importlib, threading, time, datetime, numbers, math
 import numpy as np
 import pandas as pd
 import tkinter as tk
@@ -244,7 +244,7 @@ class Experiment:
         self.variables = variables
         # dict of the form {..., name: variable, ...}
 
-        # TUsed to block evaluation of expressions
+        # Used to block evaluation of expressions
         # until their dependee variables are evaluated
         self.eval_events = {name: threading.Event() for name in variables}
 
