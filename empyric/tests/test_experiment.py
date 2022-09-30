@@ -1,4 +1,5 @@
 import os
+import time
 from empyric.experiment import Variable, Experiment
 from empyric.routines import Timecourse
 from empyric.instruments import Clock, Echo
@@ -53,7 +54,7 @@ def test_experiment(tmp_path):
     experiment = Experiment(variables, routines=routines, end='with routines')
 
     for _ in experiment:
-        pass
+        time.sleep(0.1)
 
     assert round(experiment.state['Time']) == 5
     assert round(echo_out.value) == 50

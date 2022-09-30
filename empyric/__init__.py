@@ -1,21 +1,28 @@
-import os, sys
+import os
+import sys
+import argparse
+import pytest
+
 from empyric.experiment import Manager
 
 
-def run_experiment():  # Run an experiment with a runcard
+def execute():  # Run an experiment with a runcard
 
-    args = sys.argv[1:]
+    parser = argparse.ArgumentParser(
+        description='Empyric Command Line Interface'
+    )
 
-    runcard = None
-    if len(args) > 0:
-        runcard = args[0]
+    parser.add_argument('-r', '--runcard', type=str, required=False,
+                        default=None)
 
-        if runcard == '.':
-            runcard = [path for path in os.listdir() if '.yaml' in path][0]
+    parser.add_argument('-d', '--directory', type=str, default=None)
 
-    directory = None
-    if len(args) > 1:
-        directory = args[1]
+    parser.add_argument('-t', '--test', action='store_true')
 
-    manager = Manager(runcard=runcard)
-    manager.run(directory=directory)
+    args = parser.parse_args()
+
+    if args.test:
+        pytest.main(['--pyargs', os.path.join('empyric.tests')])
+    else:
+        manager = Manager(runcard=args.runcard)
+        manager.run(directory=args.directory)
