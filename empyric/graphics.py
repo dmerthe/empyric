@@ -157,8 +157,8 @@ class Plotter:
             ydata = self.full_data[ys]
 
         if ax.lines and not errorbars:
-        # For simple plots (i.e. not error bar plots), if already plotted,
-        # simply update the plot data and axes
+            # For simple plots (i.e. not error bar plots), if already plotted,
+            # simply update the plot data and axes
 
             for line, y in zip(ax.lines, ys):
                 line.set_data(xdata, ydata[y])

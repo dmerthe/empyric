@@ -6,11 +6,14 @@ import numpy as np
 # Tools for time-keeping
 def convert_time(time_value):
     """
-    If time_value is a string, converts a time of the form "[number] [units]" (e.g. "3.5 hours") to the time in seconds.
+    If time_value is a string, converts a time of the form "[number] [units]"
+    (e.g. "3.5 hours") to the time in seconds.
     If time_value is a number, just returns the same number
-    If time_value is an array, iterates through the array doing either of the previous two operations on every element.
+    If time_value is an array, iterates through the array doing either of the
+    previous two operations on every element.
 
-    :param time_value: (str/float) time value, possibly including units such as "hours"
+    :param time_value: (str/float) time value, possibly including units such as
+    "hours"
     :return: (int) time in seconds
     """
 
@@ -20,7 +23,8 @@ def convert_time(time_value):
     if isinstance(time_value, numbers.Number):
         return time_value
     elif isinstance(time_value, str):
-        # times can be specified in the runcard with units, such as minutes, hours or days, e.g. "6 hours"
+        # times can be specified in the runcard with units, such as minutes,
+        # hours or days, e.g. "6 hours"
         time_parts = time_value.split(' ')
 
         if len(time_parts) == 1:
@@ -45,7 +49,7 @@ class Clock:
 
     def __init__(self):
 
-        self.start_time = self.stop_time = time.time()  # clock is initially stopped
+        self.start_time = self.stop_time = time.time()  # initially stopped
         self.stoppage = 0  # total time during which the clock has been stopped
 
     def start(self):
@@ -102,12 +106,13 @@ def to_number(value):
     else:
         return np.nan
 
+
 def find_nearest(allowed, value, overestimate=False, underestimate=False):
     """
     Find the closest in a list of allowed values to a given value.
 
-    In some cases it might be beneficial to overestimate (choose nearest higher value)
-    or underestimate (choose the nearest lower value)
+    In some cases it might be beneficial to overestimate (choose nearest higher
+    value) or underestimate (choose the nearest lower value)
     """
 
     if overestimate:

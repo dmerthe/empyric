@@ -19,5 +19,13 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     python_requires='>=3.6',
-    entry_points={'console_scripts': ['empyric = empyric:execute',]}
+    install_requires=[
+        'numpy',
+        'scipy',
+        'matplotlib',
+        'pandas',
+        'pykwalify',
+        'ruamel.yaml'
+    ],
+    entry_points={'console_scripts': ['empyric = empyric:execute', ]}
 )
