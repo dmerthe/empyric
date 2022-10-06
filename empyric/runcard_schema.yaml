@@ -33,7 +33,7 @@ map:
       instrument: {type: str},  # for knob and meter type variables
       knob: {type: str},  # for knob type variables
       meter: {type: str},  # for meter type variables
-      parameter: {type: any}  # for parameter type variables
+      parameter: {type: any},  # for parameter type variables
       expression: {type: str},  # for expression type variables
       definitions: {map: {  # for expression type variables
         regex;(.+): {type: any}  # references to other variables
@@ -44,8 +44,8 @@ map:
   Alarms: {map: {
     regex;(.+): {required: true, map: {  # alarm name
       protocol: {type: str, required: true},
-      condition: {type: str, required: true}
-      definitions: {map:{
+      condition: {type: str, required: true},
+      definitions: {map: {
         regex;(.+): {type: str, required: true}
       }}
     }}
@@ -61,11 +61,16 @@ map:
     }}
   }}
 
-  Plots: {map:{
+  Plots: {map: {
     regex;(.+): {required: true, map: {  # plot name
       x: {type: any},
       y: {type: any, required: true},
       s: {type: any},  # for parametric plots
-      configure: {type: any}
+      style: {type: str},
+      xlabel: {type:  str},
+      ylabel: {type: str},
+      configure: {map: {
+        regex;(.+): {type: any}  # keyword args passed to matplotlib
+      }}
     }}
   }}

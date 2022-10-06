@@ -1,6 +1,6 @@
 import os
 import time
-from empyric.experiment import Variable, Experiment
+from empyric.experiment import Variable, Experiment, validate_runcard, Manager
 from empyric.routines import Timecourse
 from empyric.instruments import Clock, Echo
 
@@ -44,17 +44,35 @@ def test_experiment(tmp_path):
     variables = {'Echo In': echo_in, 'Echo Out': echo_out}
 
     step_up_routine = Timecourse(
-            knobs={'Echo In': echo_in, },
-            times=[1, 2, 3, 4, 5],
-            values=[10, 20, 30, 40, 50]
-        )
+        knobs={'Echo In': echo_in},
+        times=[0.1, 0.2, 0.3, 0.4, 0.5],
+        values=[10, 20, 30, 40, 50]
+    )
 
     routines = {'Step Up Timecourse': step_up_routine, }
 
     experiment = Experiment(variables, routines=routines, end='with routines')
 
     for _ in experiment:
-        time.sleep(0.1)
+        time.sleep(0.001)
 
-    assert round(experiment.state['Time']) == 5
+    assert round(experiment.state['Time'], 2) == 0.5
     assert round(echo_out.value) == 50
+
+
+test_runcard_path = os.path.abspath(
+    os.path.join(
+        '.', 'examples', 'Henon Map Experiment', 'henon_runcard_example.yaml'
+    )
+)
+
+
+def test_runcard_validation():
+    assert validate_runcard(test_runcard_path)
+
+
+def test_manager():
+
+    manager = Manager(test_runcard_path)
+
+    assert manager.description['name'] == 'Henon Map Test'

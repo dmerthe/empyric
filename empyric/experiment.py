@@ -1,12 +1,13 @@
 # This submodule defines the basic behavior of the key features of the
 # empyric package
-
+import collections
 import os, sys, importlib, threading, time, datetime, pathlib
 import numpy as np
 import pandas as pd
 import tkinter as tk
 from tkinter.filedialog import askopenfilename
 
+import pykwalify.errors
 from pykwalify.core import Core as yaml_validator
 from ruamel.yaml import YAML
 
@@ -575,8 +576,13 @@ class Manager:
 
         converted_runcard = convert_runcard(self.runcard)
 
-        for key in converted_runcard:
-            self.__setattr__(key.lower(), converted_runcard[key])
+        self.description = converted_runcard['Description']
+        self.settings = converted_runcard['Settings']
+        self.instruments = converted_runcard['Instruments']
+        self.alarms = converted_runcard['Alarms']
+        self.plotter = converted_runcard['Plotter']
+
+        self.experiment = converted_runcard['Experiment']
 
         # Unpack settings
         self.followup = self.settings.get('follow-up', None)
@@ -748,131 +754,16 @@ class Manager:
         return 'Manager'
 
 
-# def validate_runcard(runcard):
-#     """
-#     Verifies that the given runcard is valid; throws a error if not
-#
-#     :param runcard: (dict) runcard to be checked
-#
-#     """
-#
-#     def validate_keys(_dict, name, valid_keys):
-#         for key in _dict[name]:
-#             if key not in valid_keys:
-#                 raise KeyError(f'"{key}" is not a valid key for {name}')
-#
-#     # Check Description
-#     validate_keys(
-#         runcard,
-#         'Description',
-#         ['name', 'operator', 'platform', 'comments']
-#     )
-#
-#     # Check Settings
-#     validate_keys(
-#         runcard,
-#         'Settings',
-#         ['follow-up', 'step interval', 'save interval', 'plot interval', 'end']
-#     )
-#
-#     # Check Instruments
-#     valid_instr_keys = ['type', 'address', 'presets', 'postsets']
-#     valid_instr_keys += _adapters.Adapter.kwargs  # include adapter kwargs
-#     for instrument, specs in runcard['Instruments'].items():
-#
-#         validate_keys(runcard['Instruments'], instrument, valid_instr_keys)
-#
-#         # Check that the instrument is supported
-#         instr_type = specs['type']
-#         if instr_type not in _instruments.supported:
-#             raise KeyError(f'{instr_type} is not a supported instrument.')
-#
-#     # Check Variables
-#     valid_var_keys = [
-#         'instrument', 'knob', 'meter', 'expression', 'definitions', 'parameter'
-#     ]
-#     for variable, specs in runcard['Variables'].items():
-#
-#         validate_keys(runcard['Variables'], variable, valid_var_keys)
-#
-#         if "instrument" in specs:  # knob and meter variables
-#
-#             instrument = specs['instrument']
-#
-#             if instrument not in runcard['Instruments']:
-#                 raise ValueError(
-#                     f'{instrument} is not defined in Instruments section'
-#                 )
-#
-#             instr_type = runcard['Instruments'][instrument]['type']
-#
-#             if 'knob' in specs:
-#                 valid_knobs = _instruments.supported[instr_type].knobs
-#                 if specs['knob'] not in valid_knobs:
-#                     raise ValueError(
-#                         f'{specs["knob"]} is not a valid knob for {instrument}'
-#                     )
-#             elif 'meter' in specs:
-#                 valid_meters = _instruments.supported[instr_type].meters
-#                 if specs['meter'] not in valid_meters:
-#                     raise ValueError(
-#                         f'{specs["meter"]} is not a '
-#                         f'valid meter for {instrument}'
-#                     )
-#
-#         elif 'expression' in specs:  # expression variables
-#
-#             expression = specs['expression']
-#
-#             definitions = specs.get('definitions', {})
-#
-#             for symbol, other_var in definitions.items():
-#                 if symbol not in expression:
-#                     raise ReferenceError(
-#                         f'{symbol} is referenced in definitions '
-#                         f'for expression variable {variable}, '
-#                         'but does not appear in the expression.')
-#                 if other_var not in runcard['Variables'].keys():
-#                     raise NameError(
-#                         f'variable {other_var} is referenced in definitions '
-#                         f'for expression variable {variable}, '
-#                         'but is not defined.')
-#
-#     # Check Alarms
-#     valid_alarm_keys = ['condition', 'variables', 'protocol']
-#     for alarm, specs in runcard['Alarms'].items():
-#
-#         validate_keys(runcard['Alarms'], alarm, valid_alarm_keys)
-#
-#         condition = specs['condition']
-#
-#         variables = specs.get('variables', {})
-#
-#         for symbol, variable in variables.items():
-#             if symbol not in condition:
-#                 raise ReferenceError(
-#                     f'{symbol} is referenced in the variable definitions '
-#                     f'for alarm {alarm}, '
-#                     f'but does not appear in the condition.'
-#                 )
-#             if variable not in runcard['Variables'].keys():
-#                 raise NameError(
-#                     f'variable {variable} is referenced in condition '
-#                     f'for alarm {alarm}, '
-#                     'but is not defined.'
-#                 )
-#
-#     # Check Routines
-#
-#
-#     # Check Plots
-#
-#     return True
+class RuncardError(BaseException):
+    pass
 
 
 def validate_runcard(runcard):
 
-    if type(runcard) is dict:
+    is_dict = isinstance(runcard, dict)
+    is_ordereddict = isinstance(runcard, collections.OrderedDict)
+
+    if is_dict or is_ordereddict:
         # create temporary runcard YAML file
         yaml = YAML()
 
@@ -885,7 +776,7 @@ def validate_runcard(runcard):
 
         os.remove(runcard_path)
 
-        return
+        return True
 
     elif type(runcard) is not str:
         raise ValueError('runcard must be either dict or str.')
@@ -896,7 +787,13 @@ def validate_runcard(runcard):
             os.path.join(pathlib.Path(__file__).parent, "runcard_schema.yaml")
         ]
     )
-    validator.validate(raise_exception=True)
+
+    try:
+        validator.validate(raise_exception=True)
+    except pykwalify.errors.SchemaError as err:
+        raise RuncardError(err)
+
+    return True
 
 
 def convert_runcard(runcard):
@@ -1009,7 +906,7 @@ def convert_runcard(runcard):
             _type = specs.pop('type')
 
             knobs = np.array([specs.get('knobs', [])]).flatten()
-            if knobs:
+            if knobs.size > 0:
                 for knob in knobs:
                     if knob not in variables:
                         raise KeyError(
@@ -1020,7 +917,7 @@ def convert_runcard(runcard):
                 specs['knobs'] = {name: variables[name] for name in knobs}
 
             meters = np.array([specs.get('meters', [])]).flatten()
-            if meters:
+            if meters.size > 0:
                 for meter in meters:
                     if meter not in variables:
                         raise KeyError(
