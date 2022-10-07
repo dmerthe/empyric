@@ -22,7 +22,7 @@ def execute():  # Run an experiment with a runcard
     args = parser.parse_args()
 
     if args.test:
-        pytest.main(['--pyargs', os.path.join('empyric.tests')])
+        pytest.main(['-r', 'A', '--pyargs', os.path.join('empyric.tests')])
     else:
         manager = Manager(runcard=args.runcard)
         manager.run(directory=args.directory)

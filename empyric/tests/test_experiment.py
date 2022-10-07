@@ -1,5 +1,6 @@
 import os
 import time
+import glob
 from empyric.experiment import Variable, Experiment, validate_runcard, Manager
 from empyric.routines import Timecourse
 from empyric.instruments import Clock, Echo
@@ -56,10 +57,17 @@ def test_experiment(tmp_path):
     for _ in experiment:
         time.sleep(0.001)
 
+    # check that experiment ended on time
     assert round(experiment.state['Time'], 2) == 0.5
     assert round(echo_out.value) == 50
 
+    # check data saving
+    experiment.save()
 
+    assert any(glob.glob('data_*.csv'))
+
+
+# Use Henon runcard example for testing
 test_runcard_path = os.path.abspath(
     os.path.join(
         '.', 'examples', 'Henon Map Experiment', 'henon_runcard_example.yaml'
@@ -75,4 +83,12 @@ def test_manager():
 
     manager = Manager(test_runcard_path)
 
+    # check that the runcard loaded
     assert manager.description['name'] == 'Henon Map Test'
+
+    # Run a short portion of an experiment
+    manager.experiment.end = 0.1
+
+    manager._run()  # skips the GUI; normally Manager.run would be called
+
+    assert manager.experiment.terminated
