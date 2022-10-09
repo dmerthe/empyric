@@ -131,7 +131,7 @@ class Plotter:
         ys = np.array([self.settings[name]['y']]).flatten()
 
         not_in_data = np.setdiff1d(np.concatenate([[x], ys]), self.data.columns)
-        if not_in_data:
+        if not_in_data.size > 0:
             raise AttributeError(
                 f'{", ".join(not_in_data)} specified for plotting, '
                 'but not in variables!'
@@ -244,7 +244,7 @@ class Plotter:
         y = np.array([self.settings[name]['y']]).flatten()[0]
         s = self.settings[name].get('s', 'Time')
 
-        not_in_data = np.setdiff1d([x,y,s], self.data.columns)
+        not_in_data = np.setdiff1d([x, y, s], self.data.columns)
         if not_in_data.size > 0:
             raise AttributeError(
                 f'{", ".join(not_in_data)} specified for plotting, '
@@ -318,7 +318,7 @@ class Plotter:
 
             fig.cbar.ax.tick_params(labelsize='small')
 
-            fig.execute_constrained_layout()
+            fig.get_layout_engine().execute(fig)
 
             plt.pause(0.01)
 

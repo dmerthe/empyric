@@ -58,7 +58,7 @@ def test_experiment(tmp_path):
         time.sleep(0.001)
 
     # check that experiment ended on time
-    assert round(experiment.state['Time'], 2) == 0.5
+    assert round(experiment.state['Time'], 1) == 0.5
     assert round(echo_out.value) == 50
 
     # check data saving
@@ -87,7 +87,7 @@ def test_manager(tmp_path):
     assert manager.description['name'] == 'Henon Map Test'
 
     # Run a short version of the Henon Map example experiment
-    manager.experiment.end = 0.1
+    manager.experiment.end = 3
     manager.followup = None
 
     manager.run(directory=tmp_path)
