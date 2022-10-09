@@ -79,16 +79,17 @@ def test_runcard_validation():
     assert validate_runcard(test_runcard_path)
 
 
-def test_manager():
+def test_manager(tmp_path):
 
     manager = Manager(test_runcard_path)
 
     # check that the runcard loaded
     assert manager.description['name'] == 'Henon Map Test'
 
-    # Run a short portion of an experiment
+    # Run a short version of the Henon Map example experiment
     manager.experiment.end = 0.1
+    manager.followup = None
 
-    manager._run()  # skips the GUI; normally Manager.run would be called
+    manager.run(directory=tmp_path)
 
     assert manager.experiment.terminated

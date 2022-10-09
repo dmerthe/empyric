@@ -245,7 +245,7 @@ class Plotter:
         s = self.settings[name].get('s', 'Time')
 
         not_in_data = np.setdiff1d([x,y,s], self.data.columns)
-        if not_in_data:
+        if not_in_data.size > 0:
             raise AttributeError(
                 f'{", ".join(not_in_data)} specified for plotting, '
                 'but not in variables!'
