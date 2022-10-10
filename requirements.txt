@@ -1,6 +1,7 @@
 numpy
 scipy
-matplotlib
+matplotlib>=3.5
 pandas
 pykwalify
 ruamel.yaml
+pytest

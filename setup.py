@@ -23,10 +23,11 @@ setuptools.setup(
     install_requires=[
         'numpy',
         'scipy',
-        'matplotlib',
+        'matplotlib>=3.5',
         'pandas',
         'pykwalify',
-        'ruamel.yaml'
+        'ruamel.yaml',
+        'pytest'
     ],
     entry_points={'console_scripts': ['empyric = empyric:execute', ]}
 )
