@@ -100,11 +100,22 @@ class Adapter:
         'close_port_after_each_call', 'slave_mode', 'byte_order'
     ]
 
+    # Library used by adapter; overwritten in children classes.
+    lib = 'python'
+
+    # If upon instantiation no valid library is found for adapter, raise
+    # AdapterError with the following message; overwritten in children classes.
+    no_lib_msg = 'no valid library found for adapter; ' \
+                 'check library installation'
+
     def __init__(self, instrument, **kwargs):
+
+        if self.lib is None:
+            # determined by class attribute `implementation`
+            raise AdapterError(self.no_lib_msg)
 
         # general parameters
         self.instrument = instrument
-        self.lib = None
         self.backend = None
         self.connected = False
         self.repeats = 0
@@ -157,7 +168,8 @@ class Adapter:
         if hasattr(self, '_write'):
             return self._write(*args, **kwargs)
         else:
-            raise AttributeError(self.__name__ + " adapter has no _write method")
+            raise AttributeError(
+                self.__name__ + " adapter has no _write method")
 
     @chaperone
     def read(self, *args, **kwargs):
@@ -218,16 +230,26 @@ class Serial(Adapter):
     read_termination = '\n'
     write_termination = '\r'
 
+    # Get serial library
+    if importlib.util.find_spec('pyvisa'):
+        lib = 'pyvisa'
+    elif importlib.util.find_spec('serial'):
+        lib = 'pyserial'
+    else:
+        lib = None
+
+    no_lib_msg = 'No serial library was found! '\
+                 'Please install either PySerial or PyVISA.'
+
     def connect(self):
 
         # List of errors that gets reported in unable to connect
         errors = []
 
         # First try connecting with PyVISA
-        try:
-            pyvisa = importlib.import_module('pyvisa')
+        if self.lib == 'pyvisa':
 
-            self.lib = 'pyvisa'
+            pyvisa = importlib.import_module('pyvisa')
 
             self.backend = pyvisa.open_resource(
                 self.instrument.address,
@@ -239,15 +261,10 @@ class Serial(Adapter):
                 read_terimation=self.read_termination
             )
 
-        except BaseException as error:
-            errors.append(error)
-            pass
-
         # Then try connecting with PySerial
-        try:
-            serial = importlib.import_module('serial')
+        elif self.lib == 'pyserial':
 
-            self.lib = 'pyserial'
+            serial = importlib.import_module('serial')
 
             self.backend = serial.Serial(
                 port=self.instrument.address,
@@ -257,22 +274,11 @@ class Serial(Adapter):
                 timeout=self.timeout
             )
 
-        except BaseException as error:
-            errors.append(error)
-            pass
-
-        if not self.lib:
-            raise AdapterError(
-                'No serial library was found! '
-                'Please install either PySerial or PyVISA.'
-            )
-
         if not self.backend:
             raise AdapterError(
-                'Unable to initialize Serial adapter for'
-                f'{self.instrument} at {self.instrument.address}; '
-                'the following errors were incurred:\n'
-                '\n'.join([str(error) for error in errors])
+                'Unable to initialize a suitable serial adapter backend for'
+                f'{self.instrument} at {self.instrument.address};'
+                'check you serial configuration.'
             )
 
         self.connected = True
@@ -326,6 +332,7 @@ class Serial(Adapter):
 
         if self.lib == 'pyvisa':
             self.backend.clear()
+
         elif self.lib == 'pyserial':
             self.backend.reset_input_buffer()
             self.backend.reset_output_buffer()
@@ -337,8 +344,47 @@ class Serial(Adapter):
     def __repr__(self):
         return 'Serial'
 
-    @staticmethod
-    def locate():
+    @classmethod
+    def list(cls, verbose=True):
+        """
+        List all connected serial devices
+
+        :param verbose: (bool) if True, list of devices will be printed
+        (defaults to True).
+
+        :return: (list of str) List of connected serial devices
+        """
+
+        if cls.lib == 'pyvisa':
+
+            pyvisa = importlib.import_module('serial')
+            resource_manager = pyvisa.ResourceManager()
+
+            devices = resource_manager.list_resources()
+
+            if verbose:
+                print('Connected serial devices (via PyVISA)')
+                print('\n'.join(devices))
+
+        elif cls.lib == 'pyserial':
+
+            list_ports = importlib.import_module(
+                'serial.tools.list_ports'
+            ).comports
+
+            devices = [port.device for port in list_ports()]
+
+            if verbose:
+                print('Connected serial devices (via PySerial)')
+                print('\n'.join(devices))
+
+        else:
+            raise AdapterError(cls.no_lib_msg)
+
+        return devices
+
+    @classmethod
+    def locate(cls):
         """
         Determine the address of a serial instrument via the
         "unplug-it-then-plug-it-back-in" method.
@@ -346,71 +392,28 @@ class Serial(Adapter):
         :return: None (address is printed to console)
         """
 
-        lib = None
+        input('Press enter when the instrument is disconnected')
+
+        other_devices = Serial.list(verbose=False)
+
+        input('Press enter when the instrument is connected')
+
+        all_devices = Serial.list(verbose=False)
 
         try:
-            importlib.import_module('pyvisa')
-            lib = 'pyvisa'
-        except ImportError:
-            pass
 
-        try:
-            importlib.import_module('pyserial')
-            lib = 'pyserial'
-        except ImportError:
-            pass
+            instrument_address = [
+                device for device in all_devices if device not in other_devices
+            ][0]
 
-        if lib == 'pyvisa':
+            print(f'Address: {instrument_address}\n')
 
-            pyvisa = importlib.import_module('pyserial')
-            resource_manager = pyvisa.ResourceManager()
+        except IndexError:
+            print('Instrument not found!\n')
 
-            input('Press enter when the instrument is disconnected')
-            other_ports = resource_manager.list_resources()
-            input('Press enter when the instrument is connected')
-            all_ports = resource_manager.list_resources()
-
-            try:
-
-                instrument_address = [
-                    port for port in all_ports if port not in other_ports
-                ][0]
-
-                print(f'Address: {instrument_address}')
-                again = 'y' in input('Again? [y/n]').lower()
-                if again:
-                    Serial.locate()
-            except IndexError:
-                raise AdapterError('Instrument not found!')
-
-        elif lib == 'pyserial':
-
-            list_ports = importlib.import_module(
-                'serial.tools.list_ports'
-            ).comports
-
-            input('Press enter when the instrument is disconnected')
-            other_ports = list_ports()
-            input('Press enter when the instrument is connected')
-            all_ports = list_ports()
-
-            try:
-
-                instrument_address = [
-                    port.device for port in all_ports if port not in other_ports
-                ][0]
-
-                print(f'Address: {instrument_address}')
-                again = 'y' in input('Again? [y/n]').lower()
-                if again:
-                    Serial.locate()
-            except IndexError:
-                raise AdapterError('Instrument not found!')
-        else:
-            raise ImportError(
-                'Either PyVISA or PySerial must be installed'
-                'to locate serial instruments.'
-            )
+        again = 'y' in input('Try again? [y/n]').lower()
+        if again:
+            Serial.locate()
 
 
 class GPIB(Adapter):

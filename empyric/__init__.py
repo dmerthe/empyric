@@ -6,6 +6,14 @@ import pytest
 from empyric.experiment import Manager
 
 
+# List of testable features.
+# Tests are invoked at the command line with `empyric --test <feature>`
+testable_features = [
+    'experiment',  # tests Variable, Experiment and Manager classes (default)
+    'serial',  # tests configuration of serial backend
+]
+
+
 def execute():
 
     parser = argparse.ArgumentParser(
@@ -30,8 +38,27 @@ def execute():
     args = parser.parse_args()
 
     if args.test is not None:
-        if len(args.test) == 0:
-            pytest.main(['-r', 'A', '--pyargs', 'empyric.tests'])
+        if len(args.test) == 0:  # test main classes in experiment.py
+            pytest.main(
+                [
+                    '-r', 'A', '--pyargs', 'empyric.tests',
+                    '-k', 'test_experiment',
+                    '-q'
+                ]
+            )
+        elif args.test[0] in testable_features:
+            # test specified feature
+            pytest.main(
+                [
+                    '-r', 'A', '--pyargs', 'empyric.tests',
+                    '-k', f'test_' + args.test[0],
+                    '-q'
+                ]
+            )
+        else:
+            raise NotImplementedError(
+                f'requested test ({args.test}) is not implemented.'
+            )
     else:
         manager = Manager(runcard=args.runcard)
         manager.run(directory=args.directory)

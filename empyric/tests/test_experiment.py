@@ -1,3 +1,5 @@
+# Tests for the basic features of empyric
+
 import os
 import time
 import glob

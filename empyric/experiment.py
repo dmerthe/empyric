@@ -41,7 +41,7 @@ class Variable:
     constant like pi or a setpoint for a control routine.
 
     The value types of variables are either numbers (floats or integers),
-    booleans, strings or arrays (containing some combination of there previous
+    booleans, strings or arrays (containing some combination of the previous
     three types).
     """
 
