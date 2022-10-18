@@ -111,7 +111,7 @@ class Adapter:
     def __init__(self, instrument, **kwargs):
 
         if self.lib is None:
-            # determined by class attribute `implementation`
+            # determined by class attribute `lib`
             raise AdapterError(self.no_lib_msg)
 
         # general parameters
@@ -243,9 +243,6 @@ class Serial(Adapter):
 
     def connect(self):
 
-        # List of errors that gets reported in unable to connect
-        errors = []
-
         # First try connecting with PyVISA
         if self.lib == 'pyvisa':
 
@@ -274,12 +271,8 @@ class Serial(Adapter):
                 timeout=self.timeout
             )
 
-        if not self.backend:
-            raise AdapterError(
-                'Unable to initialize a suitable serial adapter backend for'
-                f'{self.instrument} at {self.instrument.address};'
-                'check you serial configuration.'
-            )
+        else:
+            raise AdapterError(f'invalid library specification, {self.lib}')
 
         self.connected = True
 
@@ -418,12 +411,13 @@ class Serial(Adapter):
 
 class GPIB(Adapter):
     """
-    Handles communications with GPIB instruments through either PyVISA, LinuxGPIB (if OS is Linux) for most GPIB-USB
-    controllers (defaults to PyVISA, if installed). For Prologix GPIB-USB adapter units, this adapter uses PySerial
-    to facilitate communcations.
+    Handles communications with GPIB instruments through either PyVISA,
+    LinuxGPIB (if OS is Linux) for most GPIB-USB controllers (defaults to
+    PyVISA, if installed). For Prologix GPIB-USB adapter units, this adapter
+    uses PySerial to facilitate communications.
     """
 
-    # Timeout values (in seconds) allowed by the Linux-GPIB backend; I don't know why
+    # Enumerated timeout values (in seconds) allowed by the Linux-GPIB backend
     linux_gpib_timeouts = {
         0: None,
         1: 10e-6,
@@ -450,6 +444,33 @@ class GPIB(Adapter):
     delay = 0.05
     _timeout = None
 
+    # Get GPIB library
+    if importlib.util.find_spec('pyvisa'):
+        lib = 'pyvisa'
+    elif importlib.util.find_spec('gpib_ctypes'):
+        lib = 'linux-gpib'
+    else:
+        # Finally, look for Prologix GPIB-USB adapter
+        if importlib.util.find_spec('serial'):
+
+            list_ports = importlib.import_module(
+                'serial.tools.list_ports'
+            ).comports
+
+            device_manufacturers = [
+                device.manufacturer for device in list_ports()
+            ]
+
+            if 'Prologix' in device_manufacturers:
+                lib = 'prologix-gpib'
+
+        else:
+            lib = None
+
+    no_lib_msg = 'No valid library found for GPIB adapters!'\
+                 'Please install PyVISA (with GPIB drivers), Linux-GPIB, or' \
+                 'use a Prologix GPIB-USB adapter (requires PySerial)'
+
     @property
     def timeout(self):
         return self._timeout
@@ -469,12 +490,9 @@ class GPIB(Adapter):
 
     def connect(self):
 
-        errors = []
+        if self.lib == 'pyvisa':
 
-        try:
             visa = importlib.import_module('pyvisa')
-
-            self.lib = 'pyvisa'
 
             manager = visa.ResourceManager()
 
@@ -504,54 +522,24 @@ class GPIB(Adapter):
                     f'{self.instrument.address} not found!'
                 )
 
-        except BaseException as error:
-            errors.append(error)
-            pass
-
-        try:
+        elif self.lib == 'linux-gpib':
             self.backend = importlib.import_module('gpib')
-
-            self.lib = 'linux-gpib'
 
             self.descr = self.backend.dev(
                 0, self.instrument.address, 0, 9, 1, 0
             )
 
-        except BaseException as error:
-            errors.append(error)
-            pass
-
-        try:
+        elif self.lib == 'prologix-gpib':
 
             if not GPIB.prologix_controller:
                 GPIB.prologix_controller = PrologixGPIBUSB()
-
-            self.lib = 'prologix-gpib'
 
             GPIB.prologix_controller.devices.append(self.instrument.address)
 
             self.backend = GPIB.prologix_controller
 
-        except BaseException as error:
-            errors.append(error)
-            pass
-
-        if not self.lib:
-            raise AdapterError(
-                'No GPIB library was found! '
-                'For Windows or Mac, please install PyVISA.\n'
-                'For Linux please install either PyVISA or LinuxGPIB.\n'
-                'Prologix GPIB-USB adapters are also supported '
-                'and require either PyVISA or PySerial.'
-            )
-
-        if not self.backend:
-            raise AdapterError(
-                'Unable to initialize GPIB adapter for '
-                f'{self.instrument} at address {self.instrument.address}; '
-                'the following errors were encountered:\n'
-                '\n'.join([str(error) for error in errors])
-            )
+        else:
+            raise AdapterError(f'invalid library specification, {self.lib}')
 
         self.connected = True
 
@@ -711,16 +699,24 @@ class USB(Adapter):
 
     timeout = 0.5
 
-    def connect(self):
+    # Get USB library
+    if importlib.util.find_spec('pyvisa'):
+        lib = 'pyvisa'
+    elif importlib.util.find_spec('usbtmc'):
+        lib = 'usbtmc'
+    else:
+        lib = None
 
-        errors = []
+    no_lib_msg = 'No USB library was found! '\
+                 'Please install either PyVISA or USBTMC.'
+
+    def connect(self):
 
         serial_number = str(self.instrument.address)
 
-        try:
-            visa = importlib.import_module('pyvisa')
+        if self.lib == 'pyvisa':
 
-            self.lib = 'pyvisa'
+            visa = importlib.import_module('pyvisa')
 
             manager = visa.ResourceManager()
 
@@ -732,36 +728,16 @@ class USB(Adapter):
                     )
                     self.backend.timeout = self.timeout
 
-        except BaseException as error:
-            errors.append(error)
-            pass
+        elif self.lib == 'usbtmc':
 
-        try:
             usbtmc = importlib.import_module('usbtmc')
-
-            self.lib = 'usbtmc'
 
             self.backend = usbtmc.Instrument(
                 'USB::' + serial_number + '::INSTR'
             )
 
-        except BaseException as error:
-            errors.append(error)
-            pass
-
-        if not self.lib:
-            raise AdapterError(
-                'No USB library was found! '
-                'Please install either the PyVISA or USBTMC libraries.'
-            )
-
-        if not self.backend:
-            raise AdapterError(
-                'Unable to initialize USB adapter for '
-                f'{self.instrument} @ {self.instrument.address}; '
-                'the following errors were encountered:\n'
-                '\n'.join([str(error) for error in errors])
-            )
+        else:
+            raise AdapterError(f'invalid library specification, {self.lib}')
 
         self.connected = True
 
@@ -807,6 +783,15 @@ class Modbus(Adapter):
 
     _busy = False
 
+    # Get Modbus library
+    if importlib.util.find_spec('minimalmodbus'):
+        lib = 'minimalmodbus'
+    else:
+        lib = None
+
+    no_lib_msg = 'No Modbus library was found! '\
+                 'Please install the minimalmodbus library'
+
     @property
     def busy(self):
         return bool(sum([
@@ -822,17 +807,7 @@ class Modbus(Adapter):
 
     def connect(self):
 
-        try:
-
-            minimal_modbus = importlib.import_module('minimalmodbus')
-
-            self.lib = 'minimalmodbus'
-
-        except ImportError:
-
-            raise AdapterError(
-                'Modbus adapters require the minimalmodbus library'
-            )
+        minimal_modbus = importlib.import_module('minimalmodbus')
 
         # Get port and channel
         self.port, self.channel = self.instrument.address.split('::')
@@ -895,6 +870,14 @@ class Phidget(Adapter):
     delay = 0.2
     timeout = 5
 
+    if importlib.util.find_spec('Phidget22'):
+        lib = 'phidget'
+    else:
+        lib = None
+
+    no_lib_msg = 'Phidget library was not found! '\
+                 'Please install (pip[3] install Phidget22).'
+
     def __repr__(self):
         return 'Phidget'
 
@@ -905,14 +888,9 @@ class Phidget(Adapter):
 
         serial_number = address_parts[0]
 
-        try:
-            self.PhidgetException = importlib.import_module(
-                "Phidget22.PhidgetException"
-            ).PhidgetException
-        except ImportError:
-            raise AdapterError(
-                'Phidget instruments require the Phidget22 library'
-            )
+        self.PhidgetException = importlib.import_module(
+            "Phidget22.PhidgetException"
+        ).PhidgetException
 
         self.backend = self.instrument.device_class()
 

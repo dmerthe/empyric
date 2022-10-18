@@ -10,7 +10,13 @@ from empyric.experiment import Manager
 # Tests are invoked at the command line with `empyric --test <feature>`
 testable_features = [
     'experiment',  # tests Variable, Experiment and Manager classes (default)
-    'serial',  # tests configuration of serial backend
+
+    # Adpaters
+    'serial',
+    'gpib',
+    'usb',
+    'modbus',
+    'phidget'
 ]
 
 
@@ -38,6 +44,7 @@ def execute():
     args = parser.parse_args()
 
     if args.test is not None:
+
         if len(args.test) == 0:  # test main classes in experiment.py
             pytest.main(
                 [
@@ -46,18 +53,29 @@ def execute():
                     '-q'
                 ]
             )
-        elif args.test[0] in testable_features:
-            # test specified feature
+
+        elif all([feature in testable_features for feature in args.test]):
+            # test specified features
+            test_names = ['test_' + name for name in args.test]
+
             pytest.main(
                 [
                     '-r', 'A', '--pyargs', 'empyric.tests',
-                    '-k', f'test_' + args.test[0],
+                    '-k', ' or '.join(test_names),
                     '-q'
                 ]
             )
+
         else:
+
             raise NotImplementedError(
-                f'requested test ({args.test}) is not implemented.'
+                '\n' + '\n'.join(
+                    [
+                        f'Requested test of {feature} is not implement'
+                        for feature in args.test
+                        if feature not in testable_features
+                    ]
+                )
             )
     else:
         manager = Manager(runcard=args.runcard)
