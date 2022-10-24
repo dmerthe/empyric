@@ -1,6 +1,4 @@
-- Change PrologixGPIBUSB backend to PyVISA.
-- Make script files PeP compliant.
-- Figure out how to access files while in use.  
-- Main thread (GUI) and experiment thread require more rigirous locking for the alarms. Ex: If an alarm is triggered and you execute a command, the GUI will continue.
-- Create a buffer for recent data in order to do in-situ analysis (ex: run a Jupyter notebook on a seperate thread that accesses the buffer). Consider using shared memory modude to handle this task.
-- Tests for all Adapter classes (done: Serial)
+- Change PrologixGPIBUSB backend to PyVISA
+- Make all .py files PEP compliant (i.e. <= 80 char lines)
+- Figure out how to access files/data while in use
+- Testing and development for more robust alarm behavior
