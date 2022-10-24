@@ -1,4 +1,7 @@
-- Change PrologixGPIBUSB backend to PyVISA
 - Make all .py files PEP compliant (i.e. <= 80 char lines)
 - Figure out how to access files/data while in use
 - Testing and development for more robust alarm behavior
+- Split out different modes of GPIB adapters (e.g. NationalInstrumentsGPIBUSB, PrologixGPIBUSB, Prologix GPIBLAN)
+   - Would need distinct address patterns
+   - Might as well explicitly specify address patterns for all adapters
+- Change PrologixGPIBUSB backend to PyVISA
