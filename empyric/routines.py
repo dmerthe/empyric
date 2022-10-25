@@ -14,25 +14,33 @@ class Routine:
         """
 
         :param knobs: (Variable/1D array) knob variable(s) to be controlled
-        :param values: (1D/2D array) array or list of values for each variable; can be 1D iff there is one knob
+        :param values: (1D/2D array) array or list of values for each variable;
+        can be 1D iff there is one knob
         :param start: (float) time to start the routine
         :param end: (float) time to end the routine
         """
 
         if knobs is not None:
-            self.knobs = knobs  # dictionary of the form, {..., name: variable, ...}
+
+            self.knobs = knobs
+            # dictionary of the form, {..., name: variable, ...}
+
             for knob in self.knobs.values():
-                knob.controller = None  # for keeping track of which routines are controlling knobs
+                knob.controller = None
+                # for keeping track of which routines are controlling knobs
 
         if values is not None:
 
             if len(self.knobs) > 1:
                 if np.ndim(values) == 1:  # single list of values for all knobs
                     values = [values]*len(self.knobs)
-                elif np.shape(values)[0] == 1: # 1xN array with one N-element list of times for all knobs
+                elif np.shape(values)[0] == 1:
+                    # 1xN array with one N-element list of times for all knobs
                     values = [values[0]]*len(self.knobs)
 
-            self.values = np.array(values, dtype=object).reshape((len(self.knobs), -1))
+            self.values = np.array(
+                values, dtype=object
+            ).reshape((len(self.knobs), -1))
 
         self.start = convert_time(start)
         self.end = convert_time(end)
@@ -41,7 +49,8 @@ class Routine:
         """
         Updates the knobs controlled by the routine
 
-        :param state: (dict/Series) state of the calling experiment or process in the form, {..., variable: value, ...}
+        :param state: (dict/Series) state of the calling experiment or process
+        in the form, {..., variable: value, ...}
         :return: None
         """
 
@@ -74,7 +83,8 @@ class Timecourse(Routine):
     def __init__(self, times=None, **kwargs):
         """
 
-        :param times: (1D/2D array) array or list of times relative to the start time
+        :param times: (1D/2D array) array or list of times relative to the start
+         time
         :param kwargs: keyword arguments for Routine
         """
 
@@ -85,17 +95,23 @@ class Timecourse(Routine):
             if len(self.knobs) > 1:
                 if np.ndim(times) == 1:  # single list of times for all knobs
                     times = [times]*len(self.knobs)
-                elif np.shape(times)[0] == 1: # 1xN array with one N-element list of times for all knobs
+                elif np.shape(times)[0] == 1:
+                    # 1xN array with one N-element list of times for all knobs
                     times = [times[0]]*len(self.knobs)
 
-            self.times = np.array(times, dtype=object).reshape((len(self.knobs), -1))
+            self.times = np.array(
+                times, dtype=object
+            ).reshape((len(self.knobs), -1))
 
             # Values can be stored in a CSV file
             for i, element in enumerate(self.times):
                 if type(element[0]) == str:
                     if '.csv' in element[0]:
                         df = pd.read_csv(element[0])
-                        self.times[i] = df[df.columns[0]].values.reshape(len(df))
+
+                        df = df[df.coloumns[0]]
+
+                        self.times[i] = df.values.reshape(len(df))
 
             self.times = np.array(convert_time(self.times)).astype(float)
 
@@ -114,7 +130,8 @@ class Timecourse(Routine):
             if not self.finished:
                 for knob, values in zip(self.knobs.values(), self.values):
                     if knob.controller == self:
-                        knob.value = values[-1]  # make sure to set the end value
+                        knob.value = values[-1]
+                        # make sure to set the end value
 
                     knob.controller = None
 
@@ -124,14 +141,20 @@ class Timecourse(Routine):
         else:
             for name, knob in self.knobs.items():
 
-                if isinstance(knob.controller, Routine) and knob.controller != self:
+                has_controller = isinstance(knob.controller, Routine)
+
+                if has_controller and knob.controller != self:
                     controller = knob.controller
                     if controller.start < state['Time'] < controller.end:
-                        raise RuntimeError(f"Knob {name} has more than one controlling routine at time = {state['Time']} seconds!")
+                        raise RuntimeError(
+                            f"Knob {name} has more than one controlling "
+                            f"routine at time = {state['Time']} seconds!"
+                        )
                 else:
                     knob.controller = self
 
-        for variable, times, values in zip(self.knobs.values(), self.times, self.values):
+        knobs_times_values = zip(self.knobs.values(), self.times, self.values)
+        for variable, times, values in knobs_times_values:
 
             j_last = np.argwhere(times <= state['Time']).flatten()[-1]
             j_next = np.argwhere(times > state['Time']).flatten()[0]
@@ -143,20 +166,29 @@ class Timecourse(Routine):
             next_value = values[j_next]
 
             if 'Variable' in repr(last_value):
-                last_value = last_value._value  # replace variable with value for past times
+                last_value = last_value._value
+                # replace variable with value for past times
 
-            if isinstance(next_value, numbers.Number) and isinstance(last_value, numbers.Number):
+            last_is_number = isinstance(last_value, numbers.Number)
+            next_is_number = isinstance(next_value, numbers.Number)
+
+            if next_is_number and last_is_number:
                 # ramp linearly between numerical values
-                value = last_value + (next_value - last_value) * (state['Time'] - last_time) / (next_time - last_time)
+                value = last_value + (
+                        next_value - last_value) * (state['Time'] - last_time
+                                                    ) / (next_time - last_time)
             else:
-                value = last_value  # stay at last value until next time, when value variable will be evaluated
+                # stay at last value until next time,
+                # when value variable will be evaluated
+                value = last_value
 
             variable.value = value
 
 
 class Sequence(Routine):
     """
-    Passes knobs through a series of values regardless of time; each series for each knob must have the same length
+    Passes knobs through a series of values regardless of time; each series for
+    each knob must have the same length
     """
 
     def __init__(self, **kwargs):
@@ -178,7 +210,8 @@ class Sequence(Routine):
 
 class Minimization(Routine):
     """
-    Minimize the sum of a set of meters/expressions influenced by a set of knobs, using simulated annealing.
+    Minimize the sum of a set of meters/expressions influenced by a set of
+    knobs, using simulated annealing.
     """
 
     def __init__(self, meters=None, max_deltas=None, T0=0.1, T1=0, **kwargs):
@@ -188,7 +221,9 @@ class Minimization(Routine):
         if meters:
             self.meters = np.array([meters]).flatten()
         else:
-            raise AttributeError(f'{self.__name__} routine requires meters for feedback')
+            raise AttributeError(
+                f'{self.__name__} routine requires meters for feedback'
+            )
 
         if max_deltas:
             self.max_deltas = np.array([max_deltas]).flatten()
@@ -207,7 +242,9 @@ class Minimization(Routine):
         meter_values = np.array([state[meter] for meter in self.meters])
 
         # Update temperature
-        self.T = self.T0 + self.T1*(state['Time'] - self.start)/(self.end - self.start)
+        self.T = self.T0 + self.T1*(
+                state['Time'] - self.start
+        )/(self.end - self.start)
 
         if self.better(meter_values):
 
@@ -216,7 +253,9 @@ class Minimization(Routine):
             self.last_meters = [state[meter] for meter in self.meters]
 
             # Generate and apply new knob settings
-            new_knobs = self.last_knobs + self.max_deltas*np.random.rand(len(self.knobs))
+            new_knobs = self.last_knobs + self.max_deltas*np.random.rand(
+                len(self.knobs)
+            )
             for knob, new_value in zip(self.knobs.values(), new_knobs):
                 knob.value = new_value
 
@@ -235,7 +274,8 @@ class Minimization(Routine):
 
 class Maximization(Minimization):
     """
-    Maximize a set of meters/expressions influenced by a set of knobs; works the same way as Minimize.
+    Maximize a set of meters/expressions influenced by a set of knobs;
+    works the same way as Minimize.
     """
 
     def better(self, meter_values):
@@ -250,11 +290,13 @@ class Maximization(Minimization):
 class ModelPredictiveControl(Routine):
     """
     (NOT IMPLEMENTED)
-    Simple model predictive control; learns the relationship between knob x and meter y, assuming a linear model,
+    Simple model predictive control; learns the relationship between knob x
+    and meter y, assuming a linear model,
 
     y(t) = y0 + int_{-inf}^{t} dt' m(t-t') x(t')
 
-    then sets x to minimize the error in y relative to setpoint, over some time interval defined by cutoff.
+    then sets x to minimize the error in y relative to setpoint, over some
+    time interval defined by cutoff.
 
     """
 

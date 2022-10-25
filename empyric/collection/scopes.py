@@ -6,7 +6,8 @@ from empyric.collection.instrument import *
 
 class TekScope(Instrument):
     """
-    Tektronix oscillscope of the TDS200, TDS1000/2000, TDS1000B/2000B, TPS2000 series
+    Tektronix oscillscope of the TDS200, TDS1000/2000, TDS1000B/2000B,
+    TPS2000 series
 
     """
 

@@ -4,11 +4,13 @@ import numpy as np
 
 from empyric.adapters import *
 from empyric.collection.instrument import *
+from empyric.tools import to_number
 
 class Phidget1101(Instrument):
     """
     Phidgets 4x TC reader
-    Many instrumet methods (setX, getY, etc.) are mapped by the adapter from the Phidgets device class
+    Many instrumet methods (setX, getY, etc.) are mapped by the adapter from
+    the Phidgets device class
     """
 
     name = 'Phidget1101'
@@ -23,8 +25,12 @@ class Phidget1101(Instrument):
     # Available meters
     meters = ('temperature',)
 
-    def __init__(self, *args, **kwarhs):
-        self.device_class = importlib.import_module('Phidget22.Devices.TemperatureSensor').TemperatureSensor
+    def __init__(self, *args, **kwargs):
+
+        self.device_class = importlib.import_module(
+            'Phidget22.Devices.TemperatureSensor'
+        ).TemperatureSensor
+
         Instrument.__init__(self, *args, **kwargs)
 
     @setter

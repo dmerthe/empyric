@@ -158,8 +158,9 @@ class HenonMapper(Instrument):
     def measure_x(self):
         """
         Measure the coordinate x.
-        Each call triggers a new iteration, with new values set for x and y based on the Henon Map. Therefore, each call
-        to ``measure_x`` should be followed by a call to ``measure_y``.
+        Each call triggers a new iteration, with new values set for x and y
+        based on the Henon Map. Therefore, each call to ``measure_x`` should
+        be followed by a call to ``measure_y``.
 
         :return: (float) current value of x
         """
@@ -176,7 +177,8 @@ class HenonMapper(Instrument):
     def measure_y(self):
         """
         Measure the coordinate y.
-        Each call to ``measure_y`` should be preceded by a call to ``measure_x``.
+        Each call to ``measure_y`` should be preceded by a call to
+        ``measure_x``.
 
         :return: (float) current value of y
         """
@@ -261,7 +263,8 @@ class PIDController(Instrument):
     @measurer
     def measure_output(self):
         """Get the controller output"""
-        if self.setpoint is None:  # Don't output anything unless the setpoint is defined
+        if self.setpoint is None:
+            # Don't output anything unless the setpoint is defined
             return None
 
         if len(self.outputs) < len(self.inputs):  # if input has been updated
@@ -272,14 +275,20 @@ class PIDController(Instrument):
             # Integral and derivative terms
             if len(self.times) > 1:
 
-                interval = np.argwhere(self.times >= self.times[-1] - self.integral_time).flatten()
+                interval = np.argwhere(
+                    self.times >= self.times[-1] - self.integral_time
+                ).flatten()
 
                 dt = np.diff(self.times[interval])
                 errors = (self.setpoints - self.inputs)[interval[1:]]
 
                 integral = np.sum(dt*errors)
 
-                derivative = -(self.inputs[-1] - self.inputs[-2]) / (self.times[-1] - self.times[-2])
+                derivative = -(
+                        self.inputs[-1] - self.inputs[-2]
+                ) / (
+                        self.times[-1] - self.times[-2]
+                )
             else:
                 integral = 0
                 derivative = 0
@@ -287,7 +296,9 @@ class PIDController(Instrument):
             tD = self.derivative_time
             tI = self.integral_time
 
-            output = self.proportional_gain*(error + tD*derivative + integral/tI)
+            output = self.proportional_gain*(
+                    error + tD*derivative + integral/tI
+            )
 
             self.outputs.append(output)
 
@@ -300,10 +311,11 @@ class RandomWalk(Instrument):
     """
     Virtual random walk process for testing controllers
 
-    Dynamics of the process value is determined by the mean, step and affinity knobs. The mean is the mean
-    value of the process in steady state, the step is the size of the step that the process can take in either direction upon each
-    measurement of the process value, and the affinity is the tendancy of the process value to return to its mean value
-    at each step.
+    Dynamics of the process value is determined by the mean, step and affinity
+    knobs. The mean is the mean value of the process in steady state, the step
+    is the size of the step that the process can take in either direction upon
+    each measurement of the process value, and the affinity is the tendancy of
+    the process value to return to its mean value at each step.
     """
 
     name = 'RandomWalk'
@@ -341,7 +353,11 @@ class RandomWalk(Instrument):
 
     @measurer
     def measure_value(self):
-        self.value += np.random.choice([-self.step, self.step]) + self.affinity*(self.mean - self.value)
+
+        self.value += np.random.choice(
+            [-self.step, self.step]
+        ) + self.affinity*(self.mean - self.value)
+
         return self.value
 
 
@@ -397,6 +413,8 @@ class SimpleProcess(Instrument):
 
         last_value = self._value
         t = self._clock.measure_time()  # time since last setpoint change
-        self._value = self.setpoint + (last_value - self.setpoint)*np.exp(-t / self.response_time)
+        self._value = self.setpoint + (
+                last_value - self.setpoint
+        )*np.exp(-t / self.response_time)
 
         return self._value + self.noise_level*(2*np.random.rand() - 1)

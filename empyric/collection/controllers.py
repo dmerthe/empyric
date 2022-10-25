@@ -33,9 +33,11 @@ class OmegaCN7500(Instrument):
     @setter
     def set_output(self, state):
         if state == 'ON':
-            self.backend.write_bit(0x814, 1)  # turn on output & start PID control
+            # turn on output & start PID control
+            self.backend.write_bit(0x814, 1)
         elif state == 'OFF':
-            self.backend.write_bit(0x814, 0)  # turn off output & stop PID control
+            # turn off output & stop PID control
+            self.backend.write_bit(0x814, 0)
 
     @setter
     def set_setpoint(self, setpoint):
@@ -202,9 +204,11 @@ class RedLionPXU(Instrument):
     @setter
     def set_output(self, state):
         if state == 'ON':
-            self.backend.write_bit(0x11, 1)  # turn on output & start PID control
+            # turn on output & start PID control
+            self.backend.write_bit(0x11, 1)
         elif state == 'OFF':
-            self.backend.write_bit(0x11, 0)  # turn off output & stop PID control
+            # turn off output & stop PID control
+            self.backend.write_bit(0x11, 0)
 
     @setter
     def set_setpoint(self, setpoint):
@@ -247,7 +251,8 @@ class WatlowEZZone(Instrument):
 
     @measurer
     def measure_temperature(self):
-        return self.read(360, dtype='float', byte_order=3)  # swapped little-endian byte order (= 3 in minimalmodbus)
+        # swapped little-endian byte order (= 3 in minimalmodbus)
+        return self.read(360, dtype='float', byte_order=3)
 
     @getter
     def get_setpoint(self):

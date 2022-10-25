@@ -61,9 +61,14 @@ class Keithley2400(Instrument):
 
     fast_voltages = None
 
-    current_ranges = (1e-6, 10e-6, 100e-6, 1e-3, 10e-3, 100e-3, 1, 'AUTO')  # allowed current range settings
-    voltage_ranges = (0.2, 2, 20, 200, 'AUTO')  # allowed voltage range settings
-    ovp_levels = (20, 40, 60, 80, 100, 120, 140, 160, 210)  # over-voltage protection level settings
+    # allowed current range settings
+    current_ranges = (1e-6, 10e-6, 100e-6, 1e-3, 10e-3, 100e-3, 1, 'AUTO')
+
+    # allowed voltage range settings
+    voltage_ranges = (0.2, 2, 20, 200, 'AUTO')
+
+    # over-voltage protection level settings
+    ovp_levels = (20, 40, 60, 80, 100, 120, 140, 160, 210)
 
     @setter
     def set_source(self, variable):
@@ -104,7 +109,10 @@ class Keithley2400(Instrument):
 
         if output in [0, 'OFF', 'off']:
             self.write(':OUTP OFF')
-            self.query(':OUTP?')  # for some reason, this is needed to ensure output off
+
+            # for some reason, this is needed to ensure output off
+            self.query(':OUTP?')
+
         elif output in [1, 'ON', 'on']:
             self.write(':OUTP ON')
         else:
@@ -174,7 +182,8 @@ class Keithley2400(Instrument):
                 else:
                     self.write(':SENS:VOLT:RANGE %.2E' % voltage_range)
         else:
-            first_line = f'Given voltage range {voltage_range} is not a valid value for {self.name}\n'
+            first_line = f'Given voltage range {voltage_range} ' \
+                         f'is not a valid value for {self.name}\n'
             second_line = f'Valid values are {self.voltage_ranges}'
             raise ValueError(first_line + second_line)
 
@@ -185,7 +194,9 @@ class Keithley2400(Instrument):
             if int(voltage_limit) in self.ovp_levels:
                 self.write(':SOUR:VOLT:PROT %d' % int(voltage_limit))
             else:
-                first_line = f'{self.name} is sourcing voltage, but given voltage limit {voltage_limit} is not a valid value\n'
+                first_line = f'{self.name} is sourcing voltage, but given ' \
+                             f'voltage limit {voltage_limit} ' \
+                             f'is not a valid value\n'
                 second_line = f'Valid values are {self.ovp_levels}'
                 raise ValueError(first_line + second_line)
         else:
@@ -203,7 +214,8 @@ class Keithley2400(Instrument):
                 else:
                     self.write(':SENS:CURR:RANGE %.2E' % current_range)
         else:
-            first_line = f'Given current range {current_range} is not a valid value for {self.name}\n'
+            first_line = f'Given current range {current_range} ' \
+                         f'is not a valid value for {self.name}\n'
             second_line = f'Valid values are {self.current_ranges}'
             raise ValueError(first_line + second_line)
 
@@ -239,7 +251,10 @@ class Keithley2400(Instrument):
                 os.chdir(working_subdir)
 
             columns = fast_voltage_data.columns
-            self.fast_voltages = fast_voltage_data[columns[0]].astype(float).values
+
+            fast_voltages = fast_voltage_data[columns[0]]
+
+            self.fast_voltages = fast_voltages.astype(float).values
 
     @measurer
     def measure_fast_currents(self):
@@ -260,7 +275,10 @@ class Keithley2400(Instrument):
         list_length = len(self.fast_voltages)
 
         if list_length >= 100:  # can only take 100 voltages at a time
-            sub_lists = [self.fast_voltages[i*100:(i+1)*100] for i in range(list_length // 100)]
+            sub_lists = [
+                self.fast_voltages[i*100:(i+1)*100]
+                for i in range(list_length // 100)
+            ]
         else:
             sub_lists = []
 
@@ -273,12 +291,17 @@ class Keithley2400(Instrument):
         self.adapter.timeout = None  # the response times can be long
 
         for voltage_list in sub_lists:
-            voltage_str = ', '.join(['%.4E' % voltage for voltage in voltage_list])
+            voltage_str = ', '.join(
+                ['%.4E' % voltage for voltage in voltage_list]
+            )
+
             self.write(':SOUR:LIST:VOLT ' + voltage_str)
             self.write(':TRIG:COUN %d' % len(voltage_list))
 
             raw_response = self.query(':READ?').strip()
-            current_list += [float(current_str) for current_str in raw_response.split(',')]
+            current_list += [
+                float(current_str) for current_str in raw_response.split(',')
+            ]
 
         self.adapter.timeout = normal_timeout  # put it back
 
@@ -417,7 +440,9 @@ class Keithley2460(Instrument):
         if self.source != 'voltage':
             Warning(f'Switching sourcing mode to voltage!')
             self.set_source('voltage')
-            self.set_output('ON')  # output if automatically shut off when the source mode is changed
+
+            # turn output on if shut off when the source mode is changed
+            self.set_output('ON')
 
         self.write('SOUR:VOLT:LEV %.4E' % voltage)
 
@@ -427,7 +452,9 @@ class Keithley2460(Instrument):
         if self.source != 'current':
             Warning(f'Switching sourcing mode to current!')
             self.set_source('current')
-            self.set_output('ON')  # output if automatically shut off when the source mode is changed
+
+            # turn output on if shut off when the source mode is changed
+            self.set_output('ON')
 
         self.write('SOUR:CURR:LEV %.4E' % current)
 
@@ -443,7 +470,8 @@ class Keithley2460(Instrument):
                 else:
                     self.write(':SENS:VOLT:RANGE %.2E' % voltage_range)
         else:
-            first_line = f'Given voltage range {voltage_range} is not a valid value for {self.name}\n'
+            first_line = f'Given voltage range {voltage_range} ' \
+                         f'is not a valid value for {self.name}\n'
             second_line = f'Valid values are {self.voltage_ranges}'
             raise ValueError(first_line + second_line)
 
@@ -454,7 +482,9 @@ class Keithley2460(Instrument):
             if int(voltage_limit) in self.ovp_levels:
                 self.write(':SOUR:VOLT:PROT PROT%d' % int(voltage_limit))
             else:
-                first_line = f'{self.name} is sourcing voltage, but given voltage limit {voltage_limit} is not a valid value\n'
+                first_line = f'{self.name} is sourcing voltage, but given ' \
+                             f'voltage limit {voltage_limit} ' \
+                             f'is not a valid value\n'
                 second_line = f'Valid values are {self.ovp_levels}'
                 raise ValueError(first_line + second_line)
         else:
@@ -472,7 +502,8 @@ class Keithley2460(Instrument):
                 else:
                     self.write(':SENS:CURR:RANGE %.2E' % current_range)
         else:
-            first_line = f'Given current range {current_range} is not a valid value for {self.name}\n'
+            first_line = f'Given current range {current_range} ' \
+                         f'is not a valid value for {self.name}\n'
             second_line = f'Valid values are {self.current_ranges}'
             raise ValueError(first_line + second_line)
 
@@ -508,7 +539,10 @@ class Keithley2460(Instrument):
                 os.chdir(working_subdir)
 
             columns = fast_voltage_data.columns
-            self.fast_voltages = fast_voltage_data[columns[0]].astype(float).values
+
+            fast_voltages = fast_voltage_data[columns[0]]
+
+            self.fast_voltages = fast_voltages.astype(float).values
 
     @measurer
     def measure_fast_currents(self):
@@ -526,7 +560,10 @@ class Keithley2460(Instrument):
         list_length = len(self.fast_voltages)
 
         if list_length >= 100:
-            sub_lists = [self.fast_voltages[i*100:(i+1)*100] for i in range(list_length // 100)]
+            sub_lists = [
+                self.fast_voltages[i*100:(i+1)*100]
+                for i in range(list_length // 100)
+            ]
         else:
             sub_lists = []
 
@@ -541,13 +578,21 @@ class Keithley2460(Instrument):
         start = datetime.datetime.now()
         for voltage_list in sub_lists:
 
-            voltage_str = ', '.join(['%.4E' % voltage for voltage in voltage_list])
+            voltage_str = ', '.join(
+                ['%.4E' % voltage for voltage in voltage_list]
+            )
             self.write('SOUR:LIST:VOLT ' + voltage_str)
             self.write('SOUR:SWE:VOLT:LIST 1, %.2e' % self.source_delay)
             self.write('INIT')
             self.write('*WAI')
-            raw_response = self.query('TRAC:DATA? 1, %d, "defbuffer1", SOUR, READ' % len(voltage_list)).strip()
-            current_list += [float(current_str) for current_str in raw_response.split(',')[1::2]]
+            raw_response = self.query(
+                'TRAC:DATA? 1, %d, "defbuffer1", SOUR, READ' % len(voltage_list)
+            ).strip()
+
+            current_list += [
+                float(current_str)
+                for current_str in raw_response.split(',')[1::2]
+            ]
 
         self.adapter.timeout = normal_timeout  # put it back
         end = datetime.datetime.now()
@@ -652,7 +697,8 @@ class Keithley2651A(Instrument):
         if variable == 'voltage':
             self.write('display.smua.measure.func = display.MEASURE_DCVOLTS')
 
-        # This sourcemeter does not require specifying the meter before taking a measurement
+        # This sourcemeter does not require specifying the meter
+        # before taking a measurement
 
     @setter
     def set_output(self, output):
@@ -692,7 +738,9 @@ class Keithley2651A(Instrument):
         if self.source != 'voltage':
             Warning(f'Switching sourcing mode!')
             self.set_source('voltage')
-            self.set_output('ON')  # output if automatically shut off when the source mode is changed
+
+            # turn output on if shut off when the source mode is changed
+            self.set_output('ON')
 
         self.write(f'smua.source.levelv = {voltage}')
 
@@ -702,7 +750,9 @@ class Keithley2651A(Instrument):
         if self.source != 'current':
             Warning(f'Switching sourcing mode!')
             self.set_source('current')
-            self.set_output('ON')  # output if automatically shut off when the source mode is changed
+
+            # turn output on if shut off when the source mode is changed
+            self.set_output('ON')
 
         self.write(f'smua.source.leveli = {current}')
 
@@ -750,7 +800,10 @@ class Keithley2651A(Instrument):
                 os.chdir(working_subdir)
 
             columns = fast_voltage_data.columns
-            self.fast_voltages = fast_voltage_data[columns[0]].astype(float).values
+
+            fast_voltages = fast_voltage_data[columns[0]]
+
+            self.fast_voltages = fast_voltages.astype(float).values
 
     @measurer
     def measure_fast_currents(self):
@@ -767,7 +820,9 @@ class Keithley2651A(Instrument):
         list_length = 100  # maximum number of voltages to sweep at a time
 
         for i in range(len(self.fast_voltages) // list_length):
-            voltage_lists.append(self.fast_voltages[i*list_length:(i+1)*list_length])
+            voltage_lists.append(
+                self.fast_voltages[i*list_length:(i+1)*list_length]
+            )
 
         remainder = len(self.fast_voltages) % list_length
         if remainder:
@@ -776,19 +831,25 @@ class Keithley2651A(Instrument):
         normal_timeout = self.backend.timeout
         self.backend.timeout = 60  # give it up to a minute to do sweep
 
-        start = datetime.datetime.now()
         for voltage_list in voltage_lists:
 
-            voltage_string = ', '.join([f'{voltage}' for voltage in voltage_list])
+            voltage_string = ', '.join(
+                [f'{voltage}' for voltage in voltage_list]
+            )
 
             self.write('vlist = {%s}' % voltage_string)
-            self.write(f'SweepVListMeasureI(smua, vlist, 0.01, {len(voltage_list)})')
-            raw_response = self.query(f'printbuffer(1, {len(voltage_list)}, smua.nvbuffer1)').strip()
-            current_list += [float(current_str) for current_str in raw_response.split(',')]
+            self.write(
+                f'SweepVListMeasureI(smua, vlist, 0.01, {len(voltage_list)})'
+            )
+            raw_response = self.query(
+                f'printbuffer(1, {len(voltage_list)}, smua.nvbuffer1)'
+            ).strip()
+            current_list += [
+                float(current_str) for current_str in raw_response.split(',')
+            ]
 
-            self.set_voltage(voltage_list[-1])  # hold last voltage until next sub-sweep
-
-        end = datetime.datetime.now()
+            # hold last voltage until next sub-sweep
+            self.set_voltage(voltage_list[-1])
 
         self.connection.timeout = normal_timeout  # put it back
 

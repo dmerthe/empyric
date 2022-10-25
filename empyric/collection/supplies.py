@@ -109,11 +109,13 @@ class BK9183B(Instrument):
 
     @measurer
     def measure_current(self):
-        return [float(self.query('MEAS:CURR?')) for i in range(3)][-1] # sometimes the first measurement is lagged
+        # sometimes the first measurement is lagged
+        return [float(self.query('MEAS:CURR?')) for i in range(3)][-1]
 
     @measurer
     def measure_voltage(self):
-        return [float(self.query('MEAS:VOLT?')) for i in range(3)][-1] # sometimes the first measurement is lagged
+        # sometimes the first measurement is lagged
+        return [float(self.query('MEAS:VOLT?')) for i in range(3)][-1]
 
     @setter
     def set_max_current(self, current):
@@ -168,7 +170,9 @@ class UltraflexInductionHeater(Instrument):
     def set_power(self, percent_of_max):
 
         if percent_of_max < 0 or percent_of_max > 100:
-            raise ValueError('power setting must be a percentage value between 0 and 100')
+            raise ValueError(
+                'power setting must be a percentage value between 0 and 100'
+            )
 
         ascii_command = 'S34'
         ascii_command += hex(int(round(percent_of_max)))[-2:].upper()

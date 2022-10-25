@@ -7,13 +7,17 @@ from empyric.collection.instrument import *
 
 class SRSRGA(Instrument):
     """
-    SRS Residual Gas Analyzer, a quadrupole mass spectrometer with mass ranges from 100 to 300 amu
+    SRS Residual Gas Analyzer, a quadrupole mass spectrometer with mass ranges
+    from 100 to 300 amu
     """
 
     name = 'SRS-RGA'
 
     supported_adapters = (
-        (Serial, {'baud_rate': 28800, 'timeout': 300, 'read_termination': '\n\r'}),
+        (
+            Serial,
+            {'baud_rate': 28800, 'timeout': 300, 'read_termination': '\n\r'}
+        ),
     )
 
     knobs = (
@@ -123,12 +127,18 @@ class SRSRGA(Instrument):
 
     @measurer
     def measure_spectrum(self):
-        response = self.query('HS1', num_bytes=4*(len(self.masses)+1), decode=False)
-        return np.array(struct.unpack('<'+'i'*(len(self.masses)+1), response))[:-1] * 1.0e-16 / self.ppsf * 1000
+        response = self.query(
+            'HS1', num_bytes=4*(len(self.masses)+1), decode=False
+        )
+        return np.array(
+            struct.unpack('<'+'i'*(len(self.masses)+1), response)
+        )[:-1] * 1.0e-16 / self.ppsf * 1000
 
     @measurer
     def measure_single(self):
-        response = self.query('MR'+f'{int(self.mass)}', num_bytes=4, decode=False)
+        response = self.query(
+            'MR'+f'{int(self.mass)}', num_bytes=4, decode=False
+        )
         return struct.unpack('<i', response)[0] * 1.0e-16 / self.ppsf * 1000
 
     @measurer

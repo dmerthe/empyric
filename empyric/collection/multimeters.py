@@ -53,18 +53,25 @@ class Keithley2110(Instrument):
 
             # Find nearest encapsulating voltage range
             try:
-                nearest = np.argwhere( voltage_range <= np.array(allowed_voltage_ranges) ).flatten()[0]
+                nearest = np.argwhere(
+                    voltage_range <= np.array(allowed_voltage_ranges)
+                ).flatten()[0]
             except IndexError:
                 nearest = -1
 
             self.set_voltage_range(allowed_voltage_ranges[nearest])
 
-            Warning(f'Given voltage range not an option, setting to {allowed_voltage_ranges[nearest]} V instead')
+            Warning(
+                'Given voltage range not an option, '
+                f'setting to {allowed_voltage_ranges[nearest]} V instead'
+            )
 
         elif voltage_range == 'AUTO':
             self.write('VOLT:RANG:AUTO')
         else:
-            raise ValueError(f'voltage range choice {voltage_range} not permitted!')
+            raise ValueError(
+                f'voltage range choice {voltage_range} not permitted!'
+            )
 
     @setter
     def set_current_range(self, current_range):
@@ -76,18 +83,25 @@ class Keithley2110(Instrument):
         elif isinstance(current_range, numbers.Number):
             # Find nearest encapsulating current range
             try:
-                nearest = np.argwhere(current_range <= np.array(allowed_current_ranges)).flatten()[0]
+                nearest = np.argwhere(
+                    current_range <= np.array(allowed_current_ranges)
+                ).flatten()[0]
             except IndexError:
                 nearest = -1
 
             self.set_current_range(allowed_current_ranges[nearest])
 
-            Warning(f'Given current range not an option, setting to {allowed_current_ranges[nearest]} A instead')
+            Warning(
+                'Given current range not an option, '
+                f'setting to {allowed_current_ranges[nearest]} A instead'
+            )
 
         elif current_range == 'AUTO':
             self.write('CURR:RANG:AUTO')
         else:
-            raise ValueError(f'current range choice {current_range} not permitted!')
+            raise ValueError(
+                f'current range choice {current_range} not permitted!'
+            )
 
     @measurer
     def measure_voltage(self):
@@ -116,7 +130,8 @@ class LabJackU6(Instrument):
     name = 'LabJackU6'
 
     supported_adapters = (
-        (Adapter, {})  # custom setup below until I can get serial or modbus comms to work
+        # custom setup below until I can get serial or modbus comms to work
+        (Adapter, {})
     )
 
     knobs = (

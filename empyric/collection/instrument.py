@@ -6,7 +6,8 @@ from empyric.adapters import *
 
 def setter(method):
     """
-    Utility function which wraps all set_[knob] methods and records the new knob values
+    Utility function which wraps all set_[knob] methods and records the new
+    knob values
 
     :param method: (callable) method to be wrapped
     :return: wrapped method
@@ -20,7 +21,8 @@ def setter(method):
         self = args[0]
         value = args[1]
 
-        # The knob attribute is set to the returned value of the method, or the value argument if returned value is None
+        # The knob attribute is set to the returned value of the method, or
+        # the value argument if returned value is None
         if returned_value is not None:
             self.__setattr__(knob, returned_value)
         else:
@@ -31,7 +33,8 @@ def setter(method):
 
 def getter(method):
     """
-    Utility function which wraps all get_[knob] methods and records the retrieved knob values
+    Utility function which wraps all get_[knob] methods and records the
+    retrieved knob values
 
     :param method: (callable) method to be wrapped
     :return: wrapped method
@@ -52,7 +55,8 @@ def getter(method):
 
 def measurer(method):
     """
-    Utility function that wraps all measure_[meter] methods; right now does nothing
+    Utility function that wraps all measure_[meter] methods; right now does
+    nothing
 
     :param method: (callable) method to be wrapped
     :return: wrapped method
@@ -64,7 +68,7 @@ def measurer(method):
     def wrapped_method(*args, **kwargs):
         self = args[0]
         value = method(*args, **kwargs)
-        self.__setattr__('measured_'+meter, value)
+        self.__setattr__('measured_' + meter, value)
 
         return value
 
@@ -77,15 +81,21 @@ class Instrument:
 
     Each instrument has the following attributes:
 
-    * ``name``: the name of the instrument. Once connected via  an adapter, this is converted to
+    * ``name``: the name of the instrument. Once connected via  an adapter,
+      this is converted to
       ``name + '@' + address``.
-    * ``supported adapters``: tuple of 2-element tuples. Each 2-element tuple contains an adapter class that the
-      instrument can be used with and a dictionary of adapter settings.
-    * ``knobs``: tuple of the names of all knobs that can be set on the instrument.
-    * ``presets``: dictionary of knob settings to apply when the instrument is instantiated.
+    * ``supported adapters``: tuple of 2-element tuples. Each 2-element tuple
+      contains an adapter class that the instrument can be used with and a
+      dictionary of adapter settings.
+    * ``knobs``: tuple of the names of all knobs that can be set on the
+      instrument.
+    * ``presets``: dictionary of knob settings to apply when the instrument is
+      instantiated.
       The keys are the names of the knobs and the values are the knob values.
-    * ``postsets``: dictionary of knob settings (same format as ``presets``) to apply when the instrument is deleted.
-    * ``meters``: tuple of the names of all meters that can be measured on this instrument.
+    * ``postsets``: dictionary of knob settings (same format as ``presets``)
+      to apply when the instrument is deleted.
+    * ``meters``: tuple of the names of all meters that can be measured on
+      this instrument.
 
     """
 
@@ -103,13 +113,19 @@ class Instrument:
 
     meters = tuple()
 
-    def __init__(self, address=None, adapter=None, presets=None, postsets=None, **kwargs):
+    def __init__(
+            self, address=None, adapter=None, presets=None, postsets=None,
+            **kwargs
+    ):
         """
 
         :param address: (str/int) address of instrument
-        :param adapter: (Adapter) desired adapter to use for communications with the instrument
-        :param presets: (dict) dictionary of instrument presets of the form {..., knob: value, ...}
-        :param presets: (dict) dictionary of instrument postsets of the form {..., knob: value, ...}
+        :param adapter: (Adapter) desired adapter to use for communications
+        with the instrument
+        :param presets: (dict) dictionary of instrument presets of the form
+        {..., knob: value, ...}
+        :param presets: (dict) dictionary of instrument postsets of the form
+        {..., knob: value, ...}
         :param kwargs: (dict) any keyword args for the adapter
         """
 
@@ -130,11 +146,13 @@ class Instrument:
                     adapter_connected = True
                     break
                 except BaseException as error:
-                    errors.append('in trying ' + _adapter.__name__ + ' adapter, got '
-                                  + type(error).__name__ + ': ' + str(error))
+                    msg = f'in trying {_adapter.__name__} adapter, ' \
+                          f'got {type(error).__name__}: {error}'
+                    errors.append(msg)
 
             if not adapter_connected:
-                message = f'unable to connect an adapter to instrument {self.name} at address {address}:\n'
+                message = f'unable to connect an adapter to ' \
+                          f'instrument {self.name} at address {address}:\n'
                 for error in errors:
                     message = message + f"{error}\n"
                 raise ConnectionError(message)
@@ -144,12 +162,14 @@ class Instrument:
 
         # Get existing knob settings, if possible
         for knob in self.knobs:
-            if hasattr(self, 'get_'+knob.replace(' ', '_')):
-                self.__getattribute__('get_'+knob.replace(' ', '_'))()  # retrieves the knob value from the instrument
+            if hasattr(self, 'get_' + knob.replace(' ', '_')):
+                # retrieves the knob value from the instrument
+                self.__getattribute__('get_' + knob.replace(' ', '_'))()
             else:
-                self.__setattr__(knob.replace(' ', '_'), None)  # knob value is unknown until it is set
+                # knob value is unknown until it is set
+                self.__setattr__(knob.replace(' ', '_'), None)
 
-        # Apply presets
+                # Apply presets
         if presets:
             self.presets = {**self.presets, **presets}
 
@@ -168,9 +188,10 @@ class Instrument:
         """
         Alias for the adapter's write method
 
-        :param args: any arguments for the adapter's write method, usually including a command string
+        :param args: any arguments for the adapter's write method, usually
+        including a command string
         :param kwargs: any arguments for the adapter's write method
-        :return: whatever is returned by the adapter's write method, usually None
+        :return: whatever is returned by the adapter's write method
         """
         return self.adapter.write(*args, **kwargs)
 
@@ -178,9 +199,9 @@ class Instrument:
         """
         Alias for the adapter's read method
 
-        :param args: any arguments for the adapter's read method, usually empty
-        :param kwargs: any arguments for the adapter's write method
-        :return: whatever is returned by the adapter's write method, usually a response string
+        :param args: any arguments for the adapter's read method
+        :param kwargs: any arguments for the adapter's read method
+        :return: whatever is returned by the adapter's read method
         """
 
         return self.adapter.read(*args, **kwargs)
@@ -189,9 +210,9 @@ class Instrument:
         """
         Alias for the adapter's query method, if it has one
 
-        :param args: any arguments for the adapter's query method, usually including a query string
+        :param args: any arguments for the adapter's query method
         :param kwargs: any arguments for the adapter's query method
-        :return: whatever is returned by the adapter's query method, usually a response string
+        :return: whatever is returned by the adapter's query method
         """
 
         return self.adapter.query(*args, **kwargs)
@@ -214,15 +235,16 @@ class Instrument:
 
     def get(self, knob):
         """
-        Get the value of a knob on the instrument. If the instrument has a get method for the knob, a command will be
-        sent to the instrument to retrieve the actual value of the knob. If it does not have a get method for the knob,
-        the last known value, stored as an instance attribute, will be return (possibly being ``nan`` if no value has
-        yet been set)
+        Get the value of a knob on the instrument. If the instrument has a get
+        method for the knob, a command will be sent to the instrument to
+        retrieve the actual value of the knob. If it does not have a get method
+        for the knob, the last known value, stored as an instance attribute,
+        will be return (possibly being ``nan`` if no value has yet been set)
 
         """
 
-        if hasattr(self, 'get_'+knob.replace(' ', '_')):
-            return getattr(self, 'get_'+knob.replace(' ', '_'))()
+        if hasattr(self, 'get_' + knob.replace(' ', '_')):
+            return getattr(self, 'get_' + knob.replace(' ', '_'))()
         else:
             return getattr(self, knob.replace(' ', '_'))
 
@@ -235,7 +257,8 @@ class Instrument:
         """
 
         try:
-            measure_method = self.__getattribute__('measure_' + meter.replace(' ', '_'))
+            measure_method = self.__getattribute__(
+                'measure_' + meter.replace(' ', '_'))
         except AttributeError:
             raise AttributeError(f"{meter} cannot be measured on {self.name}")
 

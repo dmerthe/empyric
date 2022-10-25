@@ -7,9 +7,10 @@ from empyric.collection.instrument import *
 
 class ConsoleUser(Instrument):
     """
-    Virtual instrument that simply queries a human operator via the Python console
+    Virtual instrument that queries a human operator via the Python console
 
-    The prompt is what the user is asked; the cooldown is the minimum time between input requests
+    The prompt is what the user is asked; the cooldown is the minimum time
+    between input requests
     """
 
     name = 'ConsoleUser'
@@ -44,9 +45,9 @@ class ConsoleUser(Instrument):
     @measurer
     def measure_response(self):
 
-        new_message = (self.prompt != self.last_prompt)
+        new_prompt = (self.prompt != self.last_prompt)
 
-        if time.time() >= self.last_sent + self.cooldown or new_message:  # don't spam user
+        if time.time() >= self.last_sent + self.cooldown or new_prompt:
 
             response = input(self.prompt)
 
