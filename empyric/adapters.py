@@ -791,6 +791,7 @@ class Socket(Adapter):
             try:
                 self.backend.bind((self.ip_address, port))
                 self.port = port
+                break
             except OSError:
                 raise AdapterError('No available ports for socket!')
 
