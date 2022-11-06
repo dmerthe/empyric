@@ -1,21 +1,26 @@
 # This submodule defines the basic behavior of the key features of the
 # empyric package
 import collections
-import os, sys, importlib, threading, time, datetime, pathlib
-import numpy as np
-import pandas as pd
+import datetime
+import importlib
+import os
+import pathlib
+import sys
+import threading
+import time
 import tkinter as tk
 from tkinter.filedialog import askopenfilename
 
+import numpy as np
+import pandas as pd
 import pykwalify.errors
-from pykwalify.core import Core as yaml_validator
+from pykwalify.core import Core as YamlValidator
 from ruamel.yaml import YAML
 
-from empyric import routines as _routines
-from empyric import instruments as _instruments
 from empyric import adapters as _adapters
 from empyric import graphics as _graphics
-
+from empyric import instruments as _instruments
+from empyric import routines as _routines
 from empyric.tools import convert_time, Clock
 
 
@@ -40,7 +45,7 @@ class Variable:
     example is a unit conversion factor such as 2.54 cm per inch, a numerical
     constant like pi or a setpoint for a control routine.
 
-    The value types of variables are either numbers (floats or integers),
+    The value types of variables are either numbers (floats and/or integers),
     booleans, strings or arrays (containing some combination of the previous
     three types).
     """
@@ -68,8 +73,11 @@ class Variable:
                  parameter=None
                  ):
         """
-        One of either the knob, meter or expression keyword arguments must be
-        supplied along with the respective instrument or definitions.
+        For knobs or meters, either an instrument or a server argument must be
+        given.
+
+        If an expression is given with symbols/terms representing other
+        variables, that mapping must be specified in the definitions argument.
 
         :param instrument: (Instrument) instrument with the corresponding knob
         or meter
@@ -175,9 +183,12 @@ class Variable:
 
     @value.setter
     def value(self, value):
-        # value property can only be set if variable is a knob; None or nan
-        # value indicates no setting should be applied
-        if hasattr(self, 'knob') and value is not None and value is not np.nan:
+
+        # Do nothing if value is null
+        if value is None or np.isnan(value):
+            return
+
+        elif hasattr(self, 'knob'):
             self.instrument.set(self.knob, value)
             self._value = self.instrument.__getattribute__(
                 self.knob.replace(' ', '_')
@@ -781,7 +792,7 @@ def validate_runcard(runcard):
     elif type(runcard) is not str:
         raise ValueError('runcard must be either dict or str.')
 
-    validator = yaml_validator(
+    validator = YamlValidator(
         source_file=runcard,
         schema_files=[
             os.path.join(pathlib.Path(__file__).parent, "runcard_schema.yaml")
