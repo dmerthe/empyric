@@ -373,11 +373,13 @@ class Server(Routine):
         self.proc_requ_thread.join()
 
         # Close sockets
+        self.socket.shutdown(socket.SHUT_RDWR)
         self.socket.close()
 
         clients = self.clients_queue.get()
 
         for client in clients.values():
+            client.shutdown(socket.SHUT_RDWR)
             client.close()
 
     def accept_connections(self):
@@ -451,6 +453,9 @@ class Server(Routine):
             self.clients_queue.put(clients)
 
             time.sleep(0.1)
+
+    def __del__(self):
+        self.terminate()
 
 
 supported = {key: value for key, value in vars().items()

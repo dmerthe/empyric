@@ -291,6 +291,7 @@ class Variable:
     def __del__(self):
 
         if hasattr(self, 'remote'):
+            self._socket.shutdown(socket.SHUT_RDWR)
             self._socket.close()
 
 

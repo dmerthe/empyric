@@ -773,6 +773,10 @@ class Socket(Adapter):
     ip_address = None
     port = None
 
+    read_termination = '\r'
+    write_termination = '\r'
+    timeout = 1
+
     def connect(self):
 
         if self.connected:
@@ -805,42 +809,22 @@ class Socket(Adapter):
         self.connected = True
 
     def _write(self, message):
-
-        write_to_socket(self.backend, message)
-
-        bytes_message = message.encode()
-        msg_len = len(bytes_message)
-
-        failures = 0
-        max_failures = 3
-
-        total_sent = 0
-
-        while total_sent < msg_len and failures < max_failures:
-
-            sent = self.backend.send(bytes_message[total_sent:])
-
-            if sent == 0:
-                failures += 1
-
-            total_sent = total_sent + sent
-
-        if total_sent < msg_len:
-            raise AdapterError(
-                f'Socket connection to {self.instrument.address} is broken!'
-            )
-
-    def _read(self, nbytes=4096, termination='\r'):
-
-        return read_from_socket(
-            self.backend, nbytes=nbytes, termination=termination
+        write_to_socket(
+            self.backend, message, termination=self.write_termination,
+            timeout=self.timeout
         )
 
-    def _query(self, question, nbytes=4096, termination='\r'):
+    def _read(self, nbytes=4096):
+
+        return read_from_socket(
+            self.backend, nbytes=nbytes, termination=self.read_termination,
+            timeout=self.timeout
+        )
+
+    def _query(self, question, nbytes=4096):
 
         self._write(question)
-        time.sleep(0.1)
-        return self._read(nbytes=nbytes, termination=termination)
+        return self._read(nbytes=nbytes)
 
     def disconnect(self):
 
