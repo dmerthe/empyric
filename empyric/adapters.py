@@ -2,6 +2,8 @@ import importlib
 import time
 import re
 
+from empyric.tools import read_from_socket, write_to_socket
+
 
 def chaperone(method):
     """
@@ -772,9 +774,9 @@ class Socket(Adapter):
     port = None
 
     def connect(self):
-        """
-        Note: this adapter can "connect" without being given an address
-        """
+
+        if self.connected:
+            self.disconnect()
 
         socket = importlib.import_module('socket')
 
@@ -795,16 +797,16 @@ class Socket(Adapter):
             except OSError:
                 raise AdapterError('No available ports for socket!')
 
-        self.backend.listen(5)
+        address = self.instrument.address
+        remote_ip_address, remote_port = address.split('::')
 
-        if self.instrument.address:
-            address = self.instrument.address
-            remote_ip_address, remote_port = address.split('::')
-            remote_port = int(remote_port)
+        self.backend.connect((remote_ip_address, int(remote_port)))
 
-            self.backend.connect((remote_ip_address, remote_port))
+        self.connected = True
 
     def _write(self, message):
+
+        write_to_socket(self.backend, message)
 
         bytes_message = message.encode()
         msg_len = len(bytes_message)
@@ -828,36 +830,13 @@ class Socket(Adapter):
                 f'Socket connection to {self.instrument.address} is broken!'
             )
 
-    def _read(self, nbytes=4096, termination=b'\r'):
+    def _read(self, nbytes=4096, termination='\r'):
 
-        null_responses = 0
-        max_nulls = 3
+        return read_from_socket(
+            self.backend, nbytes=nbytes, termination=termination
+        )
 
-        if type(termination) == str:
-            termination = termination.encode()
-
-        message = b''
-
-        while len(message) < nbytes and null_responses < max_nulls:
-
-            part = self.backend.recv(nbytes)
-
-            if len(part) == 0:
-                null_responses += 1
-            else:
-                message = message + part
-
-                if termination is not None and termination in message:
-                    break
-
-        if null_responses == max_nulls:
-            raise AdapterError(
-                f'Socket connection to {self.instrument.address} is broken!'
-            )
-
-        return message.decode()
-
-    def _query(self, question, nbytes=4096, termination=b'\r'):
+    def _query(self, question, nbytes=4096, termination='\r'):
 
         self._write(question)
         time.sleep(0.1)

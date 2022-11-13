@@ -1,8 +1,14 @@
 import numbers
+import socket
+import queue
+import threading
+import time
+import select
 import numpy as np
 import pandas as pd
 
-from empyric.tools import convert_time
+from empyric.tools import convert_time, recast, \
+    autobind_socket, read_from_socket, write_to_socket
 
 
 class Routine:
@@ -52,6 +58,13 @@ class Routine:
         :param state: (dict/Series) state of the calling experiment or process
         in the form, {..., variable: value, ...}
         :return: None
+        """
+
+        pass
+
+    def terminate(self):
+        """
+        Signals the routine to stop
         """
 
         pass
@@ -307,6 +320,129 @@ class ModelPredictiveControl(Routine):
 
     def update(self, state):
         pass
+
+
+class Server(Routine):
+
+    def __init__(self, readwrite=None, readonly=None, **kwargs):
+
+        Routine.__init__(self, **kwargs)
+
+        self.readwrite = {}
+        self.readonly = {}
+
+        if readwrite:
+            self.readwrite = readwrite
+
+        if readonly:
+            self.readonly = readonly
+
+        self.variables = {**self.readonly, **self.readwrite}
+
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        self.ip_address, self.port = autobind_socket(self.socket)
+
+        self.socket.listen(5)
+        self.socket.settimeout(1)
+
+        print(f'Running server at {self.ip_address}::{self.port}')
+
+        self.clients_queue = queue.Queue(1)
+        self.clients_queue.put({})
+
+        self.running = True
+
+        self.acc_conn_thread = threading.Thread(
+            target=self.accept_connections
+        )
+
+        self.acc_conn_thread.start()
+
+        self.proc_requ_thread = threading.Thread(
+            target=self.process_requests
+        )
+
+        self.proc_requ_thread.start()
+
+    def terminate(self):
+
+        # Kill client handling threads
+        self.running = False
+        self.acc_conn_thread.join()
+        self.proc_requ_thread.join()
+
+        # Close sockets
+        self.socket.close()
+
+        clients = self.clients_queue.get()
+
+        for client in clients.values():
+            client.close()
+
+    def accept_connections(self):
+        while self.running:
+
+            try:
+                (client, address) = self.socket.accept()
+
+                clients = self.clients_queue.get()
+
+                clients[address] = client
+
+                self.clients_queue.put(clients)
+
+                print(f'Client at {address} has connected')
+
+            except socket.timeout:
+                pass
+
+    def process_requests(self):
+        while self.running:
+
+            clients = self.clients_queue.get()
+
+            for address, client in clients.items():
+
+                outgoing_message = None
+
+                request = read_from_socket(client)
+
+                if request:
+
+                    alias = ' '.join(request.split(' ')[:-1])
+                    value = request.split(' ')[-1]
+
+                    if alias not in self.variables:
+                        outgoing_message = f'Error: invalid alias'
+
+                    elif value == '?':  # Query of value
+                        if alias in self.variables:
+                            var = self.variables[alias]
+                            outgoing_message = f'{alias} {var.value}'
+
+                    else:  # Setting a value
+                        if alias in self.readwrite:
+                            var = self.readwrite[alias]
+                            var.value = recast(value)
+                            outgoing_message = '{alias} {var.value}'
+                        else:
+                            outgoing_message = f'Error: readonly variable'
+
+                # Send outgoing message
+                if outgoing_message is not None:
+                    write_to_socket(client, outgoing_message)
+
+                # Remove clients with problematic connections
+                exceptional = client in select.select([], [], [client], 0)[2]
+
+                if exceptional:
+                    print(f'Client at {address} has a connection issue')
+                    clients.pop(address)
+
+            self.clients_queue.put(clients)
+
+            time.sleep(0.1)
 
 
 supported = {key: value for key, value in vars().items()

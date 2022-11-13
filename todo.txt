@@ -1,4 +1,7 @@
 - Figure out how to access files/data while in use
+- Subclass Variable
+- Generalize knob and meter parts of routine section of convert_runcard method
+- Support SQL (as alternative to CSV data files)
 - Testing and development for more robust alarm behavior
 - Split out different modes of GPIB adapters (e.g. NationalInstrumentsGPIBUSB, PrologixGPIBUSB, Prologix GPIBLAN)
    - Would need distinct address patterns

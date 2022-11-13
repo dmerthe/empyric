@@ -380,9 +380,20 @@ class Plotter:
                     expanded_element = list(
                         pd.read_csv(element)[labels[i]].values
                     )
-                if np.ndim(element) == 1:
+
+                elif np.ndim(element) == 1:
+
                     expanded_element = list(element)
+
+                    expanded_element = [
+                        value if value is not None else np.nan
+                        for value in expanded_element
+                    ]
+
                 else:
+                    if element is None:
+                        element = np.nan
+
                     expanded_element = [float(element)]
 
                 max_len = np.max([len(expanded_element), max_len])
@@ -416,6 +427,11 @@ class ExperimentGUI:
     def __init__(self, experiment, title=None, **kwargs):
 
         self.experiment = experiment
+
+        if title:
+            self.title = title
+        else:
+            self.title = 'Empyric'
 
         self.closed = False  # has the GUI been closed?
 
@@ -459,7 +475,7 @@ class ExperimentGUI:
         self.root.wm_attributes('-topmost', True)  # bring window to front
         self.root.protocol("WM_DELETE_WINDOW", self.end)
 
-        self.root.title('Empyric')
+        self.root.title(self.title)
         self.root.resizable(False, False)
 
         self.status_frame = tk.Frame(self.root)

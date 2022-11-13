@@ -5,6 +5,7 @@ import datetime
 import importlib
 import os
 import pathlib
+import socket
 import sys
 import threading
 import time
@@ -21,7 +22,8 @@ from empyric import adapters as _adapters
 from empyric import graphics as _graphics
 from empyric import instruments as _instruments
 from empyric import routines as _routines
-from empyric.tools import convert_time, Clock
+from empyric.tools import convert_time, Clock, recast, write_to_socket, \
+    read_from_socket
 
 
 class Variable:
@@ -40,6 +42,9 @@ class Variable:
     calculated based on other variables of the experiment. An example of an
     expression is the output power of a power supply, where voltage is a knob
     and current is a meter: power = voltage * current.
+
+    A remote variable is a variable controlled by an experiment (running a
+    server) on a different process or computer.
 
     A parameter is a variable whose value is assigned directly by the user. An
     example is a unit conversion factor such as 2.54 cm per inch, a numerical
@@ -70,6 +75,7 @@ class Variable:
     def __init__(self,
                  instrument=None, knob=None, meter=None,
                  expression=None, definitions=None,
+                 remote=None, alias=None,
                  parameter=None
                  ):
         """
@@ -83,26 +89,52 @@ class Variable:
         or meter
         :param knob: (str) instrument knob label, if variable is a knob
         :param meter: (str) instrument meter label, if variable is a meter
+
         :param expression: (str) expression for the variable in terms of other
         variables, if variable is an expression
         :param definitions: (dict) dictionary of the form {..., symbol:
         variable, ...} mapping the symbols in the expression to other variable
         objects; only used if type is 'expression'
+
+        :param remote: (str) address of the server of the variable controlling
+        the variable, in the form '[host name/ip address]::[port]'.
+        :param alias: (str) name of the variable on the server.
+
         :param parameter (str) value of a user controlled parameter
         """
 
         if meter:
             self.meter = meter
             self.type = 'meter'
+
         elif knob:
             self.knob = knob
             self.type = 'knob'
+
         elif expression:
             self.expression = expression
             self.type = 'expression'
+
+            if definitions:
+                self.definitions = definitions
+            else:
+                self.definitions = {}
+
+        elif remote:
+            self.remote = remote
+            self.type = 'remote'
+            self.alias = alias
+
+            remote_ip, remote_port = remote.split('::')
+
+            self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+            self._socket.connect((remote_ip, int(remote_port)))
+
         elif parameter:
             self.parameter = parameter
             self.type = 'parameter'
+
         else:
             raise ValueError(
                 'variable object must have a specified knob, meter or '
@@ -114,18 +146,13 @@ class Variable:
         # time of last evaluation; used for expressions
         self.last_evaluation = np.nan
 
+        # Check that knob or meter has been assigned an instrument
         if hasattr(self, 'knob') or hasattr(self, 'meter'):
             if not instrument:
                 raise AttributeError(
                     f'{self.type} variable definition requires an instrument!'
                 )
             self.instrument = instrument
-
-        elif hasattr(self, 'expression'):
-            if definitions:
-                self.definitions = definitions
-            else:
-                self.definitions = {}
 
     @property
     def value(self):
@@ -146,7 +173,6 @@ class Variable:
             expression = expression.replace('^', '**')
 
             for symbol, variable in self.definitions.items():
-
                 # take last known value
                 expression = expression.replace(
                     symbol, '(' + str(variable._value) + ')'
@@ -167,17 +193,22 @@ class Variable:
 
             self.last_evaluation = time.time()
 
-        elif hasattr(self, 'parameter'):
+        elif hasattr(self, 'remote'):
+            write_to_socket(self._socket, f'{self.alias} ?')
+
+            response = read_from_socket(self._socket)
 
             try:
-                self._value = float(self.parameter)  # try cast to float
-            except ValueError:
-                if self.parameter == 'True':  # try boolean type cast
-                    self._value = True
-                elif self.parameter == 'False':
-                    self._value = False
-                else:
-                    self._value = self.parameter  # otherwise, keep as given
+                self._value = recast(response.split(' ')[-1])
+            except BaseException as error:
+                print(
+                    f'Warning: unable to retrieve value of {self.alias} '
+                    f'from server at {self.remote}; got error "{error}"'
+                )
+
+        elif hasattr(self, 'parameter'):
+
+            self._value = recast(self.parameter)
 
         return self._value
 
@@ -193,8 +224,45 @@ class Variable:
             self._value = self.instrument.__getattribute__(
                 self.knob.replace(' ', '_')
             )
+
+        elif hasattr(self, 'remote'):
+
+            write_to_socket(self._socket, f'{self.alias} {value}')
+
+            check = read_from_socket(self._socket)
+
+            if check == '' or check is None:
+                print(
+                    f'Warning: received no response from server at '
+                    f'{self.remote} while trying to set {self.alias}'
+                )
+            elif 'Error' in check:
+                print(
+                    f'Warning: got response "{check}" while trying to set '
+                    f'{self.alias} on server at {self.remote}'
+                )
+            else:
+                try:
+                    _, check_value = check.split(' ')
+
+                    check_value = recast(check_value)
+
+                    if value != check_value:
+                        print(
+                            f'Warning: attempted to set {self.alias} on server '
+                            f'at {self.remote} to {value} but checked value '
+                            f'is {check_value}'
+                        )
+
+                except ValueError:
+                    print(
+                        f'Warning: unable to check value while setting '
+                        f'{self.alias} on server at {self.remote}'
+                    )
+
         elif hasattr(self, 'parameter'):
             self.parameter = value
+
         else:
             raise ValueError(
                 f'Attempt to set {self.type}! '
@@ -203,6 +271,11 @@ class Variable:
 
     def __repr__(self):
         return self.type[0].upper() + self.type[1:] + 'Variable'
+
+    def __del__(self):
+
+        if hasattr(self, 'remote'):
+            self._socket.close()
 
 
 class Experiment:
@@ -218,6 +291,7 @@ class Experiment:
     HOLDING = 'Holding'  # Routines are stopped, but measurements are ongoing
     STOPPED = 'Stopped'  # Both routines and measurements are stopped
     TERMINATED = 'Terminated'
+
     # Experiment has either finished or has been terminated by the user
 
     @property
@@ -440,14 +514,14 @@ class Experiment:
         if not os.path.exists(path):
             # if this is a new file, write column headers
             with open(path, 'a') as data_file:
-                data_file.write(','+','.join(self.data.columns) + '\n')
+                data_file.write(',' + ','.join(self.data.columns) + '\n')
 
         unsaved = np.setdiff1d(self.data.index, self.saved)
 
         with open(path, 'a') as data_file:
             for line in unsaved:
                 line_data = ','.join(map(str, list(self.data.loc[line])))
-                data_file.write(str(line)+','+line_data+'\n')
+                data_file.write(str(line) + ',' + line_data + '\n')
 
         self.saved = self.saved + list(unsaved)
 
@@ -509,6 +583,10 @@ class Experiment:
         if reason:
             self.status = self.status + ': ' + reason
         self.status_locked = True
+
+        # End routines
+        for routine in self.routines.values():
+            routine.terminate()
 
     def __repr__(self):
         return 'Experiment'
@@ -648,14 +726,14 @@ class Manager:
 
         # Set up the GUI for user interaction
         self.gui = _graphics.ExperimentGUI(self.experiment,
-                                          alarms=self.alarms,
-                                          instruments=self.instruments,
-                                          title=self.description.get(
-                                              'name', 'Experiment'
-                                          ),
-                                          plotter=self.plotter,
-                                          save_interval=self.save_interval,
-                                          plot_interval=self.plot_interval)
+                                           alarms=self.alarms,
+                                           instruments=self.instruments,
+                                           title=self.description.get(
+                                               'name', 'Experiment'
+                                           ),
+                                           plotter=self.plotter,
+                                           save_interval=self.save_interval,
+                                           plot_interval=self.plot_interval)
 
         self.gui.run()
 
@@ -704,7 +782,7 @@ class Manager:
                             'time': self.experiment.data['Time'].iloc[-1],
                             'status': self.experiment.status,
                         }
-                    
+
                     if 'none' in alarm.protocol:
                         # do nothing (GUI will indicate that alarm is triggered)
                         break
@@ -750,9 +828,9 @@ class Manager:
                             if 'Running' in prior_status:
                                 self.experiment.start()
                             if 'Holding' in prior_status:
-                                self.experiment.hold(reason=name+' cleared')
+                                self.experiment.hold(reason=name + ' cleared')
                             if 'Stopped' in prior_status:
-                                self.experiment.stop(reason=name+' cleared')
+                                self.experiment.stop(reason=name + ' cleared')
 
             step_end = time.time()
 
@@ -770,7 +848,6 @@ class RuncardError(BaseException):
 
 
 def validate_runcard(runcard):
-
     is_dict = isinstance(runcard, dict)
     is_ordereddict = isinstance(runcard, collections.OrderedDict)
 
@@ -855,11 +932,11 @@ def convert_runcard(runcard):
     available_instruments = {**_instruments.supported, **custom_instruments}
 
     instruments = {}
-    for name, specs in runcard['Instruments'].items():
+    for name, specs in runcard.get('Instruments', {}).items():
 
         specs = specs.copy()
         _type = specs.pop('type')
-        address = specs.pop('address')
+        address = specs.get('address', None)
 
         # Grab any keyword arguments for the adapter
         adapter_kwargs = {}
@@ -904,6 +981,13 @@ def convert_runcard(runcard):
             variables[name] = Variable(
                 expression=expression, definitions=definitions
             )
+        elif 'remote' in specs:
+            remote = specs['remote']
+            alias = specs.get('alias', name)
+
+            variables[name] = Variable(
+                remote=remote, alias=alias
+            )
         elif 'parameter' in specs:
             variables[name] = Variable(parameter=specs['parameter'])
 
@@ -916,6 +1000,7 @@ def convert_runcard(runcard):
             specs = specs.copy()  # avoids modifying the runcard
             _type = specs.pop('type')
 
+            # For Set, Timecourse and Sequence routines
             knobs = np.array([specs.get('knobs', [])]).flatten()
             if knobs.size > 0:
                 for knob in knobs:
@@ -945,7 +1030,6 @@ def convert_runcard(runcard):
 
                 # Values can be variables, specified by their names
                 for var_name in variables:
-
                     where_variable = (specs['values'] == var_name)
                     # locate names of variables
 
@@ -969,6 +1053,36 @@ def convert_runcard(runcard):
                     in zip(specs['knobs'].keys(), specs['values'])
                 ], dtype=object)
 
+            # For Server routines
+            readwrite = np.array([specs.get('readwrite', [])]).flatten()
+            if readwrite.size > 0:
+                for variable in readwrite:
+                    if variable not in variables:
+                        raise KeyError(
+                            f'Variable {variable} specified for routine {name} '
+                            'is not in Variables!'
+                        )
+
+                specs['readwrite'] = {
+                    name: variables[name] for name in readwrite
+                }
+
+            readonly = np.array([specs.get('readonly', [])]).flatten()
+            if readonly.size > 0:
+                for variable in readonly:
+                    if variable not in variables:
+                        raise KeyError(
+                            f'Variable {variable} specified for routine {name} '
+                            'is not in Variables!'
+                        )
+
+                specs['readonly'] = {
+                    name: variables[name] for name in readonly
+                }
+
+            if _type == 'Server' and len(readonly) == 0 and len(readwrite) == 0:
+                specs['readwrite'] = variables
+
             routines[name] = available_routines[_type](**specs)
 
     converted_runcard['Experiment'] = Experiment(variables, routines=routines)
@@ -978,7 +1092,7 @@ def convert_runcard(runcard):
     if 'Alarms' in runcard:
         for name, specs in runcard['Alarms'].items():
 
-            alarm_variables = specs.copy().get('variables',{})
+            alarm_variables = specs.copy().get('variables', {})
             condition = specs.copy()['condition']
 
             for variable in specs.get('variables', {}):

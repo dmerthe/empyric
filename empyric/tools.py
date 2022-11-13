@@ -1,4 +1,7 @@
 import time
+import re
+import select
+import socket
 import numbers
 import numpy as np
 
@@ -76,7 +79,6 @@ class Clock:
 
 # Utility functions that help interpret values
 def is_on(value):
-
     on_values = [1, '1', 'ON', 'On', 'on']
 
     if value in on_values:
@@ -86,7 +88,6 @@ def is_on(value):
 
 
 def is_off(value):
-
     off_values = [0, '0', 'OFF', 'Off', 'off']
 
     if value in off_values:
@@ -96,7 +97,6 @@ def is_off(value):
 
 
 def to_number(value):
-
     if isinstance(value, numbers.Number):
         return value
     elif isinstance(str):
@@ -127,3 +127,137 @@ def find_nearest(allowed, value, overestimate=False, underestimate=False):
 
     if len(nearest) > 0:
         return allowed[nearest[0]]
+
+
+def recast(value):
+
+    if value is None:
+        return None
+    elif isinstance(value, numbers.Number) or type(value) is bool:
+        return value
+    elif type(value) is str:
+
+        if value.lower() == 'true':
+            return True
+        elif value.lower() == 'false':
+            return False
+        elif re.fullmatch('[0-9]*', value):  # integer
+            return int(value)
+        elif re.match('[0-9]*\.[0-9]*', value):  # float
+            return float(value)
+        else:
+            return value
+
+
+def get_ip_address(remote_ip='8.8.8.8', remote_port=80):
+    """Connect to Google's DNS Server to resolve IP address"""
+
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as tst_sock:
+        tst_sock.connect((remote_ip, remote_port))
+        return tst_sock.getsockname()[0]
+
+
+def autobind_socket(_socket):
+    """
+    Automatically find the appropriate IP address and a free port to bind the
+    socket to
+    """
+
+    bound = False
+
+    ip_address = get_ip_address()
+
+    for port in range(6174, 10000):
+        try:
+            _socket.bind((ip_address, port))
+            bound = True
+            break
+        except OSError:
+            pass
+
+    if not bound:
+        raise IOError(f'unable to bind socket at {ip_address} to any port!')
+
+    return ip_address, port
+
+
+def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1):
+    """
+    Read from a socket, with care taken to get the whole message
+    """
+
+    # Block until the socket is readable or until timeout
+    readable = _socket in select.select([_socket], [], [], timeout)[0]
+    if not readable:
+        return None
+
+    if nbytes is None:
+        nbytes = np.inf
+
+        if termination is None:
+            raise ValueError(
+                'nbytes must be a non-negative integer if termination is None'
+            )
+
+    null_responses = 0
+    max_nulls = 3
+
+    if type(termination) == str:
+        termination = termination.encode()
+
+    message = b''
+
+    while len(message) < nbytes and null_responses < max_nulls:
+
+        part = _socket.recv(1)
+
+        if len(part) > 0:
+
+            message = message + part
+
+            if termination is not None and termination in message:
+                break
+
+        else:
+            null_responses += 1
+
+    if null_responses < max_nulls:
+        return message.decode().strip()
+    else:
+        return None
+
+
+def write_to_socket(_socket, message, termination='\r', timeout=1):
+    """
+    Write a message to a socket, with care taken to get the whole message
+    transmitted
+    """
+
+    # Block until the socket is writeable or until timeout
+    writeable = _socket in select.select([], [_socket], [], timeout)[1]
+    if not writeable:
+        return 0
+
+    bytes_message = (message + termination).encode()
+    msg_len = len(bytes_message)
+
+    failures = 0
+    max_failures = 3
+
+    total_sent = 0
+
+    while total_sent < msg_len and failures < max_failures:
+
+        sent = _socket.send(bytes_message[total_sent:])
+
+        if sent == 0:
+            failures += 1
+
+        total_sent = total_sent + sent
+
+    if total_sent < msg_len:
+        raise IOError(
+            f'Socket connection to {_socket.getsockname()} is broken!'
+        )
+
+    return total_sent
