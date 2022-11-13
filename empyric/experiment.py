@@ -106,14 +106,17 @@ class Variable:
         if meter:
             self.meter = meter
             self.type = 'meter'
+            self.settable = False
 
         elif knob:
             self.knob = knob
             self.type = 'knob'
+            self.settable = True
 
         elif expression:
             self.expression = expression
             self.type = 'expression'
+            self.settable = False
 
             if definitions:
                 self.definitions = definitions
@@ -131,9 +134,16 @@ class Variable:
 
             self._socket.connect((remote_ip, int(remote_port)))
 
+            write_to_socket(self._socket, f'{self.alias} settable?')
+
+            response = read_from_socket(self._socket, timeout=None)
+
+            self.settable = response == f'{self.alias} settable'
+
         elif parameter:
             self.parameter = parameter
             self.type = 'parameter'
+            self.settable = True
 
         else:
             raise ValueError(
@@ -243,9 +253,8 @@ class Variable:
                 )
             else:
                 try:
-                    _, check_value = check.split(' ')
 
-                    check_value = recast(check_value)
+                    check_value = recast(check.split(f'{self.alias} ')[1])
 
                     if value != check_value:
                         print(
@@ -254,10 +263,17 @@ class Variable:
                             f'is {check_value}'
                         )
 
-                except ValueError:
+                except ValueError as val_err:
                     print(
                         f'Warning: unable to check value while setting '
-                        f'{self.alias} on server at {self.remote}'
+                        f'{self.alias} on server at {self.remote}; '
+                        f'got error "{val_err}"'
+                    )
+                except IndexError as ind_err:
+                    print(
+                        f'Warning: unable to check value while setting '
+                        f'{self.alias} on server at {self.remote}; '
+                        f'got error "{ind_err}"'
                     )
 
         elif hasattr(self, 'parameter'):

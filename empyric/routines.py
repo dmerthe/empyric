@@ -416,16 +416,24 @@ class Server(Routine):
                     if alias not in self.variables:
                         outgoing_message = f'Error: invalid alias'
 
+                    elif value == 'settable?':
+
+                        settable = self.variables[alias].settable
+
+                        if alias in self.readwrite and settable:
+                            outgoing_message = f'{alias} settable'
+                        else:
+                            outgoing_message = f'{alias} readonly'
+
                     elif value == '?':  # Query of value
-                        if alias in self.variables:
-                            var = self.variables[alias]
-                            outgoing_message = f'{alias} {var.value}'
+                        var = self.variables[alias]
+                        outgoing_message = f'{alias} {var.value}'
 
                     else:  # Setting a value
                         if alias in self.readwrite:
                             var = self.readwrite[alias]
                             var.value = recast(value)
-                            outgoing_message = '{alias} {var.value}'
+                            outgoing_message = f'{alias} {var.value}'
                         else:
                             outgoing_message = f'Error: readonly variable'
 

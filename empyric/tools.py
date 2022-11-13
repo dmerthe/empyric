@@ -187,7 +187,11 @@ def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1):
     """
 
     # Block until the socket is readable or until timeout
-    readable = _socket in select.select([_socket], [], [], timeout)[0]
+    if timeout:
+        readable = _socket in select.select([_socket], [], [], timeout)[0]
+    else:
+        readable = _socket in select.select([_socket], [], [])[0]
+
     if not readable:
         return None
 
@@ -209,7 +213,11 @@ def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1):
 
     while len(message) < nbytes and null_responses < max_nulls:
 
-        part = _socket.recv(1)
+        try:
+            part = _socket.recv(1)
+        except ConnectionResetError:
+            null_responses = max_nulls
+            break
 
         if len(part) > 0:
 
@@ -234,7 +242,11 @@ def write_to_socket(_socket, message, termination='\r', timeout=1):
     """
 
     # Block until the socket is writeable or until timeout
-    writeable = _socket in select.select([], [_socket], [], timeout)[1]
+    if timeout:
+        writeable = _socket in select.select([], [_socket], [], timeout)[1]
+    else:
+        writeable = _socket in select.select([], [_socket], [])[1]
+
     if not writeable:
         return 0
 
