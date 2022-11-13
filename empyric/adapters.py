@@ -2,6 +2,8 @@ import importlib
 import time
 import re
 
+from empyric.tools import read_from_socket, write_to_socket
+
 
 def chaperone(method):
     """
@@ -238,7 +240,7 @@ class Serial(Adapter):
     else:
         lib = None
 
-    no_lib_msg = 'No serial library was found! '\
+    no_lib_msg = 'No serial library was found! ' \
                  'Please install either PySerial or PyVISA.'
 
     def connect(self):
@@ -467,7 +469,7 @@ class GPIB(Adapter):
         else:
             lib = None
 
-    no_lib_msg = 'No valid library found for GPIB adapters!'\
+    no_lib_msg = 'No valid library found for GPIB adapters!' \
                  'Please install PyVISA (with GPIB drivers), Linux-GPIB, or' \
                  'use a Prologix GPIB-USB adapter (requires PySerial)'
 
@@ -707,7 +709,7 @@ class USB(Adapter):
     else:
         lib = None
 
-    no_lib_msg = 'No USB library was found! '\
+    no_lib_msg = 'No USB library was found! ' \
                  'Please install either PyVISA or USBTMC.'
 
     def connect(self):
@@ -763,6 +765,91 @@ class USB(Adapter):
         return 'USB'
 
 
+class Socket(Adapter):
+    """
+    Handles communications between sockets using the built-in socket module
+    """
+
+    ip_address = None
+    port = None
+
+    def connect(self):
+
+        if self.connected:
+            self.disconnect()
+
+        socket = importlib.import_module('socket')
+
+        # Get IP address by connecting to Google DNS server
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as tst_sock:
+            tst_sock.connect(("8.8.8.8", 80))
+            self.ip_address = tst_sock.getsockname()[0]
+
+        self.backend = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        self.backend.settimeout(5)
+
+        for port in range(6174, 10000):
+            try:
+                self.backend.bind((self.ip_address, port))
+                self.port = port
+                break
+            except OSError:
+                raise AdapterError('No available ports for socket!')
+
+        address = self.instrument.address
+        remote_ip_address, remote_port = address.split('::')
+
+        self.backend.connect((remote_ip_address, int(remote_port)))
+
+        self.connected = True
+
+    def _write(self, message):
+
+        write_to_socket(self.backend, message)
+
+        bytes_message = message.encode()
+        msg_len = len(bytes_message)
+
+        failures = 0
+        max_failures = 3
+
+        total_sent = 0
+
+        while total_sent < msg_len and failures < max_failures:
+
+            sent = self.backend.send(bytes_message[total_sent:])
+
+            if sent == 0:
+                failures += 1
+
+            total_sent = total_sent + sent
+
+        if total_sent < msg_len:
+            raise AdapterError(
+                f'Socket connection to {self.instrument.address} is broken!'
+            )
+
+    def _read(self, nbytes=4096, termination='\r'):
+
+        return read_from_socket(
+            self.backend, nbytes=nbytes, termination=termination
+        )
+
+    def _query(self, question, nbytes=4096, termination='\r'):
+
+        self._write(question)
+        time.sleep(0.1)
+        return self._read(nbytes=nbytes, termination=termination)
+
+    def disconnect(self):
+
+        socket = importlib.import_module('socket')
+
+        self.backend.shutdown(socket.SHUT_RDWR)
+        self.backend.close()
+
+
 class Modbus(Adapter):
     """
     Handles communications with modbus serial instruments through the
@@ -789,7 +876,7 @@ class Modbus(Adapter):
     else:
         lib = None
 
-    no_lib_msg = 'No Modbus library was found! '\
+    no_lib_msg = 'No Modbus library was found! ' \
                  'Please install the minimalmodbus library'
 
     @property
@@ -875,7 +962,7 @@ class Phidget(Adapter):
     else:
         lib = None
 
-    no_lib_msg = 'Phidget library was not found! '\
+    no_lib_msg = 'Phidget library was not found! ' \
                  'Please install (pip[3] install Phidget22).'
 
     def __repr__(self):

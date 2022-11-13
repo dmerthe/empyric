@@ -15,7 +15,7 @@ map:
     end: {type: any}
   }}
 
-  Instruments: {required: true, map: {
+  Instruments: {map: {
     regex;(.+): {required: true, map: {  # instrument name
       type: {type: str, required: true},
       address: {type: any, required: true},
@@ -37,7 +37,9 @@ map:
       expression: {type: str},  # for expression type variables
       definitions: {map: {  # for expression type variables
         regex;(.+): {type: any}  # references to other variables
-      }}
+      }},
+      remote: {type: str},
+      alias: {type: str}
     }}
   }}
 
