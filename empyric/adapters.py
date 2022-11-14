@@ -793,14 +793,6 @@ class Socket(Adapter):
 
         self.backend.settimeout(5)
 
-        for port in range(6174, 10000):
-            try:
-                self.backend.bind((self.ip_address, port))
-                self.port = port
-                break
-            except OSError:
-                raise AdapterError('No available ports for socket!')
-
         address = self.instrument.address
         remote_ip_address, remote_port = address.split('::')
 
@@ -813,6 +805,8 @@ class Socket(Adapter):
             self.backend, message, termination=self.write_termination,
             timeout=self.timeout
         )
+
+        return 'Success'
 
     def _read(self, nbytes=4096):
 
