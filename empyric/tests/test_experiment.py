@@ -85,8 +85,8 @@ def test_manager(tmp_path):
 
     manager = Manager(test_runcard_path)
 
-    # check that the runcard loaded
-    assert manager.description['name'] == 'Henon Map Test'
+    # Check that the runcard loaded
+    assert manager.description['name'] == 'Henon Map Experiment'
 
     # Run a short version of the Henon Map example experiment
     manager.experiment.end = 3
