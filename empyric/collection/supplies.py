@@ -1,5 +1,6 @@
 from empyric.adapters import *
 from empyric.collection.instrument import *
+from empyric.tools import is_on, is_off
 
 
 class Keithley2260B(Instrument):
@@ -32,7 +33,7 @@ class Keithley2260B(Instrument):
         def validator(response):
             return bool(re.match('[\+\-]\d+\.\d\d\d', response))
 
-        return float(self.query('MEAS:CURR?',validator=validator))
+        return float(self.query('MEAS:CURR?', validator=validator))
 
     @measurer
     def measure_voltage(self):
@@ -132,6 +133,7 @@ class BK9183B(Instrument):
     @getter
     def get_max_voltage(self):
         return float(self.query('SOUR:VOLT?'))
+
 
 class UltraflexInductionHeater(Instrument):
     """UltraFlex Ultraheat S2 (or similar) 2 kW induction heater"""

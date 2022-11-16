@@ -156,7 +156,7 @@ class LabJackU6(Instrument):
         u6 = importlib.import_module('u6')
         self.backend = u6.U6()
 
-        if address not in kwargs:
+        if len(args) == 0 and 'address' not in kwargs:
             kwargs['address'] = str(self.backend.serialNumber)
 
         Instrument.__init__(self, *args, **kwargs)
