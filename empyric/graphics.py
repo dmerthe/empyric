@@ -8,6 +8,7 @@ import tkinter as tk
 import pandas as pd
 
 from empyric.tools import recast
+from empyric.routines import Server
 
 if sys.platform == 'darwin':
     import matplotlib
@@ -608,6 +609,48 @@ class ExperimentGUI:
                 self.status_frame, text='', font=("Arial", 14, 'bold')
             ).grid(row=i, column=0, sticky=tk.E)
 
+        # Servers
+        self.servers = {
+            name: routine for name, routine in self.experiment.routines.items()
+            if isinstance(routine, Server)
+        }
+
+        if self.servers:
+
+            self.server_status_labels = {}
+
+            tk.Label(
+                self.status_frame, text='Servers', font=("Arial", 14, 'bold')
+            ).grid(row=i, column=1)
+
+            i += 1
+            for server in self.servers:
+
+                tk.Label(
+                    self.status_frame, text=server, width=len(server),
+                    anchor=tk.E
+                ).grid(row=i, column=0, sticky=tk.E)
+
+                ip_address = self.servers[server].ip_address
+                port = self.servers[server].port
+
+                # Make entry so text is selectable
+                self.server_status_labels[server] = tk.Entry(
+                    self.status_frame, disabledforeground='black',
+                )
+
+                self.server_status_labels[server].insert(
+                    0, f'{ip_address}::{port}'
+                )
+                self.server_status_labels[server].config(state='readonly')
+
+                self.server_status_labels[server].grid(
+                    row=i, column=1, sticky=tk.W, padx=10
+                )
+
+                i += 1
+
+        # Buttons (root is not self.status_frame, so indexing starts at 1)
         i = 1
         self.dash_button = tk.Button(
             self.root, text='Dashboard', font=("Arial", 14, 'bold'), width=10,
@@ -652,8 +695,8 @@ class ExperimentGUI:
         # Update all variable entries based on experiment state
         for name, entry in self.variable_entries.items():
 
-            # If experiment stopped allow user to edit knobs or parameters
-            if self.experiment.stopped:
+            # If stopped or holding allow user to edit knobs or parameters
+            if self.experiment.stopped or self.experiment.holding:
                 if name != 'Time' and self.variables[name].settable:
                     continue
 
@@ -719,8 +762,6 @@ class ExperimentGUI:
             self.dash_button.config(state=tk.DISABLED)
             self.hold_button.config(text='Hold')
             self.stop_button.config(text='Stop')
-
-            self.status_frame.focus()
 
             for entry in self.variable_entries.values():
                 entry.config(state=tk.DISABLED)

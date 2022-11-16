@@ -135,6 +135,8 @@ def recast(value):
         return None
     elif isinstance(value, numbers.Number) or type(value) is bool:
         return value
+    elif np.ndim(value) > 0:  # value is an array
+        return value
     elif type(value) is str:
 
         if value.lower() == 'true':
@@ -147,6 +149,8 @@ def recast(value):
             return float(value)
         else:
             return value
+    else:
+        return None
 
 
 def get_ip_address(remote_ip='8.8.8.8', remote_port=80):

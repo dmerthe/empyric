@@ -346,8 +346,6 @@ class Server(Routine):
         self.socket.listen(5)
         self.socket.settimeout(1)
 
-        print(f'Running server at {self.ip_address}::{self.port}')
-
         self.clients_queue = queue.Queue(1)
         self.clients_queue.put({})
 
@@ -372,16 +370,6 @@ class Server(Routine):
         self.acc_conn_thread.join()
         self.proc_requ_thread.join()
 
-        # Close sockets
-        self.socket.shutdown(socket.SHUT_RDWR)
-        self.socket.close()
-
-        clients = self.clients_queue.get()
-
-        for client in clients.values():
-            client.shutdown(socket.SHUT_RDWR)
-            client.close()
-
     def accept_connections(self):
         while self.running:
 
@@ -398,6 +386,22 @@ class Server(Routine):
 
             except socket.timeout:
                 pass
+
+        # Close sockets
+        try:
+            self.socket.shutdown(socket.SHUT_RDWR)
+        except OSError:  # socket was not connected
+            pass
+        self.socket.close()
+
+        clients = self.clients_queue.get()
+
+        for address, client in clients.items():
+            client.shutdown(socket.SHUT_RDWR)
+            client.close()
+
+        # Return empty clients dict to queue so process_requests can exit
+        self.clients_queue.put({})
 
     def process_requests(self):
         while self.running:
@@ -455,7 +459,8 @@ class Server(Routine):
             time.sleep(0.1)
 
     def __del__(self):
-        self.terminate()
+        if self.running:
+            self.terminate()
 
 
 supported = {key: value for key, value in vars().items()
