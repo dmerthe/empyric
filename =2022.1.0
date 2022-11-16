@@ -1,2 +1,0 @@
-Requirement already satisfied: fenics-ufl in /home/daniel/.local/lib/python3.8/site-packages (2019.1.0)
-Requirement already satisfied: numpy in /home/daniel/.local/lib/python3.8/site-packages (from fenics-ufl) (1.19.2)
