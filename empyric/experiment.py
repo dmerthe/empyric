@@ -957,7 +957,7 @@ def convert_runcard(runcard):
 
         # Grab any keyword arguments for the adapter
         adapter_kwargs = {}
-        for kwarg in _adapters.Adapter.kwargs:
+        for kwarg in _adapters.kwargs:
             if kwarg.replace('_', ' ') in specs:
                 adapter_kwargs[kwarg] = specs.pop(kwarg.replace('_', ' '))
 

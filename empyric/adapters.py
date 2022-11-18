@@ -1,4 +1,5 @@
 import importlib
+import socket
 import time
 import re
 
@@ -97,10 +98,7 @@ class Adapter:
     # in the event of a communication error
     max_reconnects = 1
 
-    kwargs = [
-        'baud_rate', 'timeout', 'delay', 'byte_size', 'parity', 'stop_bits',
-        'close_port_after_each_call', 'slave_mode', 'byte_order'
-    ]
+    kwargs = []
 
     # Library used by adapter; overwritten in children classes.
     lib = 'python'
@@ -231,6 +229,10 @@ class Serial(Adapter):
     stop_bits = 1
     read_termination = '\n'
     write_termination = '\r'
+
+    kwargs = [
+        'baud_rate', 'timeout', 'delay', 'byte_size', 'parity', 'stop_bits',
+    ]
 
     # Get serial library
     if importlib.util.find_spec('pyvisa'):
@@ -441,7 +443,10 @@ class GPIB(Adapter):
         17: 1000
     }
 
-    prologix_controller = None
+    kwargs = ['prologix_address']
+
+    prologix_address = None
+    prologix_controllers = {}
 
     delay = 0.05
     _timeout = None
@@ -452,26 +457,17 @@ class GPIB(Adapter):
     elif importlib.util.find_spec('gpib_ctypes'):
         lib = 'linux-gpib'
     else:
-        # Finally, look for Prologix GPIB-USB adapter
         if importlib.util.find_spec('serial'):
-
-            list_ports = importlib.import_module(
-                'serial.tools.list_ports'
-            ).comports
-
-            device_manufacturers = [
-                device.manufacturer for device in list_ports()
-            ]
-
-            if 'Prologix' in device_manufacturers:
-                lib = 'prologix-gpib'
-
-        else:
-            lib = None
+            lib = 'prologix-gpib'
 
     no_lib_msg = 'No valid library found for GPIB adapters!' \
                  'Please install PyVISA (with GPIB drivers), Linux-GPIB, or' \
-                 'use a Prologix GPIB-USB adapter (requires PySerial)'
+                 'use a Prologix GPIB-USB or GPIB-ETHERNET adapter ' \
+                 '(requires PySerial)'
+
+    def __init__(self, instrument, **kwargs):
+        super().__init__(instrument, kwargs)
+        self._descr = None
 
     @property
     def timeout(self):
@@ -527,18 +523,29 @@ class GPIB(Adapter):
         elif self.lib == 'linux-gpib':
             self.backend = importlib.import_module('gpib')
 
-            self.descr = self.backend.dev(
+            self._descr = self.backend.dev(
                 0, self.instrument.address, 0, 9, 1, 0
             )
 
         elif self.lib == 'prologix-gpib':
 
-            if not GPIB.prologix_controller:
-                GPIB.prologix_controller = PrologixGPIBUSB()
+            if self.prologix_address is None:
+                raise AdapterError(
+                    'trying to connect to Prologix GPIB adapter but no address '
+                    'was provided (prologix_address argument was not set); '
+                    'must be either an IP address (for Prologix GPIB-LAN) or '
+                    'serial port (for Prologix GPIB-USB)'
+                )
 
-            GPIB.prologix_controller.devices.append(self.instrument.address)
+            if self.prologix_address in GPIB.prologix_controllers:
+                self.backend = GPIB.prologix_controllers[self.prologix_address]
+            else:
+                if re.match('\d+\.\d+\.\d+\.\d+', self.prologix_address):
+                    self.backend = PrologixGPIBLAN(self.prologix_address)
+                else:
+                    self.backend = PrologixGPIBUSB(self.prologix_address)
 
-            self.backend = GPIB.prologix_controller
+                GPIB.prologix_controllers[self.prologix_address] = self.backend
 
         else:
             raise AdapterError(f'invalid library specification, {self.lib}')
@@ -550,7 +557,7 @@ class GPIB(Adapter):
         if self.lib == 'pyvisa':
             self.backend.write(message)
         elif self.lib == 'linux-gpib':
-            self.backend.write(self.descr, message)
+            self.backend.write(self._descr, message)
         elif self.lib == 'prologix-gpib':
             self.backend.write(message, address=self.instrument.address)
 
@@ -561,7 +568,7 @@ class GPIB(Adapter):
         if self.lib == 'pyvisa':
             return self.backend.read()
         elif self.lib == 'linux-gpib':
-            return self.backend.read(self.descr, bytes).decode()
+            return self.backend.read(self._descr, bytes).decode()
         elif self.lib == 'prologix-gpib':
             return self.backend.read(address=self.instrument.address)
 
@@ -589,8 +596,8 @@ class GPIB(Adapter):
             self.backend.clear()
             self.backend.close()
         elif self.lib == 'linux-gpib':
-            self.backend.clear(self.descr)
-            self.backend.close(self.descr)
+            self.backend.clear(self._descr)
+            self.backend.close(self._descr)
         elif self.lib == 'prologix-gpib':
 
             # clear the instrument buffers
@@ -625,47 +632,25 @@ class PrologixGPIBUSB:
     def timeout(self, timeout):
         self.serial_port.timeout = timeout
 
-    def __init__(self):
-
-        self.devices = []
+    def __init__(self, port):
 
         try:
             serial = importlib.import_module('serial')
-
         except ImportError:
             raise AdapterError(
                 'Please install the PySerial library '
                 'to connect a Prologix GPIB-USB adapter.'
             )
 
-        list_ports = importlib.import_module('serial.tools.list_ports')
+        self.serial_port = serial.Serial(port=port, timeout=1)
 
-        port = None
-        for comport in list_ports.comports():
-            if comport.manufacturer == 'Prologix':
-                port = comport.device
-
-        if port:
-            self.serial_port = serial.Serial(port=port, timeout=1)
-            # communications with this controller are a bit slow
-        else:
-            raise AdapterError(f'Prologix GPIB-USB adapter not found!')
-
-        self.write('rst', to_controller=True)
-        print('Resetting Prologix GPIB-USB controller...')
-        time.sleep(6)  # controller
-        self.write('mode 1', to_controller=True)
-        self.write('auto 0', to_controller=True)
+        self.write('mode 1', to_controller=True)  # set adapter to "controller" mode
+        self.write('auto 0', to_controller=True)  # instruments talk only when requested to
 
     def write(self, message, to_controller=False, address=None):
 
         if address:
-            if address in self.devices:
-                self.write(f'addr {address}', to_controller=True)
-            else:
-                raise AttributeError(
-                    f"GPIB device at address {address} is not connected!"
-                )
+            self.write(f'addr {address}', to_controller=True)
 
         proper_message = message.encode() + b'\r'
 
@@ -679,12 +664,7 @@ class PrologixGPIBUSB:
     def read(self, address=None):
 
         if address:
-            if address in self.devices:
-                self.write(f'addr {address}', to_controller=True)
-            else:
-                raise AttributeError(
-                    f"GPIB device at address {address} is not connected!"
-                )
+            self.write(f'addr {address}', to_controller=True)
 
         self.write('read eoi', to_controller=True)
 
@@ -692,6 +672,54 @@ class PrologixGPIBUSB:
 
     def close(self):
         self.serial_port.close()
+
+
+class PrologixGPIBLAN:
+    """
+    Wraps serial communications with the Prologix GPIB-ETHERNET adapter unit.
+    """
+
+    @property
+    def timeout(self):
+        return self.socket.gettimeout()
+
+    @timeout.setter
+    def timeout(self, timeout):
+        self.socket.settimeout(timeout)
+
+    def __init__(self, ip_address):
+
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        self.socket.connect((ip_address, 1234))
+
+        self.write('mode 1', to_controller=True)  # set adapter to "controller" mode
+        self.write('auto 0', to_controller=True)  # instruments talk only when requested to
+
+    def write(self, message, to_controller=False, address=None):
+
+        if address:
+            self.write(f'addr {address}', to_controller=True)
+
+        if to_controller:
+            message = '++' + message
+
+        write_to_socket(self.socket, message)
+
+        return "Success"
+
+    def read(self, address=None):
+
+        if address:
+            self.write(f'addr {address}', to_controller=True)
+
+        self.write('read eoi', to_controller=True)
+
+        return read_from_socket(self.socket)
+
+    def close(self):
+        self.socket.shutdown(socket.SHUT_RDWR)
+        self.socket.close()
 
 
 class USB(Adapter):
@@ -843,6 +871,10 @@ class Modbus(Adapter):
     parity = 'N'
     delay = 0.05
 
+    kwargs = [
+        'close_port_after_each_call', 'slave_mode', 'byte_order'
+    ]
+
     # For traffic control of modbus adapters using the same serial ports
     adapters = {}
 
@@ -983,6 +1015,10 @@ class Phidget(Adapter):
         self.backend.close()
         self.connected = True
 
-
 supported = {key: value for key, value in vars().items()
              if type(value) is type and issubclass(value, Adapter)}
+
+kwargs = []
+for cls in supported.values():
+    for kwarg in cls.kwargs:
+        kwargs.append(kwarg)
