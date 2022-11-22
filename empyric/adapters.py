@@ -644,13 +644,22 @@ class PrologixGPIBUSB:
 
         self.serial_port = serial.Serial(port=port, timeout=1)
 
-        self.write('mode 1', to_controller=True)  # set adapter to "controller" mode
-        self.write('auto 0', to_controller=True)  # instruments talk only when requested to
+        # set adapter to "controller" mode
+        self.write('mode 1', to_controller=True)
+
+        # instruments talk only when requested to
+        self.write('auto 0', to_controller=True)
+
+        # set timeout to 0.5 seconds
+        self.write('read_tmo_ms 500', to_controller=True)
+
+        self.address = None
 
     def write(self, message, to_controller=False, address=None):
 
-        if address:
+        if address and address != self.address:
             self.write(f'addr {address}', to_controller=True)
+            self.address = address
 
         proper_message = message.encode() + b'\r'
 
@@ -661,12 +670,14 @@ class PrologixGPIBUSB:
 
         return "Success"
 
-    def read(self, address=None):
+    def read(self, from_controller=False, address=None):
 
-        if address:
+        if address and address != self.address:
             self.write(f'addr {address}', to_controller=True)
+            self.address = address
 
-        self.write('read eoi', to_controller=True)
+        if not from_controller:
+            self.write(f'read eoi', to_controller=True)
 
         return self.serial_port.read_until().decode().strip()
 
