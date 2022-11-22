@@ -217,11 +217,15 @@ def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1):
 
     while len(message) < nbytes and null_responses < max_nulls:
 
+        part = b''
+
         try:
             part = _socket.recv(1)
-        except ConnectionResetError:
-            null_responses = max_nulls
+        except ConnectionResetError as err:
+            print(f'Warning: {err}')
             break
+        except socket.timeout:
+            pass
 
         if len(part) > 0:
 
@@ -233,10 +237,7 @@ def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1):
         else:
             null_responses += 1
 
-    if null_responses < max_nulls:
-        return message.decode().strip()
-    else:
-        return None
+    return message.decode().strip()
 
 
 def write_to_socket(_socket, message, termination='\r', timeout=1):

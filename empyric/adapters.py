@@ -693,13 +693,35 @@ class PrologixGPIBLAN:
 
         self.socket.connect((ip_address, 1234))
 
-        self.write('mode 1', to_controller=True)  # set adapter to "controller" mode
-        self.write('auto 0', to_controller=True)  # instruments talk only when requested to
+        self.socket.settimeout(1)
+
+        # set adapter to "controller" mode
+        self.write('mode 1', to_controller=True)
+
+        # instruments talk only when requested to
+        self.write('auto 0', to_controller=True)
+
+        # set timeout to 0.5 seconds
+        self.write('read_tmo_ms 500', to_controller=True)
+
+        # Do not append CR or LF to messages
+        self.write('eos 3', to_controller=True)
+
+        # Assert EOI with last byte to indicate end of data
+        self.write('eoi 1', to_controller=True)
+
+        # Append CR to responses from instruments to indicate message
+        # termination
+        self.write('eot_char 13', to_controller=True)
+        self.write('eot_enable 1', to_controller=True)
+
+        self.address = None
 
     def write(self, message, to_controller=False, address=None):
 
-        if address:
+        if address and address != self.address:
             self.write(f'addr {address}', to_controller=True)
+            self.address = address
 
         if to_controller:
             message = '++' + message
@@ -708,12 +730,14 @@ class PrologixGPIBLAN:
 
         return "Success"
 
-    def read(self, address=None):
+    def read(self, from_controller=False, address=None):
 
-        if address:
+        if address and address != self.address:
             self.write(f'addr {address}', to_controller=True)
+            self.address = address
 
-        self.write('read eoi', to_controller=True)
+        if not from_controller:
+            self.write(f'read eoi', to_controller=True)
 
         return read_from_socket(self.socket)
 

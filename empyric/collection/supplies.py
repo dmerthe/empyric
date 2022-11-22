@@ -201,3 +201,40 @@ class UltraflexInductionHeater(Instrument):
         else:
             raise ValueError(f'{self.name}: Unsupported control mode {mode}. '
                              'Allowed values are "manual" and "remote".')
+
+
+class SRSPS350(Instrument):
+    """
+    Stanford Rsearch Systems PS-350 high voltage power supply.
+    """
+
+    name = 'SRSPS350'
+
+    supported_adapters = (
+        (GPIB, {}),
+    )
+
+    knobs = (
+        'output',
+        'voltage',
+        'max current'
+    )
+
+    presets = {
+        'output': 'OFF',
+        'voltage': 0,
+        'max current': 5e-3
+    }
+
+    postsets = {
+        'output': 'OFF',
+        'voltage': 0,
+        'max current': 5e-3
+    }
+
+    meters = (
+        'voltage',
+        'current'
+    )
+
+

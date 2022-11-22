@@ -3,3 +3,4 @@
 - Support SQL (as alternative to CSV data files)
 - Testing and development for more robust alarm behavior
 - Change PrologixGPIBUSB backend to PyVISA
+- Add output limits to BrainboxesED560
