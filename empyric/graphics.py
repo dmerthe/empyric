@@ -215,7 +215,12 @@ class Plotter:
                 pass
                 # axis is automatically configured for datetimes; do not modify
             elif xscale == 'linear':
-                ax.ticklabel_format(axis='x', style='sci', scilimits=(-2, 4))
+                try:
+                    ax.ticklabel_format(
+                        axis='x', style='sci', scilimits=(-2, 4)
+                    )
+                except AttributeError:
+                    pass
             elif type(xscale) == dict:
                 for scale, options in xscale.items():
                     ax.set_xscale(scale, **options)
@@ -223,7 +228,12 @@ class Plotter:
                 ax.set_xscale(xscale)
 
             if yscale == 'linear':
-                ax.ticklabel_format(axis='y', style='sci', scilimits=(-2, 4))
+                try:
+                    ax.ticklabel_format(
+                        axis='y', style='sci', scilimits=(-2, 4)
+                    )
+                except AttributeError:
+                    pass
             elif type(yscale) == dict:
                 for scale, options in yscale.items():
                     ax.set_yscale(scale, **options)
@@ -402,7 +412,7 @@ class Plotter:
                     if element is None:
                         element = np.nan
 
-                    expanded_element = [float(element)]
+                    expanded_element = [element]
 
                 max_len = np.max([len(expanded_element), max_len])
 
@@ -414,7 +424,7 @@ class Plotter:
                 numerical_array[i] = numerical_array[i] + new_elements
 
         numerical_data = pd.DataFrame(
-            data=np.array(numerical_array, dtype=float).T,
+            data=np.array(numerical_array).T,
             columns=labels,
             index=numerical_indices
         )

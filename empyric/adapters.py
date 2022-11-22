@@ -466,7 +466,7 @@ class GPIB(Adapter):
                  '(requires PySerial)'
 
     def __init__(self, instrument, **kwargs):
-        super().__init__(instrument, kwargs)
+        super().__init__(instrument, **kwargs)
         self._descr = None
 
     @property
@@ -547,6 +547,9 @@ class GPIB(Adapter):
 
                 GPIB.prologix_controllers[self.prologix_address] = self.backend
 
+            if self.instrument.address not in self.backend.devices:
+                self.backend.devices.append(self.instrument.address)
+
         else:
             raise AdapterError(f'invalid library specification, {self.lib}')
 
@@ -607,11 +610,13 @@ class GPIB(Adapter):
             # return instrument to local control
             self.backend.write('loc', to_controller=True)
 
+            # unlink device from controller
             self.backend.devices.remove(self.instrument.address)
 
+            # if no more devices are connected to the controller, close it
             if len(self.backend.devices) == 0:
                 self.backend.close()
-                GPIB.prologix_controller = None
+                GPIB.prologix_controllers.pop(self.prologix_address)
 
         self.connected = False
 
@@ -726,6 +731,7 @@ class PrologixGPIBLAN:
         self.write('eot_char 13', to_controller=True)
         self.write('eot_enable 1', to_controller=True)
 
+        self.devices = []
         self.address = None
 
     def write(self, message, to_controller=False, address=None):
@@ -733,6 +739,9 @@ class PrologixGPIBLAN:
         if address and address != self.address:
             self.write(f'addr {address}', to_controller=True)
             self.address = address
+
+            if address not in self.devices:
+                self.devices.append(address)
 
         if to_controller:
             message = '++' + message
@@ -746,6 +755,9 @@ class PrologixGPIBLAN:
         if address and address != self.address:
             self.write(f'addr {address}', to_controller=True)
             self.address = address
+
+            if address not in self.devices:
+                self.devices.append(address)
 
         if not from_controller:
             self.write(f'read eoi', to_controller=True)

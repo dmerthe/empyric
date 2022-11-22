@@ -24,7 +24,8 @@ map:
       }},
       postsets: {map: {
         regex;(.+): {type: any}  # knob name and value
-      }}
+      }},
+      regex;(.+): {type: any}
     }}
   }}
 
