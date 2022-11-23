@@ -201,3 +201,111 @@ class UltraflexInductionHeater(Instrument):
         else:
             raise ValueError(f'{self.name}: Unsupported control mode {mode}. '
                              'Allowed values are "manual" and "remote".')
+
+
+class SRSPS300(Instrument):
+    """
+    Stanford Rsearch Systems PS-300 series high voltage power supply.
+    """
+
+    name = 'SRSPS350'
+
+    supported_adapters = (
+        (GPIB, {}),
+    )
+
+    knobs = (
+        'output',
+        'voltage',
+        'max voltage'
+        'max current',
+        'trip current'
+    )
+
+    presets = {
+        'output': 'OFF',
+        'voltage': 0,
+        'max current': 5e-3
+    }
+
+    postsets = {
+        'output': 'OFF',
+        'voltage': 0,
+        'max current': 5e-3
+    }
+
+    meters = (
+        'voltage',
+        'current'
+    )
+
+    @setter
+    def set_output(self, output):
+
+        if is_on(output):
+            self.write('HVON')
+        elif is_off(output):
+            self.write('HVOF')
+        else:
+            raise ValueError(f'invalid output state given for {self.name}')
+
+    @getter
+    def get_output(self):
+        # last bit of status byte is the output state
+
+        status_bit_7 = int(self.query('*STB? 7'))
+
+        if status_bit_7 == 1:
+            return 'ON'
+        else:
+            return 'OFF'
+
+    @setter
+    def set_voltage(self, voltage):
+
+        self.write('VSET%f' % float(voltage))
+
+    @getter
+    def get_voltage(self):
+
+        return float(self.query('VSET?'))
+
+    @setter
+    def set_max_voltage(self, voltage):
+
+        self.write('VLIM%f' % float(voltage))
+
+    @getter
+    def get_max_voltage(self):
+
+        return float(self.query('VLIM?'))
+
+    @setter
+    def set_max_current(self, current):
+
+        self.write('ILIM%f' % float(current))
+
+    @getter
+    def get_max_current(self):
+
+        return float(self.query('ILIM?'))
+
+    @setter
+    def set_trip_current(self, current):
+
+        self.write('ITRP%f' % float(current))
+
+    @getter
+    def get_trip_current(self):
+
+        return float(self.query('ITRP?'))
+
+    @measurer
+    def measure_voltage(self):
+
+        return float(self.query('VOUT?'))
+
+    @measurer
+    def measure_current(self):
+
+        return float(self.query('IOUT?'))

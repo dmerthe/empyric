@@ -466,7 +466,7 @@ class GPIB(Adapter):
                  '(requires PySerial)'
 
     def __init__(self, instrument, **kwargs):
-        super().__init__(instrument, kwargs)
+        super().__init__(instrument, **kwargs)
         self._descr = None
 
     @property
@@ -547,6 +547,9 @@ class GPIB(Adapter):
 
                 GPIB.prologix_controllers[self.prologix_address] = self.backend
 
+            if self.instrument.address not in self.backend.devices:
+                self.backend.devices.append(self.instrument.address)
+
         else:
             raise AdapterError(f'invalid library specification, {self.lib}')
 
@@ -607,11 +610,13 @@ class GPIB(Adapter):
             # return instrument to local control
             self.backend.write('loc', to_controller=True)
 
+            # unlink device from controller
             self.backend.devices.remove(self.instrument.address)
 
+            # if no more devices are connected to the controller, close it
             if len(self.backend.devices) == 0:
                 self.backend.close()
-                GPIB.prologix_controller = None
+                GPIB.prologix_controllers.pop(self.prologix_address)
 
         self.connected = False
 
@@ -644,13 +649,22 @@ class PrologixGPIBUSB:
 
         self.serial_port = serial.Serial(port=port, timeout=1)
 
-        self.write('mode 1', to_controller=True)  # set adapter to "controller" mode
-        self.write('auto 0', to_controller=True)  # instruments talk only when requested to
+        # set adapter to "controller" mode
+        self.write('mode 1', to_controller=True)
+
+        # instruments talk only when requested to
+        self.write('auto 0', to_controller=True)
+
+        # set timeout to 0.5 seconds
+        self.write('read_tmo_ms 500', to_controller=True)
+
+        self.address = None
 
     def write(self, message, to_controller=False, address=None):
 
-        if address:
+        if address and address != self.address:
             self.write(f'addr {address}', to_controller=True)
+            self.address = address
 
         proper_message = message.encode() + b'\r'
 
@@ -661,12 +675,14 @@ class PrologixGPIBUSB:
 
         return "Success"
 
-    def read(self, address=None):
+    def read(self, from_controller=False, address=None):
 
-        if address:
+        if address and address != self.address:
             self.write(f'addr {address}', to_controller=True)
+            self.address = address
 
-        self.write('read eoi', to_controller=True)
+        if not from_controller:
+            self.write(f'read eoi', to_controller=True)
 
         return self.serial_port.read_until().decode().strip()
 
@@ -693,13 +709,39 @@ class PrologixGPIBLAN:
 
         self.socket.connect((ip_address, 1234))
 
-        self.write('mode 1', to_controller=True)  # set adapter to "controller" mode
-        self.write('auto 0', to_controller=True)  # instruments talk only when requested to
+        self.socket.settimeout(1)
+
+        # set adapter to "controller" mode
+        self.write('mode 1', to_controller=True)
+
+        # instruments talk only when requested to
+        self.write('auto 0', to_controller=True)
+
+        # set timeout to 0.5 seconds
+        self.write('read_tmo_ms 500', to_controller=True)
+
+        # Do not append CR or LF to messages
+        self.write('eos 3', to_controller=True)
+
+        # Assert EOI with last byte to indicate end of data
+        self.write('eoi 1', to_controller=True)
+
+        # Append CR to responses from instruments to indicate message
+        # termination
+        self.write('eot_char 13', to_controller=True)
+        self.write('eot_enable 1', to_controller=True)
+
+        self.devices = []
+        self.address = None
 
     def write(self, message, to_controller=False, address=None):
 
-        if address:
+        if address and address != self.address:
             self.write(f'addr {address}', to_controller=True)
+            self.address = address
+
+            if address not in self.devices:
+                self.devices.append(address)
 
         if to_controller:
             message = '++' + message
@@ -708,12 +750,17 @@ class PrologixGPIBLAN:
 
         return "Success"
 
-    def read(self, address=None):
+    def read(self, from_controller=False, address=None):
 
-        if address:
+        if address and address != self.address:
             self.write(f'addr {address}', to_controller=True)
+            self.address = address
 
-        self.write('read eoi', to_controller=True)
+            if address not in self.devices:
+                self.devices.append(address)
+
+        if not from_controller:
+            self.write(f'read eoi', to_controller=True)
 
         return read_from_socket(self.socket)
 

@@ -1,0 +1,63 @@
+# Demonstrates usage of SRS PS-300 series power supplies
+# ASSUMES POSITIVE POLARITY
+
+Description:
+ name: Keithley 2400 IV Sweep Test
+ operator: Mike
+ platform: Test Stand 1
+ comments: Who is Mike? There is no Test Stand 1
+
+Settings:
+ follow-up: None
+ step interval: 0.25
+ save interval: 10
+ end: 60
+
+Instruments:
+ Power Supply:
+  type: SRSPS300
+  prologix address: '169.254.193.12'
+  address: 15
+  presets:
+   voltage: 0
+   output: ON
+  postsets:
+   voltage: 0
+   output: OFF
+
+Variables:
+ Output:
+  instrument: Power Supply
+  knob: output
+ Voltage Setpoint:
+  instrument: Power Supply
+  knob: voltage
+ Max Voltage:
+  instrument: Power Supply
+  knob: max voltage
+ Max Current:
+  instrument: Power Supply
+  knob: max current
+ Trip Current:
+  instrument: Power Supply
+  knob: trip current
+ Actual Voltage:
+  instrument: Power Supply
+  meter: voltage
+ Actual Current:
+  instrument: Power Supply
+  meter: current
+
+Routines:
+ Ramp to 100 V:
+  type: Timecourse
+  knobs: Voltage Setpoint
+  times: [0, 30, 60]
+  values: [0, 100, 0]
+
+Plots:
+ Voltage Ramp Plot:
+  y: [Voltage Setpoint, Actual Voltage]
+ IV Plot:
+  x: Actual Voltage
+  y: Actual Current
