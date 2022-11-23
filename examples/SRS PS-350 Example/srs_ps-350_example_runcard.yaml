@@ -1,3 +1,6 @@
+# Demonstrates usage of SRS PS-300 series power supplies
+# ASSUMES POSITIVE POLARITY
+
 Description:
  name: Keithley 2400 IV Sweep Test
  operator: Mike
@@ -12,7 +15,7 @@ Settings:
 
 Instruments:
  Power Supply:
-  type: SRSPS350
+  type: SRSPS300
   prologix address: '169.254.193.12'
   address: 15
   presets:
@@ -50,9 +53,11 @@ Routines:
   type: Timecourse
   knobs: Voltage Setpoint
   times: [0, 30, 60]
-  values: [0, -100, 0]
+  values: [0, 100, 0]
 
 Plots:
+ Voltage Ramp Plot:
+  y: [Voltage Setpoint, Actual Voltage]
  IV Plot:
   x: Actual Voltage
   y: Actual Current

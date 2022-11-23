@@ -203,9 +203,9 @@ class UltraflexInductionHeater(Instrument):
                              'Allowed values are "manual" and "remote".')
 
 
-class SRSPS350(Instrument):
+class SRSPS300(Instrument):
     """
-    Stanford Rsearch Systems PS-350 high voltage power supply.
+    Stanford Rsearch Systems PS-300 series high voltage power supply.
     """
 
     name = 'SRSPS350'
