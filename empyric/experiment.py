@@ -3,6 +3,7 @@
 import collections
 import datetime
 import importlib
+import numbers
 import os
 import pathlib
 import socket
@@ -225,9 +226,12 @@ class Variable:
     @value.setter
     def value(self, value):
 
-        # Do nothing if value is null
-        if value is None or np.isnan(value):
-            return
+        if value is None:
+            # Do nothing if value is null
+            pass
+
+        elif isinstance(value, numbers.Number) and np.isnan(value):
+            pass
 
         elif hasattr(self, 'knob'):
             self.instrument.set(self.knob, value)

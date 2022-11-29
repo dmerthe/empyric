@@ -253,7 +253,10 @@ class SRSPS300(Instrument):
     def get_output(self):
         # last bit of status byte is the output state
 
-        status_bit_7 = int(self.query('*STB? 7'))
+        def validator(response):
+            return re.match('\d{1}', response)
+
+        status_bit_7 = int(self.query('*STB? 7', validator=validator))
 
         if status_bit_7 == 1:
             return 'ON'

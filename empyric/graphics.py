@@ -160,9 +160,9 @@ class Plotter:
             if x == 'Time':
                 xdata = self.full_data.index
             else:
-                xdata = self.full_data[x]
+                xdata = self.full_data[x].astype(float)
 
-            ydata = self.full_data[ys]
+            ydata = self.full_data[ys].astype(float)
 
         if ax.lines and not errorbars:
             # For simple plots (i.e. not error bar plots), if already plotted,
