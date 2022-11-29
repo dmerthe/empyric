@@ -46,7 +46,7 @@ map:
 
   Alarms: {map: {
     regex;(.+): {required: true, map: {  # alarm name
-      protocol: {type: str, required: true},
+      protocol: {type: str},
       condition: {type: str, required: true},
       definitions: {map: {
         regex;(.+): {type: str, required: true}
@@ -61,6 +61,7 @@ map:
       knobs: {type: any},
       values: {type: any},
       meters: {type: any},
+      end: {type: any}
     }}
   }}
 

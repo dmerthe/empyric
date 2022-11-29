@@ -16,7 +16,7 @@ Instruments:
   presets:
    voltage range: 20
    current range: 1
-   fast voltages: 'voltages.csv'
+   fast voltages: 'fast voltages.csv'
 
 Variables:
  Fast Voltages:

@@ -488,6 +488,9 @@ class GPIB(Adapter):
 
     def connect(self):
 
+        if hasattr(self, 'prologix_address'):
+            self.lib = 'prologix-gpib'
+
         if self.lib == 'pyvisa':
 
             visa = importlib.import_module('pyvisa')
@@ -551,7 +554,10 @@ class GPIB(Adapter):
                 self.backend.devices.append(self.instrument.address)
 
         else:
-            raise AdapterError(f'invalid library specification, {self.lib}')
+            raise AdapterError(
+                f"invalid library specification; options are 'pyvisa', 'linux-gpib' or 'prologix-gpib'."
+                "If using a Prologix GPIB adapter, its 'prologix address' argument must be specified"
+            )
 
         self.connected = True
 
@@ -659,12 +665,16 @@ class PrologixGPIBUSB:
         self.write('read_tmo_ms 500', to_controller=True)
 
         self.address = None
+        self.devices = []
 
     def write(self, message, to_controller=False, address=None):
 
         if address and address != self.address:
             self.write(f'addr {address}', to_controller=True)
             self.address = address
+
+            if address not in self.devices:
+                self.devices.append(address)
 
         proper_message = message.encode() + b'\r'
 
@@ -680,6 +690,9 @@ class PrologixGPIBUSB:
         if address and address != self.address:
             self.write(f'addr {address}', to_controller=True)
             self.address = address
+
+            if address not in self.devices:
+                self.devices.append(address)
 
         if not from_controller:
             self.write(f'read eoi', to_controller=True)
