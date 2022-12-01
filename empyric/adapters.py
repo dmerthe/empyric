@@ -697,7 +697,7 @@ class PrologixGPIBUSB:
         if not from_controller:
             self.write(f'read eoi', to_controller=True)
 
-        return self.serial_port.read_until().decode().strip()
+        return self.serial_port.read_until(b'\r').decode().strip()
 
     def close(self):
         self.serial_port.close()

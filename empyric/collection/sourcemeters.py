@@ -39,11 +39,8 @@ class Keithley2400(Instrument):
     presets = {
         'source': 'voltage',
         'meter': 'current',
-        'voltage':0,
+        'voltage': 0,
         'output': 'ON',
-        'voltage range': 200,
-        'current range': 100e-3,
-        'nplc': 1,
         'source_delay': 0,
     }
 
