@@ -2,7 +2,7 @@
 # ASSUMES POSITIVE POLARITY
 
 Description:
- name: Keithley 2400 IV Sweep Test
+ name: SRS PS-300 IV Sweep Test
  operator: Mike
  platform: Test Stand 1
  comments: Who is Mike? There is no Test Stand 1
