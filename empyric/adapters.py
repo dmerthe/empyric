@@ -488,7 +488,7 @@ class GPIB(Adapter):
 
     def connect(self):
 
-        if hasattr(self, 'prologix_address'):
+        if self.prologix_address is not None:
             self.lib = 'prologix-gpib'
 
         if self.lib == 'pyvisa':
