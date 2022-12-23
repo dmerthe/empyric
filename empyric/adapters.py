@@ -479,7 +479,10 @@ class GPIB(Adapter):
         if self.connected:
             if self.lib == 'pyvisa':
                 # pyvisa records timeouts in milliseconds
-                self.backend.timeout = timeout * 1000
+                if timeout is None:
+                    self.backend.timeout = None
+                else:
+                    self.backend.timeout = timeout * 1000
                 self._timeout = timeout
             elif self.lib == 'linux-gpib':
                 self._timeout = self._linux_gpib_set_timeout(timeout)
