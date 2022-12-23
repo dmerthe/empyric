@@ -23,7 +23,7 @@ setuptools.setup(
     install_requires=[
         'numpy',
         'scipy',
-        'matplotlib>=3.5',
+        'matplotlib>=3.6',
         'pandas',
         'pykwalify',
         'ruamel.yaml',

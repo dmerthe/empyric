@@ -336,7 +336,10 @@ class Plotter:
 
             fig.cbar.ax.tick_params(labelsize='small')
 
-            fig.get_layout_engine().execute(fig)
+            try:
+                fig.get_layout_engine().execute(fig)
+            except AttributeError:  # sometimes happens for reasons
+                pass
 
             plt.pause(0.01)
 
