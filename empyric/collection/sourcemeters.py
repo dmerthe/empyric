@@ -234,24 +234,30 @@ class Keithley2400(Instrument):
 
     @setter
     def set_fast_voltages(self, voltages):
-        self.fast_voltages = voltages
 
         # import fast voltages, if specified as a path
-        if type(self.fast_voltages) == str:  # can be specified as a path
+        if type(voltages) == str:  # can be specified as a path
             try:
-                fast_voltage_data = pd.read_csv(self.fast_voltages)
+                voltage_data = pd.read_csv(voltages)
             except FileNotFoundError:
                 # probably in an experiment data directory; try going up a level
                 working_subdir = os.getcwd()
                 os.chdir('..')
-                fast_voltage_data = pd.read_csv(self.fast_voltages)
+                voltage_data = pd.read_csv(voltages)
                 os.chdir(working_subdir)
 
-            columns = fast_voltage_data.columns
+            columns = voltage_data.columns
 
-            fast_voltages = fast_voltage_data[columns[0]]
+            named = np.intersect1d(
+                ['Voltages', 'Fast Voltages'], columns
+            )
 
-            self.fast_voltages = fast_voltages.astype(float).values
+            if named:
+                voltages = voltage_data[named[0]]
+            else:
+                voltages = voltage_data[columns[0]]
+
+        self.fast_voltages = voltages.astype(float).values
 
     @measurer
     def measure_fast_currents(self):

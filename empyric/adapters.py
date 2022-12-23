@@ -516,10 +516,7 @@ class GPIB(Adapter):
                     full_address = address
 
             if full_address:
-                self.backend = manager.open_resource(
-                    full_address,
-                    open_timeout=self.timeout
-                )
+                self.backend = manager.open_resource(full_address)
             else:
                 AdapterError(
                     'GPIB device at address '

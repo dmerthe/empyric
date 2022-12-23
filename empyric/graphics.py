@@ -269,9 +269,9 @@ class Plotter:
                 'but not in variables!'
             )
 
-        xdata = self.full_data[x]
-        ydata = self.full_data[y]
-        sdata = self.full_data[s]
+        xdata = self.full_data[x].values.astype(float)
+        ydata = self.full_data[y].values.astype(float)
+        sdata = self.full_data[s].values.astype(float)
 
         if s == 'Time':  # Rescale time if values are large
             units = 'seconds'
