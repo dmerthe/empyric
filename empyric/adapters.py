@@ -555,8 +555,9 @@ class GPIB(Adapter):
 
         else:
             raise AdapterError(
-                f"invalid library specification; options are 'pyvisa', 'linux-gpib' or 'prologix-gpib'."
-                "If using a Prologix GPIB adapter, its 'prologix address' argument must be specified"
+                f"invalid library specification; options are 'pyvisa', "
+                f"'linux-gpib' or 'prologix-gpib'. If using a Prologix GPIB "
+                "adapter, its 'prologix address' argument must be specified"
             )
 
         self.connected = True
@@ -1074,6 +1075,7 @@ class Phidget(Adapter):
     def disconnect(self):
         self.backend.close()
         self.connected = True
+
 
 supported = {key: value for key, value in vars().items()
              if type(value) is type and issubclass(value, Adapter)}

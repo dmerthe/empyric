@@ -104,6 +104,8 @@ class Variable:
         :param parameter (str) value of a user controlled parameter
         """
 
+        self._value = None  # last known value of this variable
+
         if meter:
             self.meter = meter
             self.type = 'meter'
@@ -143,6 +145,7 @@ class Variable:
 
         elif parameter:
             self.parameter = parameter
+            self._value = parameter
             self.type = 'parameter'
             self.settable = True
 
@@ -151,8 +154,6 @@ class Variable:
                 'variable object must have a specified knob, meter or '
                 'expression, or assigned a value if a parameter!'
             )
-
-        self._value = None  # last known value of this variable
 
         # time of last evaluation; used for expressions
         self.last_evaluation = np.nan
@@ -966,8 +967,14 @@ def convert_runcard(runcard):
                 adapter_kwargs[kwarg] = specs.pop(kwarg.replace('_', ' '))
 
         # Any remaining keywords are instrument presets
-        presets = specs.get('presets', {})
-        postsets = specs.get('postsets', {})
+        presets = {
+            key: recast(value) for key, value
+            in specs.get('presets', {}).items()
+        }
+        postsets = {
+            key: recast(value) for key, value
+            in specs.get('postsets', {}).items()
+        }
 
         instrument_class = available_instruments[_type]
         instruments[name] = instrument_class(
@@ -1065,7 +1072,7 @@ def convert_runcard(runcard):
                         return False
 
                 def get_csv(path, column):
-                    df = pd.read_csv(path)
+                    df = pd.read_csv(recast(path))
                     return df[column].values.flatten()
 
                 specs['values'] = np.array([

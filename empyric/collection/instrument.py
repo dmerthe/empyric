@@ -1,7 +1,6 @@
-import numpy as np
-from numbers import Number
 from functools import wraps
 from empyric.adapters import *
+from empyric.tools import recast
 
 
 def setter(method):
@@ -19,7 +18,7 @@ def setter(method):
     def wrapped_method(*args, **kwargs):
         returned_value = method(*args, **kwargs)
         self = args[0]
-        value = args[1]
+        value = recast(args[1])
 
         # The knob attribute is set to the returned value of the method, or
         # the value argument if returned value is None
@@ -45,7 +44,7 @@ def getter(method):
     @wraps(method)
     def wrapped_method(*args, **kwargs):
         self = args[0]
-        value = method(*args, **kwargs)
+        value = recast(method(*args, **kwargs))
         self.__setattr__(knob, value)
 
         return value
@@ -67,7 +66,7 @@ def measurer(method):
     @wraps(method)
     def wrapped_method(*args, **kwargs):
         self = args[0]
-        value = method(*args, **kwargs)
+        value = recast(method(*args, **kwargs))
         self.__setattr__('measured_' + meter, value)
 
         return value
