@@ -267,6 +267,8 @@ class Keithley2400(Instrument):
         else:
             raise ValueError(f'invalid fast voltages: {voltages}')
 
+        return self.fast_voltages
+
     @measurer
     def measure_fast_currents(self):
 

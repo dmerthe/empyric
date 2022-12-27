@@ -168,7 +168,7 @@ class Instrument:
                 # knob value is unknown until it is set
                 self.__setattr__(knob.replace(' ', '_'), None)
 
-                # Apply presets
+        # Apply presets
         if presets:
             self.presets = {**self.presets, **presets}
 
