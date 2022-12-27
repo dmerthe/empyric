@@ -263,11 +263,9 @@ class Keithley2400(Instrument):
                 voltages = voltage_data[columns[0]].values
 
         if np.ndim(voltages) == 1:
-            self.fast_voltages = np.array(voltages, dtype=float)
+            return np.array(voltages, dtype=float)  # --> self.fast_voltages
         else:
             raise ValueError(f'invalid fast voltages: {voltages}')
-
-        return self.fast_voltages
 
     @measurer
     def measure_fast_currents(self):
