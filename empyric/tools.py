@@ -131,6 +131,9 @@ def find_nearest(allowed, value, overestimate=False, underestimate=False):
 
 
 def recast(value):
+    """
+    Convert a value into the appropriate type for the information it contains
+    """
 
     if value is None:
         return None
