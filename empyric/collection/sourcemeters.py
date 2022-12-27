@@ -257,12 +257,15 @@ class Keithley2400(Instrument):
             )
 
             if named:
-                voltages = voltage_data[named[0]]
+                voltages = voltage_data[named[0]].values
             else:
                 # If no matching column name, take the first column
-                voltages = voltage_data[columns[0]]
+                voltages = voltage_data[columns[0]].values
 
-        self.fast_voltages = np.array(voltages, dtype=float)
+        if np.ndim(voltages) == 1:
+            self.fast_voltages = np.array(voltages, dtype=float)
+        else:
+            raise ValueError(f'invalid fast voltages: {voltages}')
 
     @measurer
     def measure_fast_currents(self):
