@@ -57,20 +57,21 @@ class Variable:
     """
 
     # Abbreviated functions that can be used to evaluate expression variables
+    # parentheses are included to facilitate search for functions in expressions
     expression_functions = {
-        'sqrt': 'np.sqrt',
-        'exp': 'np.exp',
-        'sin': 'np.sin',
-        'cos': 'np.cos',
-        'tan': 'np.tan',
-        'sum': 'np.nansum',
-        'mean': 'np.nanmean',
-        'rms': 'np.nanstd',
-        'std': 'np.nanstd',
-        'var': 'np.nanvar',
-        'diff': 'np.diff',
-        'max': 'np.nanmax',
-        'min': 'np.nanmin'
+        'sqrt(': 'np.sqrt(',
+        'exp(': 'np.exp(',
+        'sin(': 'np.sin(',
+        'cos(': 'np.cos(',
+        'tan(': 'np.tan(',
+        'sum(': 'np.nansum(',
+        'mean(': 'np.nanmean(',
+        'rms(': 'np.nanstd(',
+        'std(': 'np.nanstd(',
+        'var(': 'np.nanvar(',
+        'diff(': 'np.diff(',
+        'max(': 'np.nanmax(',
+        'min(': 'np.nanmin('
     }
 
     def __init__(self,
@@ -184,10 +185,14 @@ class Variable:
             # carets represent exponents
             expression = expression.replace('^', '**')
 
+            expr_vals = {}
             for symbol, variable in self.definitions.items():
                 # take last known value
+
+                expr_vals[symbol] = variable._value
+
                 expression = expression.replace(
-                    symbol, '(' + str(variable._value) + ')'
+                    symbol, f"expr_vals['{symbol}']"
                 )
 
             for shorthand, longhand in self.expression_functions.items():
