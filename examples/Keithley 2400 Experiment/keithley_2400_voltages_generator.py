@@ -7,6 +7,6 @@ voltages = np.concatenate([
     np.arange(-20,1)
 ])
 
-df = pd.DataFrame({'Voltages': voltages})
+df = pd.DataFrame({'Voltage': voltages})
 
 df.to_csv('keithley_2400_voltages.csv',index=False)

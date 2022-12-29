@@ -12,8 +12,8 @@ Settings:
 Instruments:
  Sourcemeter:
   type: Keithley2400
-  address: 10
-  prologix address: 'COM5'
+  address: 5
+#  prologix address: 'COM5'
   presets:
    voltage range: 20
    current range: 1
@@ -45,4 +45,4 @@ Routines:
   type: Sequence
   knobs: Voltage
   end: 2 minutes
-  values: 'voltages.csv'
+  values: 'keithley_2400_voltages.csv'
