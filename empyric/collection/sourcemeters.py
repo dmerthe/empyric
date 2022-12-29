@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 from empyric.collection.instrument import *
+from empyric.tools import is_on
 
 
 class Keithley2400(Instrument):
@@ -31,6 +32,7 @@ class Keithley2400(Instrument):
         'output',
         'source',
         'meter',
+        'remote sense',
         'source delay'
     )
 
@@ -76,12 +78,10 @@ class Keithley2400(Instrument):
         self.set_output('OFF')
 
         if variable == 'voltage':
-
             self.write(':SOUR:FUNC VOLT')
             self.current = None
 
         if variable == 'current':
-
             self.write(':SOUR:FUNC CURR')
             self.voltage = None
 
@@ -98,6 +98,24 @@ class Keithley2400(Instrument):
         if variable == 'current':
             self.write(':SENS:FUNC "CURR"')
             self.write(':FORM:ELEM CURR')
+
+    @setter
+    def set_remote_sense(self, on_or_off):
+
+        self.set_output('OFF')
+
+        if is_on(on_or_off):
+            self.write(':SYST:RSEN ON')
+        else:
+            self.write(':SYST:RSEN OFF')
+
+    @getter
+    def get_remote_sense(self):
+
+        if is_on(self.query(':SYST:RSEN?').strip()):
+            return 'ON'
+        else:
+            return 'OFF'
 
     @setter
     def set_output(self, output):
@@ -216,7 +234,7 @@ class Keithley2400(Instrument):
 
     @setter
     def set_current_limit(self, current_limit):
-        self.write(':SENS:CURR:PROT %.2E' %  current_limit)
+        self.write(':SENS:CURR:PROT %.2E' % current_limit)
 
     @setter
     def set_nplc(self, nplc):
@@ -280,7 +298,7 @@ class Keithley2400(Instrument):
             sub_lists = []
         else:  # instrument can only store 100 voltages
             sub_lists = [
-                self.fast_voltages[i*100:(i+1)*100]
+                self.fast_voltages[i * 100:(i + 1) * 100]
                 for i in range(list_length // 100)
             ]
 
@@ -353,7 +371,7 @@ class Keithley2460(Instrument):
     presets = {
         'source': 'voltage',
         'meter': 'current',
-        'voltage':0,
+        'voltage': 0,
         'output': 'ON',
         'nplc': 1,
         'source delay': 0,
@@ -387,12 +405,10 @@ class Keithley2460(Instrument):
         self.set_output('OFF')
 
         if variable == 'voltage':
-
             self.write('SOUR:FUNC VOLT')
             self.current = None
 
         if variable == 'current':
-
             self.write('SOUR:FUNC CURR')
             self.voltage = None
 
@@ -545,13 +561,13 @@ class Keithley2460(Instrument):
         if len(self.fast_voltages) == 0:
             raise ValueError('Fast IV sweep voltages have not been set!')
 
-        path = self.name+'-fast_iv_measurement.csv'
+        path = self.name + '-fast_iv_measurement.csv'
 
         list_length = len(self.fast_voltages)
 
         if list_length >= 100:
             sub_lists = [
-                self.fast_voltages[i*100:(i+1)*100]
+                self.fast_voltages[i * 100:(i + 1) * 100]
                 for i in range(list_length // 100)
             ]
         else:
@@ -567,7 +583,6 @@ class Keithley2460(Instrument):
 
         start = datetime.datetime.now()
         for voltage_list in sub_lists:
-
             voltage_str = ', '.join(
                 ['%.4E' % voltage for voltage in voltage_list]
             )
@@ -644,7 +659,7 @@ class Keithley2651A(Instrument):
     presets = {
         'voltage range': 40,
         'current range': 5,
-        'voltage':0,
+        'voltage': 0,
         'output': 'ON',
         'nplc': 1,
         'source': 'voltage',
@@ -677,7 +692,7 @@ class Keithley2651A(Instrument):
             raise ValueError('source must be either "current" or "voltage"')
 
     @setter
-    def set_meter(self,variable):
+    def set_meter(self, variable):
 
         self.write('display.screen = display.SMUA')
 
@@ -811,7 +826,7 @@ class Keithley2651A(Instrument):
 
         for i in range(len(self.fast_voltages) // list_length):
             voltage_lists.append(
-                self.fast_voltages[i*list_length:(i+1)*list_length]
+                self.fast_voltages[i * list_length:(i + 1) * list_length]
             )
 
         remainder = len(self.fast_voltages) % list_length
@@ -822,7 +837,6 @@ class Keithley2651A(Instrument):
         self.backend.timeout = 60  # give it up to a minute to do sweep
 
         for voltage_list in voltage_lists:
-
             voltage_string = ', '.join(
                 [f'{voltage}' for voltage in voltage_list]
             )
@@ -849,5 +863,5 @@ class Keithley2651A(Instrument):
         return np.array(current_list)
 
     @setter
-    def set_source_delay(self,delay):
+    def set_source_delay(self, delay):
         self.write(f'smua.source.delay = {delay}')
