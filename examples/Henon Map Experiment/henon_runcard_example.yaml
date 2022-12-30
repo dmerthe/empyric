@@ -51,7 +51,7 @@ Alarms:
   protocol: hold
 
 Plots:
- Henon Map:
+ Henon Map:  # simple plot of y versus x
   x: Coordinate x
   y: Coordinate y
   xlabel: 'X'
@@ -62,9 +62,12 @@ Plots:
    marker: 'o'
    markersize: 3
 
- Y Plot:
-  x: Time
-  y: Coordinate y
+ X and Y Plots:  # combines 2 plots into a single figure
+  # x-axis defaults to "Time" if not specified 
+  y1: Coordinate y
+  y2: Coordinate x
+  y1label: Y
+  y2label: X
 
 Routines:
  Ramp Knob a:

@@ -1,5 +1,6 @@
 import numbers
 import os.path
+import re
 import time
 import sys
 import numpy as np
@@ -70,9 +71,50 @@ class Plotter:
 
         self.plots = {}
         for plot_name in settings:
-            self.plots[plot_name] = plt.subplots(
-                constrained_layout=True, figsize=(5, 4)
-            )
+
+            # Single plot has a single 'y' specification
+            y_keys = [
+                key for key in settings[plot_name] if key == 'y'
+            ]
+
+            # A row of plots is specified by yi, i = 1, 2, 3, ...
+            yi_keys = [
+                key for key in settings[plot_name] if re.fullmatch('y\d', key)
+            ]
+
+            # An array of plots is specified by yij, i/j = 1, 2, 3, ...
+            yij_keys = [
+                key for key in settings[plot_name] if re.fullmatch('y\d\d', key)
+            ]
+
+            if y_keys:
+
+                self.plots[plot_name] = plt.subplots(
+                    constrained_layout=True, figsize=(5, 4)
+                )
+
+            elif yi_keys:
+
+                self.plots[plot_name] = plt.subplots(
+                    constrained_layout=True, figsize=(5*len(yi_keys), 4),
+                    ncols=len(yi_keys), squeeze=True
+                )
+
+            elif yij_keys:
+
+                ncols = max([int(key[1]) for key in yij_keys])
+                nrows = max([int(key[2]) for key in yij_keys])
+
+                self.plots[plot_name] = plt.subplots(
+                    constrained_layout=True,
+                    figsize=(5 * ncols, 4 * nrows),
+                    ncols=ncols, nrows=nrows
+                )
+
+            else:
+                raise KeyError(
+                    f'invalid plot specification for {plot_name}'
+                )
 
     def save(self, plot_name=None, save_as=None):
         """Save the plots to PNG files in the working directory"""
@@ -122,7 +164,7 @@ class Plotter:
             elif style == 'averaged':
                 self._plot_basic(name, averaged=True)
             elif style == 'errorbars':
-                self._plot_basis(name, errorbars=True)
+                self._plot_basic(name, errorbars=True)
             elif style == 'parametric':
                 self._plot_parametric(name)
             else:
@@ -130,13 +172,89 @@ class Plotter:
                     f"Plotting style '{style}' not recognized!"
                 )
 
-    def _plot_basic(self, name, averaged=False, errorbars=False):
+    def _plot_basic(
+            self, name, averaged=False, errorbars=False, row=None, column=None
+    ):
         """Make a simple plot, (possibly multiple) y vs. x"""
 
         fig, ax = self.plots[name]
 
-        x = self.settings[name].get('x', 'Time')
-        ys = np.array([self.settings[name]['y']]).flatten()
+        # Determine if single plot, row of plots, or array of plots
+        if column is None and row is None:
+
+            if np.ndim(ax) == 0:
+                # if just single set of axes, then grab variable names
+
+                x = self.settings[name].get('x', 'Time')
+                ys = np.array([self.settings[name]['y']]).flatten()
+
+            elif np.ndim(ax) == 1:
+                # if axes are a 1D array, recurse through columns
+
+                for i in range(len(ax)):
+                    self._plot_basic(
+                        name, averaged=averaged, errorbars=errorbars, column=i
+                    )
+
+                return
+
+            elif np.ndim(ax) == 2:
+                # if axes are a 2D array, recurse through rows & columns
+
+                nrows, ncols = np.shape(ax)
+
+                for i in range(ncols):
+                    for j in range(nrows):
+                        try:
+                            self._plot_basic(
+                                name, averaged=averaged, errorbars=errorbars,
+                                row=j, column=i
+                            )
+                        except KeyError:
+                            # in case plot array is not fully populated
+                            pass
+
+                return
+
+            else:
+
+                raise RuntimeError(
+                    f'there was a problem initializing the axes for {name}'
+                )
+
+        elif column is not None and row is None:
+
+            if 'x' in self.settings[name]:
+                x = self.settings[name]['x']
+            elif 'x1' in self.settings[name]:
+                x = self.settings[name]['x' + str(column+1)]
+            else:
+                x = 'Time'
+
+            ys = np.array([self.settings[name]['y' + str(column+1)]]).flatten()
+
+            ax = ax[column]
+
+        elif column is not None and row is not None:
+
+            if 'x' in self.settings[name]:
+                x = self.settings[name]['x']
+            elif 'x11' in self.settings[name]:
+                x = self.settings[name]['x' + str(column+1) + str(row+1)]
+            else:
+                x = 'Time'
+
+            ys = np.array(
+                [self.settings[name]['y' + str(column+1) + str(row+1)]]
+            ).flatten()
+
+            ax = ax[row, column]
+
+        else:
+            raise ValueError(
+                'invalid row and/or column arguments; valid options are no row '
+                'and no column, column and no row, or both row and column'
+            )
 
         not_in_data = np.setdiff1d(np.concatenate([[x], ys]), self.data.columns)
         if not_in_data.size > 0:
@@ -191,8 +309,8 @@ class Plotter:
             if len(ys) > 1:  # a legend will be made
                 plot_kwargs['label'] = ys
 
-            xscale = self.settings[name].get('x scale', 'linear')
-            yscale = self.settings[name].get('y scale', 'linear')
+            xscale = self.settings[name].get('xscale', 'linear')
+            yscale = self.settings[name].get('yscale', 'linear')
 
             if x == 'Time':
                 ax.xaxis.set_major_locator(self.date_locator)
@@ -240,16 +358,42 @@ class Plotter:
             else:
                 ax.set_yscale(yscale)
 
-            ax.set_title(name)
+            if row is None and column is None:
+                ax.set_title(name)
+            else:
+                fig.suptitle(name)
+
             ax.tick_params(labelsize='small')
             ax.grid()
 
             if len(ys) > 1:
                 ax.legend()
 
+            # Make plot labels
+
             if x != 'Time':
-                ax.set_xlabel(self.settings[name].get('xlabel', x))
-            ax.set_ylabel(self.settings[name].get('ylabel', ys[0]))
+
+                if 'xlabel' in self.settings[name]:
+                    ax.set_xlabel(self.settings[name]['xlabel'])
+                elif 'x'+str(column)+'label' in self.settings[name]:
+                    ax.set_xlabel(self.settings[name]['x'+str(column)+'label'])
+                elif 'x'+str(column)+str(row)+'label' in self.settings[name]:
+                    ax.set_xlabel(
+                        self.settings[name]['x'+str(column)+str(row)+'label']
+                    )
+                else:
+                    ax.set_xlabel(x)
+
+            if 'ylabel' in self.settings[name]:
+                ax.set_ylabel(self.settings[name]['ylabel'])
+            elif 'y'+str(column+1)+'label' in self.settings[name]:
+                ax.set_ylabel(self.settings[name]['y'+str(column+1)+'label'])
+            elif 'y'+str(column+1)+str(row+1)+'label' in self.settings[name]:
+                ax.set_ylabel(
+                    self.settings[name]['y'+str(column+1)+str(row+1) + 'label']
+                )
+            else:
+                ax.set_ylabel(ys[0])
 
             plt.pause(0.01)
 

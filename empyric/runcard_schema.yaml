@@ -67,12 +67,12 @@ map:
 
   Plots: {map: {
     regex;(.+): {required: true, map: {  # plot name
-      x: {type: any},
-      y: {type: any, required: true},
+      regex;(x\d*): {type: any},
+      regex;(y\d*): {type: any},
       s: {type: any},  # for parametric plots
       style: {type: str},
-      xlabel: {type:  str},
-      ylabel: {type: str},
+      regex;(x\d*label): {type:  str},
+      regex;(y\d*label): {type: str},
       configure: {map: {
         regex;(.+): {type: any}  # keyword args passed to matplotlib
       }}
