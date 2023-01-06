@@ -40,4 +40,4 @@ Supported Instruments
    instruments/barometers
    instruments/spectrometers
    instruments/scopes
-
+   instruments/io
