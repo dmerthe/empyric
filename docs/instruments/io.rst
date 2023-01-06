@@ -1,4 +1,4 @@
-.. _virtual-instruments-section:
+.. _io-instruments-section:
 
 Virtual
 =======
