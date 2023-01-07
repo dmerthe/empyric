@@ -2,6 +2,7 @@ import numbers, importlib
 from empyric.adapters import *
 from empyric.collection.instrument import *
 
+
 class Keithley2110(Instrument):
     """
     Keithley 2110 digital multimeter instrument
@@ -17,19 +18,19 @@ class Keithley2110(Instrument):
         'voltage range',
         'current range'
     )
-    
+
     meters = (
         'voltage',
         'current',
         'temperature'
     )
-    
+
     _mode = None
-    
+
     @property
     def mode(self):
         return self._mode
-    
+
     @mode.setter
     def mode(self, mode):
         if mode == 'voltage':
@@ -41,7 +42,7 @@ class Keithley2110(Instrument):
         if mode == 'temperature':
             self.write('FUNC "TCO"')
             self._mode = 'temperature'
-            
+
     @setter
     def set_voltage_range(self, voltage_range):
 
@@ -122,6 +123,78 @@ class Keithley2110(Instrument):
         return float(self.query('READ?'))
 
 
+class Keithley6500(Instrument):
+    """
+    Multimeter with 6.5 digits and high speed scanning and digitizing
+    capabilities.
+    """
+
+    name = 'Keithley6500'
+
+    supported_adapters = (
+        (USB, {}),
+        (Socket, {}),
+        (Serial, {}),
+        (GPIB, {})
+    )
+
+    knobs = (
+        'function'
+        'count',  # number of digitized measurements
+        'nplc',  # number of power line cycles between measurements
+        'range',
+    )
+
+    meters = (
+        'voltage',
+        'voltages',
+        'current',
+        'currents'
+        'resistance',
+        'temperature'
+    )
+
+    functions = {
+        'voltage': '"VOLT"',
+        'current': '"CURR"',
+        'resistance': '"RES"',
+
+        'diode': '"DIOD"',
+        'capacitance': '"CAP"',
+        'temperature': '"TEMP"',
+        'continuity': '"CONT"',
+        'frequency': '"FREQ"',
+
+    }
+
+    @setter
+    def set_function(self, function):
+
+        if function in self.functions:
+            self.query(f':FUNC {self.functions[function]}')
+        else:
+            raise ValueError(f'invalid measurement function "{function}"')
+
+    @setter
+    def get_function(self):
+
+        reverse_functions = {val: key for key, val in self.functions.items()}
+
+        return reverse_functions[self.query('FUNC?')]
+
+    @setter
+    def set_count(self, count):
+
+        self.write(f':COUN {count}')
+
+    @setter
+    def set_nplc(self, nplc):
+
+        func = self.query(':FUNC?')
+
+        self.write(f':{func}: {nplc}')
+
+
 class LabJackU6(Instrument):
     """
     LabJack U6 Multi-function DAQ
@@ -152,7 +225,6 @@ class LabJackU6(Instrument):
     )
 
     def __init__(self, *args, **kwargs):
-
         u6 = importlib.import_module('u6')
         self.backend = u6.U6()
 

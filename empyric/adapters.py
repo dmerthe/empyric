@@ -870,8 +870,6 @@ class Socket(Adapter):
         if self.connected:
             self.disconnect()
 
-        socket = importlib.import_module('socket')
-
         # Get IP address by connecting to Google DNS server
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as tst_sock:
             tst_sock.connect(("8.8.8.8", 80))
@@ -879,7 +877,7 @@ class Socket(Adapter):
 
         self.backend = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-        self.backend.settimeout(5)
+        self.backend.settimeout(self.timeout)
 
         address = self.instrument.address
         remote_ip_address, remote_port = address.split('::')
@@ -909,8 +907,6 @@ class Socket(Adapter):
         return self._read(nbytes=nbytes)
 
     def disconnect(self):
-
-        socket = importlib.import_module('socket')
 
         self.backend.shutdown(socket.SHUT_RDWR)
         self.backend.close()
