@@ -1,8 +1,9 @@
 .. _io-instruments-section:
 
-Virtual
+I/O
 =======
 
 .. automodule:: empyric.collection.io
    :members:
    :undoc-members:
+
