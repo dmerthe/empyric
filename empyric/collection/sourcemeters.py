@@ -85,6 +85,14 @@ class Keithley2400(Instrument):
             self.write(':SOUR:FUNC CURR')
             self.voltage = None
 
+    @getter
+    def get_source(self):
+
+        if self.query('SOUR:FUNC?').strip() == 'VOLT':
+            return 'Voltage'
+        else:
+            return 'Current'
+
     @setter
     def set_meter(self, variable):
 
@@ -98,6 +106,11 @@ class Keithley2400(Instrument):
         if variable == 'current':
             self.write(':SENS:FUNC "CURR"')
             self.write(':FORM:ELEM CURR')
+
+    @getter
+    def get_meters(self): #pending work
+
+        raise ValueError('funcion no funciona')
 
     @setter
     def set_remote_sense(self, on_or_off):
@@ -130,6 +143,14 @@ class Keithley2400(Instrument):
             self.write(':OUTP ON')
         else:
             raise ValueError(f'Ouput setting {output} not recognized!')
+
+    @getter
+    def get_output(self):
+
+        if is_on(self.query('OUTP?').strip()):
+            return 'ON'
+        else:
+            return 'OFF'
 
     @measurer
     def measure_voltage(self):
@@ -172,6 +193,11 @@ class Keithley2400(Instrument):
 
         self.write(':SOUR:VOLT:LEV %.2E' % voltage)
 
+    @getter
+    def get_voltage(self):
+
+        return self.query(':SOUR:VOLT:LEV ?').split()
+
     @setter
     def set_current(self, current):
 
@@ -183,6 +209,11 @@ class Keithley2400(Instrument):
 
         self.write(':SOUR:CURR:LEV %.2E' % current)
 
+    @getter
+    def get_current(self):
+
+        return self.query(':SOUR:CURR:LEV ?').split()
+
     @setter
     def set_voltage_range(self, voltage_range):
 
@@ -191,7 +222,7 @@ class Keithley2400(Instrument):
                 self.write(':SOUR:VOLT:RANGE %.2E' % voltage_range)
             else:
                 if voltage_range == 'AUTO':
-                    self.write(':SENS:VOLT:RANGE AUTO')
+                    self.write(':SENS:VOLT:RANGE: AUTO ON')
                 else:
                     self.write(':SENS:VOLT:RANGE %.2E' % voltage_range)
         else:
@@ -199,6 +230,22 @@ class Keithley2400(Instrument):
                          f'is not a valid value for {self.name}\n'
             second_line = f'Valid values are {self.voltage_ranges}'
             raise ValueError(first_line + second_line)
+
+    @getter
+    def get_voltage_range(self):
+
+        if self.source == 'voltage':
+
+            if is_on(self.query(':SOUR:VOLT:RANGE:AUTO?').split()):
+                return 'AUTO'
+            else:
+                return self.query(':SOUR:VOLT:RANG?').split()
+
+        else:
+            if is_on(self.query(':SENS:VOLT:RANGE:AUTO?').split()):
+                return 'AUTO'
+            else:
+                return self.query(':SENS:VOLT:RANG?').split()
 
     @setter
     def set_voltage_limit(self, voltage_limit):
@@ -214,6 +261,14 @@ class Keithley2400(Instrument):
                 raise ValueError(first_line + second_line)
         else:
             self.write(':SENS:VOLT:PROT %.2E' % voltage_limit)
+
+    @getter
+    def get_voltage_limit(self):
+
+        if self.source == 'voltage':
+            return self.query(':SOUR:VOLT:PROT?').split()
+        else:
+            return self.query(':SENS:VOLT:PROT?').split()
 
     @setter
     def set_current_range(self, current_range):
@@ -232,9 +287,33 @@ class Keithley2400(Instrument):
             second_line = f'Valid values are {self.current_ranges}'
             raise ValueError(first_line + second_line)
 
+    @getter
+    def get_current_range(self):
+
+        if self.source == 'current':
+
+            if is_on(self.query(':SOUR:CURR:RANGE:AUTO?').split()):
+                return 'AUTO'
+            else:
+                return self.query(':SOUR:CURR:RANG?').split()
+
+        else:
+            if is_on(self.query(':SENS:CURR:RANGE:AUTO?').split()):
+                return 'AUTO'
+            else:
+                return self.query(':SENS:CURR:RANG?').split()
+
     @setter
     def set_current_limit(self, current_limit):
         self.write(':SENS:CURR:PROT %.2E' % current_limit)
+
+    @getter
+    def get_current_limit(self):
+
+        if self.source == 'current':
+            return self.query(':SOUR:CURR:PROT?'.split())
+        else:
+            return self.query(':SENS:CURR:PROT?').split()
 
     @setter
     def set_nplc(self, nplc):
@@ -243,6 +322,14 @@ class Keithley2400(Instrument):
             self.write(':SENS:CURR:NPLC %.2E' % nplc)
         elif self.meter == 'voltage':
             self.write(':SENS:VOLT:NPLC %.2E' % nplc)
+
+    @getter
+    def get_nplc(self, nplc):
+
+        if self.meter == 'current':
+            return self.query(':SENS:CURR:NPLC?').split()
+        elif self.meter == 'voltage':
+            return self.query(':SENS:VOLT:NPLC?').split()
 
     @setter
     def set_delay(self, delay):
@@ -337,6 +424,10 @@ class Keithley2400(Instrument):
     @setter
     def set_source_delay(self, delay):
         self.write(':SOUR:DEL %.4E' % delay)
+
+    @getter
+    def get_source_delay(self):
+        return self.query(':SOUR:DEL?').split()
 
 
 class Keithley2460(Instrument):
