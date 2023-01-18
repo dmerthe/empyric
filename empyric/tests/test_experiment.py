@@ -89,7 +89,7 @@ def test_manager(tmp_path):
     assert manager.description['name'] == 'Henon Map Experiment'
 
     # Run a short version of the Henon Map example experiment
-    manager.experiment.end = 3
+    manager.experiment.end = 10
     manager.followup = None
 
     manager.run(directory=tmp_path)

@@ -479,7 +479,10 @@ class GPIB(Adapter):
         if self.connected:
             if self.lib == 'pyvisa':
                 # pyvisa records timeouts in milliseconds
-                self.backend.timeout = timeout * 1000
+                if timeout is None:
+                    self.backend.timeout = None
+                else:
+                    self.backend.timeout = timeout * 1000
                 self._timeout = timeout
             elif self.lib == 'linux-gpib':
                 self._timeout = self._linux_gpib_set_timeout(timeout)
@@ -488,7 +491,7 @@ class GPIB(Adapter):
 
     def connect(self):
 
-        if hasattr(self, 'prologix_address'):
+        if self.prologix_address is not None:
             self.lib = 'prologix-gpib'
 
         if self.lib == 'pyvisa':
@@ -513,10 +516,7 @@ class GPIB(Adapter):
                     full_address = address
 
             if full_address:
-                self.backend = manager.open_resource(
-                    full_address,
-                    open_timeout=self.timeout
-                )
+                self.backend = manager.open_resource(full_address)
             else:
                 AdapterError(
                     'GPIB device at address '
@@ -555,8 +555,9 @@ class GPIB(Adapter):
 
         else:
             raise AdapterError(
-                f"invalid library specification; options are 'pyvisa', 'linux-gpib' or 'prologix-gpib'."
-                "If using a Prologix GPIB adapter, its 'prologix address' argument must be specified"
+                f"invalid library specification; options are 'pyvisa', "
+                f"'linux-gpib' or 'prologix-gpib'. If using a Prologix GPIB "
+                "adapter, its 'prologix address' argument must be specified"
             )
 
         self.connected = True
@@ -1070,6 +1071,7 @@ class Phidget(Adapter):
     def disconnect(self):
         self.backend.close()
         self.connected = True
+
 
 supported = {key: value for key, value in vars().items()
              if type(value) is type and issubclass(value, Adapter)}

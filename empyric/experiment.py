@@ -57,20 +57,21 @@ class Variable:
     """
 
     # Abbreviated functions that can be used to evaluate expression variables
+    # parentheses are included to facilitate search for functions in expressions
     expression_functions = {
-        'sqrt': 'np.sqrt',
-        'exp': 'np.exp',
-        'sin': 'np.sin',
-        'cos': 'np.cos',
-        'tan': 'np.tan',
-        'sum': 'np.nansum',
-        'mean': 'np.nanmean',
-        'rms': 'np.nanstd',
-        'std': 'np.nanstd',
-        'var': 'np.nanvar',
-        'diff': 'np.diff',
-        'max': 'np.nanmax',
-        'min': 'np.nanmin'
+        'sqrt(': 'np.sqrt(',
+        'exp(': 'np.exp(',
+        'sin(': 'np.sin(',
+        'cos(': 'np.cos(',
+        'tan(': 'np.tan(',
+        'sum(': 'np.nansum(',
+        'mean(': 'np.nanmean(',
+        'rms(': 'np.nanstd(',
+        'std(': 'np.nanstd(',
+        'var(': 'np.nanvar(',
+        'diff(': 'np.diff(',
+        'max(': 'np.nanmax(',
+        'min(': 'np.nanmin('
     }
 
     def __init__(self,
@@ -103,6 +104,8 @@ class Variable:
 
         :param parameter (str) value of a user controlled parameter
         """
+
+        self._value = None  # last known value of this variable
 
         if meter:
             self.meter = meter
@@ -143,6 +146,7 @@ class Variable:
 
         elif parameter:
             self.parameter = parameter
+            self._value = parameter
             self.type = 'parameter'
             self.settable = True
 
@@ -151,8 +155,6 @@ class Variable:
                 'variable object must have a specified knob, meter or '
                 'expression, or assigned a value if a parameter!'
             )
-
-        self._value = None  # last known value of this variable
 
         # time of last evaluation; used for expressions
         self.last_evaluation = np.nan
@@ -183,10 +185,14 @@ class Variable:
             # carets represent exponents
             expression = expression.replace('^', '**')
 
+            expr_vals = {}
             for symbol, variable in self.definitions.items():
                 # take last known value
+
+                expr_vals[symbol] = variable._value
+
                 expression = expression.replace(
-                    symbol, '(' + str(variable._value) + ')'
+                    symbol, f"expr_vals['{symbol}']"
                 )
 
             for shorthand, longhand in self.expression_functions.items():
@@ -966,8 +972,14 @@ def convert_runcard(runcard):
                 adapter_kwargs[kwarg] = specs.pop(kwarg.replace('_', ' '))
 
         # Any remaining keywords are instrument presets
-        presets = specs.get('presets', {})
-        postsets = specs.get('postsets', {})
+        presets = {
+            key: recast(value) for key, value
+            in specs.get('presets', {}).items()
+        }
+        postsets = {
+            key: recast(value) for key, value
+            in specs.get('postsets', {}).items()
+        }
 
         instrument_class = available_instruments[_type]
         instruments[name] = instrument_class(
@@ -1065,7 +1077,7 @@ def convert_runcard(runcard):
                         return False
 
                 def get_csv(path, column):
-                    df = pd.read_csv(path)
+                    df = pd.read_csv(recast(path))
                     return df[column].values.flatten()
 
                 specs['values'] = np.array([

@@ -269,9 +269,9 @@ class Plotter:
                 'but not in variables!'
             )
 
-        xdata = self.full_data[x]
-        ydata = self.full_data[y]
-        sdata = self.full_data[s]
+        xdata = self.full_data[x].values
+        ydata = self.full_data[y].values
+        sdata = self.full_data[s].values
 
         if s == 'Time':  # Rescale time if values are large
             units = 'seconds'
@@ -329,6 +329,7 @@ class Plotter:
             ax.tick_params(labelsize='small')
             ax.set_xlabel(self.settings[name].get('xlabel', x))
             ax.set_ylabel(self.settings[name].get('ylabel', y))
+
             if s == 'Time':
                 fig.cbar.ax.set_ylabel('Time ' + f" ({units})")
             else:
@@ -336,7 +337,10 @@ class Plotter:
 
             fig.cbar.ax.tick_params(labelsize='small')
 
-            fig.get_layout_engine().execute(fig)
+            try:
+                fig.get_layout_engine().execute(fig)
+            except AttributeError:  # sometimes happens for reasons
+                pass
 
             plt.pause(0.01)
 
@@ -420,7 +424,8 @@ class Plotter:
 
             numerical_indices = numerical_indices + [index] * max_len
             for i, column in enumerate(columns):
-                new_elements = column + [np.nan] * (max_len - len(column))
+                # fill remainder of column with most recent value
+                new_elements = column + [column[-1]] * (max_len - len(column))
                 numerical_array[i] = numerical_array[i] + new_elements
 
         numerical_data = pd.DataFrame(

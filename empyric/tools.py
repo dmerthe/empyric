@@ -1,3 +1,4 @@
+import os
 import time
 import re
 import select
@@ -130,12 +131,15 @@ def find_nearest(allowed, value, overestimate=False, underestimate=False):
 
 
 def recast(value):
+    """
+    Convert a value into the appropriate type for the information it contains
+    """
 
     if value is None:
         return None
-    elif isinstance(value, numbers.Number) or type(value) is bool:
-        return value
     elif np.ndim(value) > 0:  # value is an array
+        return np.array([recast(subval) for subval in value])
+    elif isinstance(value, numbers.Number) or type(value) is bool:
         return value
     elif type(value) is str:
 
@@ -145,14 +149,20 @@ def recast(value):
             return False
         elif re.fullmatch('[0-9]*', value):  # integer
             return int(value)
-        elif re.match('[0-9]*\.[0-9]*', value):  # float
+        elif re.fullmatch('[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?', value):
+            # float
             return float(value)
+        elif os.path.isfile(value):  # path in the current working directory
+            return os.path.abspath(value)
+        elif os.path.isfile(os.path.join('..', value)):  # ... up one level
+            return os.path.abspath(os.path.join('..', value))
         else:
             return value
     else:
         return None
 
 
+# Tools for handling sockets
 def get_ip_address(remote_ip='8.8.8.8', remote_port=80):
     """Connect to Google's DNS Server to resolve IP address"""
 

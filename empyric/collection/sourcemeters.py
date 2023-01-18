@@ -1,12 +1,10 @@
 import os
-import re
 import datetime
 import numpy as np
 import pandas as pd
-import numbers
 
-from empyric.adapters import *
 from empyric.collection.instrument import *
+
 
 class Keithley2400(Instrument):
     """
@@ -56,7 +54,7 @@ class Keithley2400(Instrument):
         'fast currents'
     )
 
-    fast_voltages = None
+    fast_voltages = []
 
     # allowed current range settings
     current_ranges = (1e-6, 10e-6, 100e-6, 1e-3, 10e-3, 100e-3, 1, 'AUTO')
@@ -234,50 +232,57 @@ class Keithley2400(Instrument):
 
     @setter
     def set_fast_voltages(self, voltages):
-        self.fast_voltages = voltages
 
         # import fast voltages, if specified as a path
-        if type(self.fast_voltages) == str:  # can be specified as a path
-            try:
-                fast_voltage_data = pd.read_csv(self.fast_voltages)
-            except FileNotFoundError:
-                # probably in an experiment data directory; try going up a level
-                working_subdir = os.getcwd()
-                os.chdir('..')
-                fast_voltage_data = pd.read_csv(self.fast_voltages)
-                os.chdir(working_subdir)
+        if type(voltages) == str:
 
-            columns = fast_voltage_data.columns
+            is_csv = '.csv' in voltages.lower()
+            is_file = os.path.isfile(voltages)
 
-            fast_voltages = fast_voltage_data[columns[0]]
+            if not is_csv or not is_file:
+                raise ValueError(
+                    f'invalid fast voltages path for {self.name}; '
+                    'a 1D numerical array or valid path to CSV file must be '
+                    'provided.'
+                )
 
-            self.fast_voltages = fast_voltages.astype(float).values
+            voltage_data = pd.read_csv(voltages)
+
+            columns = voltage_data.columns
+
+            # Look for matching column name
+            named = np.intersect1d(
+                ['Voltage', 'Fast Voltage', 'Voltages', 'Fast Voltages'],
+                columns
+            )
+
+            if named:
+                voltages = voltage_data[named[0]].values
+            else:
+                # If no matching column name, take the first column
+                voltages = voltage_data[columns[0]].values
+
+        if np.ndim(voltages) == 1:
+            return np.array(voltages, dtype=float)  # --> self.fast_voltages
+        else:
+            raise ValueError(f'invalid fast voltages: {voltages}')
 
     @measurer
     def measure_fast_currents(self):
 
-        if self.source != 'voltage':
-            self.set_source('voltage')
-
-        self.set_output('ON')
-
-        try:
-            if len(self.fast_voltages) == 0:
-                raise ValueError('Fast IV sweep voltages have not been set!')
-        except AttributeError:
-            raise ValueError('Fast IV sweep voltages have not been set!')
-
-        self.write(':SOUR:VOLT:MODE LIST')
-
         list_length = len(self.fast_voltages)
 
-        if list_length >= 100:  # can only take 100 voltages at a time
+        if list_length == 0:
+            raise ValueError(
+                f'fast voltages for {self.name} have not been set'
+            )
+        elif list_length <= 100:
+            sub_lists = []
+        else:  # instrument can only store 100 voltages
             sub_lists = [
                 self.fast_voltages[i*100:(i+1)*100]
                 for i in range(list_length // 100)
             ]
-        else:
-            sub_lists = []
 
         if list_length % 100 > 0:
             sub_lists.append(self.fast_voltages[-(list_length % 100):])
@@ -286,6 +291,10 @@ class Keithley2400(Instrument):
 
         normal_timeout = self.adapter.timeout
         self.adapter.timeout = None  # the response times can be long
+
+        self.set_source('voltage')
+        self.set_output('ON')
+        self.write(':SOUR:VOLT:MODE LIST')
 
         for voltage_list in sub_lists:
             voltage_str = ', '.join(
@@ -522,24 +531,8 @@ class Keithley2460(Instrument):
 
     @setter
     def set_fast_voltages(self, voltages):
-        self.fast_voltages = voltages
 
-        # import fast voltages, if specified as a path
-        if type(self.fast_voltages) == str:  # can be specified as a path
-            try:
-                fast_voltage_data = pd.read_csv(self.fast_voltages)
-            except FileNotFoundError:
-                # probably in an experiment data directory; try going up a level
-                working_subdir = os.getcwd()
-                os.chdir('..')
-                fast_voltage_data = pd.read_csv(self.fast_voltages)
-                os.chdir(working_subdir)
-
-            columns = fast_voltage_data.columns
-
-            fast_voltages = fast_voltage_data[columns[0]]
-
-            self.fast_voltages = fast_voltages.astype(float).values
+        Keithley2400.set_fast_voltages(self, voltages)
 
     @measurer
     def measure_fast_currents(self):
