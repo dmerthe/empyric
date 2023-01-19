@@ -1009,7 +1009,11 @@ def convert_runcard(runcard):
 
             for symbol, var_name in specs['definitions'].items():
                 expression = expression.replace(symbol, var_name)
-                definitions[var_name] = variables[var_name]
+
+                try:
+                    definitions[var_name] = variables[var_name]
+                except KeyError as undefined:
+                    raise KeyError(f"variable {undefined} is not defined for expression '{name}'")
 
             variables[name] = Variable(
                 expression=expression, definitions=definitions
@@ -1032,6 +1036,8 @@ def convert_runcard(runcard):
         for name, specs in runcard['Routines'].items():
             specs = specs.copy()  # avoids modifying the runcard
             _type = specs.pop('type')
+
+            specs = {key.replace(' ', '_'): value for key, value in specs.items()}
 
             # For Set, Timecourse and Sequence routines
             knobs = np.array([specs.get('knobs', [])]).flatten()

@@ -18,7 +18,7 @@ map:
   Instruments: {map: {
     regex;(.+): {required: true, map: {  # instrument name
       type: {type: str, required: true},
-      address: {type: any, required: true},
+      address: {type: any},
       presets: {map: {
         regex;(.+): {type: any}  # knob name and value
       }},
@@ -57,11 +57,7 @@ map:
   Routines: {map: {
     regex;(.+): {required: true, map: {  # routine name
       type: {type: str, required: true},
-      times: {type: any},
-      knobs: {type: any},
-      values: {type: any},
-      meters: {type: any},
-      end: {type: any}
+      regex;(.+): {type: any}
     }}
   }}
 

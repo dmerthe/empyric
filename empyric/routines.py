@@ -39,10 +39,10 @@ class Routine:
 
             if len(self.knobs) > 1:
                 if np.ndim(values) == 1:  # single list of values for all knobs
-                    values = [values]*len(self.knobs)
+                    values = [values] * len(self.knobs)
                 elif np.shape(values)[0] == 1:
                     # 1xN array with one N-element list of times for all knobs
-                    values = [values[0]]*len(self.knobs)
+                    values = [values[0]] * len(self.knobs)
 
             self.values = np.array(
                 values, dtype=object
@@ -107,10 +107,10 @@ class Timecourse(Routine):
 
             if len(self.knobs) > 1:
                 if np.ndim(times) == 1:  # single list of times for all knobs
-                    times = [times]*len(self.knobs)
+                    times = [times] * len(self.knobs)
                 elif np.shape(times)[0] == 1:
                     # 1xN array with one N-element list of times for all knobs
-                    times = [times[0]]*len(self.knobs)
+                    times = [times[0]] * len(self.knobs)
 
             self.times = np.array(
                 times, dtype=object
@@ -227,12 +227,12 @@ class Minimization(Routine):
     knobs, using simulated annealing.
     """
 
-    def __init__(self, meters=None, max_deltas=None, T0=0.1, T1=0, **kwargs):
+    def __init__(self, meters=None, max_deltas=None, T0=1.0, T1=0.0, **kwargs):
 
         Routine.__init__(self, **kwargs)
 
         if meters:
-            self.meters = np.array([meters]).flatten()
+            self.meters = tuple(meters.keys())
         else:
             raise AttributeError(
                 f'{self.__name__} routine requires meters for feedback'
@@ -246,41 +246,62 @@ class Minimization(Routine):
         self.T = T0
         self.T0 = T0
         self.T1 = T1
-        self.last_knobs = [np.nan]*len(self.knobs)
-        self.last_meters = [np.nan]*len(self.meters)
+        self.best_knobs = [knob.value for knob in self.knobs.values()]
+        self.best_meters = [meter.value for meter in meters.values()]
+        self.finished = False
 
     def update(self, state):
 
-        # Get meter values
-        meter_values = np.array([state[meter] for meter in self.meters])
+        if state['Time'] < self.start:
+            return
+        elif state['Time'] > self.end:
+            if not self.finished:
+                print('Finishing...')
+                for knob, best_value in zip(self.knobs.values(), self.best_knobs):
+                    if knob.controller == self:
+                        print('Setting to', best_value)
+                        knob.value = best_value
+                        knob.controller = None
 
-        # Update temperature
-        self.T = self.T0 + self.T1*(
-                state['Time'] - self.start
-        )/(self.end - self.start)
+                self.finished = True
+        else:
 
-        if self.better(meter_values):
+            # Take control of knobs
+            for knob in self.knobs.values():
+                knob.controller = self
 
-            # Record this new optimal state
-            self.last_knobs = [state[knob] for knob in self.knobs]
-            self.last_meters = [state[meter] for meter in self.meters]
+            # Get meter values
+            meter_values = np.array([state[meter] for meter in self.meters])
+
+            # Update temperature
+            self.T = self.T0 + (self.T1 - self.T0) \
+                     * (state['Time'] - self.start) / (self.end - self.start)
+
+            if self.better(meter_values):
+                # Record this new optimal state
+                self.best_knobs = [state[knob] for knob in self.knobs]
+                self.best_meters = [state[meter] for meter in self.meters]
+
+            else:  # go back
+                for knob, last_value in zip(self.knobs.values(), self.best_knobs):
+                    knob.value = last_value
 
             # Generate and apply new knob settings
-            new_knobs = self.last_knobs + self.max_deltas*np.random.rand(
-                len(self.knobs)
-            )
+            new_knobs = self.best_knobs \
+                        + self.max_deltas \
+                        * (2 * np.random.rand(len(self.knobs)) - 1)
+
             for knob, new_value in zip(self.knobs.values(), new_knobs):
                 knob.value = new_value
 
-        else:  # go back
-            for knob, last_value in zip(self.knobs.values(), self.last_knobs):
-                knob.value = last_value
-
     def better(self, meter_values):
 
-        if np.prod(self.last_meters) != np.nan:
-            change = np.sum(meter_values) - np.sum(self.last_meters)
-            return (change < 0) or (np.exp(-change/self.T) > np.random.rand())
+        if np.prod(self.best_meters) != np.nan:
+            change = np.sum(meter_values) - np.sum(self.best_meters)
+            if self.T > 0:
+                return (change < 0) or (np.exp(-change / self.T) > np.random.rand())
+            else:
+                return change < 0
         else:
             return False
 
@@ -293,9 +314,12 @@ class Maximization(Minimization):
 
     def better(self, meter_values):
 
-        if np.prod(self.last_meters) != np.nan:
-            change = np.sum(meter_values) - np.sum(self.last_meters)
-            return (change > 0) or (np.exp(change / self.T) > np.random.rand())
+        if np.prod(self.best_meters) != np.nan and None not in meter_values:
+            change = np.sum(meter_values) - np.sum(self.best_meters)
+            if self.T > 0:
+                return (change > 0) or (np.exp(change / self.T) > np.random.rand())
+            else:
+                return change > 0
         else:
             return False
 
@@ -314,7 +338,6 @@ class ModelPredictiveControl(Routine):
     """
 
     def __init__(self, meters=None, **kwargs):
-
         Routine.__init__(self, **kwargs)
         self.meters = meters
 
