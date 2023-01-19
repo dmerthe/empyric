@@ -132,67 +132,63 @@ class Keithley6500(Instrument):
     name = 'Keithley6500'
 
     supported_adapters = (
-        (USB, {}),
-        (Socket, {}),
-        (Serial, {}),
-        (GPIB, {})
+        (Socket, {'write_termination': '\n'}),
     )
 
     knobs = (
-        'function'
-        'count',  # number of digitized measurements
-        'nplc',  # number of power line cycles between measurements
-        'range',
+        'meter',
+        # 'count',  # number of digitized measurements
+        # 'nplc',  # number of power line cycles between measurements
+        # 'range',
     )
 
     meters = (
         'voltage',
-        'voltages',
-        'current',
-        'currents'
-        'resistance',
-        'temperature'
+        'current'
     )
 
-    functions = {
-        'voltage': '"VOLT"',
-        'current': '"CURR"',
-        'resistance': '"RES"',
-
-        'diode': '"DIOD"',
-        'capacitance': '"CAP"',
-        'temperature': '"TEMP"',
-        'continuity': '"CONT"',
-        'frequency': '"FREQ"',
-
-    }
-
     @setter
-    def set_function(self, function):
+    def set_meter(self, meter):
 
-        if function in self.functions:
-            self.query(f':FUNC {self.functions[function]}')
+        valid_meters = ('current', 'voltage')
+
+        if meter in valid_meters:
+
+            self.write(f'dmm.measure.func = dmm.FUNC_DC_{meter.upper()}')
+
         else:
-            raise ValueError(f'invalid measurement function "{function}"')
+            raise ValueError(f'invalid meter "{meter}"')
 
-    @setter
-    def get_function(self):
+    @getter
+    def get_meter(self):
 
-        reverse_functions = {val: key for key, val in self.functions.items()}
+        meter = self.query('print(dmm.measure.func)')
 
-        return reverse_functions[self.query('FUNC?')]
+        meter_dict = {
+            'dmm.FUNC_DC_CURRENT': 'current',
+            'dmm.FUNC_DC_VOLTAGE': 'voltage'
+        }
 
-    @setter
-    def set_count(self, count):
+        if meter in meter_dict:
+            return meter_dict[meter]
+        else:
+            return None
 
-        self.write(f':COUN {count}')
+    @measurer
+    def measure_current(self):
 
-    @setter
-    def set_nplc(self, nplc):
+        if self.meter != 'current':
+            self.set_meter('current')
 
-        func = self.query(':FUNC?')
+        return float(self.query('print(dmm.measure.read())'))
 
-        self.write(f':{func}: {nplc}')
+    @measurer
+    def measure_voltage(self):
+
+        if self.meter != 'voltage':
+            self.set_meter('voltage')
+
+        return float(self.query('print(dmm.measure.read())'))
 
 
 class LabJackU6(Instrument):

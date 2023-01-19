@@ -866,6 +866,8 @@ class Socket(Adapter):
     write_termination = '\r'
     timeout = 1
 
+    kwargs = ['read_termination', 'write_termination', 'timeout']
+
     def connect(self):
 
         if self.connected:
@@ -876,7 +878,7 @@ class Socket(Adapter):
             tst_sock.connect(("8.8.8.8", 80))
             self.ip_address = tst_sock.getsockname()[0]
 
-        self.backend = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.backend = socket.socket()
 
         self.backend.settimeout(self.timeout)
 
@@ -911,6 +913,9 @@ class Socket(Adapter):
 
         self.backend.shutdown(socket.SHUT_RDWR)
         self.backend.close()
+
+    def __repr__(self):
+        return 'Socket'
 
 
 class Modbus(Adapter):
