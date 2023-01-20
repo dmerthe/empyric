@@ -1,0 +1,44 @@
+# Simple optimization example
+
+Description:
+ name: Quadratic Maximization
+ operator: Mike
+ platform: Test Stand 1
+ comments: Who is Mike? There is no Test Stand 1
+
+Settings:
+ step interval: 0.5
+ plot interval: 1
+ save interval: 10
+ end: 60
+
+Instruments:
+ Dummy Instrument:
+  type: Echo
+
+Variables:
+ Some Parameter:
+  parameter: -5
+ Some Metric:
+  expression: '1 - x^2'
+  definitions:
+   x: Some Parameter
+
+Plots:
+ Parameter Plot:
+  y: Some Parameter
+ Metric Plot:
+  x: Some Parameter
+  y: Some Metric
+  style: parametric
+
+Routines:
+ Maximization Routine:
+  type: Maximization
+  knobs: Some Parameter
+  meters: Some Metric
+  max deltas: 1.0
+  T0: 0.01
+  T1: 0
+  start: 3
+  end: 50
