@@ -18,7 +18,6 @@ def setter(method):
     def wrapped_method(*args, **kwargs):
         returned_value = method(*args, **kwargs)
         self = args[0]
-        print(args)
         value = recast(args[1])
 
         # The knob attribute is set to the returned value of the method, or

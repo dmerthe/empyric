@@ -1,4 +1,5 @@
 import numbers, importlib
+import numpy as np
 from empyric.adapters import *
 from empyric.collection.instrument import *
 
@@ -136,37 +137,52 @@ class Keithley6500(Instrument):
     )
 
     knobs = (
-        'meter',
-        # 'count',  # number of digitized measurements
-        # 'nplc',  # number of power line cycles between measurements
-        # 'range',
+        'meter',  # either 'voltage', 'current', 'fast voltages' or 'fast currents'
+        'sample count',  # number of digitized measurements for fast voltages/currents
+        'sample rate',  # sample rate for fast voltages/currents
+        'nplc',  # number of power line cycles between measurements
+        'range',  # measurement range for either voltage or current
     )
 
     meters = (
         'voltage',
-        'current'
+        'current',
+        'fast voltages',
+        'fast currents'
     )
 
     @setter
     def set_meter(self, meter):
 
-        valid_meters = ('current', 'voltage')
-
-        if meter in valid_meters:
-
-            self.write(f'dmm.measure.func = dmm.FUNC_DC_{meter.upper()}')
-
+        if meter.lower() == 'voltage':
+            self.write(f'dmm.measure.func = dmm.FUNC_DC_VOLTAGE')
+        elif meter.lower() == 'current':
+            self.write(f'dmm.measure.func = dmm.FUNC_DC_CURRENT')
+        elif meter.lower() == 'fast voltages':
+            self.write(f'dmm.digitize.func = dmm.FUNC_DIGITIZE_VOLTAGE')
+        elif meter.lower() == 'fast currents':
+            self.write(f'dmm.digitize.func = dmm.FUNC_DIGITIZE_CURRENT')
         else:
             raise ValueError(f'invalid meter "{meter}"')
+
+        return meter.lower()
 
     @getter
     def get_meter(self):
 
         meter = self.query('print(dmm.measure.func)')
 
+        if 'dmm.FUNC_NONE' in meter:
+            meter = self.query('print(dmm.digitize.func)')
+
+            if 'dmm.FUNC_NONE' in meter:
+                raise ValueError(f'meter is undefined for {self.name}')
+
         meter_dict = {
             'dmm.FUNC_DC_CURRENT': 'current',
-            'dmm.FUNC_DC_VOLTAGE': 'voltage'
+            'dmm.FUNC_DC_VOLTAGE': 'voltage',
+            'dmm.FUNC_DIGITIZE_CURRENT': 'fast currents',
+            'dmm.FUNC_DIGITIZE_VOLTAGE': 'fast voltages'
         }
 
         if meter in meter_dict:
@@ -174,13 +190,94 @@ class Keithley6500(Instrument):
         else:
             return None
 
+    @setter
+    def set_sample_count(self, count):
+
+        if 'fast' in self.meter:
+            self.write(f'dmm.digitize.count = {int(count)}')
+        else:
+            return np.nan
+
+    @getter
+    def get_sample_count(self):
+
+        if 'fast' in self.meter:
+            response = self.query('print(dmm.digitize.count)')
+
+            if 'nil' in response:
+                return np.nan
+            else:
+                return int(response)
+        else:
+            return np.nan
+
+    @setter
+    def set_sample_rate(self, rate):
+
+        if 'fast' in self.meter:
+            self.write(f'dmm.digitize.samplerate = {rate}')
+        else:
+            return np.nan
+
+    @getter
+    def get_sample_rate(self):
+
+        if 'fast' in self.meter:
+
+            response = self.query(f'print(dmm.digitize.samplerate)')
+
+            if 'nil' in response:
+                return np.nan
+            else:
+                return recast(response)
+        else:
+            return np.nan
+
+    @setter
+    def set_nplc(self, nplc):
+
+        if 'fast' not in self.meter:
+            self.write(f'dmm.measure.nplc = {nplc}')
+        else:
+            return np.nan
+
+    @getter
+    def get_nplc(self):
+
+        if 'fast' not in self.meter:
+            return recast(self.query('print(dmm.measure.nplc)'))
+        else:
+            return np.nan
+
+    @setter
+    def set_range(self, _range):
+
+        if 'fast' not in self.meter:
+            if _range.lower() == 'auto':
+                self.write('dmm.measure.autorange = dmm.ON')
+            else:
+                self.write(f'dmm.measure.range = {_range}')
+        else:
+            return np.nan
+
+    @getter
+    def get_range(self):
+
+        if 'fast' not in self.meter:
+            if self.query('print(dmm.measure.autorange)') == 'dmm.ON':
+                return 'auto'
+            else:
+                return recast(self.query('print(dmm.measure.range)'))
+        else:
+            return np.nan
+
     @measurer
     def measure_current(self):
 
         if self.meter != 'current':
             self.set_meter('current')
 
-        return float(self.query('print(dmm.measure.read())'))
+        return recast(self.query('print(dmm.measure.read())'))
 
     @measurer
     def measure_voltage(self):
@@ -188,7 +285,7 @@ class Keithley6500(Instrument):
         if self.meter != 'voltage':
             self.set_meter('voltage')
 
-        return float(self.query('print(dmm.measure.read())'))
+        return recast(self.query('print(dmm.measure.read())'))
 
 
 class LabJackU6(Instrument):
