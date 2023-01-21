@@ -115,18 +115,27 @@ class Keithley6500(Instrument):
 
     name = 'Keithley6500'
 
-    supported_adapters = ((Socket, {'write_termination': '\n'}),)
-
-    knobs = ('meter',
-             # either 'voltage', 'current', 'fast voltages' or 'fast currents'
-             'sample count',
-             # number of digitized measurements for fast voltages/currents
-             'sample rate',  # sample rate for fast voltages/currents
-             'nplc',  # number of power line cycles between measurements
-             'range',  # measurement range for either voltage or current
+    supported_adapters = (
+        (Socket, {'write_termination': '\n', 'timeout': 0.5}),
     )
 
-    meters = ('voltage', 'current', 'fast voltages', 'fast currents')
+    knobs = (
+        'meter',
+        'nplc',
+        'range',
+        'sample count',
+        'sample rate',
+        'trigger_source'
+    )
+
+    meters = (
+        'voltage',
+        'current',
+        'fast voltages',
+        'fast currents'
+    )
+
+    _trig_src = 'trigger.EVENT_DISPLAY'
 
     @setter
     def set_meter(self, meter):
@@ -147,7 +156,10 @@ class Keithley6500(Instrument):
     @getter
     def get_meter(self):
 
-        meter = self.query('print(dmm.measure.func)')
+        def validator(response):
+            return re.match('dmm.FUNC', response)
+
+        meter = self.query('print(dmm.measure.func)', validator=validator)
 
         if 'dmm.FUNC_NONE' in meter:
             meter = self.query('print(dmm.digitize.func)')
@@ -155,10 +167,12 @@ class Keithley6500(Instrument):
             if 'dmm.FUNC_NONE' in meter:
                 raise ValueError(f'meter is undefined for {self.name}')
 
-        meter_dict = {'dmm.FUNC_DC_CURRENT': 'current',
+        meter_dict = {
+            'dmm.FUNC_DC_CURRENT': 'current',
             'dmm.FUNC_DC_VOLTAGE': 'voltage',
             'dmm.FUNC_DIGITIZE_CURRENT': 'fast currents',
-            'dmm.FUNC_DIGITIZE_VOLTAGE': 'fast voltages'}
+            'dmm.FUNC_DIGITIZE_VOLTAGE': 'fast voltages'
+        }
 
         if meter in meter_dict:
             return meter_dict[meter]
@@ -246,6 +260,25 @@ class Keithley6500(Instrument):
         else:
             return np.nan
 
+    @setter
+    def set_trigger_source(self, trigger_source):
+
+        valid_sources = {
+            'front panel': 'trigger.EVENT_DISPLAY',
+            'front': 'trigger.EVENT_DISPLAY',
+            'external in': 'trigger.EVENT_EXTERNAL',
+            'ext': 'trigger.EVENT_EXTERNAL'
+        }
+
+        if trigger_source.lower() in valid_sources:
+            self._trig_src = valid_sources[trigger_source.lower()]
+        else:
+            raise ValueError(f'invalid trigger source for {self.name}')
+
+    @getter
+    def get_trigger_source(self):
+        return self._trig_src
+
     @measurer
     def measure_current(self):
 
@@ -262,13 +295,19 @@ class Keithley6500(Instrument):
 
         return recast(self.query('print(dmm.measure.read())'))
 
-    def _execute_fast_measurement(self):
+    def _execute_fast_measurements(self):
+
+        if 'fast' not in self.meter:
+            raise AttributeError(
+                f"meter for {self.name} must be 'fast voltages' or "
+                "'fast currents' to execute fast measurements"
+            )
 
         self.write(
             'trigger.model.setblock(1, trigger.BLOCK_BUFFER_CLEAR, '
             'defbuffer1)\n'
             'trigger.model.setblock(2, trigger.BLOCK_WAIT, '
-            'trigger.EVENT_EXTERNAL)\n'
+            f'{self._trig_src})\n'
             'trigger.model.setblock(3, trigger.BLOCK_DELAY_CONSTANT, 0)\n'
             'trigger.model.setblock(4, trigger.BLOCK_MEASURE_DIGITIZE, '
             'defbuffer1)\n'
@@ -294,7 +333,9 @@ class Keithley6500(Instrument):
 
         while running:
 
-            state = self.query('print(trigger.model.state())')
+            self.write('state, state, block_num = trigger.model.state()')
+
+            state = self.query('print(state)')
 
             running = state in running_states
 
@@ -305,19 +346,32 @@ class Keithley6500(Instrument):
                 f'fast measurement failed; trigger state is "{state}"'
             )
 
+        readings = self.query(
+            'printbuffer(1, defbuffer1.n, defbuffer1.readings)',
+            nbytes=np.inf
+        )
+
+        return recast(readings.split(', '))
+
     @measurer
     def measure_fast_voltages(self):
 
-        self._execute_fast_measurement()
+        if self.meter != 'fast voltages':
+            self.set_meter('fast voltages')
 
-        return []
+        fast_voltages = self._execute_fast_measurements()
+
+        return fast_voltages
 
     @measurer
     def measure_fast_currents(self):
 
-        self._execute_fast_measurement()
+        if self.meter != 'fast currents':
+            self.set_meter('fast currents')
 
-        return []
+        fast_currents = self._execute_fast_measurements()
+
+        return fast_currents
 
 
 class LabJackU6(Instrument):

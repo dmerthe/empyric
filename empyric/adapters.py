@@ -108,6 +108,8 @@ class Adapter:
     no_lib_msg = 'no valid library found for adapter; ' \
                  'check library installation'
 
+    delay = 0.1  # delay between successive communication attempts
+
     def __init__(self, instrument, **kwargs):
 
         if self.lib is None:
@@ -913,6 +915,8 @@ class Socket(Adapter):
 
         self.backend.shutdown(socket.SHUT_RDWR)
         self.backend.close()
+
+        self.connected = False
 
     def __repr__(self):
         return 'Socket'
