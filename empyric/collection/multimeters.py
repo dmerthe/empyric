@@ -11,20 +11,11 @@ class Keithley2110(Instrument):
 
     name = "Keithley2110"
 
-    supported_adapters = (
-        (USB, {}),
-    )
+    supported_adapters = ((USB, {}),)
 
-    knobs = (
-        'voltage range',
-        'current range'
-    )
+    knobs = ('voltage range', 'current range')
 
-    meters = (
-        'voltage',
-        'current',
-        'temperature'
-    )
+    meters = ('voltage', 'current', 'temperature')
 
     _mode = None
 
@@ -55,25 +46,21 @@ class Keithley2110(Instrument):
 
             # Find nearest encapsulating voltage range
             try:
-                nearest = np.argwhere(
-                    voltage_range <= np.array(allowed_voltage_ranges)
-                ).flatten()[0]
+                nearest = np.argwhere(voltage_range <= np.array(
+                    allowed_voltage_ranges)).flatten()[0]
             except IndexError:
                 nearest = -1
 
             self.set_voltage_range(allowed_voltage_ranges[nearest])
 
-            Warning(
-                'Given voltage range not an option, '
-                f'setting to {allowed_voltage_ranges[nearest]} V instead'
-            )
+            Warning('Given voltage range not an option, '
+                    f'setting to {allowed_voltage_ranges[nearest]} V instead')
 
         elif voltage_range == 'AUTO':
             self.write('VOLT:RANG:AUTO')
         else:
             raise ValueError(
-                f'voltage range choice {voltage_range} not permitted!'
-            )
+                f'voltage range choice {voltage_range} not permitted!')
 
     @setter
     def set_current_range(self, current_range):
@@ -85,25 +72,21 @@ class Keithley2110(Instrument):
         elif isinstance(current_range, numbers.Number):
             # Find nearest encapsulating current range
             try:
-                nearest = np.argwhere(
-                    current_range <= np.array(allowed_current_ranges)
-                ).flatten()[0]
+                nearest = np.argwhere(current_range <= np.array(
+                    allowed_current_ranges)).flatten()[0]
             except IndexError:
                 nearest = -1
 
             self.set_current_range(allowed_current_ranges[nearest])
 
-            Warning(
-                'Given current range not an option, '
-                f'setting to {allowed_current_ranges[nearest]} A instead'
-            )
+            Warning('Given current range not an option, '
+                    f'setting to {allowed_current_ranges[nearest]} A instead')
 
         elif current_range == 'AUTO':
             self.write('CURR:RANG:AUTO')
         else:
             raise ValueError(
-                f'current range choice {current_range} not permitted!'
-            )
+                f'current range choice {current_range} not permitted!')
 
     @measurer
     def measure_voltage(self):
@@ -132,24 +115,18 @@ class Keithley6500(Instrument):
 
     name = 'Keithley6500'
 
-    supported_adapters = (
-        (Socket, {'write_termination': '\n'}),
+    supported_adapters = ((Socket, {'write_termination': '\n'}),)
+
+    knobs = ('meter',
+             # either 'voltage', 'current', 'fast voltages' or 'fast currents'
+             'sample count',
+             # number of digitized measurements for fast voltages/currents
+             'sample rate',  # sample rate for fast voltages/currents
+             'nplc',  # number of power line cycles between measurements
+             'range',  # measurement range for either voltage or current
     )
 
-    knobs = (
-        'meter',  # either 'voltage', 'current', 'fast voltages' or 'fast currents'
-        'sample count',  # number of digitized measurements for fast voltages/currents
-        'sample rate',  # sample rate for fast voltages/currents
-        'nplc',  # number of power line cycles between measurements
-        'range',  # measurement range for either voltage or current
-    )
-
-    meters = (
-        'voltage',
-        'current',
-        'fast voltages',
-        'fast currents'
-    )
+    meters = ('voltage', 'current', 'fast voltages', 'fast currents')
 
     @setter
     def set_meter(self, meter):
@@ -178,12 +155,10 @@ class Keithley6500(Instrument):
             if 'dmm.FUNC_NONE' in meter:
                 raise ValueError(f'meter is undefined for {self.name}')
 
-        meter_dict = {
-            'dmm.FUNC_DC_CURRENT': 'current',
+        meter_dict = {'dmm.FUNC_DC_CURRENT': 'current',
             'dmm.FUNC_DC_VOLTAGE': 'voltage',
             'dmm.FUNC_DIGITIZE_CURRENT': 'fast currents',
-            'dmm.FUNC_DIGITIZE_VOLTAGE': 'fast voltages'
-        }
+            'dmm.FUNC_DIGITIZE_VOLTAGE': 'fast voltages'}
 
         if meter in meter_dict:
             return meter_dict[meter]
@@ -287,6 +262,63 @@ class Keithley6500(Instrument):
 
         return recast(self.query('print(dmm.measure.read())'))
 
+    def _execute_fast_measurement(self):
+
+        self.write(
+            'trigger.model.setblock(1, trigger.BLOCK_BUFFER_CLEAR, '
+            'defbuffer1)\n'
+            'trigger.model.setblock(2, trigger.BLOCK_WAIT, '
+            'trigger.EVENT_EXTERNAL)\n'
+            'trigger.model.setblock(3, trigger.BLOCK_DELAY_CONSTANT, 0)\n'
+            'trigger.model.setblock(4, trigger.BLOCK_MEASURE_DIGITIZE, '
+            'defbuffer1)\n'
+            'trigger.model.initiate()\n'
+        )
+
+        running = True
+
+        running_states = [
+            'trigger.STATE_BUILDING',
+            'trigger.STATE_RUNNING',
+            'trigger.STATE_PAUSED',
+            'trigger.STATE_WAITING'
+        ]
+
+        failed_states = [
+            'trigger.STATE_ABORTING',
+            'trigger.STATE_ABORTED',
+            'trigger.STATE_FAILED'
+        ]
+
+        state = ''
+
+        while running:
+
+            state = self.query('print(trigger.model.state())')
+
+            running = state in running_states
+
+            time.sleep(0.5)
+
+        if state in failed_states:
+            raise RuntimeError(
+                f'fast measurement failed; trigger state is "{state}"'
+            )
+
+    @measurer
+    def measure_fast_voltages(self):
+
+        self._execute_fast_measurement()
+
+        return []
+
+    @measurer
+    def measure_fast_currents(self):
+
+        self._execute_fast_measurement()
+
+        return []
+
 
 class LabJackU6(Instrument):
     """
@@ -297,25 +329,14 @@ class LabJackU6(Instrument):
 
     supported_adapters = (
         # custom setup below until I can get serial or modbus comms to work
-        (Adapter, {})
-    )
+        (Adapter, {}))
 
-    knobs = (
-        'DAC0 ',
-        'DAC1',
-    )
+    knobs = ('DAC0 ', 'DAC1',)
 
     meters = (
-        'AIN0',
-        'AIN1',
-        'AIN2',
-        'AIN3',
-        'internal temperature',
-        'temperature 0',  # AIN0 / 41 uV / C
-        'temperature 1',
-        'temperature 2',
-        'temperature 3',
-    )
+        'AIN0', 'AIN1', 'AIN2', 'AIN3', 'internal temperature', 'temperature 0',
+        # AIN0 / 41 uV / C
+        'temperature 1', 'temperature 2', 'temperature 3',)
 
     def __init__(self, *args, **kwargs):
         u6 = importlib.import_module('u6')
