@@ -157,7 +157,7 @@ def recast(value):
         elif os.path.isfile(os.path.join('..', value)):  # ... up one level
             return os.path.abspath(os.path.join('..', value))
         else:
-            return value
+            return value  # must be an actual string
     else:
         return None
 
