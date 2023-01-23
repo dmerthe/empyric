@@ -875,11 +875,6 @@ class Socket(Adapter):
         if self.connected:
             self.disconnect()
 
-        # Get IP address by connecting to Google DNS server
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as tst_sock:
-            tst_sock.connect(("8.8.8.8", 80))
-            self.ip_address = tst_sock.getsockname()[0]
-
         self.backend = socket.socket()
 
         self.backend.settimeout(self.timeout)
