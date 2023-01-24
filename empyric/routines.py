@@ -248,7 +248,8 @@ class Minimization(Routine):
         self.T1 = T1
         self.best_knobs = [knob.value for knob in self.knobs.values()]
         self.best_meters = [meter.value for meter in meters.values()]
-        self.finished = False
+
+        self.finished = False  # whether the routine has reached minimum
 
     def update(self, state):
 
@@ -270,6 +271,10 @@ class Minimization(Routine):
             for knob in self.knobs.values():
                 knob.controller = self
 
+            # Update temperature
+            self.T = self.T0 + (self.T1 - self.T0) \
+                     * (state['Time'] - self.start) / (self.end - self.start)
+
             # Get meter values
             meter_values = np.array([state[meter] for meter in self.meters])
 
@@ -277,14 +282,12 @@ class Minimization(Routine):
             self.T = self.T0 + (self.T1 - self.T0) \
                      * (state['Time'] - self.start) / (self.end - self.start)
 
+            # Check if metric is lower
             if self.better(meter_values):
+
                 # Record this new optimal state
                 self.best_knobs = [state[knob] for knob in self.knobs]
-                self.best_meters = [state[meter] for meter in self.meters]
-
-            else:  # go back
-                for knob, last_value in zip(self.knobs.values(), self.best_knobs):
-                    knob.value = last_value
+                self.best_meters = meter_values
 
             # Generate and apply new knob settings
             new_knobs = self.best_knobs \
