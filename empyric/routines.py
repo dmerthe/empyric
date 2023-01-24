@@ -305,7 +305,7 @@ class Minimization(Routine):
                 # Record this new optimal state
                 self.best_knobs = [state[knob] for knob in self.knobs]
 
-                if self.revert:
+                if self.revert and isinstance(self.best_meter, numbers.Number):
                     # moving average of repeated meter value measurements
                     r = self.recency_bias
                     self.best_meter = r*meter_value + (1-r)*self.best_meter
