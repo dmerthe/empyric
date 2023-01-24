@@ -1,6 +1,6 @@
 from empyric.collection.instrument import Instrument, setter, getter, measurer
 from empyric.adapters import Socket
-
+from empyric.tools import recast
 
 class BrainboxesED560(Instrument):
     """
@@ -30,7 +30,7 @@ class BrainboxesED560(Instrument):
     @getter
     def get_analog_out0(self):
         response = self.query('$0160')
-        return float(response[3:])
+        return recast(response[3:])
 
     @setter
     def set_analog_out1(self, value):
@@ -39,7 +39,7 @@ class BrainboxesED560(Instrument):
     @getter
     def get_analog_out1(self):
         response = self.query('$0161')
-        return float(response[3:])
+        return recast(response[3:])
 
     @setter
     def set_analog_out2(self, value):
@@ -48,7 +48,7 @@ class BrainboxesED560(Instrument):
     @getter
     def get_analog_out2(self):
         response = self.query('$0162')
-        return float(response[3:])
+        return recast(response[3:])
 
     @setter
     def set_analog_out3(self, value):
@@ -57,7 +57,7 @@ class BrainboxesED560(Instrument):
     @getter
     def get_analog_out3(self):
         response = self.query('$0163')
-        return float(response[3:])
+        return recast(response[3:])
 
 
 class BrainboxesED549(Instrument):
@@ -84,19 +84,19 @@ class BrainboxesED549(Instrument):
     @measurer
     def measure_analog_in0(self):
         response = self.query('#010')
-        return float(response[1:])
+        return recast(response[1:])
 
     @measurer
     def measure_analog_in1(self):
         response = self.query('#011')
-        return float(response[1:])
+        return recast(response[1:])
 
     @measurer
     def measure_analog_in2(self):
         response = self.query('#012')
-        return float(response[1:])
+        return recast(response[1:])
 
     @measurer
     def measure_analog_in3(self):
         response = self.query('#013')
-        return float(response[1:])
+        return recast(response[1:])

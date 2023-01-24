@@ -76,6 +76,7 @@ class Variable:
 
     def __init__(self,
                  instrument=None, knob=None, meter=None,
+                 lower_limit=-np.inf, upper_limit=np.inf,
                  expression=None, definitions=None,
                  remote=None, alias=None,
                  parameter=None
@@ -116,6 +117,8 @@ class Variable:
             self.knob = knob
             self.type = 'knob'
             self.settable = True
+            self.lower_limit = lower_limit
+            self.upper_limit = upper_limit
 
         elif expression:
             self.expression = expression
@@ -240,10 +243,17 @@ class Variable:
             pass
 
         elif hasattr(self, 'knob'):
-            self.instrument.set(self.knob, value)
-            self._value = self.instrument.__getattribute__(
-                self.knob.replace(' ', '_')
-            )
+
+            if self.lower_limit < value < self.upper_limit:
+                self.instrument.set(self.knob, value)
+                self._value = self.instrument.__getattribute__(
+                    self.knob.replace(' ', '_')
+                )
+            else:
+                raise Warning(
+                    f'attempted to set {self} to value {value}, which is '
+                    f'outside of bounds ({self.lower_limit} to {self.upper_limit})!'
+                )
 
         elif hasattr(self, 'remote'):
 
@@ -1001,7 +1011,9 @@ def convert_runcard(runcard):
         elif 'knob' in specs:
             instrument = converted_runcard['Instruments'][specs['instrument']]
             variables[name] = Variable(
-                knob=specs['knob'], instrument=instrument
+                knob=specs['knob'], instrument=instrument,
+                lower_limit=specs.get('lower limit', -np.inf),
+                upper_limit=specs.get('upper limit', np.inf)
             )
         elif 'expression' in specs:
             expression = specs['expression']

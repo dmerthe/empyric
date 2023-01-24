@@ -33,6 +33,8 @@ map:
     regex;(.+): {required: true, map: {  # variable name
       instrument: {type: str},  # for knob and meter type variables
       knob: {type: str},  # for knob type variables
+      lower limit: {type: number},
+      upper limit: {type: number},
       meter: {type: str},  # for meter type variables
       parameter: {type: any},  # for parameter type variables
       expression: {type: str},  # for expression type variables

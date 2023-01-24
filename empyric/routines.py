@@ -297,9 +297,18 @@ class Minimization(Routine):
             # Get meter values
             meter_value = state[self.meter]
 
+            if meter_value is None or meter_value == np.nan:
+                # no action taken if meter value is undefined
+                return
+            elif None in [state[knob] for knob in self.knobs]:
+                # no action taken if knobs values are undefined
+                return
+            elif np.nan in [state[knob] for knob in self.knobs]:
+                # no action taken if knobs values are undefined
+                return
+
             # Check if found (or returned to) minimum
             if self.better(meter_value) or self.revert:
-
                 self.revert = False
 
                 # Record this new optimal state

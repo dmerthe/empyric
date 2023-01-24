@@ -135,7 +135,7 @@ def recast(value):
     Convert a value into the appropriate type for the information it contains
     """
 
-    if value is None:
+    if value is None or value == '':
         return None
     elif np.ndim(value) > 0:  # value is an array
         return np.array([recast(subval) for subval in value])
@@ -147,7 +147,7 @@ def recast(value):
             return True
         elif value.lower() == 'false':
             return False
-        elif re.fullmatch('[0-9]*', value):  # integer
+        elif re.fullmatch('[0-9]+', value):  # integer
             return int(value)
         elif re.fullmatch('[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?', value):
             # float
