@@ -4,7 +4,12 @@ from empyric.adapters import Socket
 
 class BrainboxesED560(Instrument):
     """
-    Brainboxes 4 channel analog output (0-10 V / 0-20mA) gateway
+    Brainboxes 4 channel analog output (0-10 V / 0-20mA) gateway.
+
+    For socket communication, the default port is 9500. If the IP address is unknown, you can use the Boost.IO Driver
+    software from Brainboxes to find it.
+
+    ASCII Protocol must be used.
     """
 
     supported_adapters = (
@@ -57,7 +62,12 @@ class BrainboxesED560(Instrument):
 
 class BrainboxesED549(Instrument):
     """
-    Brainboxes 4 channel analog input (0-10 V / 0-20mA) gateway
+    Brainboxes 4 channel analog input (0-10 V / 0-20mA) gateway.
+
+    For socket communication, the default port is 9500. If the IP address is unknown, you can use the Boost.IO Driver
+    software from Brainboxes to find it.
+
+    ASCII Protocol must be used.
     """
 
     supported_adapters = (

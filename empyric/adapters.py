@@ -108,6 +108,8 @@ class Adapter:
     no_lib_msg = 'no valid library found for adapter; ' \
                  'check library installation'
 
+    delay = 0.1  # delay between successive communication attempts
+
     def __init__(self, instrument, **kwargs):
 
         if self.lib is None:
@@ -866,21 +868,16 @@ class Socket(Adapter):
     write_termination = '\r'
     timeout = 1
 
+    kwargs = ['read_termination', 'write_termination', 'timeout']
+
     def connect(self):
 
         if self.connected:
             self.disconnect()
 
-        socket = importlib.import_module('socket')
+        self.backend = socket.socket()
 
-        # Get IP address by connecting to Google DNS server
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as tst_sock:
-            tst_sock.connect(("8.8.8.8", 80))
-            self.ip_address = tst_sock.getsockname()[0]
-
-        self.backend = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-        self.backend.settimeout(5)
+        self.backend.settimeout(self.timeout)
 
         address = self.instrument.address
         remote_ip_address, remote_port = address.split('::')
@@ -911,10 +908,13 @@ class Socket(Adapter):
 
     def disconnect(self):
 
-        socket = importlib.import_module('socket')
-
         self.backend.shutdown(socket.SHUT_RDWR)
         self.backend.close()
+
+        self.connected = False
+
+    def __repr__(self):
+        return 'Socket'
 
 
 class Modbus(Adapter):

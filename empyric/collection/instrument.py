@@ -135,7 +135,7 @@ class Instrument:
 
         adapter_connected = False
         if adapter:
-            self.adapter = adapter
+            self.adapter = adapter(self, **kwargs)
         else:
             errors = []
             for _adapter, settings in self.supported_adapters:
