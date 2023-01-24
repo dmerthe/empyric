@@ -29,8 +29,8 @@ Variables:
  Some Metric:
   expression: '1 - x^2 + noise'
   definitions:
-   noise: Some Noise
    x: Some Parameter
+   noise: Some Noise
 
 Plots:
  Parameter Plot:
@@ -45,7 +45,7 @@ Routines:
   type: Maximization
   knobs: Some Parameter
   meters: Some Metric
-  max deltas: 1.0
+  max deltas: 0.25
   T0: 0.01
   T1: 0
   start: 3

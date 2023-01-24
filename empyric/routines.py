@@ -223,8 +223,18 @@ class Sequence(Routine):
 
 class Minimization(Routine):
     """
-    Minimize the sum of a set of meters/expressions influenced by a set of
-    knobs, using simulated annealing.
+    Minimize a meter/expression influenced by a set of knobs, using simulated
+    annealing.
+
+    Arguments:
+    - `knobs`: (required) dictionary containing the knobs to be varied
+    - `meters`: (required) dictionary whose first entry is the meter/expression
+    to minimize.
+    - `max_deltas`: (optional) list/array of same length as `knobs` indicating
+    the maximum change per step for each knob; if not are specified, defaults
+    to a list of ones.
+    -`T0` and `T1`: (optional) the initial and final temperatures; if not
+    specified, defaults to T0 = 1.0 and T1 = 0.0.
     """
 
     def __init__(self, meters=None, max_deltas=None, T0=1.0, T1=0.0, **kwargs):
@@ -246,6 +256,7 @@ class Minimization(Routine):
         self.T = T0
         self.T0 = T0
         self.T1 = T1
+
         self.best_knobs = [knob.value for knob in self.knobs.values()]
         self.best_meter = np.nan
 
@@ -258,10 +269,10 @@ class Minimization(Routine):
             return
         elif state['Time'] > self.end:
             if not self.finished:
-                print('Finishing...')
+
                 for knob, best_val in zip(self.knobs.values(), self.best_knobs):
                     if knob.controller == self:
-                        print('Setting to', best_val)
+
                         knob.value = best_val
                         knob.controller = None
 
