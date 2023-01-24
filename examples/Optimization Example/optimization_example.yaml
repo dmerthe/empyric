@@ -7,7 +7,7 @@ Description:
  comments: Who is Mike? There is no Test Stand 1
 
 Settings:
- step interval: 0.5
+ step interval: 0.1
  plot interval: 1
  save interval: 10
  end: 60
@@ -15,13 +15,21 @@ Settings:
 Instruments:
  Dummy Instrument:
   type: Echo
+ Dummy Noise:
+  type: SimpleProcess
+  presets:
+   noise level: 0.1
 
 Variables:
  Some Parameter:
   parameter: -5
+ Some Noise:
+  instrument: Dummy Noise
+  meter: value
  Some Metric:
-  expression: '1 - x^2'
+  expression: '1 - x^2 + noise'
   definitions:
+   noise: Some Noise
    x: Some Parameter
 
 Plots:
