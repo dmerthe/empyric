@@ -235,9 +235,14 @@ class Minimization(Routine):
     to a list of ones.
     -`T0` and `T1`: (optional) the initial and final temperatures; if not
     specified, defaults to T0 = 1.0 and T1 = 0.0.
+    - `recency bias`: (optional) weight to assign most recent meter measurement
+    of minimum when comparing configurations.
     """
 
-    def __init__(self, meters=None, max_deltas=None, T0=1.0, T1=0.0, **kwargs):
+    def __init__(self,
+                 meters=None, max_deltas=None, T0=1.0, T1=0.0,
+                 recency_bias=0.5,
+                 **kwargs):
 
         Routine.__init__(self, **kwargs)
 
@@ -257,11 +262,13 @@ class Minimization(Routine):
         self.T0 = T0
         self.T1 = T1
 
+        self.recency_bias = recency_bias
+
         self.best_knobs = [knob.value for knob in self.knobs.values()]
         self.best_meter = np.nan
 
-        self.recheck = False  # whether the routine is reevaluating minimum
-        self.finished = False  # whether the routine has reached minimum
+        self.revert = False  # going back?
+        self.finished = False
 
     def update(self, state):
 
@@ -290,13 +297,20 @@ class Minimization(Routine):
             # Get meter values
             meter_value = state[self.meter]
 
-            if self.better(meter_value) or self.recheck:
+            # Check if found (or returned to) minimum
+            if self.better(meter_value) or self.revert:
 
-                self.recheck = False
+                self.revert = False
 
                 # Record this new optimal state
                 self.best_knobs = [state[knob] for knob in self.knobs]
-                self.best_meter = meter_value
+
+                if self.revert:
+                    # moving average of repeated meter value measurements
+                    r = self.recency_bias
+                    self.best_meter = r*meter_value + (1-r)*self.best_meter
+                else:
+                    self.best_meter = meter_value
 
                 # Generate and apply new knob settings
                 new_knobs = self.best_knobs \
@@ -311,7 +325,7 @@ class Minimization(Routine):
                 for knob, best_val in zip(self.knobs.values(), self.best_knobs):
                     knob.value = best_val
 
-                self.recheck = True
+                self.revert = True
 
     def better(self, meter_value):
 
