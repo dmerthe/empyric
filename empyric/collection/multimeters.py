@@ -111,6 +111,11 @@ class Keithley6500(Instrument):
     """
     Multimeter with 6.5 digits and high speed scanning and digitizing
     capabilities.
+
+    For socket, communication default port is 5025. If IP address is unknown, you can find and set it on the unit's
+    Communication --> LAN menu.
+
+    Uses TSP communication protocol.
     """
 
     name = 'Keithley6500'
