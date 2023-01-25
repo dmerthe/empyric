@@ -1,0 +1,44 @@
+Description:
+  name: Brainboxes ED-560 Example
+  operator: Mike
+  platform: test stand 1
+  comments: Who is Mike? There is no test stand 1
+
+Settings:
+  step interval: 1 seconds
+  save interval: 30 seconds
+  plot interval: 1 seconds
+  end: 60 seconds
+
+Instruments:
+
+  Brainboxes ED-560:
+    type: BrainboxesED560
+    address: '192.168.127.254::9500'
+    timeout: 1.0
+
+Variables:
+
+  Output Voltage 1:
+    instrument: Brainboxes ED-560
+    knob: analog_out0
+
+  Output Voltage 2:
+    instrument: Brainboxes ED-560
+    knob: analog_out1
+
+  Output Voltage 3:
+    instrument: Brainboxes ED-560
+    knob: analog_out2
+
+  Output Voltage 4:
+    instrument: Brainboxes ED-560
+    knob: analog_out3
+
+Plots:
+  Output Voltages:
+    y:
+      - Output Voltage 1
+      - Output Voltage 2
+      - Output Voltage 3
+      - Output Voltage 4
