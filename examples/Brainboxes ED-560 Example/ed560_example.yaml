@@ -14,7 +14,7 @@ Instruments:
 
   Brainboxes ED-560:
     type: BrainboxesED560
-    address: '192.168.127.254::9500'
+    address: '192.168.127.254::9500'  # replace with unit's IP address and port
     timeout: 1.0
 
 Variables:

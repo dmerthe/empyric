@@ -113,4 +113,5 @@ class BrainboxesED549(Instrument):
 
     @staticmethod
     def _validator(response):
-        return re.match('>\+\d\d\.\d\d\d', response)
+        print(response)
+        return re.match('>\+?\-?\d\d\.\d\d\d', response)
