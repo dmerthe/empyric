@@ -244,16 +244,16 @@ class Variable:
 
         elif hasattr(self, 'knob'):
 
-            if self.lower_limit < value < self.upper_limit:
-                self.instrument.set(self.knob, value)
-                self._value = self.instrument.__getattribute__(
-                    self.knob.replace(' ', '_')
-                )
+            if value > self.upper_limit:
+                self.instrument.set(self.knob, self.upper_limit)
+            elif value < self.lower_limit:
+                self.instrument.set(self.knob, self.lower_limit)
             else:
-                raise Warning(
-                    f'attempted to set {self} to value {value}, which is '
-                    f'outside of bounds ({self.lower_limit} to {self.upper_limit})!'
-                )
+                self.instrument.set(self.knob, value)
+
+            self._value = self.instrument.__getattribute__(
+                self.knob.replace(' ', '_')
+            )
 
         elif hasattr(self, 'remote'):
 
