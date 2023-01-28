@@ -1042,12 +1042,19 @@ class ConfigTestDialog(BasicDialog):
             self, parent, title='Config/Test: ' + instrument.name
         )
 
-    def apply_knob_entry(self, knob):
+    def set_knob_entry(self, knob):
         value = self.knob_entries[knob].get()
-        try:
-            self.instrument.set(knob, float(value))
-        except ValueError:
-            self.instrument.set(knob, value)
+        self.instrument.set(knob, recast(value))
+
+    def get_knob_entry(self, knob):
+
+        if hasattr(self.instrument, 'get_'+knob):
+            value = self.instrument.get(knob)
+        else:
+            value = getattr(self.instrument, knob)
+
+        self.knob_entries[knob].delete(0, tk.END)
+        self.knob_entries[knob].insert(0, str(value))
 
     def update_meter_entry(self, meter):
         value = str(self.instrument.measure(meter))
@@ -1075,6 +1082,7 @@ class ConfigTestDialog(BasicDialog):
         label.grid(row=0, column=3, sticky=tk.W)
 
         self.set_buttons = {}
+        self.get_buttons = {}
         i = 1
         for knob in knobs:
             formatted_name = ' '.join(
@@ -1090,9 +1098,15 @@ class ConfigTestDialog(BasicDialog):
 
             self.set_buttons[knob] = tk.Button(
                 master, text='Set',
-                command=lambda knob=knob: self.apply_knob_entry(knob)
+                command=lambda knob=knob: self.set_knob_entry(knob)
             )
             self.set_buttons[knob].grid(row=i, column=2)
+
+            self.set_buttons[knob] = tk.Button(
+                master, text='Get',
+                command=lambda knob=knob: self.get_knob_entry(knob)
+            )
+            self.set_buttons[knob].grid(row=i, column=3)
 
             i += 1
 
@@ -1104,10 +1118,10 @@ class ConfigTestDialog(BasicDialog):
             )
 
             label = tk.Label(master, text=formatted_name)
-            label.grid(row=i, column=3, sticky=tk.W)
+            label.grid(row=i, column=4, sticky=tk.W)
 
             self.meter_entries[meter] = tk.Entry(master)
-            self.meter_entries[meter].grid(row=i, column=4)
+            self.meter_entries[meter].grid(row=i, column=5)
             self.meter_entries[meter].insert(0, '???')
             self.meter_entries[meter].config(state='readonly')
 
@@ -1115,6 +1129,6 @@ class ConfigTestDialog(BasicDialog):
                 master, text='Measure',
                 command=lambda meter=meter: self.update_meter_entry(meter)
             )
-            self.measure_buttons[meter].grid(row=i, column=5)
+            self.measure_buttons[meter].grid(row=i, column=6)
 
             i += 1
