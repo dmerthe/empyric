@@ -1,7 +1,11 @@
 import os
 import sys
 import argparse
-import pytest
+
+try:
+    import pytest
+except ImportError:
+    pytest = None
 
 from empyric.experiment import Manager
 
@@ -44,6 +48,9 @@ def execute():
     args = parser.parse_args()
 
     if args.test is not None:
+
+        if pytest is None:
+            raise ImportError('pytest is not installed')
 
         if len(args.test) == 0:  # test main classes in experiment.py
             pytest.main(

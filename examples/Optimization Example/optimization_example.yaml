@@ -1,0 +1,52 @@
+# Simple optimization example
+
+Description:
+ name: Quadratic Maximization
+ operator: Mike
+ platform: Test Stand 1
+ comments: Who is Mike? There is no Test Stand 1
+
+Settings:
+ step interval: 0.1
+ plot interval: 1
+ save interval: 10
+ end: 60
+
+Instruments:
+ Dummy Instrument:
+  type: Echo
+ Dummy Noise:
+  type: SimpleProcess
+  presets:
+   noise level: 0.1
+
+Variables:
+ Some Parameter:
+  parameter: -5
+ Some Noise:
+  instrument: Dummy Noise
+  meter: value
+ Some Metric:
+  expression: '1 - x^2 + noise'
+  definitions:
+   x: Some Parameter
+   noise: Some Noise
+
+Plots:
+ Parameter Plot:
+  y: Some Parameter
+ Metric Plot:
+  x: Some Parameter
+  y: Some Metric
+  style: parametric
+
+Routines:
+ Maximization Routine:
+  type: Maximization
+  knobs: Some Parameter
+  meters: Some Metric
+  max deltas: 0.25
+  T0: 0.01
+  T1: 0
+  start: 3
+  end: 50

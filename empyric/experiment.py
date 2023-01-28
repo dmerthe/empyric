@@ -76,6 +76,7 @@ class Variable:
 
     def __init__(self,
                  instrument=None, knob=None, meter=None,
+                 lower_limit=-np.inf, upper_limit=np.inf,
                  expression=None, definitions=None,
                  remote=None, alias=None,
                  parameter=None
@@ -116,6 +117,8 @@ class Variable:
             self.knob = knob
             self.type = 'knob'
             self.settable = True
+            self.lower_limit = lower_limit
+            self.upper_limit = upper_limit
 
         elif expression:
             self.expression = expression
@@ -240,7 +243,14 @@ class Variable:
             pass
 
         elif hasattr(self, 'knob'):
-            self.instrument.set(self.knob, value)
+
+            if value > self.upper_limit:
+                self.instrument.set(self.knob, self.upper_limit)
+            elif value < self.lower_limit:
+                self.instrument.set(self.knob, self.lower_limit)
+            else:
+                self.instrument.set(self.knob, value)
+
             self._value = self.instrument.__getattribute__(
                 self.knob.replace(' ', '_')
             )
@@ -1001,7 +1011,9 @@ def convert_runcard(runcard):
         elif 'knob' in specs:
             instrument = converted_runcard['Instruments'][specs['instrument']]
             variables[name] = Variable(
-                knob=specs['knob'], instrument=instrument
+                knob=specs['knob'], instrument=instrument,
+                lower_limit=specs.get('lower limit', -np.inf),
+                upper_limit=specs.get('upper limit', np.inf)
             )
         elif 'expression' in specs:
             expression = specs['expression']
@@ -1009,7 +1021,11 @@ def convert_runcard(runcard):
 
             for symbol, var_name in specs['definitions'].items():
                 expression = expression.replace(symbol, var_name)
-                definitions[var_name] = variables[var_name]
+
+                try:
+                    definitions[var_name] = variables[var_name]
+                except KeyError as undefined:
+                    raise KeyError(f"variable {undefined} is not defined for expression '{name}'")
 
             variables[name] = Variable(
                 expression=expression, definitions=definitions
@@ -1032,6 +1048,8 @@ def convert_runcard(runcard):
         for name, specs in runcard['Routines'].items():
             specs = specs.copy()  # avoids modifying the runcard
             _type = specs.pop('type')
+
+            specs = {key.replace(' ', '_'): value for key, value in specs.items()}
 
             # For Set, Timecourse and Sequence routines
             knobs = np.array([specs.get('knobs', [])]).flatten()
