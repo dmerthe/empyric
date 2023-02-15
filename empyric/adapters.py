@@ -1149,14 +1149,10 @@ class Modbus(Adapter):
         payload_module = importlib.import_module('.payload', package='pymodbus')
 
         # Utility for encoding data
-        self.builder = payload_module.BinaryPayloadBuilder(
-            byteorder=self.byte_order, wordorder=self.word_order
-        )
+        self._builder_cls = payload_module.BinaryPayloadBuilder
 
         # Utility for decoding data
-        self.decoder = payload_module.BinaryPayloadDecoder(
-            None, byteorder=self.byte_order, wordorder=self.word_order
-        )
+        self._decoder_cls = payload_module.BinaryPayloadDecoder
 
         self.connected = True
 
@@ -1180,8 +1176,6 @@ class Modbus(Adapter):
                 ', '.join(self.dtypes)
             )
 
-        self.builder.reset()
-
         if '5' in str(func_code):
             # Write coils
 
@@ -1191,7 +1185,7 @@ class Modbus(Adapter):
                 address, bool_values, slave=self.slave_id
             )
 
-            if response.function_code != 15:
+            if response.function_code == 15:
                 return 'Success'
             else:
                 raise AdapterError(
@@ -1204,10 +1198,14 @@ class Modbus(Adapter):
             if dtype is None:
                 dtype = '16bit_uint'
 
-            for value in values:
-                self.builder.__getattribute__('add_'+dtype)(value)
+            builder = self._builder_cls(
+                byteorder=self.byte_order, wordorder=self.word_order
+            )
 
-            register_values = self.builder.to_registers()
+            for value in values:
+                builder.__getattribute__('add_'+dtype)(value)
+
+            register_values = builder.to_registers()
 
             response = self.backend.write_registers(
                 address, register_values, slave=self.slave_id
@@ -1245,24 +1243,33 @@ class Modbus(Adapter):
                 address, count=count, slave=self.slave_id
             ).bits
 
-            return [bool(bit) for bit in response][:count]
+            coils = [bool(bit) for bit in response][:count]
+
+            if len(coils) == 1:
+                return coils[0]
+            else:
+                return coils
 
         elif func_code in [3, 4]:
             # Read holding registers or input registers
 
-            response = self.functions[func_code](
+            registers = self.functions[func_code](
                 address, count=count, slave=self.slave_id
+            ).registers
+
+            decoder = self._decoder_cls.fromRegisters(
+                registers, byteorder=self.byte_order, wordorder=self.word_order
             )
 
-            self.decoder._payload = response
-            self.decoder.reset()
-
             values = [
-                self.decoder.__getattribute__('decode_' + dtype)()
+                decoder.__getattribute__('decode_' + dtype)()
                 for _ in range(count)
             ]
 
-            return values
+            if len(values) == 1:
+                return values[0]
+            else:
+                return values
 
         else:
             # Invalid function code
@@ -1274,6 +1281,10 @@ class Modbus(Adapter):
     def _query(self, *args, **kwargs):
         """Alias of `_read` method"""
         return self._read(*args, **kwargs)
+
+    def disconnect(self):
+
+        self.backend.close()
 
 
 class Phidget(Adapter):
