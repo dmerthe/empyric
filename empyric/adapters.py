@@ -1261,9 +1261,11 @@ class Modbus(Adapter):
                 registers, byteorder=self.byte_order, wordorder=self.word_order
             )
 
+            n_values = int(16 * count / (int(dtype.split('bit')[0])))
+
             values = [
                 decoder.__getattribute__('decode_' + dtype)()
-                for _ in range(count)
+                for _ in range(n_values)
             ]
 
             if len(values) == 1:
