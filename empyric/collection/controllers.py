@@ -11,7 +11,7 @@ class OmegaCN7500(Instrument):
     name = 'OmegaCN7500'
 
     supported_adapters = (
-        (Modbus, {'slave_mode': 'rtu',
+        (ModbusSerial, {'slave_mode': 'rtu',
                   'baud_rate': 38400,
                   'parity': 'N',
                   'delay': 0.2}),
@@ -88,7 +88,7 @@ class OmegaPlatinum(Instrument):
     name = "OmegaPlatinum"
 
     supported_adapters = (
-        (Modbus, {
+        (ModbusSerial, {
             'baud_rate': 19200,
             'parity': 'O'
         }),
@@ -187,7 +187,7 @@ class RedLionPXU(Instrument):
     name = 'RedLionPXU'
 
     supported_adapters = (
-        (Modbus, {'buad_rate': 38400}),
+        (ModbusSerial, {'buad_rate': 38400}),
     )
 
     knobs = (
@@ -238,7 +238,7 @@ class WatlowEZZone(Instrument):
     name = 'WatlowEZZone'
 
     supported_adapters = (
-        (Modbus, {'baud_rate': 9600}),
+        (ModbusSerial, {'baud_rate': 9600}),
     )
 
     knobs = (
