@@ -300,9 +300,9 @@ class MKSGSeries(Instrument):
     )
 
     meters = (
-        'flow rate',
-        'valve position',
-        'temperature'
+        'flow rate',  # actual flow rate in SCCM
+        'valve position',  # valve position in percent
+        'temperature'  # temperature in degrees C
     )
 
     @setter
@@ -332,3 +332,45 @@ class MKSGSeries(Instrument):
     @measurer
     def measure_temperature(self):
         return self.read(4, 0x4002, count=2, dtype='32bit_float')
+
+
+class AlicatMFC(Instrument):
+    """Alicat mass flow controller"""
+
+    name = 'AlicatMFC'
+
+    supported_adapters = (
+        (Modbus, {'byte_order': '>'}),
+    )
+
+    knobs = (
+        'setpoint',  # flow rate setpoint in SCCM
+    )
+
+    meters = (
+        'flow rate',  # actual flow rate in SCCM
+        'temperature',  # temperature in degrees C
+        'pressure'  
+        # pressure in PSI (absolute, gauge or differential,
+        # depending on device configuration)
+    )
+
+    @setter
+    def set_setpoint(self, setpoint):
+        self.write(16, 1009, setpoint, dtype='32bit_float')
+
+    @getter
+    def get_setpoint(self):
+        return self.read(3, 1009, count=2, dtype='32bit_float')
+
+    @measurer
+    def measure_flow_rate(self):
+        return self.read(4, 1208, count=2, dtype='32bit_float')
+
+    @measurer
+    def measure_temperature(self):
+        return self.read(4, 1204, count=2, dtype='32bit_float')
+
+    @measurer
+    def measure_pressure(self):
+        return self.read(4, 1202, count=2, dtype='32bit_float')
