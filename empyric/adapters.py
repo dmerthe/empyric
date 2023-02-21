@@ -1211,7 +1211,7 @@ class Modbus(Adapter):
                 address, register_values, slave=self.slave_id
             )
 
-            if response.function_code != 16:
+            if response.function_code == 16:
                 return 'Success'
             else:
                 raise AdapterError(
