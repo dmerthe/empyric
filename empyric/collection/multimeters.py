@@ -388,7 +388,8 @@ class LabJackU6(Instrument):
 
     supported_adapters = (
         # custom setup below until I can get serial or modbus comms to work
-        (Adapter, {}))
+        (Adapter, {}),
+    )
 
     knobs = ('DAC0 ', 'DAC1',)
 
@@ -466,13 +467,17 @@ class LabJackU6(Instrument):
 
 
 class LabJackT7(Instrument):
-    """LabJack T7/T7-Pro DAQ"""
+    """
+    LabJack T7/T7-Pro DAQ
+
+    Only reading the default 14 inputs as voltages is currently supported, but this could easily be expanded.
+    """
 
     name = 'LabJackT7'
 
     supported_adapters = (
-        # custom setup below until I can get serial or modbus comms to work
-        (Modbus, {'byte_order': '>'}))
+        (Modbus, {'byte_order': '>'}),
+    )
 
     knobs = ('DAC0 ', 'DAC1',)
 
@@ -480,7 +485,7 @@ class LabJackT7(Instrument):
         'AIN0', 'AIN1', 'AIN2', 'AIN3', 'AIN4', 'AIN5', 'AIN6',
         'AIN7', 'AIN8', 'AIN9', 'AIN10', 'AIN11', 'AIN12', 'AIN13',
         'AIN all',
-        'internal temperature'
+        'device temperature'
     )
 
     def _measure_AIN(self, n):
@@ -544,8 +549,10 @@ class LabJackT7(Instrument):
 
     @measurer
     def measure_AIN_all(self):
-        return self.read(4, 0, count=2*254, dtype='32bit_float')
+        """Reads all 14 analog inputs in a single call"""
+        return self.read(4, 0, count=2*14, dtype='32bit_float')
 
     @measurer
-    def measure_internal_temperature(self):
+    def measure_device_temperature(self):
+        """Device temperature in C"""
         return self.read(4, 60052, count=2, dtype='32bit_float') - 273.15
