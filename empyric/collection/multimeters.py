@@ -544,7 +544,7 @@ class LabJackT7(Instrument):
 
     @measurer
     def measure_AIN_all(self):
-        return self.read(4, 0, count=2*253, dtype='32bit_float')
+        return self.read(4, 0, count=2*254, dtype='32bit_float')
 
     @measurer
     def measure_internal_temperature(self):
