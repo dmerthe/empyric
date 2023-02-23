@@ -388,7 +388,8 @@ class LabJackU6(Instrument):
 
     supported_adapters = (
         # custom setup below until I can get serial or modbus comms to work
-        (Adapter, {}))
+        (Adapter, {}),
+    )
 
     knobs = ('DAC0 ', 'DAC1',)
 
@@ -463,3 +464,95 @@ class LabJackU6(Instrument):
     @measurer
     def measure_temperature_3(self):
         return self.read(6) / 37e-6 + self.measure_internal_temperature()
+
+
+class LabJackT7(Instrument):
+    """
+    LabJack T7/T7-Pro DAQ
+
+    Only reading the default 14 inputs as voltages is currently supported, but this could easily be expanded.
+    """
+
+    name = 'LabJackT7'
+
+    supported_adapters = (
+        (Modbus, {'byte_order': '>'}),
+    )
+
+    knobs = ('DAC0 ', 'DAC1',)
+
+    meters = (
+        'AIN0', 'AIN1', 'AIN2', 'AIN3', 'AIN4', 'AIN5', 'AIN6',
+        'AIN7', 'AIN8', 'AIN9', 'AIN10', 'AIN11', 'AIN12', 'AIN13',
+        'AIN all',
+        'device temperature'
+    )
+
+    def _measure_AIN(self, n):
+        return self.read(4, 0*(2*int(n)), count=2, dtype='32bit_float')
+
+    @measurer
+    def measure_AIN0(self):
+        return self._measure_AIN(0)
+
+    @measurer
+    def measure_AIN1(self):
+        return self._measure_AIN(1)
+
+    @measurer
+    def measure_AIN2(self):
+        return self._measure_AIN(2)
+
+    @measurer
+    def measure_AIN3(self):
+        return self._measure_AIN(3)
+
+    @measurer
+    def measure_AIN4(self):
+        return self._measure_AIN(4)
+
+    @measurer
+    def measure_AIN5(self):
+        return self._measure_AIN(5)
+
+    @measurer
+    def measure_AIN6(self):
+        return self._measure_AIN(6)
+
+    @measurer
+    def measure_AIN7(self):
+        return self._measure_AIN(7)
+
+    @measurer
+    def measure_AIN8(self):
+        return self._measure_AIN(8)
+
+    @measurer
+    def measure_AIN9(self):
+        return self._measure_AIN(9)
+
+    @measurer
+    def measure_AIN10(self):
+        return self._measure_AIN(10)
+
+    @measurer
+    def measure_AIN11(self):
+        return self._measure_AIN(11)
+
+    @measurer
+    def measure_AIN12(self):
+        return self._measure_AIN(12)
+
+    @measurer
+    def measure_AIN13(self):
+        return self._measure_AIN(13)
+
+    @measurer
+    def measure_AIN_all(self):
+        """Reads all 14 analog inputs in a single call"""
+        return self.read(4, 0, count=2*14, dtype='32bit_float')
+
+    @measurer
+    def measure_device_temperature(self):
+        """Device temperature in C"""
+        return self.read(4, 60052, count=2, dtype='32bit_float') - 273.15
