@@ -397,7 +397,18 @@ class ModelPredictiveControl(Routine):
         pass
 
 
-class Server(Routine):
+class SocketServer(Routine):
+    """
+    Server routine for transmitting data to other experiments, local or remote,
+    using the socket interface.
+
+    Variables accessible to the server are specified by providing
+    dictionaries of variables in the form, {..., name: variable, ...} as the
+    readwrite and/or readonly arguments. Any variables given in the
+    `readwrite` argumment will be readable and writeable from by connected
+    clients. Variables given in the `readonly` argument will be read-only by
+    clients.
+    """
 
     def __init__(self, readwrite=None, readonly=None, **kwargs):
 
@@ -536,6 +547,55 @@ class Server(Routine):
     def __del__(self):
         if self.running:
             self.terminate()
+
+
+class ModbusServer(Routine):
+    """
+    Server routine for transmitting data to other experiments, local or remote,
+    using the Modbus over TCP/IP protocol.
+
+    Variables accessible to the server are specified by providing
+    dictionaries of variables in the form, {..., name: variable, ...} as the
+    readwrite and/or readonly arguments. Any variables given in the
+    `readwrite` argumment will be readable and writeable from by connected
+    clients. Variables given in the `readonly` argument will be read-only by
+    clients.
+    """
+
+    def __init__(self, readwrite=None, readonly=None, **kwargs):
+
+        Routine.__init__(self, **kwargs)
+
+        self.running = True
+
+        # Set up pymodbus server...
+
+    def terminate(self):
+
+        # Kill client handling threads
+        self.running = False
+
+        # Close pymodbus server...
+
+
+class Server(Routine):
+    """
+    Convenience wrapper for either SocketServer of ModbusServer, depending
+    on backend argument.
+    """
+
+    def __init__(self, *args, backend='socket', **kwargs):
+
+        Routine.__init__(*args, **kwargs)
+
+        if backend == 'socket':
+            self.proxy = SocketServer(*args, **kwargs)
+        elif backend == 'modbus':
+            self.proxy = ModbusServer(*args, **kwargs)
+
+    def __del__(self):
+
+        self.proxy.terminate()
 
 
 supported = {key: value for key, value in vars().items()
