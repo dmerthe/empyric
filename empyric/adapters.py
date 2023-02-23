@@ -3,6 +3,8 @@ import socket
 import time
 import re
 
+import numpy as np
+
 from empyric.tools import read_from_socket, write_to_socket
 
 
@@ -917,10 +919,12 @@ class Socket(Adapter):
         return 'Socket'
 
 
-class Modbus(Adapter):
+class ModbusSerial(Adapter):
     """
+    (TO BE REMOVED)
+
     Handles communications with modbus serial instruments through the
-    Minimal Modbus package
+    Minimal ModbusSerial package
     """
 
     # Common defaults
@@ -941,19 +945,20 @@ class Modbus(Adapter):
 
     _busy = False
 
-    # Get Modbus library
+    # Get Minimal Modbus library
     if importlib.util.find_spec('minimalmodbus'):
         lib = 'minimalmodbus'
     else:
         lib = None
 
-    no_lib_msg = 'No Modbus library was found! ' \
+    no_lib_msg = 'No ModbusSerial library was found! ' \
                  'Please install the minimalmodbus library'
 
     @property
     def busy(self):
         return bool(sum([
-            adapter._busy for adapter in Modbus.adapters.get(self.port, [])
+            adapter._busy
+            for adapter in ModbusSerial.adapters.get(self.port, [])
         ]))
 
     @busy.setter
@@ -961,7 +966,7 @@ class Modbus(Adapter):
         self._busy = busy
 
     def __repr__(self):
-        return 'Modbus'
+        return 'ModbusSerial'
 
     def connect(self):
 
@@ -970,10 +975,10 @@ class Modbus(Adapter):
         # Get port and channel
         self.port, self.channel = self.instrument.address.split('::')
 
-        if self.port in Modbus.adapters:
-            Modbus.adapters[self.port].append(self)
+        if self.port in ModbusSerial.adapters:
+            ModbusSerial.adapters[self.port].append(self)
         else:
-            Modbus.adapters[self.port] = [self]
+            ModbusSerial.adapters[self.port] = [self]
 
         # Handshake with instrument
         self.backend = minimal_modbus.Instrument(
@@ -1017,6 +1022,271 @@ class Modbus(Adapter):
     @staticmethod
     def locate():
         return Serial.locate()
+
+
+class Modbus(Adapter):
+    """
+    Handles communication with instruments via the Modbus communication
+    protocol, over either TCP or serial ports.
+    """
+
+    kwargs = (
+        'slave id',
+        'byte order',
+        'word order',
+
+        'baud rate',
+        'timeout',
+        'byte size',
+        'stop bits',
+        'parity',
+        'delay'
+    )
+
+    slave_id = 0
+    # Byte and word order is either little-endian (<) or big-endian (>)
+    byte_order = '<'
+    word_order = '>'
+
+    dtypes = [
+        '8bit_uint', '16bit_uint', '32bit_uint', '64bit_uint',
+        '8bit_int', '16bit_int', '32bit_int', '64bit_int',
+        '16bit_float', '32bit_float', '64bit_float',
+    ]
+
+    baud_rate = 19200
+    timeout = 0.05
+    byte_size = 8
+    stop_bits = 1
+    parity = 'N'
+    delay = 0.05
+
+    _protocol = None
+    _serial_adapters = {}  # for Modbus Serial
+
+    # Locate PyModbus library
+    if importlib.util.find_spec('pymodbus'):
+        lib = 'pymodbus'
+    else:
+        lib = None
+
+    @property
+    def busy(self):
+
+        if self._protocol == 'Serial':
+            return bool(sum([
+                adapter._busy
+                for adapter in Modbus.adapters.get(self.port, [])
+            ]))
+        else:
+            return self._busy
+
+    @busy.setter
+    def busy(self, busy):
+        self._busy = busy
+
+    def connect(self):
+
+        client = importlib.import_module('.client', package='pymodbus')
+
+        # Get port (Serial) or address & port (TCP)
+        address = self.instrument.address.split('::')
+
+        if re.match('\d+\.\d+\.\d+\.\d+', address[0]):
+
+            # Modbus TCP
+            self._protocol = 'TCP'
+
+            if len(address) == 1:
+                address.append(502)  # standard Modbus TCP port
+
+            self.backend = client.ModbusTcpClient(
+                host=address[0],
+                port=int(address[1])
+            )
+
+        else:
+
+            # Modbus Serial
+            self._protocol = 'Serial'
+
+            if len(address) == 1:
+                raise ValueError(
+                    'Modbus over serial requires both the '
+                    'serial port address and slave address'
+                )
+
+            if address[0] in Modbus._serial_adapters:
+                ModbusSerial.adapters[address[0]].append(self)
+            else:
+
+                ModbusSerial.adapters[self.port] = [self]
+
+                self.backend = client.ModbusSerialClient(
+                    address=address[0],
+                    baudrate=self.baud_rate,
+                    bytesize=self.byte_size,
+                    parity=self.parity,
+                    stopbits=self.stop_bits,
+                )
+
+        # Enumerate modbus functions
+        self.functions = {
+            1: self.backend.read_coils,
+            2: self.backend.read_discrete_inputs,
+            3: self.backend.read_holding_registers,
+            4: self.backend.read_input_registers,
+
+            5: self.backend.write_coil,
+            6: self.backend.write_register,
+
+            15: self.backend.write_coils,
+            16: self.backend.write_registers
+
+        }
+
+        # Get data reading/writing utility classes
+        payload_module = importlib.import_module('.payload', package='pymodbus')
+
+        # Utility for encoding data
+        self._builder_cls = payload_module.BinaryPayloadBuilder
+
+        # Utility for decoding data
+        self._decoder_cls = payload_module.BinaryPayloadDecoder
+
+        self.connected = True
+
+    def _write(self, func_code, address, values, dtype=None):
+        """
+        Write values to coils (func_code = 5 [single] or 15 [multiple]) or
+        holding registers (func_code = 6 [single] or 16 [multiple]).
+
+        The Modbus data type for decoding registers is specified by the `dtype`
+        argument. Valid values for `dtype` are listed in the `dtypes` attribute.
+        """
+
+        values = np.array([values]).flatten()
+
+        if func_code not in [5, 15, 6, 16]:
+            raise ValueError(f'invalid Modbus function code {func_code}')
+
+        if dtype and dtype not in self.dtypes:
+            raise TypeError(
+                'invalid dtype argument; must be one of:\n'
+                ', '.join(self.dtypes)
+            )
+
+        if '5' in str(func_code):
+            # Write coils
+
+            bool_values = [bool(value) for value in values]
+
+            response = self.backend.write_coils(
+                address, bool_values, slave=self.slave_id
+            )
+
+            if response.function_code == 15:
+                return 'Success'
+            else:
+                raise AdapterError(
+                    f'error writing to coil(s) on {self.instrument.name}'
+                )
+
+        else:
+            # Write registers
+
+            if dtype is None:
+                dtype = '16bit_uint'
+
+            builder = self._builder_cls(
+                byteorder=self.byte_order, wordorder=self.word_order
+            )
+
+            for value in values:
+                builder.__getattribute__('add_'+dtype)(value)
+
+            register_values = builder.to_registers()
+
+            response = self.backend.write_registers(
+                address, register_values, slave=self.slave_id
+            )
+
+            if response.function_code == 16:
+                return 'Success'
+            else:
+                raise AdapterError(
+                    f'error writing to register(s) on {self.instrument.name} '
+                    'for writing coils/registers'
+                )
+
+    def _read(self, func_code, address, count=1, dtype=None):
+        """
+        Read from coils (func_code = 1), discrete inputs (func_code = 2),
+        holding registers (func_code = 3), or input registers (func_code = 4).
+
+        A single data unit is read by specifying the function code
+        (`func_code`) and address; the data can be converted to the desired
+        data type (`dtype` = `int` or `float`). Multiple sequential addresses
+        are read by specifying the count.
+        """
+
+        if dtype and dtype not in self.dtypes:
+            raise TypeError(
+                'invalid dtype argument; must be one of:\n'
+                ', '.join(self.dtypes)
+            )
+
+        if func_code in [1, 2]:
+            # Read coils or discrete inputs
+
+            response = self.functions[func_code](
+                address, count=count, slave=self.slave_id
+            ).bits
+
+            coils = [bool(bit) for bit in response][:count]
+
+            if len(coils) == 1:
+                return coils[0]
+            else:
+                return coils
+
+        elif func_code in [3, 4]:
+            # Read holding registers or input registers
+
+            registers = self.functions[func_code](
+                address, count=count, slave=self.slave_id
+            ).registers
+
+            decoder = self._decoder_cls.fromRegisters(
+                registers, byteorder=self.byte_order, wordorder=self.word_order
+            )
+
+            n_values = int(16 * count / (int(dtype.split('bit')[0])))
+
+            values = [
+                decoder.__getattribute__('decode_' + dtype)()
+                for _ in range(n_values)
+            ]
+
+            if len(values) == 1:
+                return values[0]
+            else:
+                return values
+
+        else:
+            # Invalid function code
+            raise ValueError(
+                f'invalid Modbus function code {func_code} for '
+                'reading coils/registers'
+            )
+
+    def _query(self, *args, **kwargs):
+        """Alias of `_read` method"""
+        return self._read(*args, **kwargs)
+
+    def disconnect(self):
+
+        self.backend.close()
 
 
 class Phidget(Adapter):
