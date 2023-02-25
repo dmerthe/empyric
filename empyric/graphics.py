@@ -8,7 +8,7 @@ import tkinter as tk
 import pandas as pd
 
 from empyric.tools import recast
-from empyric.routines import Server
+from empyric.routines import SocketServer, ModbusServer
 
 if sys.platform == 'darwin':
     import matplotlib
@@ -627,7 +627,8 @@ class ExperimentGUI:
         # Servers
         self.servers = {
             name: routine for name, routine in self.experiment.routines.items()
-            if isinstance(routine, Server)
+            if isinstance(routine, SocketServer)
+               or isinstance(routine, ModbusServer)
         }
 
         if self.servers:

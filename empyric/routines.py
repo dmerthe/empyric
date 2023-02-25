@@ -1,3 +1,4 @@
+import importlib
 import numbers
 import socket
 import queue
@@ -8,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 from empyric.tools import convert_time, recast, \
-    autobind_socket, read_from_socket, write_to_socket
+    autobind_socket, read_from_socket, write_to_socket, get_ip_address
 
 
 class Routine:
@@ -566,9 +567,54 @@ class ModbusServer(Routine):
 
         Routine.__init__(self, **kwargs)
 
-        self.running = True
+        # Check for PyModbus installation
+        try:
+            importlib.import_module('pymodbus')
+        except ModuleNotFoundError:
+            raise ModuleNotFoundError(
+                'pymodbus must be installed to run a Modbus server'
+            )
 
-        # Set up pymodbus server...
+        # Import tools from pymodbus
+        datastore = importlib.import_module('.datastore', package='pymodbus')
+        device = importlib.import_module('.device', package='pymodbus')
+        server = importlib.import_module('.server', package='pymodbus')
+
+        # Map each variable to 2 sequential registers
+        readonly_block = datastore.ModbusSequentialDataBlock(
+            0, [0] * 2 * len(readonly)
+        )
+
+        readwrite_block = datastore.ModbusSequentialDataBlock(
+            0, [0] * 2 * len(readwrite)
+        )
+
+        # Set up a PyModbus TCP Server
+        context = datastore.ModbusServerContext(
+            slaves=datastore.ModbusSlaveContext(
+                ir=readonly_block,
+                hr=readwrite_block
+            ),
+            single=True
+        )
+
+        identity = device.ModbusDeviceIdentification(
+            info_name={
+                "VendorName": "Empyric",
+                "ProductCode": "EMP",
+                "VendorUrl": "https://github.com/dmerthe/empyric",
+                "ProductName": "Modbus Server",
+                "ModelName": "Modbus Server",
+            }
+        )
+
+        self.server = server.StartTcpServer(
+            context=context,
+            identity=identity,
+            address=(get_ip_address(), 502),
+        )
+
+        self.running = True
 
     def terminate(self):
 
@@ -576,26 +622,6 @@ class ModbusServer(Routine):
         self.running = False
 
         # Close pymodbus server...
-
-
-class Server(Routine):
-    """
-    Convenience wrapper for either SocketServer of ModbusServer, depending
-    on backend argument.
-    """
-
-    def __init__(self, *args, backend='socket', **kwargs):
-
-        Routine.__init__(*args, **kwargs)
-
-        if backend == 'socket':
-            self.proxy = SocketServer(*args, **kwargs)
-        elif backend == 'modbus':
-            self.proxy = ModbusServer(*args, **kwargs)
-
-    def __del__(self):
-
-        self.proxy.terminate()
 
 
 supported = {key: value for key, value in vars().items()

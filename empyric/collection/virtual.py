@@ -418,3 +418,11 @@ class SimpleProcess(Instrument):
         )*np.exp(-t / self.response_time)
 
         return self._value + self.noise_level*(2*np.random.rand() - 1)
+
+class DataClient(Instrument):
+    """
+    Counterpart to DataServer routines. Communicates with DataServer instances
+    in other experiments to control variables
+    """
+
+    name = 'DataClient'
