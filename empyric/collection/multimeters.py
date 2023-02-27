@@ -479,8 +479,6 @@ class LabJackT7(Instrument):
         (Modbus, {'byte_order': '>'}),
     )
 
-    knobs = ('DAC0 ', 'DAC1',)
-
     meters = (
         'AIN0', 'AIN1', 'AIN2', 'AIN3', 'AIN4', 'AIN5', 'AIN6',
         'AIN7', 'AIN8', 'AIN9', 'AIN10', 'AIN11', 'AIN12', 'AIN13',
