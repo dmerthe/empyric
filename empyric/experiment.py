@@ -102,8 +102,7 @@ class Variable:
         :param remote: (str) address of the server of the variable controlling
         the variable, in the form '[host name/ip address]::[port]'.
         :param alias: (str) name of the variable on the server.
-
-        :param parameter (str) value of a user controlled parameter
+        :param parameter: (str) value of a user controlled parameter
         """
 
         self._value = None  # last known value of this variable

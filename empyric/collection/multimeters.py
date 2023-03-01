@@ -112,8 +112,8 @@ class Keithley6500(Instrument):
     Multimeter with 6.5 digits and high speed scanning and digitizing
     capabilities.
 
-    For socket, communication default port is 5025. If IP address is unknown, you can find and set it on the unit's
-    Communication --> LAN menu.
+    For socket communication default port is 5025. If IP address is unknown,
+    you can find or set it on the unit's Communication --> LAN menu.
 
     Uses TSP communication protocol.
     """
@@ -394,9 +394,9 @@ class LabJackU6(Instrument):
     knobs = ('DAC0 ', 'DAC1',)
 
     meters = (
-        'AIN0', 'AIN1', 'AIN2', 'AIN3', 'internal temperature', 'temperature 0',
-        # AIN0 / 41 uV / C
-        'temperature 1', 'temperature 2', 'temperature 3',)
+        'AIN0', 'AIN1', 'AIN2', 'AIN3', 'device temperature',
+        'temperature 0', 'temperature 1', 'temperature 2', 'temperature 3'
+    )
 
     def __init__(self, *args, **kwargs):
         u6 = importlib.import_module('u6')
@@ -446,31 +446,32 @@ class LabJackU6(Instrument):
         return self.read(6)
 
     @measurer
-    def measure_internal_temperature(self):
+    def measure_device_temperature(self):
         return self.backend.getTemperature() - 273.15
 
     @measurer
     def measure_temperature_0(self):
-        return self.read(0) / 37e-6 + self.measure_internal_temperature()
+        return self.read(0) / 37e-6 + self.measure_device_temperature()
 
     @measurer
     def measure_temperature_1(self):
-        return self.read(2) / 37e-6 + self.measure_internal_temperature()
+        return self.read(2) / 37e-6 + self.measure_device_temperature()
 
     @measurer
     def measure_temperature_2(self):
-        return self.read(4) / 37e-6 + self.measure_internal_temperature()
+        return self.read(4) / 37e-6 + self.measure_device_temperature()
 
     @measurer
     def measure_temperature_3(self):
-        return self.read(6) / 37e-6 + self.measure_internal_temperature()
+        return self.read(6) / 37e-6 + self.measure_device_temperature()
 
 
 class LabJackT7(Instrument):
     """
     LabJack T7/T7-Pro DAQ
 
-    Only reading the default 14 inputs as voltages is currently supported, but this could easily be expanded.
+    Only reading the default 14 inputs as voltages is currently supported, but
+    this may eventually be expanded.
     """
 
     name = 'LabJackT7'
