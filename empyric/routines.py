@@ -3,6 +3,7 @@ import numbers
 import socket
 import queue
 import threading
+import asyncio
 import time
 import select
 import numpy as np
@@ -565,6 +566,15 @@ class ModbusServer(Routine):
 
     def __init__(self, readwrite=None, readonly=None, **kwargs):
 
+        self.readwrite = {}
+        self.readonly = {}
+
+        if readwrite:
+            self.readwrite = readwrite
+
+        if readonly:
+            self.readonly = readonly
+
         Routine.__init__(self, **kwargs)
 
         # Check for PyModbus installation
@@ -578,7 +588,10 @@ class ModbusServer(Routine):
         # Import tools from pymodbus
         datastore = importlib.import_module('.datastore', package='pymodbus')
         device = importlib.import_module('.device', package='pymodbus')
-        server = importlib.import_module('.server', package='pymodbus')
+        payload = importlib.import_module('.payload', package='pymodbus')
+
+        self._builder_cls = payload.BinaryPayloadBuilder
+        self._decoder_cls = payload.BinaryPayloadDecoder
 
         # Map each variable to 2 sequential registers
         readonly_block = datastore.ModbusSequentialDataBlock(
@@ -590,7 +603,7 @@ class ModbusServer(Routine):
         )
 
         # Set up a PyModbus TCP Server
-        context = datastore.ModbusServerContext(
+        self.context = datastore.ModbusServerContext(
             slaves=datastore.ModbusSlaveContext(
                 ir=readonly_block,
                 hr=readwrite_block
@@ -598,7 +611,7 @@ class ModbusServer(Routine):
             single=True
         )
 
-        identity = device.ModbusDeviceIdentification(
+        self.identity = device.ModbusDeviceIdentification(
             info_name={
                 "VendorName": "Empyric",
                 "VendorUrl": "https://github.com/dmerthe/empyric",
@@ -607,116 +620,75 @@ class ModbusServer(Routine):
             }
         )
 
-        self.server = server.StartTcpServer(
-            context=context,
-            identity=identity,
-            address=(get_ip_address(), 502),
-        )
-
-        self.clients_queue = queue.Queue(1)
-        self.clients_queue.put({})
+        asyncio.run(self._run_server, debug=True)
 
         self.running = True
 
-        self.acc_conn_thread = threading.Thread(
-            target=self.accept_connections
-        )
+    async def update_registers(self):
 
-        self.acc_conn_thread.start()
-
-        self.proc_requ_thread = threading.Thread(
-            target=self.process_requests
-        )
-
-        self.proc_requ_thread.start()
-
-    def accept_connections(self):
         while self.running:
 
-            try:
-                (client, address) = self.socket.accept()
+            decoder = self._decoder_cls.fromRegisters(
+                self.context.getValues(3, 0, 2*len(self.readwrite))
+            )
 
-                clients = self.clients_queue.get()
+            # Apply readwrite register values to writable variables
+            for i, (_, variable) in enumerate(self.readwrite.items()):
 
-                clients[address] = client
+                if type(variable._value) is bool:
+                    value = bool(decoder.decode_32bit_uint(value))
+                elif type(variable._value) is int:
+                    value = decoder.decode_32bit_int(value)
+                elif type(variable._value) is float:
+                    value = decoder.decode_32bit_float(value)
 
-                self.clients_queue.put(clients)
+                variable.value = value
 
-                print(f'Client at {address} has connected')
+            builder = self._builder_cls()
 
-            except socket.timeout:
-                pass
+            # Store readwrite variable values in holding registers (fc = 3)
+            for i, (_, variable) in enumerate(self.readwrite.items()):
 
-        # Close sockets
-        try:
-            self.socket.shutdown(socket.SHUT_RDWR)
-        except OSError:  # socket was not connected
-            pass
-        self.socket.close()
+                value = variable._value
 
-        clients = self.clients_queue.get()
+                if type(value) is bool:
+                    builder.add_32bit_uint(value)
+                elif type(value) is int:
+                    builder.add_32bit_int(value)
+                elif type(value) is float:
+                    builder.add_32bit_float(value)
 
-        for address, client in clients.items():
-            client.shutdown(socket.SHUT_RDWR)
-            client.close()
+            self.context[0].setValues(3, 0, builder.to_registers())
 
-        # Return empty clients dict to queue so process_requests can exit
-        self.clients_queue.put({})
+            builder.reset()
 
-    def process_requests(self):
-        while self.running:
+            # Store readonly variable values in input registers (fc = 4)
+            for i, (_, variable) in enumerate(self.readwrite.items()):
 
-            clients = self.clients_queue.get()
+                value = variable._value
 
-            for address, client in clients.items():
+                if type(value) is bool:
+                    builder.add_32bit_uint(value)
+                elif type(value) is int:
+                    builder.add_32bit_int(value)
+                elif type(value) is float:
+                    builder.add_32bit_float(value)
 
-                outgoing_message = None
+            self.context[0].setValues(4, 0, builder.to_registers())
 
-                request = read_from_socket(client)
+        await asyncio.sleep(0.1)
 
-                if request:
+    async def _run_sever(self):
 
-                    alias = ' '.join(request.split(' ')[:-1])
-                    value = request.split(' ')[-1]
+        asyncio.create_task(self.update_registers())
 
-                    if alias not in self.variables:
-                        outgoing_message = f'Error: invalid alias'
+        server = importlib.import_module('.server', package='pymodbus')
 
-                    elif value == 'settable?':
-
-                        settable = self.variables[alias].settable
-
-                        if alias in self.readwrite and settable:
-                            outgoing_message = f'{alias} settable'
-                        else:
-                            outgoing_message = f'{alias} readonly'
-
-                    elif value == '?':  # Query of value
-                        var = self.variables[alias]
-                        outgoing_message = f'{alias} {var.value}'
-
-                    else:  # Setting a value
-                        if alias in self.readwrite:
-                            var = self.readwrite[alias]
-                            var.value = recast(value)
-                            outgoing_message = f'{alias} {var.value}'
-                        else:
-                            outgoing_message = f'Error: readonly variable'
-
-                # Send outgoing message
-                if outgoing_message is not None:
-                    write_to_socket(client, outgoing_message)
-
-                # Remove clients with problematic connections
-                exceptional = client in select.select([], [], [client], 0)[2]
-
-                if exceptional:
-                    print(f'Client at {address} has a connection issue')
-                    clients.pop(address)
-
-            self.clients_queue.put(clients)
-
-            time.sleep(0.1)
+        await server.StartAsyncTcpServer(
+            context=self.context,
+            identity=self.identity,
+            address=(get_ip_address(), 502),
+        )
 
     def terminate(self):
 
