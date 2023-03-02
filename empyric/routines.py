@@ -601,7 +601,6 @@ class ModbusServer(Routine):
         identity = device.ModbusDeviceIdentification(
             info_name={
                 "VendorName": "Empyric",
-                "ProductCode": "EMP",
                 "VendorUrl": "https://github.com/dmerthe/empyric",
                 "ProductName": "Modbus Server",
                 "ModelName": "Modbus Server",
@@ -614,14 +613,118 @@ class ModbusServer(Routine):
             address=(get_ip_address(), 502),
         )
 
+        self.clients_queue = queue.Queue(1)
+        self.clients_queue.put({})
+
         self.running = True
+
+        self.acc_conn_thread = threading.Thread(
+            target=self.accept_connections
+        )
+
+        self.acc_conn_thread.start()
+
+        self.proc_requ_thread = threading.Thread(
+            target=self.process_requests
+        )
+
+        self.proc_requ_thread.start()
+
+    def accept_connections(self):
+        while self.running:
+
+            try:
+                (client, address) = self.socket.accept()
+
+                clients = self.clients_queue.get()
+
+                clients[address] = client
+
+                self.clients_queue.put(clients)
+
+                print(f'Client at {address} has connected')
+
+            except socket.timeout:
+                pass
+
+        # Close sockets
+        try:
+            self.socket.shutdown(socket.SHUT_RDWR)
+        except OSError:  # socket was not connected
+            pass
+        self.socket.close()
+
+        clients = self.clients_queue.get()
+
+        for address, client in clients.items():
+            client.shutdown(socket.SHUT_RDWR)
+            client.close()
+
+        # Return empty clients dict to queue so process_requests can exit
+        self.clients_queue.put({})
+
+    def process_requests(self):
+        while self.running:
+
+            clients = self.clients_queue.get()
+
+            for address, client in clients.items():
+
+                outgoing_message = None
+
+                request = read_from_socket(client)
+
+                if request:
+
+                    alias = ' '.join(request.split(' ')[:-1])
+                    value = request.split(' ')[-1]
+
+                    if alias not in self.variables:
+                        outgoing_message = f'Error: invalid alias'
+
+                    elif value == 'settable?':
+
+                        settable = self.variables[alias].settable
+
+                        if alias in self.readwrite and settable:
+                            outgoing_message = f'{alias} settable'
+                        else:
+                            outgoing_message = f'{alias} readonly'
+
+                    elif value == '?':  # Query of value
+                        var = self.variables[alias]
+                        outgoing_message = f'{alias} {var.value}'
+
+                    else:  # Setting a value
+                        if alias in self.readwrite:
+                            var = self.readwrite[alias]
+                            var.value = recast(value)
+                            outgoing_message = f'{alias} {var.value}'
+                        else:
+                            outgoing_message = f'Error: readonly variable'
+
+                # Send outgoing message
+                if outgoing_message is not None:
+                    write_to_socket(client, outgoing_message)
+
+                # Remove clients with problematic connections
+                exceptional = client in select.select([], [], [client], 0)[2]
+
+                if exceptional:
+                    print(f'Client at {address} has a connection issue')
+                    clients.pop(address)
+
+            self.clients_queue.put(clients)
+
+            time.sleep(0.1)
 
     def terminate(self):
 
         # Kill client handling threads
         self.running = False
 
-        # Close pymodbus server...
+        # Close pymodbus server
+        self.server.shutdown()
 
 
 supported = {key: value for key, value in vars().items()

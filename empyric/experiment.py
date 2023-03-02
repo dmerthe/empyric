@@ -78,7 +78,7 @@ class Variable:
                  instrument=None, knob=None, meter=None,
                  lower_limit=-np.inf, upper_limit=np.inf,
                  expression=None, definitions=None,
-                 remote=None, alias=None,
+                 remote=None, alias=None, protocol=None,
                  parameter=None
                  ):
         """
@@ -102,6 +102,9 @@ class Variable:
         :param remote: (str) address of the server of the variable controlling
         the variable, in the form '[host name/ip address]::[port]'.
         :param alias: (str) name of the variable on the server.
+        :param protocol: (str) server communication protocol; set to 'modbus'
+        if the server is a `ModbusServer`, otherwise no protocol (default)
+        implies that the server is a `SocketServer`.
 
         :param parameter (str) value of a user controlled parameter
         """
@@ -134,18 +137,22 @@ class Variable:
             self.remote = remote
             self.type = 'remote'
             self.alias = alias
+            self.protocol = protocol
 
-            remote_ip, remote_port = remote.split('::')
+            if protocol == 'modbus':
+                pass
+            else:
+                remote_ip, remote_port = remote.split('::')
 
-            self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-            self._socket.connect((remote_ip, int(remote_port)))
+                self._socket.connect((remote_ip, int(remote_port)))
 
-            write_to_socket(self._socket, f'{self.alias} settable?')
+                write_to_socket(self._socket, f'{self.alias} settable?')
 
-            response = read_from_socket(self._socket, timeout=None)
+                response = read_from_socket(self._socket, timeout=None)
 
-            self.settable = response == f'{self.alias} settable'
+                self.settable = response == f'{self.alias} settable'
 
         elif parameter:
             self.parameter = parameter
