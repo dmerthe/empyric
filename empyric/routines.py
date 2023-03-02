@@ -562,6 +562,12 @@ class ModbusServer(Routine):
     `readwrite` argumment will be readable and writeable from by connected
     clients. Variables given in the `readonly` argument will be read-only by
     clients.
+
+    Only variables with `bool`, `int` or `float` types can be used.
+
+    Readwrite variables will be stored in holding registers in the same order
+    as given in the argument, starting from address 0. Readonly variables will
+    be stored similarly in input registers.
     """
 
     def __init__(self, readwrite=None, readonly=None, **kwargs):
@@ -594,20 +600,28 @@ class ModbusServer(Routine):
         self._decoder_cls = payload.BinaryPayloadDecoder
 
         # Map each variable to 2 sequential registers
-        readonly_block = datastore.ModbusSequentialDataBlock(
-            0, [0] * 2 * len(readonly)
-        )
+        if self.readonly:
+            readonly_block = datastore.ModbusSequentialDataBlock(
+                0, [0] * 2 * len(readonly)
+            )
+        else:
+            readonly_block = datastore.ModbusSequentialDataBlock.create()
 
-        readwrite_block = datastore.ModbusSequentialDataBlock(
-            0, [0] * 2 * len(readwrite)
-        )
+        if self.readwrite:
+            readwrite_block = datastore.ModbusSequentialDataBlock(
+                0, [0] * 2 * len(readwrite)
+            )
+        else:
+            readwrite_block = datastore.ModbusSequentialDataBlock.create()
 
         # Set up a PyModbus TCP Server
-        self.context = datastore.ModbusServerContext(
-            slaves=datastore.ModbusSlaveContext(
+        self.slave = datastore.ModbusSlaveContext(
                 ir=readonly_block,
                 hr=readwrite_block
-            ),
+            )
+
+        self.context = datastore.ModbusServerContext(
+            slaves=self.slave,
             single=True
         )
 
@@ -620,83 +634,101 @@ class ModbusServer(Routine):
             }
         )
 
-        asyncio.run(self._run_server, debug=True)
+        # Run server
+        self.server = None  # assigned in _run_async_server
 
-        self.running = True
+        self.server_thread = threading.Thread(
+            target=self._run_server
+        )
 
-    async def update_registers(self):
+        self.server_thread.start()
 
-        while self.running:
+    async def _update_registers(self, update_variables=True):
 
+        # Apply readwrite register values to writable variables
+        if update_variables:
             decoder = self._decoder_cls.fromRegisters(
-                self.context.getValues(3, 0, 2*len(self.readwrite))
+                self.slave.getValues(3, 0, 2*len(self.readwrite))
             )
 
-            # Apply readwrite register values to writable variables
             for i, (_, variable) in enumerate(self.readwrite.items()):
+
+                value = None
 
                 if type(variable._value) is bool:
-                    value = bool(decoder.decode_32bit_uint(value))
+                    value = bool(decoder.decode_32bit_uint())
                 elif type(variable._value) is int:
-                    value = decoder.decode_32bit_int(value)
+                    value = decoder.decode_32bit_int()
                 elif type(variable._value) is float:
-                    value = decoder.decode_32bit_float(value)
+                    value = decoder.decode_32bit_float()
 
-                variable.value = value
+                if value is not None:
+                    variable.value = value
 
-            builder = self._builder_cls()
+        # Store readwrite variable values in holding registers (fc = 3)
+        builder = self._builder_cls()
 
-            # Store readwrite variable values in holding registers (fc = 3)
-            for i, (_, variable) in enumerate(self.readwrite.items()):
+        for i, (_, variable) in enumerate(self.readwrite.items()):
 
-                value = variable._value
+            value = variable._value
 
-                if type(value) is bool:
-                    builder.add_32bit_uint(value)
-                elif type(value) is int:
-                    builder.add_32bit_int(value)
-                elif type(value) is float:
-                    builder.add_32bit_float(value)
+            if type(value) is bool:
+                builder.add_32bit_uint(value)
+            elif type(value) is int:
+                builder.add_32bit_int(value)
+            elif type(value) is float:
+                builder.add_32bit_float(value)
 
-            self.context[0].setValues(3, 0, builder.to_registers())
+        self.slave.setValues(3, 0, builder.to_registers())
 
-            builder.reset()
+        # Store readonly variable values in input registers (fc = 4)
+        builder.reset()
 
-            # Store readonly variable values in input registers (fc = 4)
-            for i, (_, variable) in enumerate(self.readwrite.items()):
+        for i, (_, variable) in enumerate(self.readonly.items()):
 
-                value = variable._value
+            value = variable._value
 
-                if type(value) is bool:
-                    builder.add_32bit_uint(value)
-                elif type(value) is int:
-                    builder.add_32bit_int(value)
-                elif type(value) is float:
-                    builder.add_32bit_float(value)
+            if type(value) is bool:
+                builder.add_32bit_uint(value)
+            elif type(value) is int:
+                builder.add_32bit_int(value)
+            elif type(value) is float:
+                builder.add_32bit_float(value)
 
-            self.context[0].setValues(4, 0, builder.to_registers())
+        self.slave.setValues(4, 0, builder.to_registers())
 
         await asyncio.sleep(0.1)
 
-    async def _run_sever(self):
+    async def _run_async_server(self):
 
-        asyncio.create_task(self.update_registers())
+        asyncio.create_task(self._update_registers())
 
         server = importlib.import_module('.server', package='pymodbus')
 
-        await server.StartAsyncTcpServer(
-            context=self.context,
+        self.server = server.ModbusTcpServer(
+            self.context,
             identity=self.identity,
-            address=(get_ip_address(), 502),
+            address=(get_ip_address(), 502)
         )
 
+        try:
+            await self.server.serve_forever()
+        except asyncio.exceptions.CancelledError:
+            # Server shutdown cancels the _update_registers task
+            pass
+
+    def _run_server(self):
+        """Run the server"""
+
+        # Input variable values into registers
+        asyncio.run(self._update_registers(update_variables=False))
+
+        # Start the Modbus TCP server
+        asyncio.run(self._run_async_server())
+
     def terminate(self):
-
-        # Kill client handling threads
-        self.running = False
-
-        # Close pymodbus server
-        self.server.shutdown()
+        asyncio.run(self.server.shutdown())
+        self.server_thread.join()
 
 
 supported = {key: value for key, value in vars().items()
