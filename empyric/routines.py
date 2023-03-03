@@ -636,6 +636,8 @@ class ModbusServer(Routine):
 
         # Run server
         self.server = None  # assigned in _run_async_server
+        self.ip_address = get_ip_address()
+        self.port = kwargs.get('port', 502)
 
         self.server_thread = threading.Thread(
             target=self._run_server
@@ -715,7 +717,7 @@ class ModbusServer(Routine):
         self.server = server.ModbusTcpServer(
             self.context,
             identity=self.identity,
-            address=(get_ip_address(), 502)
+            address=(self.ip_address, self.port)
         )
 
         try:

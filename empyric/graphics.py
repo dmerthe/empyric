@@ -628,7 +628,7 @@ class ExperimentGUI:
         self.servers = {
             name: routine for name, routine in self.experiment.routines.items()
             if isinstance(routine, SocketServer)
-               or isinstance(routine, ModbusServer)
+            or isinstance(routine, ModbusServer)
         }
 
         if self.servers:
