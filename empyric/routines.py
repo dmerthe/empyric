@@ -653,14 +653,15 @@ class ModbusServer(Routine):
 
             for i, (_, variable) in enumerate(self.readwrite.items()):
 
-                value = None
-
                 if type(variable._value) is bool:
                     value = bool(decoder.decode_32bit_uint())
                 elif type(variable._value) is int:
                     value = decoder.decode_32bit_int()
                 elif type(variable._value) is float:
                     value = decoder.decode_32bit_float()
+                else:
+                    decoder.decode_32bit_int()  # decode 2 registers and ignore
+                    value = None
 
                 if value is not None:
                     variable.value = value
@@ -678,6 +679,8 @@ class ModbusServer(Routine):
                 builder.add_32bit_int(value)
             elif type(value) is float:
                 builder.add_32bit_float(value)
+            else:
+                builder.add_32bit_int(-1)
 
         self.slave.setValues(3, 0, builder.to_registers())
 
@@ -694,10 +697,14 @@ class ModbusServer(Routine):
                 builder.add_32bit_int(value)
             elif type(value) is float:
                 builder.add_32bit_float(value)
+            else:
+                builder.add_32bit_int(-1)
 
         self.slave.setValues(4, 0, builder.to_registers())
 
         await asyncio.sleep(0.1)
+
+        asyncio.create_task(self._update_registers())
 
     async def _run_async_server(self):
 
