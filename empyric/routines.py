@@ -737,7 +737,6 @@ class ModbusServer(Routine):
 
     def terminate(self):
         asyncio.run(self.server.shutdown())
-        self.server_thread.join(timeout=1.0)
 
 
 supported = {key: value for key, value in vars().items()

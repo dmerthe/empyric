@@ -75,10 +75,18 @@ class Variable:
     }
 
     def __init__(self,
+                 # Knobs and meters
                  instrument=None, knob=None, meter=None,
                  lower_limit=-np.inf, upper_limit=np.inf,
+
+                 # Expressions
                  expression=None, definitions=None,
-                 remote=None, alias=None, protocol=None,
+
+                 # Remote variables
+                 remote=None, alias=None, protocol=None, dtype=None,
+                 settable=False,
+
+                 # Parameters
                  parameter=None
                  ):
         """
@@ -101,10 +109,14 @@ class Variable:
 
         :param remote: (str) address of the server of the variable controlling
         the variable, in the form '[host name/ip address]::[port]'.
-        :param alias: (str) name of the variable on the server.
+        :param alias: (str) For a SocketServer, the name of the variable on the
+        server; for a ModbusServer, the register address of the variable.
         :param protocol: (str) server communication protocol; set to 'modbus'
         if the server is a `ModbusServer`, otherwise no protocol (default)
         implies that the server is a `SocketServer`.
+        :param dtype: (str) the data type of the remote variable. It is only
+        relevant for ModbusServer variables which can be either boolean,
+        integer or float.
 
         :param parameter (str) value of a user controlled parameter
         """
@@ -135,12 +147,14 @@ class Variable:
 
         elif remote:
             self.remote = remote
-            self.type = 'remote'
             self.alias = alias
             self.protocol = protocol
+            self.dtype = '32bit_float' if dtype is None else dtype
+            self.type = 'remote'
 
             if protocol == 'modbus':
-                pass
+                self._client = _instruments.ModbusClient(remote)
+                self.settable = settable
             else:
                 remote_ip, remote_port = remote.split('::')
 
@@ -221,17 +235,27 @@ class Variable:
             self.last_evaluation = time.time()
 
         elif hasattr(self, 'remote'):
-            write_to_socket(self._socket, f'{self.alias} ?')
 
-            response = read_from_socket(self._socket)
+            if self.protocol == 'modbus':
 
-            try:
-                self._value = recast(response.split(' ')[-1])
-            except BaseException as error:
-                print(
-                    f'Warning: unable to retrieve value of {self.alias} '
-                    f'from server at {self.remote}; got error "{error}"'
+                fcode = 3 if self.settable else 4
+
+                self._value = self._client.read(
+                    fcode, self.alias, count=2, dtype=self.dtype
                 )
+
+            else:
+                write_to_socket(self._socket, f'{self.alias} ?')
+
+                response = read_from_socket(self._socket)
+
+                try:
+                    self._value = recast(response.split(' ')[-1])
+                except BaseException as error:
+                    print(
+                        f'Warning: unable to retrieve value of {self.alias} '
+                        f'from server at {self.remote}; got error "{error}"'
+                    )
 
         elif hasattr(self, 'parameter'):
 
@@ -262,11 +286,18 @@ class Variable:
                 self.knob.replace(' ', '_')
             )
 
-        elif hasattr(self, 'remote'):
+        elif hasattr(self, 'remote') and self.settable:
 
-            write_to_socket(self._socket, f'{self.alias} {value}')
+            if self.protocol == 'modbus':
 
-            check = read_from_socket(self._socket)
+                self._client.write(16, self.alias, value, dtype=self.dtype)
+
+                check = self.value
+
+            else:
+                write_to_socket(self._socket, f'{self.alias} {value}')
+
+                check = read_from_socket(self._socket)
 
             if check == '' or check is None:
                 print(
@@ -318,8 +349,11 @@ class Variable:
     def __del__(self):
 
         if hasattr(self, 'remote'):
-            self._socket.shutdown(socket.SHUT_RDWR)
-            self._socket.close()
+            if self.protocol == 'modbus':
+                self._client.disconnect()
+            else:
+                self._socket.shutdown(socket.SHUT_RDWR)
+                self._socket.close()
 
 
 class Experiment:
@@ -1040,10 +1074,15 @@ def convert_runcard(runcard):
         elif 'remote' in specs:
             remote = specs['remote']
             alias = specs.get('alias', name)
+            protocol = specs.get('protocol', None)
+            dtype = specs.get('dtype', None)
+            settable = specs.get('settable', None)
 
             variables[name] = Variable(
-                remote=remote, alias=alias
+                remote=remote, alias=alias, protocol=protocol,
+                dtype=dtype, settable=settable
             )
+
         elif 'parameter' in specs:
             variables[name] = Variable(parameter=specs['parameter'])
 
@@ -1056,7 +1095,9 @@ def convert_runcard(runcard):
             specs = specs.copy()  # avoids modifying the runcard
             _type = specs.pop('type')
 
-            specs = {key.replace(' ', '_'): value for key, value in specs.items()}
+            specs = {
+                key.replace(' ', '_'): value for key, value in specs.items()
+            }
 
             # For Set, Timecourse and Sequence routines
             knobs = np.array([specs.get('knobs', [])]).flatten()
@@ -1138,8 +1179,10 @@ def convert_runcard(runcard):
                     name: variables[name] for name in readonly
                 }
 
-            if _type == 'Server' and len(readonly) == 0 and len(readwrite) == 0:
-                specs['readwrite'] = variables
+            if 'Server' in _type and len(readonly) == 0 and len(readwrite) == 0:
+                # Give readonly access to all variables if no variables
+                # specified
+                specs['readonly'] = variables
 
             routines[name] = available_routines[_type](**specs)
 

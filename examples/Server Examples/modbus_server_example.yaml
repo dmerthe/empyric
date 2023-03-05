@@ -11,7 +11,7 @@ Settings:
  step interval: 0.5
  plot interval: 5
  save interval: 10
- end: 180
+ end: 300
 
 Instruments:
  Henon Mapper:
@@ -76,4 +76,4 @@ Routines:
   times: [3, 5]
   values: [0.0, 0.3]
  Server:
-  type: Server
+  type: ModbusServer
