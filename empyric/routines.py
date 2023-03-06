@@ -689,16 +689,16 @@ class ModbusServer(Routine):
         # Store readonly variable values in input registers (fc = 4)
         builder.reset()
 
-        for i, (_, variable) in enumerate(self.readonly.items()):
+        for i, (name, variable) in enumerate(self.readonly.items()):
 
             value = variable._value
 
-            if type(value) is bool:
-                builder.add_32bit_uint(value)
-            elif type(value) is int:
-                builder.add_32bit_int(value)
-            elif type(value) is float:
-                builder.add_32bit_float(value)
+            if isinstance(value, bool) or isinstance(value, np.bool_):
+                builder.add_32bit_uint(bool(value))
+            elif isinstance(value, int) or isinstance(value, np.integer):
+                builder.add_32bit_int(int(value))
+            elif isinstance(value, float) or isinstance(value, np.floating):
+                builder.add_32bit_float(float(value))
             else:
                 builder.add_32bit_int(-1)
 
