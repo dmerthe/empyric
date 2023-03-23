@@ -292,47 +292,45 @@ class Variable:
 
                 self._client.write(16, self.alias, value, dtype=self.dtype)
 
-                check = self.value
-
             else:
                 write_to_socket(self._socket, f'{self.alias} {value}')
 
                 check = read_from_socket(self._socket)
 
-            if check == '' or check is None:
-                print(
-                    f'Warning: received no response from server at '
-                    f'{self.remote} while trying to set {self.alias}'
-                )
-            elif 'Error' in check:
-                print(
-                    f'Warning: got response "{check}" while trying to set '
-                    f'{self.alias} on server at {self.remote}'
-                )
-            else:
-                try:
+                if check == '' or check is None:
+                    print(
+                        f'Warning: received no response from server at '
+                        f'{self.remote} while trying to set {self.alias}'
+                    )
+                elif 'Error' in check:
+                    print(
+                        f'Warning: got response "{check}" while trying to set '
+                        f'{self.alias} on server at {self.remote}'
+                    )
+                else:
+                    try:
 
-                    check_value = recast(check.split(f'{self.alias} ')[1])
+                        check_value = recast(check.split(f'{self.alias} ')[1])
 
-                    if value != check_value:
+                        if value != check_value:
+                            print(
+                                f'Warning: attempted to set {self.alias} on '
+                                f'server at {self.remote} to {value} but '
+                                f'checked value is {check_value}'
+                            )
+
+                    except ValueError as val_err:
                         print(
-                            f'Warning: attempted to set {self.alias} on server '
-                            f'at {self.remote} to {value} but checked value '
-                            f'is {check_value}'
+                            f'Warning: unable to check value while setting '
+                            f'{self.alias} on server at {self.remote}; '
+                            f'got error "{val_err}"'
                         )
-
-                except ValueError as val_err:
-                    print(
-                        f'Warning: unable to check value while setting '
-                        f'{self.alias} on server at {self.remote}; '
-                        f'got error "{val_err}"'
-                    )
-                except IndexError as ind_err:
-                    print(
-                        f'Warning: unable to check value while setting '
-                        f'{self.alias} on server at {self.remote}; '
-                        f'got error "{ind_err}"'
-                    )
+                    except IndexError as ind_err:
+                        print(
+                            f'Warning: unable to check value while setting '
+                            f'{self.alias} on server at {self.remote}; '
+                            f'got error "{ind_err}"'
+                        )
 
         elif hasattr(self, 'parameter'):
             self.parameter = value
@@ -1076,7 +1074,7 @@ def convert_runcard(runcard):
             alias = specs.get('alias', name)
             protocol = specs.get('protocol', None)
             dtype = specs.get('dtype', None)
-            settable = specs.get('settable', None)
+            settable = specs.get('settable', False)
 
             variables[name] = Variable(
                 remote=remote, alias=alias, protocol=protocol,

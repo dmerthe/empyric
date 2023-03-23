@@ -6,6 +6,7 @@ import threading
 import asyncio
 import time
 import select
+import functools
 import numpy as np
 import pandas as pd
 
@@ -407,7 +408,7 @@ class SocketServer(Routine):
     Variables accessible to the server are specified by providing
     dictionaries of variables in the form, {..., name: variable, ...} as the
     readwrite and/or readonly arguments. Any variables given in the
-    `readwrite` argumment will be readable and writeable from by connected
+    `readwrite` argumment will be readable and writeable by connected
     clients. Variables given in the `readonly` argument will be read-only by
     clients.
     """
@@ -559,11 +560,13 @@ class ModbusServer(Routine):
     Variables accessible to the server are specified by providing
     dictionaries of variables in the form, {..., name: variable, ...} as the
     readwrite and/or readonly arguments. Any variables given in the
-    `readwrite` argumment will be readable and writeable from by connected
+    `readwrite` argumment will be readable and writeable by connected
     clients. Variables given in the `readonly` argument will be read-only by
     clients.
 
-    Only variables with `bool`, `int` or `float` types can be used.
+    Because data is stored in statically assigned registers, only variables
+    with `bool`, `int` or `float` types can be used. Variable values are
+    stored in consecutive 2 registers (32 bits per value).
 
     Readwrite variables will be stored in holding registers in the same order
     as given in the argument, starting from address 0. Readonly variables will
@@ -599,22 +602,24 @@ class ModbusServer(Routine):
         self._builder_cls = payload.BinaryPayloadBuilder
         self._decoder_cls = payload.BinaryPayloadDecoder
 
+        DataBlock = datastore.ModbusSequentialDataBlock
+
         # Map each variable to 2 sequential registers
         if self.readonly:
-            readonly_block = datastore.ModbusSequentialDataBlock(
-                0, [0] * 2 * len(readonly)
-            )
+            readonly_block = DataBlock(0, [0] * 2 * len(readonly))
         else:
-            readonly_block = datastore.ModbusSequentialDataBlock.create()
+            readonly_block = DataBlock.create()
 
         if self.readwrite:
-            readwrite_block = datastore.ModbusSequentialDataBlock(
-                0, [0] * 2 * len(readwrite)
-            )
+            readwrite_block = DataBlock(0, [0] * 2 * len(readwrite))
         else:
-            readwrite_block = datastore.ModbusSequentialDataBlock.create()
+            readwrite_block = DataBlock.create()
 
         # Set up a PyModbus TCP Server
+        datastore.ModbusSlaveContext.setValues = self.setValues_decorator(
+            datastore.ModbusSlaveContext.setValues
+        )
+
         self.slave = datastore.ModbusSlaveContext(
                 ir=readonly_block,
                 hr=readwrite_block
@@ -640,33 +645,49 @@ class ModbusServer(Routine):
         self.port = kwargs.get('port', 502)
 
         self.server_thread = threading.Thread(
-            target=self._run_server
+            target=asyncio.run, args=(self._run_async_server(),)
         )
 
         self.server_thread.start()
 
-    async def _update_registers(self, update_variables=True):
+    def setValues_decorator(self, setValues_method):
+        """
+        This decorator adds a `from_vars` kwarg to indicate that the intention
+        is to update the registers from variable values. Otherwise, the wrapped
+        method sets the corresponding variables instead.
+        """
 
-        # Apply readwrite register values to writable variables
-        if update_variables:
-            decoder = self._decoder_cls.fromRegisters(
-                self.slave.getValues(3, 0, 2*len(self.readwrite))
-            )
+        @functools.wraps(setValues_method)
+        def wrapped_method(self2, *args, from_vars=False):
+            if from_vars:
+                return setValues_method(self2, *args)
+            else:
 
-            for i, (_, variable) in enumerate(self.readwrite.items()):
+                fc_as_hex, address, values = args
 
-                if type(variable._value) is bool:
-                    value = bool(decoder.decode_32bit_uint())
-                elif type(variable._value) is int:
-                    value = decoder.decode_32bit_int()
-                elif type(variable._value) is float:
-                    value = decoder.decode_32bit_float()
+                if fc_as_hex != 16:
+                    print(
+                        f'Warning: an attempt was made to write to a readonly '
+                        f'register at address {address}'
+                    )
                 else:
-                    decoder.decode_32bit_int()  # decode 2 registers and ignore
-                    value = None
 
-                if value is not None:
-                    variable.value = value
+                    variable = list(self.readwrite.values())[address//2]
+
+                    decoder = self._decoder_cls.fromRegisters(values)
+
+                    val = variable._value
+
+                    if isinstance(val, bool) or isinstance(val, np.bool_):
+                        variable.value = decoder.decode_32bit_uint()
+                    elif isinstance(val, int) or isinstance(val, np.integer):
+                        variable.value = decoder.decode_32bit_int()
+                    else:
+                        variable.value = decoder.decode_32bit_float()
+
+        return wrapped_method
+
+    async def _update_registers(self, update_variables=True):
 
         # Store readwrite variable values in holding registers (fc = 3)
         builder = self._builder_cls()
@@ -675,16 +696,17 @@ class ModbusServer(Routine):
 
             value = variable._value
 
-            if type(value) is bool:
-                builder.add_32bit_uint(value)
-            elif type(value) is int:
-                builder.add_32bit_int(value)
-            elif type(value) is float:
-                builder.add_32bit_float(value)
+            if isinstance(value, bool) or isinstance(value, np.bool_):
+                builder.add_32bit_uint(bool(value))
+            elif isinstance(value, int) or isinstance(value, np.integer):
+                builder.add_32bit_int(int(value))
+            elif isinstance(value, float) or isinstance(value, np.floating):
+                builder.add_32bit_float(float(value))
             else:
-                builder.add_32bit_int(-1)
+                builder.add_32bit_float(float('nan'))
 
-        self.slave.setValues(3, 0, builder.to_registers())
+        # from_vars kwarg added with setValues_decorator above
+        self.slave.setValues(3, 0, builder.to_registers(), from_vars=True)
 
         # Store readonly variable values in input registers (fc = 4)
         builder.reset()
@@ -700,9 +722,10 @@ class ModbusServer(Routine):
             elif isinstance(value, float) or isinstance(value, np.floating):
                 builder.add_32bit_float(float(value))
             else:
-                builder.add_32bit_int(-1)
+                builder.add_32bit_float(float('nan'))
 
-        self.slave.setValues(4, 0, builder.to_registers())
+        # from_vars kwarg added with setValues_decorator above
+        self.slave.setValues(4, 0, builder.to_registers(), from_vars=True)
 
         await asyncio.sleep(0.1)
 
@@ -725,15 +748,6 @@ class ModbusServer(Routine):
         except asyncio.exceptions.CancelledError:
             # Server shutdown cancels the _update_registers task
             pass
-
-    def _run_server(self):
-        """Run the server"""
-
-        # Input variable values into registers
-        asyncio.run(self._update_registers(update_variables=False))
-
-        # Start the Modbus TCP server
-        asyncio.run(self._run_async_server())
 
     def terminate(self):
         asyncio.run(self.server.shutdown())
