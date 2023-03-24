@@ -76,4 +76,4 @@ Routines:
   times: [3, 5]
   values: [0.0, 0.3]
  Server:
-  type: Server
+  type: SocketServer

@@ -2,7 +2,7 @@ import time
 import numpy as np
 from empyric.instruments import Instrument
 from empyric.instruments import setter, measurer
-from empyric.adapters import Adapter
+from empyric.adapters import Adapter, Modbus
 
 
 class Clock(Instrument):
@@ -418,3 +418,16 @@ class SimpleProcess(Instrument):
         )*np.exp(-t / self.response_time)
 
         return self._value + self.noise_level*(2*np.random.rand() - 1)
+
+
+class ModbusClient(Instrument):
+    """
+    Counterpart to the ModbusServer routine. Communicates with a ModbusServer
+    instance in other experiments to control variables.
+    """
+
+    name = 'DataClient'
+
+    supported_adapters = (
+        (Modbus, {}),
+    )

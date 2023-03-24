@@ -1,0 +1,28 @@
+# Example showing how to set up a client experiment that handles a remote variable
+
+Description:
+ name: Henon Map Experiment Client
+ operator: Pierre
+ platform: Bench 2
+ comments: I halp
+
+Settings:
+ step interval: 1
+ plot interval: 5
+ save interval: 10
+ end: 60
+
+Variables:
+ Knob a: # This remote variable is settable (knob on server)
+  remote: 10.0.2.9::502  # replace with the ip address and port of your server
+  protocol: modbus
+  settable: True
+  alias: 0  # replace with the register address of the remote variable
+ Distance r: # This remote variable is not settable (expression on server)
+  remote: 10.0.2.9::502  # replace with the ip address and port of your server
+  protocol: modbus
+  alias: 4  # replace with the register address of the remote variable
+
+Plots:
+ R Plot:
+  y: Distance r
