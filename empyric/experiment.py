@@ -77,7 +77,7 @@ class Variable:
     def __init__(self,
                  # Knobs and meters
                  instrument=None, knob=None, meter=None,
-                 lower_limit=-np.inf, upper_limit=np.inf,
+                 lower_limit=None, upper_limit=None,
 
                  # Expressions
                  expression=None, definitions=None,
@@ -276,16 +276,23 @@ class Variable:
 
         elif hasattr(self, 'knob'):
 
-            if value > self.upper_limit:
-                self.instrument.set(self.knob, self.upper_limit)
-            elif value < self.lower_limit:
-                self.instrument.set(self.knob, self.lower_limit)
-            else:
-                self.instrument.set(self.knob, value)
+            try:
+                if self.upper_limit and value > self.upper_limit:
+                    self.instrument.set(self.knob, self.upper_limit)
+                elif self.lower_limit and value < self.lower_limit:
+                    self.instrument.set(self.knob, self.lower_limit)
+                else:
+                    self.instrument.set(self.knob, value)
 
-            self._value = self.instrument.__getattribute__(
-                self.knob.replace(' ', '_')
-            )
+                self._value = self.instrument.__getattribute__(
+                    self.knob.replace(' ', '_')
+                )
+            except TypeError:
+                print(self.upper_limit, self.lower_limit)
+                raise TypeError(
+                    'An upper or lower limit was specified for a non-numeric '
+                    'variable.'
+                )
 
         elif hasattr(self, 'remote') and self.settable:
 
@@ -1052,8 +1059,8 @@ def convert_runcard(runcard):
             instrument = converted_runcard['Instruments'][specs['instrument']]
             variables[name] = Variable(
                 knob=specs['knob'], instrument=instrument,
-                lower_limit=specs.get('lower limit', -np.inf),
-                upper_limit=specs.get('upper limit', np.inf)
+                lower_limit=specs.get('lower limit', None),
+                upper_limit=specs.get('upper limit', None)
             )
         elif 'expression' in specs:
             expression = specs['expression']
