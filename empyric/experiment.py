@@ -109,7 +109,8 @@ class Variable:
 
         :param remote: (str) address of the server of the variable controlling
         the variable, in the form '[host name/ip address]::[port]'.
-        :param alias: (str) For a SocketServer, the name of the variable on the
+
+        :param alias: (str) for a SocketServer, the name of the variable on the
         server; for a ModbusServer, the register address of the variable.
         :param protocol: (str) server communication protocol; set to 'modbus'
         if the server is a `ModbusServer`, otherwise no protocol (default)
@@ -118,7 +119,7 @@ class Variable:
         relevant for ModbusServer variables which can be either boolean,
         integer or float.
 
-        :param parameter (str) value of a user controlled parameter
+        :param parameter (str) value of a user controlled parameter.
         """
 
         self._value = None  # last known value of this variable

@@ -152,8 +152,6 @@ class Adapter:
         """
         Establishes communications with the instrument through the appropriate
         backend.
-
-        :return: None
         """
         self.connected = True
 
@@ -163,9 +161,8 @@ class Adapter:
         Write a command.
 
         :param args: any arguments for the write method
-        :param validator: (callable) function that returns True if its input
-        looks right or False if it does not
         :param kwargs: any keyword arguments for the write method
+
         :return: (str/float/int/bool) instrument response, if valid
         """
 
@@ -181,9 +178,8 @@ class Adapter:
         Read an awaiting message.
 
         :param args: any arguments for the read method
-        :param validator: (callable) function that returns True if its input
-        looks right or False if it does not
         :param kwargs: any keyword arguments for the read method
+
         :return: (str/float/int/bool) instrument response, if valid
         """
 
@@ -198,9 +194,8 @@ class Adapter:
         Submit a query.
 
         :param args: any arguments for the query method
-        :param validator: (callable) function that returns True if its input
-        looks right or False if it does not
         :param kwargs: any keyword arguments for the query method
+
         :return: (str/float/int/bool) instrument response, if valid
         """
 
@@ -214,8 +209,6 @@ class Adapter:
     def disconnect(self):
         """
         Close communication port/channel
-
-        :return: None
         """
         self.connected = False
 
@@ -711,6 +704,10 @@ class PrologixGPIBUSB:
 class PrologixGPIBLAN:
     """
     Wraps serial communications with the Prologix GPIB-ETHERNET adapter unit.
+
+    The IP address of the adapter unit can be found with Prologix's Netfinder
+    utility and GPIB configuration can be modified with Prologix's GPIB
+    Configurator.
     """
 
     @property
@@ -1130,21 +1127,6 @@ class Modbus(Adapter):
                     stopbits=self.stop_bits,
                 )
 
-        # Enumerate modbus functions
-        self.functions = {
-            1: self.backend.read_coils,
-            2: self.backend.read_discrete_inputs,
-            3: self.backend.read_holding_registers,
-            4: self.backend.read_input_registers,
-
-            5: self.backend.write_coil,
-            6: self.backend.write_register,
-
-            15: self.backend.write_coils,
-            16: self.backend.write_registers
-
-        }
-
         # Get data reading/writing utility classes
         payload_module = importlib.import_module('.payload', package='pymodbus')
 
@@ -1236,24 +1218,32 @@ class Modbus(Adapter):
                 ', '.join(self.dtypes)
             )
 
+        # Enumerate modbus read functions
+        read_functions = {
+            1: self.backend.read_coils,
+            2: self.backend.read_discrete_inputs,
+            3: self.backend.read_holding_registers,
+            4: self.backend.read_input_registers,
+        }
+
         if func_code in [1, 2]:
             # Read coils or discrete inputs
 
-            response = self.functions[func_code](
+            response = read_functions[func_code](
                 address, count=count, slave=self.slave_id
             ).bits
 
-            coils = [bool(bit) for bit in response][:count]
+            bits = [bool(bit) for bit in response][:count]
 
-            if len(coils) == 1:
-                return coils[0]
+            if len(bits) == 1:
+                return bits[0]
             else:
-                return coils
+                return bits
 
         elif func_code in [3, 4]:
             # Read holding registers or input registers
 
-            registers = self.functions[func_code](
+            registers = read_functions[func_code](
                 address, count=count, slave=self.slave_id
             ).registers
 
@@ -1292,7 +1282,6 @@ class Modbus(Adapter):
 class Phidget(Adapter):
     """
     Handles communications with Phidget devices
-
     """
 
     delay = 0.2
