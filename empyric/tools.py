@@ -78,6 +78,26 @@ class Clock:
         return elapsed_time
 
 
+class _Toggle(np.bool_):
+    """
+    Represents toggle knobs
+    """
+
+    def __init__(self, state):
+
+        super().__init__(self)
+        self.on = np.bool_(True) if is_on(state) else np.bool_(True)
+
+    def __eq__(self, other):
+        return True if other.on == self.on else False
+
+    def __bool__(self):
+        return True if self.on else False
+
+
+ON = _Toggle('ON')
+OFF = _Toggle('OFF')
+
 # Utility functions that help interpret values
 def is_on(value):
     on_values = [1, '1', 'ON', 'On', 'on']
@@ -130,6 +150,8 @@ def find_nearest(allowed, value, overestimate=False, underestimate=False):
         return allowed[nearest[0]]
 
 
+
+
 def recast(value):
     """
     Convert a value into the appropriate type for the information it contains
@@ -139,16 +161,20 @@ def recast(value):
         return None
     elif np.ndim(value) > 0:  # value is an array
         return np.array([recast(subval) for subval in value])
-    elif isinstance(value, numbers.Number) or type(value) is bool:
-        return value
+    elif isinstance(value, bool) or isinstance(value, np.bool_):
+        return np.bool_(value)
+    elif isinstance(value, int) or isinstance(value, np.integer):
+        return np.int64(value)
+    elif isinstance(value, float) or isinstance(value, np.floating):
+        return np.float64(value)
     elif type(value) is str:
 
         if value.lower() == 'true':
-            return True
+            return np.bool_(True)
         elif value.lower() == 'false':
-            return False
+            return np.bool_(False)
         elif re.fullmatch('[0-9]+', value):  # integer
-            return int(value)
+            return np.int64(value)
         elif re.fullmatch('[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?', value):
             # float
             return float(value)
@@ -159,7 +185,7 @@ def recast(value):
         else:
             return value  # must be an actual string
     else:
-        return None
+        raise TypeError(f'unable to recast {value}')
 
 
 # Tools for handling sockets
