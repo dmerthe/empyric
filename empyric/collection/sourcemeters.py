@@ -75,6 +75,8 @@ class Keithley2400(Instrument):
 
         self.write(':SOUR:CLE:AUTO OFF')  # disable auto output-off
 
+        self.write(':SENS:FUNC:CONC OFF') # disable concurrent measurements
+
         self.set_output('OFF')
 
         if variable == 'voltage':
@@ -108,9 +110,12 @@ class Keithley2400(Instrument):
             self.write(':FORM:ELEM CURR')
 
     @getter
-    def get_meters(self): #pending work
+    def get_meter(self):
+        if self.query(':SENS:FUNC?').strip() == 'VOLT:DC':
+            return 'VOLT'
+        else:
+            return 'CURR'
 
-        raise ValueError('funcion no funciona')
 
     @setter
     def set_remote_sense(self, on_or_off):
@@ -196,7 +201,7 @@ class Keithley2400(Instrument):
     @getter
     def get_voltage(self):
 
-        return self.query(':SOUR:VOLT:LEV ?').split()
+        return self.query(':SOUR:VOLT:LEV?').split()
 
     @setter
     def set_current(self, current):
@@ -212,7 +217,7 @@ class Keithley2400(Instrument):
     @getter
     def get_current(self):
 
-        return self.query(':SOUR:CURR:LEV ?').split()
+        return self.query(':SOUR:CURR:LEV?').split()
 
     @setter
     def set_voltage_range(self, voltage_range):
@@ -334,6 +339,10 @@ class Keithley2400(Instrument):
     @setter
     def set_delay(self, delay):
         self.adapter.delay = delay
+
+    @getter
+    def get_delay(self):
+        return self.adapter.delay
 
     @setter
     def set_fast_voltages(self, voltages):
