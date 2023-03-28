@@ -11,7 +11,7 @@ class OmegaCN7500(Instrument):
     name = 'OmegaCN7500'
 
     supported_adapters = (
-        (Modbus, {'slave_mode': 'rtu',
+        (ModbusSerial, {'slave_mode': 'rtu',
                   'baud_rate': 38400,
                   'parity': 'N',
                   'delay': 0.2}),
@@ -88,7 +88,7 @@ class OmegaPlatinum(Instrument):
     name = "OmegaPlatinum"
 
     supported_adapters = (
-        (Modbus, {
+        (ModbusSerial, {
             'baud_rate': 19200,
             'parity': 'O'
         }),
@@ -187,7 +187,7 @@ class RedLionPXU(Instrument):
     name = 'RedLionPXU'
 
     supported_adapters = (
-        (Modbus, {'buad_rate': 38400}),
+        (ModbusSerial, {'buad_rate': 38400}),
     )
 
     knobs = (
@@ -238,7 +238,7 @@ class WatlowEZZone(Instrument):
     name = 'WatlowEZZone'
 
     supported_adapters = (
-        (Modbus, {'baud_rate': 9600}),
+        (ModbusSerial, {'baud_rate': 9600}),
     )
 
     knobs = (
@@ -285,3 +285,92 @@ class WatlowEZZone(Instrument):
     @setter
     def set_time_derivative(self, derivative):
         return self.write(1896, derivative, dtype='float', byte_order=3)
+
+
+class MKSGSeries(Instrument):
+    """MKS G series mass flow controller"""
+
+    name = 'MKSGSeries'
+
+    supported_adapters = ((Modbus, {'byte_order': '>'}),)
+
+    knobs = (
+        'setpoint',  # flow rate setpoint in SCCM
+        'ramp time'  # ramp time in milliseconds
+    )
+
+    meters = (
+        'flow rate',  # actual flow rate in SCCM
+        'valve position',  # valve position in percent
+        'temperature'  # temperature in degrees C
+    )
+
+    @setter
+    def set_setpoint(self, setpoint):
+        self.write(16, 0xA000, setpoint, dtype='32bit_float')
+
+    @getter
+    def get_setpoint(self):
+        return self.read(3, 0xA000, count=2, dtype='32bit_float')
+
+    @setter
+    def set_ramp_time(self, ramp_time):
+        self.write(16, 0xA002, int(ramp_time), dtype='32bit_uint')
+
+    @getter
+    def get_ramp_time(self):
+        return self.read(3, 0xA002, count=2, dtype='32bit_uint')
+
+    @measurer
+    def measure_flow_rate(self):
+        return self.read(4, 0x4000, count=2, dtype='32bit_float')
+
+    @measurer
+    def measure_valve_position(self):
+        return self.read(4, 0x4004, count=2, dtype='32bit_float')
+
+    @measurer
+    def measure_temperature(self):
+        return self.read(4, 0x4002, count=2, dtype='32bit_float')
+
+
+class AlicatMFC(Instrument):
+    """Alicat mass flow controller"""
+
+    name = 'AlicatMFC'
+
+    supported_adapters = (
+        (Modbus, {'byte_order': '>'}),
+    )
+
+    knobs = (
+        'setpoint',  # flow rate setpoint in SCCM
+    )
+
+    meters = (
+        'flow rate',  # actual flow rate in SCCM
+        'temperature',  # temperature in degrees C
+        'pressure'  
+        # pressure in PSI (absolute, gauge or differential,
+        # depending on device configuration)
+    )
+
+    @setter
+    def set_setpoint(self, setpoint):
+        self.write(16, 1009, setpoint, dtype='32bit_float')
+
+    @getter
+    def get_setpoint(self):
+        return self.read(3, 1009, count=2, dtype='32bit_float')
+
+    @measurer
+    def measure_flow_rate(self):
+        return self.read(4, 1208, count=2, dtype='32bit_float')
+
+    @measurer
+    def measure_temperature(self):
+        return self.read(4, 1204, count=2, dtype='32bit_float')
+
+    @measurer
+    def measure_pressure(self):
+        return self.read(4, 1202, count=2, dtype='32bit_float')

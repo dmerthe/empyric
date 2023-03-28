@@ -1,14 +1,17 @@
+import importlib
 import numbers
 import socket
 import queue
 import threading
+import asyncio
 import time
 import select
+import functools
 import numpy as np
 import pandas as pd
 
 from empyric.tools import convert_time, recast, \
-    autobind_socket, read_from_socket, write_to_socket
+    autobind_socket, read_from_socket, write_to_socket, get_ip_address
 
 
 class Routine:
@@ -397,7 +400,18 @@ class ModelPredictiveControl(Routine):
         pass
 
 
-class Server(Routine):
+class SocketServer(Routine):
+    """
+    Server routine for transmitting data to other experiments, local or remote,
+    using the socket interface.
+
+    Variables accessible to the server are specified by providing
+    dictionaries of variables in the form, {..., name: variable, ...} as the
+    readwrite and/or readonly arguments. Any variables given in the
+    `readwrite` argumment will be readable and writeable by connected
+    clients. Variables given in the `readonly` argument will be read-only by
+    clients.
+    """
 
     def __init__(self, readwrite=None, readonly=None, **kwargs):
 
@@ -536,6 +550,207 @@ class Server(Routine):
     def __del__(self):
         if self.running:
             self.terminate()
+
+
+class ModbusServer(Routine):
+    """
+    Server routine for transmitting data to other experiments, local or remote,
+    using the Modbus over TCP/IP protocol.
+
+    Variables accessible to the server are specified by providing
+    dictionaries of variables in the form, {..., name: variable, ...} as the
+    readwrite and/or readonly arguments. Any variables given in the
+    `readwrite` argumment will be readable and writeable by connected
+    clients. Variables given in the `readonly` argument will be read-only by
+    clients.
+
+    Because data is stored in statically assigned registers, only variables
+    with `bool`, `int` or `float` types can be used. Variable values are
+    stored in consecutive 2 registers (32 bits per value).
+
+    Readwrite variables will be stored in holding registers in the same order
+    as given in the argument, starting from address 0. Readonly variables will
+    be stored similarly in input registers.
+    """
+
+    def __init__(self, readwrite=None, readonly=None, **kwargs):
+
+        self.readwrite = {}
+        self.readonly = {}
+
+        if readwrite:
+            self.readwrite = readwrite
+
+        if readonly:
+            self.readonly = readonly
+
+        Routine.__init__(self, **kwargs)
+
+        # Check for PyModbus installation
+        try:
+            importlib.import_module('pymodbus')
+        except ModuleNotFoundError:
+            raise ModuleNotFoundError(
+                'pymodbus must be installed to run a Modbus server'
+            )
+
+        # Import tools from pymodbus
+        datastore = importlib.import_module('.datastore', package='pymodbus')
+        device = importlib.import_module('.device', package='pymodbus')
+        payload = importlib.import_module('.payload', package='pymodbus')
+
+        self._builder_cls = payload.BinaryPayloadBuilder
+        self._decoder_cls = payload.BinaryPayloadDecoder
+
+        DataBlock = datastore.ModbusSequentialDataBlock
+
+        # Map each variable to 2 sequential registers
+        if self.readonly:
+            readonly_block = DataBlock(0, [0] * 2 * len(readonly))
+        else:
+            readonly_block = DataBlock.create()
+
+        if self.readwrite:
+            readwrite_block = DataBlock(0, [0] * 2 * len(readwrite))
+        else:
+            readwrite_block = DataBlock.create()
+
+        # Set up a PyModbus TCP Server
+        datastore.ModbusSlaveContext.setValues = self.setValues_decorator(
+            datastore.ModbusSlaveContext.setValues
+        )
+
+        self.slave = datastore.ModbusSlaveContext(
+                ir=readonly_block,
+                hr=readwrite_block
+            )
+
+        self.context = datastore.ModbusServerContext(
+            slaves=self.slave,
+            single=True
+        )
+
+        self.identity = device.ModbusDeviceIdentification(
+            info_name={
+                "VendorName": "Empyric",
+                "VendorUrl": "https://github.com/dmerthe/empyric",
+                "ProductName": "Modbus Server",
+                "ModelName": "Modbus Server",
+            }
+        )
+
+        # Run server
+        self.server = None  # assigned in _run_async_server
+        self.ip_address = get_ip_address()
+        self.port = kwargs.get('port', 502)
+
+        self.server_thread = threading.Thread(
+            target=asyncio.run, args=(self._run_async_server(),)
+        )
+
+        self.server_thread.start()
+
+    def setValues_decorator(self, setValues_method):
+        """
+        This decorator adds a `from_vars` kwarg to indicate that the intention
+        is to update the registers from variable values. Otherwise, the wrapped
+        method sets the corresponding variables instead.
+        """
+
+        @functools.wraps(setValues_method)
+        def wrapped_method(self2, *args, from_vars=False):
+            if from_vars:
+                return setValues_method(self2, *args)
+            else:
+
+                fc_as_hex, address, values = args
+
+                if fc_as_hex != 16:
+                    print(
+                        f'Warning: an attempt was made to write to a readonly '
+                        f'register at address {address}'
+                    )
+                else:
+
+                    variable = list(self.readwrite.values())[address//2]
+
+                    decoder = self._decoder_cls.fromRegisters(values)
+
+                    val = variable._value
+
+                    if isinstance(val, bool) or isinstance(val, np.bool_):
+                        variable.value = decoder.decode_32bit_uint()
+                    elif isinstance(val, int) or isinstance(val, np.integer):
+                        variable.value = decoder.decode_32bit_int()
+                    else:
+                        variable.value = decoder.decode_32bit_float()
+
+        return wrapped_method
+
+    async def _update_registers(self, update_variables=True):
+
+        # Store readwrite variable values in holding registers (fc = 3)
+        builder = self._builder_cls()
+
+        for i, (_, variable) in enumerate(self.readwrite.items()):
+
+            value = variable._value
+
+            if isinstance(value, bool) or isinstance(value, np.bool_):
+                builder.add_32bit_uint(bool(value))
+            elif isinstance(value, int) or isinstance(value, np.integer):
+                builder.add_32bit_int(int(value))
+            elif isinstance(value, float) or isinstance(value, np.floating):
+                builder.add_32bit_float(float(value))
+            else:
+                builder.add_32bit_float(float('nan'))
+
+        # from_vars kwarg added with setValues_decorator above
+        self.slave.setValues(3, 0, builder.to_registers(), from_vars=True)
+
+        # Store readonly variable values in input registers (fc = 4)
+        builder.reset()
+
+        for i, (name, variable) in enumerate(self.readonly.items()):
+
+            value = variable._value
+
+            if isinstance(value, bool) or isinstance(value, np.bool_):
+                builder.add_32bit_uint(bool(value))
+            elif isinstance(value, int) or isinstance(value, np.integer):
+                builder.add_32bit_int(int(value))
+            elif isinstance(value, float) or isinstance(value, np.floating):
+                builder.add_32bit_float(float(value))
+            else:
+                builder.add_32bit_float(float('nan'))
+
+        # from_vars kwarg added with setValues_decorator above
+        self.slave.setValues(4, 0, builder.to_registers(), from_vars=True)
+
+        await asyncio.sleep(0.1)
+
+        asyncio.create_task(self._update_registers())
+
+    async def _run_async_server(self):
+
+        asyncio.create_task(self._update_registers())
+
+        server = importlib.import_module('.server', package='pymodbus')
+
+        self.server = server.ModbusTcpServer(
+            self.context,
+            identity=self.identity,
+            address=(self.ip_address, self.port)
+        )
+
+        try:
+            await self.server.serve_forever()
+        except asyncio.exceptions.CancelledError:
+            # Server shutdown cancels the _update_registers task
+            pass
+
+    def terminate(self):
+        asyncio.run(self.server.shutdown())
 
 
 supported = {key: value for key, value in vars().items()

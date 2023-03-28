@@ -5,8 +5,14 @@ from empyric.tools import recast
 
 def setter(method):
     """
-    Utility function which wraps all set_[knob] methods and records the new
-    knob values
+    Utility function that wraps all set_[knob] methods and records the new
+    knob values.
+
+    If the wrapped method returns a value, this value is assigned to the
+    corresponding knob attribute of the instrument. This is convenient for
+    cases where the set value maps to another value which is more relevant.
+    Otherwise, the value of the method's first argument is assigned to the
+    attribute.
 
     :param method: (callable) method to be wrapped
     :return: wrapped method
@@ -32,8 +38,8 @@ def setter(method):
 
 def getter(method):
     """
-    Utility function which wraps all get_[knob] methods and records the
-    retrieved knob values
+    Utility function that wraps all get_[knob] methods and records the
+    retrieved knob values.
 
     :param method: (callable) method to be wrapped
     :return: wrapped method
@@ -54,8 +60,8 @@ def getter(method):
 
 def measurer(method):
     """
-    Utility function that wraps all measure_[meter] methods; right now does
-    nothing
+    Utility function that wraps all measure_[meter] methods and records the
+    measured value.
 
     :param method: (callable) method to be wrapped
     :return: wrapped method

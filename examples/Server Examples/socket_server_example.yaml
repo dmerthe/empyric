@@ -1,0 +1,86 @@
+# Example showing how to set up a Server routine
+# Otherwise, works the same as the Henon Map Experiment example
+
+Description:
+ name: Henon Map Experiment with Server
+ operator: Marie
+ platform: Bench 1
+ comments: A few neutrons never hurt anyone
+
+Settings:
+ step interval: 0.5
+ plot interval: 5
+ save interval: 10
+ end: 180
+
+Instruments:
+ Henon Mapper:
+  type: HenonMapper
+  address: 1
+  presets:
+   a: 0
+   b: 0
+  postsets:
+   a: 0
+   b: 0
+
+Variables:
+ Knob a:
+  instrument: Henon Mapper
+  knob: a
+ Knob b:
+  instrument: Henon Mapper
+  knob: b
+ Coordinate x:
+  instrument: Henon Mapper
+  meter: x
+ Coordinate y:
+  instrument: Henon Mapper
+  meter: y
+ Distance r:
+  expression: 'sqrt(x^2 + y^2)'
+  definitions:
+   x: Coordinate x
+   y: Coordinate y
+
+Alarms:
+ r > 1:
+  condition: 'Distance r > 1'
+  protocol: hold
+
+Plots:
+ Henon Map:
+  x: Coordinate x
+  y: Coordinate y
+  xlabel: 'X'
+  ylabel: 'Y'
+  style: parametric
+  configure:
+   linestyle: None
+   marker: 'o'
+   markersize: 3
+
+ Y Plot:
+  x: Time
+  y: Coordinate y
+
+Routines:
+ Ramp Knob a:
+  type: Timecourse
+  knobs: Knob a
+  times: [3, 5]
+  values: [0.0, 1.4]
+ Ramp Knob b:
+  type: Timecourse
+  knobs: Knob b
+  times: [3, 5]
+  values: [0.0, 0.3]
+ Server:
+  type: SocketServer
+  readwrite:
+   - Knob a
+   - Knob b
+  readonly:
+   - Coordinate x
+   - Coordinate y
+   - Distance r
