@@ -91,9 +91,9 @@ class Keithley2400(Instrument):
     def get_source(self):
 
         if self.query('SOUR:FUNC?').strip() == 'VOLT':
-            return 'Voltage'
+            return 'voltage'
         else:
-            return 'Current'
+            return 'current'
 
     @setter
     def set_meter(self, variable):
@@ -112,9 +112,9 @@ class Keithley2400(Instrument):
     @getter
     def get_meter(self):
         if self.query(':SENS:FUNC?').strip() == 'VOLT:DC':
-            return 'VOLT'
+            return 'voltage'
         else:
-            return 'CURR'
+            return 'current'
 
 
     @setter
@@ -169,7 +169,7 @@ class Keithley2400(Instrument):
             match = re.match('.\d\.\d+E.\d\d', response)
             return bool(match)
 
-        return float(self.query(':READ?', validator=validator))
+        return self.query(':READ?', validator=validator)
 
     @measurer
     def measure_current(self):
@@ -185,7 +185,7 @@ class Keithley2400(Instrument):
             match = re.match('.\d\.\d+E.\d\d', response)
             return bool(match)
 
-        return float(self.query(':READ?', validator=validator))
+        return self.query(':READ?', validator=validator)
 
     @setter
     def set_voltage(self, voltage):
