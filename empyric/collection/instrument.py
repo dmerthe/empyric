@@ -22,12 +22,15 @@ def setter(method):
 
     @wraps(method)
     def wrapped_method(*args, **kwargs):
-        returned_value = method(*args, **kwargs)
+
         self = args[0]
         value = recast(args[1])
+        args = (self, value, *args[2:])
+
+        returned_value = recast(method(*args, **kwargs))
 
         # The knob attribute is set to the returned value of the method, or
-        # the value argument if returned value is None
+        # the value argument if the returned value is None
         if returned_value is not None:
             self.__setattr__(knob, returned_value)
         else:
@@ -73,7 +76,7 @@ def measurer(method):
     def wrapped_method(*args, **kwargs):
         self = args[0]
         value = recast(method(*args, **kwargs))
-        self.__setattr__('measured_' + meter, value)
+        self.__setattr__(meter, value)
 
         return value
 
@@ -222,7 +225,7 @@ class Instrument:
 
         return self.adapter.query(*args, **kwargs)
 
-    def set(self, knob, value):
+    def set(self, knob: str, value):
         """
         Set the value of a knob on the instrument
 
@@ -238,7 +241,7 @@ class Instrument:
 
         set_method(value)
 
-    def get(self, knob):
+    def get(self, knob: str):
         """
         Get the value of a knob on the instrument. If the instrument has a get
         method for the knob, a command will be sent to the instrument to
@@ -253,7 +256,7 @@ class Instrument:
         else:
             return getattr(self, knob.replace(' ', '_'))
 
-    def measure(self, meter):
+    def measure(self, meter: str):
         """
         Measure the value of a variable associated with this instrument
 
