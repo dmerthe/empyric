@@ -18,6 +18,7 @@ import pykwalify.errors
 from pykwalify.core import Core as YamlValidator
 from ruamel.yaml import YAML
 
+from empyric import variables as _variables
 from empyric import adapters as _adapters
 from empyric import graphics as _graphics
 from empyric import instruments as _instruments
@@ -131,7 +132,11 @@ class Experiment:
 
             threads = {}
             for name, variable in self.variables.items():
-                if variable.type in ['knob', 'parameter']:
+
+                is_knob = isinstance(variable, _variables.Knob)
+                is_parameter = isinstance(variable, _variables.Parameter)
+
+                if is_knob or is_parameter:
                     threads[name] = threading.Thread(
                         target=self._update_variable, args=(name,)
                     )
@@ -208,7 +213,7 @@ class Experiment:
 
         try:
 
-            if self.variables[name].type == 'expression':
+            if isinstance(self.variables[name], _variables.Expression):
                 for dependee in self.variables[name].definitions:
                     event = self.eval_events[dependee]
                     event.wait()  # wait for dependee to be evaluated
@@ -346,7 +351,7 @@ class Alarm:
     """
 
     def __init__(self, condition, variables, protocol=None):
-        self.trigger_variable = Variable(
+        self.trigger_variable = _variables.Expression(
             expression=condition, definitions=variables
         )
 
@@ -715,12 +720,12 @@ def convert_runcard(runcard):
     for name, specs in runcard['Variables'].items():
         if 'meter' in specs:
             instrument = converted_runcard['Instruments'][specs['instrument']]
-            variables[name] = Variable(
+            variables[name] = _variables.Meter(
                 meter=specs['meter'], instrument=instrument
             )
         elif 'knob' in specs:
             instrument = converted_runcard['Instruments'][specs['instrument']]
-            variables[name] = Variable(
+            variables[name] = _variables.Knob(
                 knob=specs['knob'], instrument=instrument,
                 lower_limit=specs.get('lower limit', None),
                 upper_limit=specs.get('upper limit', None)
@@ -735,9 +740,12 @@ def convert_runcard(runcard):
                 try:
                     definitions[var_name] = variables[var_name]
                 except KeyError as undefined:
-                    raise KeyError(f"variable {undefined} is not defined for expression '{name}'")
+                    raise KeyError(
+                        f"variable {undefined} is not defined for expression "
+                        f"'{name}'"
+                    )
 
-            variables[name] = Variable(
+            variables[name] = _variables.Expression(
                 expression=expression, definitions=definitions
             )
         elif 'remote' in specs:
@@ -747,13 +755,13 @@ def convert_runcard(runcard):
             dtype = specs.get('dtype', None)
             settable = specs.get('settable', False)
 
-            variables[name] = Variable(
+            variables[name] = _variables.Remote(
                 remote=remote, alias=alias, protocol=protocol,
                 dtype=dtype, settable=settable
             )
 
         elif 'parameter' in specs:
-            variables[name] = Variable(parameter=specs['parameter'])
+            variables[name] = _variables.Parameter(parameter=specs['parameter'])
 
     # Routines section
     available_routines = {**_routines.supported, **custom_routines}

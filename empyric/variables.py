@@ -17,7 +17,6 @@ class Variable:
     experiment.
     """
 
-    # All attributes below should be overwritten by child classes
     settable = False  # whether the value of the variable can be set
     dtype = None  # the data type of the variable
     last_evaluation = None  # time of last evaluation in seconds
@@ -25,11 +24,28 @@ class Variable:
 
     @property
     def value(self):
+        # overwritten by child classes
         pass
 
     @value.setter
     def value(self, value):
+        # overwritten by child classes
         pass
+
+    def validate_dtype(self, value):
+
+        if value is not None:
+            if self.dtype is not None:
+                if not isinstance(value, self.dtype):
+                    raise TypeError(
+                        f"attempted to set value of {self} to {value} but "
+                        f" type {type(value)} does not match variable's data "
+                        f" type {self.dtype}"
+                    )
+            else:
+                # if type not explicitly defined upon construction,
+                # infer from first set value
+                self.dtype = type(recast(value))
 
 
 class Knob(Variable):
@@ -66,8 +82,7 @@ class Knob(Variable):
         self._value = self.instrument.get(self.knob)
         self.last_evaluation = time.time()
 
-        if self.dtype and self._value is not None:
-            self.dtype = type(recast(self._value))
+        self.validate_dtype(self._value)
 
         return self._value
 
@@ -110,8 +125,7 @@ class Meter(Variable):
         self._value = self.instrument.measure(self.meter)
         self.last_evaluation = time.time()
 
-        if self.dtype and self._value is not None:
-            self.dtype = type(recast(self._value))
+        self.validate_dtype(self._value)
 
         return self._value
 
@@ -123,6 +137,22 @@ class Expression(Variable):
     expression, where voltage is a knob and current is a meter:
     power = voltage * current.
     """
+
+    _functions = {
+        'sqrt(': 'np.sqrt(',
+        'exp(': 'np.exp(',
+        'sin(': 'np.sin(',
+        'cos(': 'np.cos(',
+        'tan(': 'np.tan(',
+        'sum(': 'np.nansum(',
+        'mean(': 'np.nanmean(',
+        'rms(': 'np.nanstd(',
+        'std(': 'np.nanstd(',
+        'var(': 'np.nanvar(',
+        'diff(': 'np.diff(',
+        'max(': 'np.nanmax(',
+        'min(': 'np.nanmin('
+    }
 
     def __init__(self, expression=None, definitions=None):
 
@@ -147,7 +177,7 @@ class Expression(Variable):
                 symbol, f"expr_vals['{symbol}']"
             )
 
-        for shorthand, longhand in self.expression_functions.items():
+        for shorthand, longhand in self._functions.items():
             if shorthand in expression:
                 expression = expression.replace(shorthand, longhand)
 
@@ -162,8 +192,7 @@ class Expression(Variable):
 
         self.last_evaluation = time.time()
 
-        if self.dtype and self._value is not None:
-            self.dtype = type(recast(self._value))
+        self.validate_dtype(self._value)
 
         return self._value
 
@@ -222,8 +251,7 @@ class Remote(Variable):
                     f'from server at {self.remote}; got error "{error}"'
                 )
 
-        if self.dtype and self._value is not None:
-            self.dtype = type(recast(self._value))
+        self.validate_dtype(self._value)
 
         return self._value
 
@@ -301,8 +329,7 @@ class Parameter(Variable):
     def value(self):
         self._value = self.parameter
 
-        if self.dtype and self._value is not None:
-            self.dtype = type(recast(self._value))
+        self.validate_dtype(self._value)
 
         return self._value
 

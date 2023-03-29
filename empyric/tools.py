@@ -150,17 +150,32 @@ def find_nearest(allowed, value, overestimate=False, underestimate=False):
         return allowed[nearest[0]]
 
 
-
-
 def recast(value):
     """
-    Convert a value into the appropriate type for the information it contains
+    Convert a value into the appropriate type for the information it contains.
+
+    Booleans are converted into numpy booleans; integers are converted into
+    64-bit numpy integers; floats are converted into 64-bit numpy floats.
+
+    Array-like values are converted into the analogous numpy array.
+
+    Strings are inspected to determine if they represent boolean or numerical
+    values and, if so, recasts values to the appropriate types. If a string
+    is a path in either the working directory or the parent directory thereof,
+    it is converted into the full absolute path. If a string does not
+    represent boolean or numerical values and is not a path, then this function
+    just returns the same string.
+
+    If the value argument does not fit into one of the above categories, a
+    `TypeError` is thrown.
     """
 
     if value is None or value == '':
         return None
     elif np.ndim(value) > 0:  # value is an array
-        return np.array([recast(subval) for subval in value])
+        np_array = np.array(value)
+        rep_elem = np_array.flatten()[0]
+        return np_array.astype(type(recast(rep_elem)))
     elif isinstance(value, bool) or isinstance(value, np.bool_):
         return np.bool_(value)
     elif isinstance(value, int) or isinstance(value, np.integer):
