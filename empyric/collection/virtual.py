@@ -135,7 +135,7 @@ class HenonMapper(Instrument):
     x, y = 0.63, 0.19  # near the unstable fixed point
 
     @setter
-    def set_a(self, value):
+    def set_a(self, value: np.float64):
         """
         Set the parameter a
 
@@ -145,7 +145,7 @@ class HenonMapper(Instrument):
         pass
 
     @setter
-    def set_b(self, value):
+    def set_b(self, value: np.float64):
         """
         Set the parameter b
 
@@ -155,7 +155,7 @@ class HenonMapper(Instrument):
         pass
 
     @measurer
-    def measure_x(self):
+    def measure_x(self) -> np.float64:
         """
         Measure the coordinate x.
         Each call triggers a new iteration, with new values set for x and y
@@ -165,7 +165,7 @@ class HenonMapper(Instrument):
         :return: (float) current value of x
         """
 
-        x_new = 1 - self.a * self.x ** 2 + self.y
+        x_new = 1.0 - self.a * self.x ** 2 + self.y
         y_new = self.b * self.x
 
         self.x = x_new
@@ -174,7 +174,7 @@ class HenonMapper(Instrument):
         return self.x
 
     @measurer
-    def measure_y(self):
+    def measure_y(self) -> np.float64:
         """
         Measure the coordinate y.
         Each call to ``measure_y`` should be preceded by a call to

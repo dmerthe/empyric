@@ -23,7 +23,8 @@ from empyric import adapters as _adapters
 from empyric import graphics as _graphics
 from empyric import instruments as _instruments
 from empyric import routines as _routines
-from empyric.tools import convert_time, Clock, recast
+from empyric.tools import convert_time, Clock
+from empyric.types import recast
 
 
 class Experiment:

@@ -71,9 +71,14 @@ class Knob(Variable):
         self.lower_limit = lower_limit
         self.upper_limit = upper_limit
 
-        self.dtype = typing.get_type_hints(
-            getattr(instrument, 'set_'+knob)
-        ).get('return', None)
+        # infer dtype from type hint of first argument of set method
+        set_method = getattr(instrument, 'set_'+knob)
+        type_hints = typing.get_type_hints(set_method)
+        type_hints.pop('return', None)  # exclude return type hint
+
+        if type_hints:
+            arg_hints = list(type_hints)
+            self.dtype = type_hints[arg_hints[0]]
 
         self._value = None
 

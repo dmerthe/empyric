@@ -7,13 +7,13 @@ import datetime
 import tkinter as tk
 import pandas as pd
 
-from empyric.tools import recast
+from empyric.types import recast
 from empyric.routines import SocketServer, ModbusServer
 
 if sys.platform == 'darwin':
     import matplotlib
 
-    matplotlib.use('TkAgg')  # works better on MacOS
+    matplotlib.use('TkAgg')  # works better on macOS
 
 import matplotlib.pyplot as plt
 from matplotlib.cm import ScalarMappable

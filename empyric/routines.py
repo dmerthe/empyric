@@ -10,8 +10,9 @@ import functools
 import numpy as np
 import pandas as pd
 
-from empyric.tools import convert_time, recast, \
-    autobind_socket, read_from_socket, write_to_socket, get_ip_address
+from empyric.tools import convert_time, autobind_socket, read_from_socket, \
+    write_to_socket, get_ip_address
+from empyric.types import recast
 
 
 class Routine:

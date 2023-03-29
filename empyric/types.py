@@ -2,7 +2,6 @@
 import os
 import re
 from abc import ABC
-from numpy import ndarray
 import pandas as pd
 import numpy as np
 
@@ -16,22 +15,23 @@ Boolean.register(bool)
 Boolean.register(np.bool_)
 
 
-class Toggle(ABC):
+class Toggle:
+    """
+    Convenience class for handling toggle variables, which are either off or on.
+    """
 
     on_values = [True, 1, '1', 'ON', 'On', 'on']
     off_values = [False, 0, '0', 'OFF', 'Off', 'off']
 
-    UNDEFINED = 'UNDEFINED'
+    def __init__(self, state: str):
 
-    def __init__(self, on_or_off: str):
-
-        if on_or_off in self.on_values:
+        if state in self.on_values:
             self.on = True
-        elif on_or_off in self.off_values:
+        elif state in self.off_values:
             self.on = False
         else:
             raise ValueError(
-                f'toggle was initialized with invalid state {on_or_off}'
+                f'toggle was initialized with invalid state {state}'
             )
 
     def __bool__(self):
@@ -82,7 +82,7 @@ class Array(ABC):
 
 Array.register(list)
 Array.register(tuple)
-Array.register(ndarray)
+Array.register(np.ndarray)
 Array.register(pd.Series)
 Array.register(pd.DataFrame)
 
@@ -137,4 +137,4 @@ def recast(value):
         else:
             return value  # must be an actual string
     else:
-        raise TypeError(f'unable to recast {value}')
+        raise TypeError(f'unable to recast value {value} of type {type(value)}')
