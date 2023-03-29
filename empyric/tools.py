@@ -78,56 +78,6 @@ class Clock:
         return elapsed_time
 
 
-class _Toggle(np.bool_):
-    """
-    Represents toggle knobs
-    """
-
-    def __init__(self, state):
-
-        super().__init__(self)
-        self.on = np.bool_(True) if is_on(state) else np.bool_(True)
-
-    def __eq__(self, other):
-        return True if other.on == self.on else False
-
-    def __bool__(self):
-        return True if self.on else False
-
-
-ON = _Toggle('ON')
-OFF = _Toggle('OFF')
-
-# Utility functions that help interpret values
-def is_on(value):
-    on_values = [1, '1', 'ON', 'On', 'on']
-
-    if value in on_values:
-        return True
-    else:
-        return False
-
-
-def is_off(value):
-    off_values = [0, '0', 'OFF', 'Off', 'off']
-
-    if value in off_values:
-        return True
-    else:
-        return False
-
-
-def to_number(value):
-    if isinstance(value, numbers.Number):
-        return value
-    elif isinstance(str):
-        return float(value)
-    elif isinstance(np.ndarray) and np.ndim(value) == 0:
-        return float(value)
-    else:
-        return np.nan
-
-
 def find_nearest(allowed, value, overestimate=False, underestimate=False):
     """
     Find the closest in a list of allowed values to a given value.
@@ -148,59 +98,6 @@ def find_nearest(allowed, value, overestimate=False, underestimate=False):
 
     if len(nearest) > 0:
         return allowed[nearest[0]]
-
-
-def recast(value):
-    """
-    Convert a value into the appropriate type for the information it contains.
-
-    Booleans are converted into numpy booleans; integers are converted into
-    64-bit numpy integers; floats are converted into 64-bit numpy floats.
-
-    Array-like values are converted into the analogous numpy array.
-
-    Strings are inspected to determine if they represent boolean or numerical
-    values and, if so, recasts values to the appropriate types. If a string
-    is a path in either the working directory or the parent directory thereof,
-    it is converted into the full absolute path. If a string does not
-    represent boolean or numerical values and is not a path, then this function
-    just returns the same string.
-
-    If the value argument does not fit into one of the above categories, a
-    `TypeError` is thrown.
-    """
-
-    if value is None or value == '':
-        return None
-    elif np.ndim(value) > 0:  # value is an array
-        np_array = np.array(value)
-        rep_elem = np_array.flatten()[0]
-        return np_array.astype(type(recast(rep_elem)))
-    elif isinstance(value, bool) or isinstance(value, np.bool_):
-        return np.bool_(value)
-    elif isinstance(value, int) or isinstance(value, np.integer):
-        return np.int64(value)
-    elif isinstance(value, float) or isinstance(value, np.floating):
-        return np.float64(value)
-    elif type(value) is str:
-
-        if value.lower() == 'true':
-            return np.bool_(True)
-        elif value.lower() == 'false':
-            return np.bool_(False)
-        elif re.fullmatch('[0-9]+', value):  # integer
-            return np.int64(value)
-        elif re.fullmatch('[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?', value):
-            # float
-            return float(value)
-        elif os.path.isfile(value):  # path in the current working directory
-            return os.path.abspath(value)
-        elif os.path.isfile(os.path.join('..', value)):  # ... up one level
-            return os.path.abspath(os.path.join('..', value))
-        else:
-            return value  # must be an actual string
-    else:
-        raise TypeError(f'unable to recast {value}')
 
 
 # Tools for handling sockets

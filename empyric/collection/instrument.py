@@ -1,6 +1,6 @@
 from functools import wraps
 from empyric.adapters import *
-from empyric.tools import recast
+from empyric.types import recast
 
 
 def setter(method):

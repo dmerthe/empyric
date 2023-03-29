@@ -8,7 +8,8 @@ import typing
 import numpy as np
 
 from empyric import instruments
-from empyric.tools import recast, write_to_socket, read_from_socket, is_on
+from empyric.tools import write_to_socket, read_from_socket
+from empyric.types import recast
 
 
 class Variable:

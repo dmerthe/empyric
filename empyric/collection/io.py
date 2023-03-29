@@ -2,7 +2,8 @@ import re
 
 from empyric.collection.instrument import Instrument, setter, getter, measurer
 from empyric.adapters import Socket
-from empyric.tools import recast
+from empyric.types import recast
+
 
 class BrainboxesED560(Instrument):
     """

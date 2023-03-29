@@ -1,6 +1,6 @@
 from empyric.adapters import *
 from empyric.collection.instrument import *
-from empyric.tools import is_on, is_off
+from empyric.types import Toggle
 
 
 class Keithley2260B(Instrument):
@@ -187,9 +187,10 @@ class UltraflexInductionHeater(Instrument):
 
     @setter
     def set_output(self, output):
-        if is_on(output):
+
+        if Toggle(output):
             self.query('S3200E8K')
-        elif is_off(output):
+        else:
             self.query('S3347K')
 
     @setter
@@ -242,12 +243,10 @@ class SRSPS300(Instrument):
     @setter
     def set_output(self, output):
 
-        if is_on(output):
+        if Toggle(output):
             self.write('HVON')
-        elif is_off(output):
-            self.write('HVOF')
         else:
-            raise ValueError(f'invalid output state given for {self.name}')
+            self.write('HVOF')
 
     @getter
     def get_output(self):

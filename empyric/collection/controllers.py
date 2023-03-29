@@ -1,5 +1,5 @@
 from empyric.adapters import *
-from empyric.tools import is_on, is_off
+from empyric.types import Toggle
 from empyric.collection.instrument import *
 
 
@@ -138,16 +138,16 @@ class OmegaPlatinum(Instrument):
 
     @setter
     def set_autotune(self, state):
-        if is_on(state):
+        if Toggle(state):
             self.write(0x0243, 1)
-        elif is_off(state):
+        else:
             self.write(0x0243, 0)
 
     @setter
     def set_output(self, state):
-        if is_on(state):
+        if Toggle(state):
             self.write(0x0240, 6)
-        elif is_off(state):
+        else:
             self.write(0x0240, 8)
 
     @getter
