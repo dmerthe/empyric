@@ -4,12 +4,12 @@ import numbers
 import socket
 import time
 import typing
-
+from functools import wraps
 import numpy as np
 
 from empyric import instruments
 from empyric.tools import write_to_socket, read_from_socket
-from empyric.types import recast
+from empyric.types import recast, Integer, Float
 
 
 class Variable:
@@ -33,20 +33,76 @@ class Variable:
         # overwritten by child classes
         pass
 
-    def validate_dtype(self, value):
+    @staticmethod
+    def setter_type_validator(setter):
+        """Checks that set value is compatible with variable's dtype"""
+        @wraps(setter)
+        def wrapped_setter(self, value):
 
-        if value is not None:
+            if value is None or np.isnan(value):
+                self._value = None
+                return
+
             if self.dtype is not None:
-                if not isinstance(value, self.dtype):
+                # if value and dtype are both numeric, but the type of value
+                # does not match dtype, then just make the conversion
+                if isinstance(value, numbers.Number):
+
+                    if issubclass(self.dtype, Integer):
+                        setter(self, np.int64(value))
+                    if issubclass(self.dtype, Float):
+                        setter(self, np.float64(value))
+
+                elif not isinstance(value, self.dtype):
                     raise TypeError(
                         f"attempted to set value of {self} to {value} but "
                         f" type {type(value)} does not match variable's data "
                         f" type {self.dtype}"
                     )
             else:
-                # if type not explicitly defined upon construction,
+                # if type is not explicitly defined upon construction,
+                # infer from first set value
+                setter(self, recast(value))
+                self.dtype = type(recast(value))
+
+        return wrapped_setter
+
+    @staticmethod
+    def getter_type_validator(getter):
+        """Checks that get value is compatible with variable's dtype"""
+        @wraps(getter)
+        def wrapped_getter(self):
+
+            value = getter(self)
+
+            if value is None or np.isnan(value):
+                self._value = None
+
+            if self.dtype is not None:
+                # if value and dtype are both numeric, but the type of value
+                # does not match dtype, then just make the conversion
+                if isinstance(value, numbers.Number):
+
+                    if issubclass(self.dtype, Integer):
+                        self._value = np.int64(value)
+                    if issubclass(self.dtype, Float):
+                        self._value = np.float64(value)
+
+                elif not isinstance(value, self.dtype):
+                    raise TypeError(
+                        f"attempted to set value of {self} to {value} but "
+                        f" type {type(value)} does not match variable's data "
+                        f" type {self.dtype}"
+                    )
+            else:
+                # if type is not explicitly defined upon construction,
                 # infer from first set value
                 self.dtype = type(recast(value))
+                self._value = recast(value)
+
+            return self._value
+
+        return wrapped_getter
 
 
 class Knob(Variable):
@@ -83,16 +139,16 @@ class Knob(Variable):
         self._value = None
 
     @property
+    @Variable.getter_type_validator
     def value(self):
 
         self._value = self.instrument.get(self.knob)
         self.last_evaluation = time.time()
 
-        self.validate_dtype(self._value)
-
         return self._value
 
     @value.setter
+    @Variable.setter_type_validator
     def value(self, value):
 
         if self.upper_limit and value > self.upper_limit:
@@ -126,12 +182,11 @@ class Meter(Variable):
         self._value = None
 
     @property
+    @Variable.getter_type_validator
     def value(self):
 
         self._value = self.instrument.measure(self.meter)
         self.last_evaluation = time.time()
-
-        self.validate_dtype(self._value)
 
         return self._value
 
@@ -166,6 +221,7 @@ class Expression(Variable):
         self.definitions = definitions if definitions is not None else {}
 
     @property
+    @Variable.getter_type_validator
     def value(self):
 
         expression = self.expression
@@ -197,8 +253,6 @@ class Expression(Variable):
             self._value = None
 
         self.last_evaluation = time.time()
-
-        self.validate_dtype(self._value)
 
         return self._value
 
@@ -234,6 +288,7 @@ class Remote(Variable):
             self.settable = response == f'{self.alias} settable'
 
     @property
+    @Variable.getter_type_validator
     def value(self):
 
         if self.protocol == 'modbus':
@@ -257,11 +312,10 @@ class Remote(Variable):
                     f'from server at {self.remote}; got error "{error}"'
                 )
 
-        self.validate_dtype(self._value)
-
         return self._value
 
     @value.setter
+    @Variable.setter_type_validator
     def value(self, value):
 
         if self.protocol == 'modbus':
@@ -332,16 +386,15 @@ class Parameter(Variable):
         self._value = parameter
 
     @property
+    @Variable.getter_type_validator
     def value(self):
         self._value = self.parameter
-
-        self.validate_dtype(self._value)
-
         return self._value
 
     @value.setter
+    @Variable.setter_type_validator
     def value(self, value):
-        self.parameter = recast(value)
+        self.parameter = value
 
 
 supported = {key: value for key, value in vars().items()

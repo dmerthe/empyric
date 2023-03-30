@@ -110,8 +110,8 @@ def recast(value):
     if value is None or value == '':
         return None
     elif isinstance(value, Array):  # value is an array
-        np_array = np.array(value)
-        rep_elem = np_array.flatten()[0]
+        np_array = np.array(value)  # convert to numpy array
+        rep_elem = np_array.flatten()[0]  # representative element
         return np_array.astype(type(recast(rep_elem)))
     elif isinstance(value, Boolean):
         return np.bool_(value)

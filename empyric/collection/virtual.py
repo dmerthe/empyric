@@ -99,11 +99,11 @@ class Echo(Instrument):
     meters = ('output',)
 
     @setter
-    def set_input(self, input):
+    def set_input(self, _input: np.float64):
         pass
 
     @measurer
-    def measure_output(self):
+    def measure_output(self) -> np.float64:
         return self.input
 
 
@@ -393,7 +393,7 @@ class SimpleProcess(Instrument):
         self._time = self._clock.measure_time()
 
     @setter
-    def set_setpoint(self, setpoint):
+    def set_setpoint(self, setpoint: np.float64):
         if hasattr(self, '_time'):
             self.measure_value()
             self._clock.set_state('RESET')
@@ -401,15 +401,15 @@ class SimpleProcess(Instrument):
             self._value = setpoint
 
     @setter
-    def set_noise_level(self, noise_level):
+    def set_noise_level(self, noise_level: np.float64):
         pass
 
     @setter
-    def set_response_time(self, response_time):
+    def set_response_time(self, response_time: np.float64):
         pass
 
     @measurer
-    def measure_value(self):
+    def measure_value(self) -> np.float64:
 
         last_value = self._value
         t = self._clock.measure_time()  # time since last setpoint change
