@@ -3,6 +3,7 @@ import numpy as np
 from empyric.instruments import Instrument
 from empyric.instruments import setter, measurer
 from empyric.adapters import Adapter, Modbus
+from empyric.types import Float
 
 
 class Clock(Instrument):
@@ -99,11 +100,11 @@ class Echo(Instrument):
     meters = ('output',)
 
     @setter
-    def set_input(self, _input: np.float64):
+    def set_input(self, _input: Float):
         pass
 
     @measurer
-    def measure_output(self) -> np.float64:
+    def measure_output(self) -> Float:
         return self.input
 
 
@@ -135,7 +136,7 @@ class HenonMapper(Instrument):
     x, y = 0.63, 0.19  # near the unstable fixed point
 
     @setter
-    def set_a(self, value: np.float64):
+    def set_a(self, value: Float):
         """
         Set the parameter a
 
@@ -145,7 +146,7 @@ class HenonMapper(Instrument):
         pass
 
     @setter
-    def set_b(self, value: np.float64):
+    def set_b(self, value: Float):
         """
         Set the parameter b
 
@@ -155,7 +156,7 @@ class HenonMapper(Instrument):
         pass
 
     @measurer
-    def measure_x(self) -> np.float64:
+    def measure_x(self) -> Float:
         """
         Measure the coordinate x.
         Each call triggers a new iteration, with new values set for x and y
@@ -174,7 +175,7 @@ class HenonMapper(Instrument):
         return self.x
 
     @measurer
-    def measure_y(self) -> np.float64:
+    def measure_y(self) -> Float:
         """
         Measure the coordinate y.
         Each call to ``measure_y`` should be preceded by a call to
@@ -393,7 +394,7 @@ class SimpleProcess(Instrument):
         self._time = self._clock.measure_time()
 
     @setter
-    def set_setpoint(self, setpoint: np.float64):
+    def set_setpoint(self, setpoint: Float):
         if hasattr(self, '_time'):
             self.measure_value()
             self._clock.set_state('RESET')
@@ -401,15 +402,15 @@ class SimpleProcess(Instrument):
             self._value = setpoint
 
     @setter
-    def set_noise_level(self, noise_level: np.float64):
+    def set_noise_level(self, noise_level: Float):
         pass
 
     @setter
-    def set_response_time(self, response_time: np.float64):
+    def set_response_time(self, response_time: Float):
         pass
 
     @measurer
-    def measure_value(self) -> np.float64:
+    def measure_value(self) -> Float:
 
         last_value = self._value
         t = self._clock.measure_time()  # time since last setpoint change
