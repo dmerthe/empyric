@@ -14,13 +14,24 @@ from empyric.types import recast, Integer, Float
 
 class Variable:
     """
-    Base class representing a specific quantity of interested monitored in an
+    Base class representing a specific quantity of interest monitored in an
     experiment.
+
+    All variables have the following attributes:
+    - `settable` indicates whether the value of a variable can be set
+    - `dtype` indicates the type of the variable value. If the value is
+    indeterminate, then it is set to `None`. Otherwise, the value type must be
+    one of the types enumerated in `empyric.types`, essentially either a
+    `Toggle`, `Boolean`, `Integer`, `Float`, `String`, or `Array`
+    - `last evaluation` is the result of calling `time.time` on the most recent
+    evaluation of the variable.
+
     """
 
     settable = False  # whether the value of the variable can be set
     dtype = None  # the data type of the variable
     last_evaluation = None  # time of last evaluation in seconds
+
     _value = None  # last known value of the variable
 
     @property
