@@ -197,7 +197,7 @@ class Instrument:
         Alias for the adapter's write method
 
         :param args: any arguments for the adapter's write method, usually
-        including a command string
+                     including a command string
         :param kwargs: any arguments for the adapter's write method
         :return: whatever is returned by the adapter's write method
         """

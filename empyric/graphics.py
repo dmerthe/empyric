@@ -565,7 +565,7 @@ class ExperimentGUI:
                 row=i, column=1, sticky=tk.W, padx=10
             )
 
-            if self.variables[name].settable:
+            if self.variables[name]._settable:
                 entry = self.variable_entries[name]
                 variable = self.variables[name]
                 root = self.status_frame
@@ -713,7 +713,7 @@ class ExperimentGUI:
 
             # If stopped or holding allow user to edit knobs or parameters
             if self.experiment.stopped or self.experiment.holding:
-                if name != 'Time' and self.variables[name].settable:
+                if name != 'Time' and self.variables[name]._settable:
                     continue
 
             def write_entry(_entry, text):
@@ -771,7 +771,7 @@ class ExperimentGUI:
 
             # Settable variable values can be edited
             for name, entry in self.variable_entries.items():
-                if name != 'Time' and self.variables[name].settable:
+                if name != 'Time' and self.variables[name]._settable:
                     entry.config(state=tk.NORMAL)
 
         else:  # otherwise, experiment is running

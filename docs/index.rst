@@ -14,6 +14,8 @@ Empyric is an experiment automation library, which offers easy access to instrum
    instruments
    adapters
    experiments
+   variables
+   types
    routines
    runcards
    graphics

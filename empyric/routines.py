@@ -514,7 +514,7 @@ class SocketServer(Routine):
 
                     elif value == 'settable?':
 
-                        settable = self.variables[alias].settable
+                        settable = self.variables[alias]._settable
 
                         if alias in self.readwrite and settable:
                             outgoing_message = f'{alias} settable'
