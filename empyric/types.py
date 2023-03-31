@@ -24,7 +24,7 @@ class Toggle:
     on_values = [True, 1, '1', 'ON', 'On', 'on']
     off_values = [False, 0, '0', 'OFF', 'Off', 'off']
 
-    def __init__(self, state: str):
+    def __init__(self, state: [str, bool, int]):
 
         if state in self.on_values:
             self.on = True
@@ -40,6 +40,9 @@ class Toggle:
 
     def __eq__(self, other):
         return True if self.on == other.on else False
+
+    def __int__(self):
+        return 1 if self.on else 0
 
 
 ON = Toggle('ON')
