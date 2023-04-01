@@ -2,7 +2,7 @@ import re
 
 from empyric.collection.instrument import Instrument, setter, getter, measurer
 from empyric.adapters import Socket
-from empyric.types import recast
+from empyric.types import recast, Boolean, Toggle, Integer, Float, Array
 
 
 class BrainboxesED560(Instrument):
@@ -27,38 +27,38 @@ class BrainboxesED560(Instrument):
     )
 
     @setter
-    def set_analog_out0(self, value):
+    def set_analog_out0(self, value: Float):
         self.query('#010%f' % float(value), validator=self._set_validator)
 
     @getter
-    def get_analog_out0(self):
+    def get_analog_out0(self) -> Float:
         response = self.query('$0160', validator=self._get_validator)
         return recast(response[3:])
 
     @setter
-    def set_analog_out1(self, value):
+    def set_analog_out1(self, value: Float):
         self.query('#011%f' % float(value), validator=self._set_validator)
 
     @getter
-    def get_analog_out1(self):
+    def get_analog_out1(self) -> Float:
         response = self.query('$0161', validator=self._get_validator)
         return recast(response[3:])
 
     @setter
-    def set_analog_out2(self, value):
+    def set_analog_out2(self, value: Float):
         self.query('#012%f' % float(value), validator=self._set_validator)
 
     @getter
-    def get_analog_out2(self):
+    def get_analog_out2(self) -> Float:
         response = self.query('$0162', validator=self._get_validator)
         return recast(response[3:])
 
     @setter
-    def set_analog_out3(self, value):
+    def set_analog_out3(self, value: Float):
         self.query('#013%f' % float(value), validator=self._set_validator)
 
     @getter
-    def get_analog_out3(self):
+    def get_analog_out3(self) -> Float:
         response = self.query('$0163', validator=self._get_validator)
         return recast(response[3:])
 
@@ -93,24 +93,24 @@ class BrainboxesED549(Instrument):
     )
 
     @measurer
-    def measure_analog_in0(self):
+    def measure_analog_in0(self) -> Float:
         response = self.query('#010', validator=self._validator)
-        return recast(response[1:])
+        return response[1:]
 
     @measurer
-    def measure_analog_in1(self):
+    def measure_analog_in1(self) -> Float:
         response = self.query('#011', validator=self._validator)
-        return recast(response[1:])
+        return response[1:]
 
     @measurer
-    def measure_analog_in2(self):
+    def measure_analog_in2(self) -> Float:
         response = self.query('#012', validator=self._validator)
-        return recast(response[1:])
+        return response[1:]
 
     @measurer
-    def measure_analog_in3(self):
+    def measure_analog_in3(self) -> Float:
         response = self.query('#013', validator=self._validator)
-        return recast(response[1:])
+        return response[1:]
 
     @staticmethod
     def _validator(response):

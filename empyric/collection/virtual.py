@@ -3,7 +3,7 @@ import numpy as np
 from empyric.instruments import Instrument
 from empyric.instruments import setter, measurer
 from empyric.adapters import Adapter, Modbus
-from empyric.types import Float
+from empyric.types import Boolean, Toggle, Integer, Float, String, Array
 
 
 class Clock(Instrument):
@@ -40,7 +40,7 @@ class Clock(Instrument):
         self.stoppage = 0  # total time during which the clock has been stopped
 
     @setter
-    def set_state(self, state):
+    def set_state(self, state: String):
         """
         Set the clock state:
 
@@ -75,7 +75,7 @@ class Clock(Instrument):
             return self.state  # return to START or STOP state once reset
 
     @measurer
-    def measure_time(self):
+    def measure_time(self) -> Float:
         """Measure the clock time"""
         return self._time
 
@@ -230,27 +230,27 @@ class PIDController(Instrument):
         self.outputs = np.array([])
 
     @setter
-    def set_setpoint(self, setpoint):
+    def set_setpoint(self, setpoint: Float):
         """Set the process setpoint"""
         pass
 
     @setter
-    def set_proportional_gain(self, gain):
+    def set_proportional_gain(self, gain: Float):
         """Set the proportional gain"""
         pass
 
     @setter
-    def set_derivative_time(self, _time):
+    def set_derivative_time(self, _time: Float):
         """Set the derivative time"""
         pass
 
     @setter
-    def set_integral_time(self, _time):
+    def set_integral_time(self, _time: Float):
         """Set the integral time"""
         pass
 
     @setter
-    def set_input(self, input):
+    def set_input(self, input: Float):
         """Input the process value"""
 
         if len(self.times) == 0:
@@ -262,7 +262,7 @@ class PIDController(Instrument):
             self.inputs = np.concatenate([self.inputs, [input]])
 
     @measurer
-    def measure_output(self):
+    def measure_output(self) -> Float:
         """Get the controller output"""
         if self.setpoint is None:
             # Don't output anything unless the setpoint is defined
@@ -335,25 +335,25 @@ class RandomWalk(Instrument):
 
         Instrument.__init__(self,*args, **kwargs)
 
-        self.mean = 0
-        self.step = 1
+        self.mean = 0.
+        self.step = 1.
         self.affinity = 0.01
         self.value = self.mean
 
     @setter
-    def set_mean(self, mean):
+    def set_mean(self, mean: Float):
         pass
 
     @setter
-    def set_step(self, step):
+    def set_step(self, step: Float):
         pass
 
     @setter
-    def set_drift(self, drift):
+    def set_drift(self, drift: Float):
         pass
 
     @measurer
-    def measure_value(self):
+    def measure_value(self) -> Float:
 
         self.value += np.random.choice(
             [-self.step, self.step]
@@ -378,9 +378,9 @@ class SimpleProcess(Instrument):
              'response time')
 
     presets = {
-        'setpoint': 0,
+        'setpoint': 0.0,
         'noise level': 0.1,
-        'response time': 10
+        'response time': 10.0
     }
 
     meters = ('value',)
