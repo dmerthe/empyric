@@ -9,7 +9,7 @@ import numpy as np
 
 from empyric import instruments, types
 from empyric.tools import write_to_socket, read_from_socket
-from empyric.types import recast, Integer, Float, Boolean, Toggle
+from empyric.types import recast, Integer, Float, Boolean, Toggle, _Type
 
 
 class Variable:
@@ -303,7 +303,7 @@ class Remote(Variable):
                  remote=None,
                  alias=None,
                  protocol=None,
-                 dtype=None,
+                 dtype=None,  # used only for modbus protocol
                  settable=False):
 
         self.remote = remote
@@ -313,7 +313,23 @@ class Remote(Variable):
         if protocol == 'modbus':
             self._client = instruments.ModbusClient(remote)
             self._settable = settable
-            self.dtype = np.float64 if dtype is None else dtype
+
+            if issubclass(dtype, _Type):
+                self.dtype = dtype
+            elif issubclass(dtype, Boolean):
+                self.dtype = Boolean
+            elif issubclass(dtype, Toggle):
+                self.dtype = Toggle
+            elif issubclass(dtype, Integer):
+                self.dtype = Integer
+            elif issubclass(dtype, Float) or dtype is None:
+                self.dtype = Float
+            else:
+                raise ValueError(
+                    f'dtype {dtype} is not supported for Modbus remote '
+                    f'variables; only boolean, toggle, integer or float types '
+                    f'are supported.'
+                )
         else:
             remote_ip, remote_port = remote.split('::')
 
@@ -335,7 +351,7 @@ class Remote(Variable):
             try:
                 self.dtype = types.supported[response.split(' ')[-1]]
             except KeyError:
-                self.dtype = None
+                self.dtype = None  # to be inferred based in values
 
     @property
     @Variable.getter_type_validator
@@ -346,7 +362,7 @@ class Remote(Variable):
 
         if self.protocol == 'modbus':
 
-            fcode = 3 if self.settable else 4
+            fcode = 3 if self._settable else 4
 
             self._value = self._client.read(
                 fcode, self.alias, count=4,

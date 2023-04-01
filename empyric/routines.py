@@ -700,9 +700,10 @@ class ModbusServer(Routine):
         # Store readwrite variable values in holding registers (fc = 3)
         builder = self._builder_cls()
 
-        for i, (_, variable) in enumerate(self.readwrite.items()):
-
-            if issubclass(variable.dtype, Boolean):
+        for i, (name, variable) in enumerate(self.readwrite.items()):
+            if variable._value is None or variable.dtype is None:
+                builder.add_64bit_float(float('nan'))
+            elif issubclass(variable.dtype, Boolean):
                 builder.add_64bit_uint(variable._value)
             elif issubclass(variable.dtype, Toggle):
                 builder.add_64bit_uint(variable._value)
@@ -711,7 +712,11 @@ class ModbusServer(Routine):
             elif issubclass(variable.dtype, Float):
                 builder.add_64bit_float(variable._value)
             else:
-                builder.add_64bit_float(float('nan'))
+                raise ValueError(
+                    f'unable to update modbus server registers from value '
+                    f'{variable._value} of variable {name} with data type '
+                    f'{variable.dtype}'
+                )
 
         # from_vars kwarg added with setValues_decorator above
         self.slave.setValues(3, 0, builder.to_registers(), from_vars=True)
@@ -721,7 +726,9 @@ class ModbusServer(Routine):
 
         for i, (name, variable) in enumerate(self.readonly.items()):
 
-            if issubclass(variable.dtype, Boolean):
+            if variable._value is None or variable.dtype is None:
+                builder.add_64bit_float(float('nan'))
+            elif issubclass(variable.dtype, Boolean):
                 builder.add_64bit_uint(variable._value)
             elif issubclass(variable.dtype, Toggle):
                 builder.add_64bit_uint(variable._value)
@@ -730,7 +737,11 @@ class ModbusServer(Routine):
             elif issubclass(variable.dtype, Float):
                 builder.add_64bit_float(variable._value)
             else:
-                builder.add_64bit_float(float('nan'))
+                raise ValueError(
+                    f'unable to update modbus server registers from value '
+                    f'{variable._value} of variable {name} with data type '
+                    f'{variable.dtype}'
+                )
 
         # from_vars kwarg added with setValues_decorator above
         self.slave.setValues(4, 0, builder.to_registers(), from_vars=True)

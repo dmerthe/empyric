@@ -753,13 +753,11 @@ def convert_runcard(runcard):
             remote = specs['remote']
             alias = specs.get('alias', name)
             protocol = specs.get('protocol', None)
-            dtype = specs.get('dtype', None)
+            dtype = specs.get('dtype', 'float')
             settable = specs.get('settable', False)
 
-            # convert dtype string into appropriate data type
-            if dtype is None:
-                pass
-            elif 'bool' in dtype.lower():
+            # Convert dtype string into appropriate data type
+            if 'bool' in dtype.lower():
                 dtype = Boolean
             elif 'toggle' in dtype.lower():
                 dtype = Toggle
@@ -769,7 +767,10 @@ def convert_runcard(runcard):
                 dtype = Float
             else:
                 raise ValueError(
-                    f'invalid dtype {dtype} given for remote variable {name}'
+                    f"invalid dtype {dtype} given for remote variable {name}; "
+                    "dtype entry must be 'boolean', 'toggle', 'integer' or "
+                    "'float', or left blank if dtype is float or protocol is "
+                    "not modbus"
                 )
 
             variables[name] = _variables.Remote(
