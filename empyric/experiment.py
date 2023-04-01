@@ -24,7 +24,7 @@ from empyric import graphics as _graphics
 from empyric import instruments as _instruments
 from empyric import routines as _routines
 from empyric.tools import convert_time, Clock
-from empyric.types import recast
+from empyric.types import recast, Boolean, Toggle, Integer, Float
 
 
 class Experiment:
@@ -755,6 +755,22 @@ def convert_runcard(runcard):
             protocol = specs.get('protocol', None)
             dtype = specs.get('dtype', None)
             settable = specs.get('settable', False)
+
+            # convert dtype string into appropriate data type
+            if dtype is None:
+                pass
+            elif 'bool' in dtype.lower():
+                dtype = Boolean
+            elif 'toggle' in dtype.lower():
+                dtype = Toggle
+            elif 'int' in dtype.lower():
+                dtype = Integer
+            elif 'float' in dtype.lower():
+                dtype = Float
+            else:
+                raise ValueError(
+                    f'invalid dtype {dtype} given for remote variable {name}'
+                )
 
             variables[name] = _variables.Remote(
                 remote=remote, alias=alias, protocol=protocol,

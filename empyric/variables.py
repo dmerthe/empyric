@@ -7,9 +7,9 @@ import typing
 from functools import wraps
 import numpy as np
 
-from empyric import instruments
+from empyric import instruments, types
 from empyric.tools import write_to_socket, read_from_socket
-from empyric.types import recast, Integer, Float
+from empyric.types import recast, Integer, Float, Boolean, Toggle
 
 
 class Variable:
@@ -119,8 +119,11 @@ class Knob(Variable):
 
     _settable = True  #:
 
-    def __init__(self, instrument=None, knob=None,
-                 lower_limit=None, upper_limit=None):
+    def __init__(self,
+                 instrument=None,
+                 knob=None,
+                 lower_limit=None,
+                 upper_limit=None):
 
         for required_kwarg in ['instrument', 'knob']:
             if not required_kwarg:
@@ -289,17 +292,28 @@ class Remote(Variable):
 
     _settable = True  #: ability to set may also be determined by the server
 
-    def __init__(self, remote=None, alias=None, protocol=None, dtype=None,
+    dtype_map = {
+        Toggle: '64bit_uint',
+        Boolean: '64bit_uint',
+        Integer: '64bit_int',
+        Float: '64bit_float'
+    }
+
+    def __init__(self,
+                 remote=None,
+                 alias=None,
+                 protocol=None,
+                 dtype=None,
                  settable=False):
 
         self.remote = remote
         self.alias = alias
         self.protocol = protocol
-        self.dtype = np.float64 if dtype is None else dtype
 
         if protocol == 'modbus':
             self._client = instruments.ModbusClient(remote)
-            self.settable = settable
+            self._settable = settable
+            self.dtype = np.float64 if dtype is None else dtype
         else:
             remote_ip, remote_port = remote.split('::')
 
@@ -311,7 +325,17 @@ class Remote(Variable):
 
             response = read_from_socket(self._socket, timeout=None)
 
-            self.settable = response == f'{self.alias} settable'
+            self._settable = response == f'{self.alias} settable'
+
+            # Get dtype
+            write_to_socket(self._socket, f'{self.alias} dtype?')
+
+            response = read_from_socket(self._socket, timeout=None)
+
+            try:
+                self.dtype = types.supported[response.split(' ')[-1]]
+            except KeyError:
+                self.dtype = None
 
     @property
     @Variable.getter_type_validator
@@ -325,7 +349,8 @@ class Remote(Variable):
             fcode = 3 if self.settable else 4
 
             self._value = self._client.read(
-                fcode, self.alias, count=4, dtype=self.dtype
+                fcode, self.alias, count=4,
+                dtype=self.dtype_map[self.dtype]
             )
 
         else:
@@ -352,7 +377,9 @@ class Remote(Variable):
 
         if self.protocol == 'modbus':
 
-            self._client.write(16, self.alias, value, dtype=self.dtype)
+            self._client.write(
+                16, self.alias, value, dtype=self.dtype_map[self.dtype]
+            )
 
         else:
             write_to_socket(self._socket, f'{self.alias} {value}')

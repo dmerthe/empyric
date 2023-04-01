@@ -521,6 +521,12 @@ class SocketServer(Routine):
                         else:
                             outgoing_message = f'{alias} readonly'
 
+                    elif value == 'dtype?':
+
+                        dtype = self.variables[alias].dtype
+
+                        outgoing_message = f'{alias} {dtype}'
+
                     elif value == '?':  # Query of value
                         var = self.variables[alias]
                         outgoing_message = f'{alias} {var.value}'
@@ -699,7 +705,7 @@ class ModbusServer(Routine):
             if issubclass(variable.dtype, Boolean):
                 builder.add_64bit_uint(variable._value)
             elif issubclass(variable.dtype, Toggle):
-                builder.add_64bit_uint(int(variable._value))
+                builder.add_64bit_uint(variable._value)
             elif issubclass(variable.dtype, Integer):
                 builder.add_64bit_int(variable._value)
             elif issubclass(variable.dtype, Float):
@@ -718,7 +724,7 @@ class ModbusServer(Routine):
             if issubclass(variable.dtype, Boolean):
                 builder.add_64bit_uint(variable._value)
             elif issubclass(variable.dtype, Toggle):
-                builder.add_64bit_uint(int(variable._value))
+                builder.add_64bit_uint(variable._value)
             elif issubclass(variable.dtype, Integer):
                 builder.add_64bit_int(variable._value)
             elif issubclass(variable.dtype, Float):
