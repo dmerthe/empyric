@@ -1,4 +1,5 @@
 # Standardization of data types
+import abc
 import os
 import re
 from abc import ABC
@@ -116,7 +117,7 @@ Array.register(pd.DataFrame)
 
 
 supported = {key: value for key, value in vars().items()
-             if type(value) is type and issubclass(value, _Type)}
+             if type(value) is abc.ABCMeta and issubclass(value, _Type)}
 
 
 def recast(value: Any, to: type = _Type):

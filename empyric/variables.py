@@ -9,7 +9,7 @@ import numpy as np
 
 from empyric import instruments, types
 from empyric.tools import write_to_socket, read_from_socket
-from empyric.types import recast, Integer, Float, Boolean, Toggle, _Type
+from empyric.types import recast, Integer, Float, Boolean, Toggle, _Type, Array
 
 
 class Variable:
@@ -50,26 +50,34 @@ class Variable:
                 return
 
             if self.dtype is not None:
+
                 # if value and dtype are both numeric, but the type of value
                 # does not match dtype, then just make the conversion
                 if isinstance(value, numbers.Number):
-
                     if issubclass(self.dtype, Integer):
                         setter(self, np.int64(value))
                     if issubclass(self.dtype, Float):
                         setter(self, np.float64(value))
+                else:
+                    try:
+                        setter(self, recast(value, to=self.dtype))
+                    except ValueError:
+                        raise ValueError(
+                            f'unable to convert value {value} '
+                            f'to type {self.dtype}'
+                        )
 
-                elif not isinstance(value, self.dtype):
-                    raise TypeError(
-                        f"attempted to set value of {self} to {value} but "
-                        f" type {type(value)} does not match variable's data "
-                        f" type {self.dtype}"
-                    )
             else:
                 # if type is not explicitly defined upon construction,
                 # infer from first set value
-                setter(self, recast(value))
-                self.dtype = type(recast(value))
+
+                recasted_value = recast(value)
+
+                for _type in types.supported.values():
+                    if isinstance(recasted_value, _type):
+                        print('dtype set', _type, recasted_value)
+                        self.dtype = _type
+                        setter(self, recast(value, to=_type))
 
         return wrapped_setter
 
@@ -85,26 +93,34 @@ class Variable:
                 self._value = None
 
             if self.dtype is not None:
+
                 # if value and dtype are both numeric, but the type of value
                 # does not match dtype, then just make the conversion
                 if isinstance(value, numbers.Number):
-
                     if issubclass(self.dtype, Integer):
                         self._value = np.int64(value)
                     if issubclass(self.dtype, Float):
                         self._value = np.float64(value)
+                else:
 
-                elif not isinstance(value, self.dtype):
-                    raise TypeError(
-                        f"attempted to set value of {self} to {value} but "
-                        f" type {type(value)} does not match variable's data "
-                        f" type {self.dtype}"
-                    )
+                    try:
+                        self._value = recast(value, to=self.dtype)
+                    except ValueError:
+                        raise ValueError(
+                            f'unable to convert value {value} '
+                            f'to type {self.dtype}'
+                        )
+
             else:
                 # if type is not explicitly defined upon construction,
                 # infer from first set value
-                self.dtype = type(recast(value))
-                self._value = recast(value)
+
+                recasted_value = recast(value)
+
+                for _type in types.supported.values():
+                    if isinstance(recasted_value, _type):
+                        self.dtype = _type
+                        self._value = recast(value, to=_type)
 
             return self._value
 
@@ -276,7 +292,10 @@ class Expression(Variable):
             else:
                 self._value = None
         except BaseException as err:
-            print(f'Unable to evaluate expression {self.expression}:', err)
+            print(
+                f'Unable to evaluate expression {self.expression} due to '
+                f'error: ', err
+            )
             self._value = None
 
         self.last_evaluation = time.time()
@@ -290,8 +309,6 @@ class Remote(Variable):
     different process or computer.
     """
 
-    _settable = True  #: ability to set may also be determined by the server
-
     dtype_map = {
         Toggle: '64bit_uint',
         Boolean: '64bit_uint',
@@ -303,8 +320,8 @@ class Remote(Variable):
                  remote=None,
                  alias=None,
                  protocol=None,
-                 dtype: type = Float,  # used only for modbus protocol
-                 settable=False):
+                 settable=False  # needed for modbus protocol
+                 ):
 
         self.remote = remote
         self.alias = alias
@@ -314,22 +331,6 @@ class Remote(Variable):
             self._client = instruments.ModbusClient(remote)
             self._settable = settable
 
-            if issubclass(dtype, _Type):
-                self.dtype = dtype
-            elif issubclass(dtype, Boolean):
-                self.dtype = Boolean
-            elif issubclass(dtype, Toggle):
-                self.dtype = Toggle
-            elif issubclass(dtype, Integer):
-                self.dtype = Integer
-            elif issubclass(dtype, Float):
-                self.dtype = Float
-            else:
-                raise ValueError(
-                    f'dtype {dtype} is not supported for Modbus remote '
-                    f'variables; only boolean, toggle, integer or float types '
-                    f'are supported.'
-                )
         else:
             remote_ip, remote_port = remote.split('::')
 
@@ -364,11 +365,23 @@ class Remote(Variable):
 
             fcode = 3 if self._settable else 4
 
-            self._value = self._client.read(
-                fcode, self.alias, count=4,
-                dtype=self.dtype_map[self.dtype]
+            dtype_int = self._client.read(
+                fcode, self.alias + 4, dtype='16bit_int'
             )
 
+            dtype = {
+                0: Boolean,
+                1: Toggle,
+                2: Integer,
+                3: Float,
+            }.get(dtype_int, None)
+
+            if dtype is not None:
+                self._value = self._client.read(
+                    fcode, self.alias, count=4,
+                    dtype=self.dtype_map[dtype]
+                )
+            print(self.alias, self.dtype, self._value)
         else:
             write_to_socket(self._socket, f'{self.alias} ?')
 

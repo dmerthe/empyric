@@ -12,7 +12,8 @@ import pandas as pd
 
 from empyric.tools import convert_time, autobind_socket, read_from_socket, \
     write_to_socket, get_ip_address
-from empyric.types import recast, Boolean, Integer, Float, Toggle, OFF, ON
+from empyric.types import recast, Boolean, Integer, Float, Toggle, OFF, ON, \
+    Array, String
 
 
 class Routine:
@@ -611,14 +612,15 @@ class ModbusServer(Routine):
 
         DataBlock = datastore.ModbusSequentialDataBlock
 
-        # Map each variable to 2 sequential registers
+        # Map each variable to 2 sequential registers (64-bit encoding) + 1
+        # register which contains meta data
         if self.readonly:
-            readonly_block = DataBlock(0, [0] * 4 * len(readonly))
+            readonly_block = DataBlock(0, [0] * 5 * len(readonly))
         else:
             readonly_block = DataBlock.create()
 
         if self.readwrite:
-            readwrite_block = DataBlock(0, [0] * 4 * len(readwrite))
+            readwrite_block = DataBlock(0, [0] * 5 * len(readwrite))
         else:
             readwrite_block = DataBlock.create()
 
@@ -701,6 +703,8 @@ class ModbusServer(Routine):
         builder = self._builder_cls()
 
         for i, (name, variable) in enumerate(self.readwrite.items()):
+
+            # encode the value into the 4 registers
             if variable._value is None or variable.dtype is None:
                 builder.add_64bit_float(float('nan'))
             elif issubclass(variable.dtype, Boolean):
@@ -717,6 +721,18 @@ class ModbusServer(Routine):
                     f'{variable._value} of variable {name} with data type '
                     f'{variable.dtype}'
                 )
+
+            # encode the meta data
+            meta_reg_val = {
+                Boolean: 0,
+                Toggle: 1,
+                Integer: 2,
+                Float: 3,
+                Array: 4,
+                String: 5,
+            }.get(variable.dtype, -1)
+
+            builder.add_16bit_int(meta_reg_val)
 
         # from_vars kwarg added with setValues_decorator above
         self.slave.setValues(3, 0, builder.to_registers(), from_vars=True)
@@ -726,6 +742,7 @@ class ModbusServer(Routine):
 
         for i, (name, variable) in enumerate(self.readonly.items()):
 
+            # encode the value into the 4 registers
             if variable._value is None or variable.dtype is None:
                 builder.add_64bit_float(float('nan'))
             elif issubclass(variable.dtype, Boolean):
@@ -742,6 +759,16 @@ class ModbusServer(Routine):
                     f'{variable._value} of variable {name} with data type '
                     f'{variable.dtype}'
                 )
+
+            # encode the meta data
+            dtype_int = {
+                Boolean: 0,
+                Toggle: 1,
+                Integer: 2,
+                Float: 3
+            }.get(variable.dtype, -1)
+
+            builder.add_16bit_int(dtype_int)
 
         # from_vars kwarg added with setValues_decorator above
         self.slave.setValues(4, 0, builder.to_registers(), from_vars=True)
