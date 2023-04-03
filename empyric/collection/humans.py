@@ -3,6 +3,7 @@ import time
 
 from empyric.adapters import *
 from empyric.collection.instrument import *
+from empyric.types import String, Float
 
 
 class ConsoleUser(Instrument):
@@ -35,26 +36,21 @@ class ConsoleUser(Instrument):
     last_sent = float('-inf')
 
     @setter
-    def set_prompt(self, prompt):
+    def set_prompt(self, prompt: String):
         pass
 
     @setter
-    def set_cooldown(self, cooldown):
+    def set_cooldown(self, cooldown: Float):
         pass
 
     @measurer
-    def measure_response(self):
+    def measure_response(self) -> String:
 
         new_prompt = (self.prompt != self.last_prompt)
 
         if time.time() >= self.last_sent + self.cooldown or new_prompt:
 
             response = input(self.prompt)
-
-            try:
-                response = float(response)
-            except ValueError:
-                pass
 
             self.last_prompt = self.prompt
 

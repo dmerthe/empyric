@@ -303,7 +303,7 @@ class Remote(Variable):
                  remote=None,
                  alias=None,
                  protocol=None,
-                 dtype=None,  # used only for modbus protocol
+                 dtype: type = Float,  # used only for modbus protocol
                  settable=False):
 
         self.remote = remote
@@ -322,7 +322,7 @@ class Remote(Variable):
                 self.dtype = Toggle
             elif issubclass(dtype, Integer):
                 self.dtype = Integer
-            elif issubclass(dtype, Float) or dtype is None:
+            elif issubclass(dtype, Float):
                 self.dtype = Float
             else:
                 raise ValueError(

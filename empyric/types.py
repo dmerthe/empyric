@@ -4,10 +4,11 @@ import re
 from abc import ABC
 import pandas as pd
 import numpy as np
+from typing import Any
 
 
 class _Type(ABC):
-    """Abstract base class for all data types"""
+    """Abstract base class for all supported data types"""
     pass
 
 
@@ -29,9 +30,11 @@ class Toggle(_Type):
     on_values = [True, 1, '1', 'ON', 'On', 'on']
     off_values = [False, 0, '0', 'OFF', 'Off', 'off']
 
-    def __init__(self, state: [str, bool, int]):
+    def __init__(self, state: [str, bool, int, type]):
 
-        if state in self.on_values:
+        if hasattr(state, 'on'):
+            self.on = state.on
+        elif state in self.on_values:
             self.on = True
         elif state in self.off_values:
             self.on = False
@@ -43,11 +46,23 @@ class Toggle(_Type):
     def __bool__(self):
         return True if self.on else False
 
-    def __eq__(self, other):
-        return True if self.on == other.on else False
-
     def __int__(self):
         return 1 if self.on else 0
+
+    def __str__(self):
+        return 'ON' if self.on else 'OFF'
+
+    def __eq__(self, other):
+
+        if hasattr(other, 'on'):
+            return self.on == other.on
+        else:
+            if other in self.on_values:
+                return True
+            elif other in self.off_values:
+                return False
+            else:
+                raise TypeError(f'{other} is not comparable to Toggle')
 
 
 ON = Toggle('ON')
@@ -104,7 +119,7 @@ supported = {key: value for key, value in vars().items()
              if type(value) is type and issubclass(value, _Type)}
 
 
-def recast(value):
+def recast(value: Any, to: type = _Type):
     """
     Convert a value into the appropriate type for the information it contains.
 
@@ -122,36 +137,64 @@ def recast(value):
 
     If the value argument does not fit into one of the above categories, a
     `TypeError` is thrown.
+
+    :param value: (Any) the value whose type needs converting
+    :param to: (_type) optional keyword argument indicating which type to
+                       convert to; default value is `_Type` which indicates
+                       that the type should be inferred based on the value.
     """
 
-    if value is None or value == '':
-        return None
-    elif isinstance(value, Array):  # value is an array
-        np_array = np.array(value)  # convert to numpy array
-        rep_elem = np_array.flatten()[0]  # representative element
-        return np_array.astype(type(recast(rep_elem)))
-    elif isinstance(value, Boolean):
-        return np.bool_(value)
-    elif isinstance(value, Integer):
-        return np.int64(value)
-    elif isinstance(value, Float):
-        return np.float64(value)
-    elif isinstance(value, String):
-
-        if value.lower() == 'true':
-            return np.bool_(True)
-        elif value.lower() == 'false':
-            return np.bool_(False)
-        elif re.fullmatch('[0-9]+', value):  # integer
+    if to != _Type:
+        # recast to desired
+        if issubclass(to, Boolean):
+            return np.bool_(value)
+        elif issubclass(to, Toggle):
+            return Toggle(value)
+        elif issubclass(to, Integer):
             return np.int64(value)
-        elif re.fullmatch('[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?', value):
-            # float
-            return float(value)
-        elif os.path.isfile(value):  # path in the current working directory
-            return os.path.abspath(value)
-        elif os.path.isfile(os.path.join('..', value)):  # ... up one level
-            return os.path.abspath(os.path.join('..', value))
+        elif issubclass(to, Float):
+            return np.float64(value)
+        elif issubclass(to, String):
+            return np.str_(value)
+        elif issubclass(to, Array):
+            return np.array(value)
         else:
-            return value  # must be an actual string
+            raise TypeError(
+                'unsupported data type; see `empyric.types` for supported types'
+            )
+
     else:
-        raise TypeError(f'unable to recast value {value} of type {type(value)}')
+        # infer type
+        if value is None or value == '':
+            return None
+        elif isinstance(value, Array):  # value is an array
+            np_array = np.array(value)  # convert to numpy array
+            rep_elem = np_array.flatten()[0]  # representative element
+            return np_array.astype(type(recast(rep_elem)))
+        elif isinstance(value, Boolean):
+            return np.bool_(value)
+        elif isinstance(value, Integer):
+            return np.int64(value)
+        elif isinstance(value, Float):
+            return np.float64(value)
+        elif isinstance(value, String):
+
+            if value.lower() == 'true':
+                return np.bool_(True)
+            elif value.lower() == 'false':
+                return np.bool_(False)
+            elif re.fullmatch('[0-9]+', value):  # integer
+                return np.int64(value)
+            elif re.fullmatch('[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?', value):
+                # float
+                return float(value)
+            elif os.path.isfile(value):  # path in the current working directory
+                return os.path.abspath(value)
+            elif os.path.isfile(os.path.join('..', value)):  # ... up one level
+                return os.path.abspath(os.path.join('..', value))
+            else:
+                return value  # must be an actual string
+        else:
+            raise TypeError(
+                f'unable to recast value {value} of type {type(value)}'
+            )

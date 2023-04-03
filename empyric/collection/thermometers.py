@@ -1,7 +1,7 @@
 import importlib
 from empyric.adapters import Phidget, Serial
 from empyric.instruments import Instrument, setter, measurer
-from empyric.types import recast
+from empyric.types import recast, String, Float
 
 
 class Phidget1101(Instrument):
@@ -32,7 +32,7 @@ class Phidget1101(Instrument):
         Instrument.__init__(self, *args, **kwargs)
 
     @setter
-    def set_type(self, type_):
+    def set_type(self, type_: String):
 
         types = importlib.import_module('Phidget22.ThermocoupleType')
 
@@ -46,7 +46,7 @@ class Phidget1101(Instrument):
         self.write('ThermocoupleType', type_dict[type_])
 
     @measurer
-    def measure_temperature(self):
+    def measure_temperature(self) -> Float:
         return self.query('Temperature')
 
 
@@ -70,15 +70,15 @@ class WilliamsonPyrometer(Instrument):
     )
 
     @measurer
-    def measure_temperature(self):
+    def measure_temperature(self) -> Float:
         # temp returned in F, convert to C
         return (recast(self.query('FT')) - 32) / 1.8
 
     @measurer
-    def measure_unfiltered_temperature(self):
+    def measure_unfiltered_temperature(self) -> Float:
         # temp returned in F, convert to C
         return (recast(self.query('UT')) - 32) / 1.8
 
     @measurer
-    def measure_signal_strength(self):
+    def measure_signal_strength(self) -> Float:
         return recast(self.query('SS'))

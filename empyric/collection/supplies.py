@@ -1,6 +1,6 @@
 from empyric.adapters import *
 from empyric.collection.instrument import *
-from empyric.types import Toggle
+from empyric.types import Toggle, Float, ON, OFF
 
 
 class Keithley2260B(Instrument):
@@ -28,7 +28,7 @@ class Keithley2260B(Instrument):
     )
 
     @measurer
-    def measure_current(self):
+    def measure_current(self) -> Float:
 
         def validator(response):
             return bool(re.match('[\+\-]\d+\.\d\d\d', response))
@@ -36,7 +36,7 @@ class Keithley2260B(Instrument):
         return float(self.query('MEAS:CURR?', validator=validator))
 
     @measurer
-    def measure_voltage(self):
+    def measure_voltage(self) -> Float:
 
         def validator(response):
             return bool(re.match('[\+\-]\d+\.\d\d\d', response))
@@ -44,23 +44,23 @@ class Keithley2260B(Instrument):
         return float(self.query('MEAS:VOLT?', validator=validator))
 
     @setter
-    def set_max_voltage(self, voltage):
+    def set_max_voltage(self, voltage: Float):
         self.write('VOLT %.4f' % voltage)
 
     @setter
-    def set_max_current(self, current):
+    def set_max_current(self, current: Float):
         self.write('CURR %.4f' % current)
 
     @setter
-    def set_output(self, output):
+    def set_output(self, output: Toggle):
 
-        if output == 'ON':
+        if output == ON:
             self.write('OUTP:STAT:IMM ON')
-        elif output == 'OFF':
+        elif output == OFF:
             self.write('OUTP:STAT:IMM OFF')
 
     @getter
-    def get_max_current(self):
+    def get_max_current(self) -> Float:
 
         def validator(response):
             return bool(re.match('[\+\-]\d+\.\d\d\d', response))
@@ -68,7 +68,7 @@ class Keithley2260B(Instrument):
         return float(self.query('CURR?', validator=validator))
 
     @getter
-    def get_max_voltage(self):
+    def get_max_voltage(self) -> Float:
 
         def validator(response):
             return bool(re.match('[\+\-]\d+\.\d\d\d', response))
@@ -101,11 +101,11 @@ class BK9183B(Instrument):
     )
 
     @setter
-    def set_output(self, output):
+    def set_output(self, output: Toggle):
 
-        if output == 'ON':
+        if output == ON:
             self.write('OUT ON')
-        elif output == 'OFF':
+        elif output == OFF:
             self.write('OUT OFF')
 
     @measurer

@@ -1,6 +1,7 @@
+import typing
 from functools import wraps
 from empyric.adapters import *
-from empyric.types import recast
+from empyric.types import recast, _Type
 
 
 def setter(method):
@@ -20,21 +21,29 @@ def setter(method):
 
     knob = '_'.join(method.__name__.split('_')[1:])
 
+    type_hints = typing.get_type_hints(method)
+    type_hints.pop('self', None)
+    type_hints.pop('return', None)
+
+    if type_hints:
+        dtype = type_hints[list(type_hints)[0]]
+    else:
+        dtype = _Type
+
     @wraps(method)
     def wrapped_method(*args, **kwargs):
 
         self = args[0]
-        value = recast(args[1])
-        args = (self, value, *args[2:])
+        value = args[1]
 
-        returned_value = recast(method(*args, **kwargs))
+        returned_value = method(*args, **kwargs)
 
         # The knob attribute is set to the returned value of the method, or
         # the value argument if the returned value is None
         if returned_value is not None:
-            self.__setattr__(knob, returned_value)
+            self.__setattr__(knob, recast(returned_value, to=dtype))
         else:
-            self.__setattr__(knob, value)
+            self.__setattr__(knob, recast(value, to=dtype))
 
     return wrapped_method
 
@@ -50,10 +59,12 @@ def getter(method):
 
     knob = '_'.join(method.__name__.split('_')[1:])
 
+    dtype = typing.get_type_hints(method).get('return', _Type)
+
     @wraps(method)
     def wrapped_method(*args, **kwargs):
         self = args[0]
-        value = recast(method(*args, **kwargs))
+        value = recast(method(*args, **kwargs), to=dtype)
         self.__setattr__(knob, value)
 
         return value
@@ -72,10 +83,12 @@ def measurer(method):
 
     meter = '_'.join(method.__name__.split('_')[1:])
 
+    dtype = typing.get_type_hints(method).get('return', _Type)
+
     @wraps(method)
     def wrapped_method(*args, **kwargs):
         self = args[0]
-        value = recast(method(*args, **kwargs))
+        value = recast(method(*args, **kwargs), to=dtype)
         self.__setattr__(meter, value)
 
         return value
