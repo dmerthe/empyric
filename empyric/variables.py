@@ -272,14 +272,10 @@ class Expression(Variable):
         # carets represent exponents
         expression = expression.replace('^', '**')
 
-        expr_vals = {}
         for symbol, variable in self.definitions.items():
-            # take last known value
-
-            expr_vals[symbol] = variable._value
 
             expression = expression.replace(
-                symbol, f"expr_vals['{symbol}']"
+                symbol, f"({variable._value})"
             )
 
         for shorthand, longhand in self._functions.items():

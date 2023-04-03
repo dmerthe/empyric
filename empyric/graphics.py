@@ -460,10 +460,7 @@ class ExperimentGUI:
 
         self.variables = experiment.variables
 
-        if 'alarms' in kwargs:
-            self.alarms = {}
-        else:
-            self.alarms = kwargs['alarms']
+        self.alarms = kwargs.get('alarms', {})
 
         if 'instruments' in kwargs:
             self.instruments = kwargs['instruments']
@@ -590,6 +587,7 @@ class ExperimentGUI:
 
             i += 1
 
+        i += 1
         tk.Label(
             self.status_frame, text='', font=("Arial", 14, 'bold')
         ).grid(row=i, column=0, sticky=tk.E)
@@ -635,6 +633,7 @@ class ExperimentGUI:
 
             self.server_status_labels = {}
 
+            i += 1
             tk.Label(
                 self.status_frame, text='Servers', font=("Arial", 14, 'bold')
             ).grid(row=i, column=1)
