@@ -10,8 +10,10 @@ import functools
 import numpy as np
 import pandas as pd
 
-from empyric.tools import convert_time, recast, \
-    autobind_socket, read_from_socket, write_to_socket, get_ip_address
+from empyric.tools import convert_time, autobind_socket, read_from_socket, \
+    write_to_socket, get_ip_address
+from empyric.types import recast, Boolean, Integer, Float, Toggle, OFF, ON, \
+    Array, String
 
 
 class Routine:
@@ -513,12 +515,18 @@ class SocketServer(Routine):
 
                     elif value == 'settable?':
 
-                        settable = self.variables[alias].settable
+                        settable = self.variables[alias]._settable
 
                         if alias in self.readwrite and settable:
                             outgoing_message = f'{alias} settable'
                         else:
                             outgoing_message = f'{alias} readonly'
+
+                    elif value == 'dtype?':
+
+                        dtype = self.variables[alias].dtype
+
+                        outgoing_message = f'{alias} {dtype}'
 
                     elif value == '?':  # Query of value
                         var = self.variables[alias]
@@ -565,8 +573,8 @@ class ModbusServer(Routine):
     clients.
 
     Because data is stored in statically assigned registers, only variables
-    with `bool`, `int` or `float` types can be used. Variable values are
-    stored in consecutive 2 registers (32 bits per value).
+    of boolean, toggle, integer or float types can be used. Variable values are
+    stored in consecutive 4 registers (64 bits per value).
 
     Readwrite variables will be stored in holding registers in the same order
     as given in the argument, starting from address 0. Readonly variables will
@@ -604,14 +612,15 @@ class ModbusServer(Routine):
 
         DataBlock = datastore.ModbusSequentialDataBlock
 
-        # Map each variable to 2 sequential registers
+        # Map each variable to 2 sequential registers (64-bit encoding) + 1
+        # register which contains meta data
         if self.readonly:
-            readonly_block = DataBlock(0, [0] * 2 * len(readonly))
+            readonly_block = DataBlock(0, [0] * 5 * len(readonly))
         else:
             readonly_block = DataBlock.create()
 
         if self.readwrite:
-            readwrite_block = DataBlock(0, [0] * 2 * len(readwrite))
+            readwrite_block = DataBlock(0, [0] * 5 * len(readwrite))
         else:
             readwrite_block = DataBlock.create()
 
@@ -672,18 +681,19 @@ class ModbusServer(Routine):
                     )
                 else:
 
-                    variable = list(self.readwrite.values())[address//2]
+                    variable = list(self.readwrite.values())[address//4]
 
                     decoder = self._decoder_cls.fromRegisters(values)
 
-                    val = variable._value
-
-                    if isinstance(val, bool) or isinstance(val, np.bool_):
-                        variable.value = decoder.decode_32bit_uint()
-                    elif isinstance(val, int) or isinstance(val, np.integer):
-                        variable.value = decoder.decode_32bit_int()
-                    else:
-                        variable.value = decoder.decode_32bit_float()
+                    if issubclass(variable.dtype, Boolean):
+                        variable.value = decoder.decode_64bit_uint()
+                    elif issubclass(variable.dtype, Toggle):
+                        int_value = decoder.decode_64bit_uint()
+                        variable.value = OFF if int_value == 0 else ON
+                    elif issubclass(variable.dtype, Integer):
+                        variable.value = decoder.decode_64bit_int()
+                    elif issubclass(variable.dtype, Float):
+                        variable.value = decoder.decode_64bit_float()
 
         return wrapped_method
 
@@ -692,18 +702,37 @@ class ModbusServer(Routine):
         # Store readwrite variable values in holding registers (fc = 3)
         builder = self._builder_cls()
 
-        for i, (_, variable) in enumerate(self.readwrite.items()):
+        for i, (name, variable) in enumerate(self.readwrite.items()):
 
-            value = variable._value
-
-            if isinstance(value, bool) or isinstance(value, np.bool_):
-                builder.add_32bit_uint(bool(value))
-            elif isinstance(value, int) or isinstance(value, np.integer):
-                builder.add_32bit_int(int(value))
-            elif isinstance(value, float) or isinstance(value, np.floating):
-                builder.add_32bit_float(float(value))
+            # encode the value into the 4 registers
+            if variable._value is None or variable.dtype is None:
+                builder.add_64bit_float(float('nan'))
+            elif issubclass(variable.dtype, Boolean):
+                builder.add_64bit_uint(variable._value)
+            elif issubclass(variable.dtype, Toggle):
+                builder.add_64bit_uint(variable._value)
+            elif issubclass(variable.dtype, Integer):
+                builder.add_64bit_int(variable._value)
+            elif issubclass(variable.dtype, Float):
+                builder.add_64bit_float(variable._value)
             else:
-                builder.add_32bit_float(float('nan'))
+                raise ValueError(
+                    f'unable to update modbus server registers from value '
+                    f'{variable._value} of variable {name} with data type '
+                    f'{variable.dtype}'
+                )
+
+            # encode the meta data
+            meta_reg_val = {
+                Boolean: 0,
+                Toggle: 1,
+                Integer: 2,
+                Float: 3,
+                Array: 4,
+                String: 5,
+            }.get(variable.dtype, -1)
+
+            builder.add_16bit_int(meta_reg_val)
 
         # from_vars kwarg added with setValues_decorator above
         self.slave.setValues(3, 0, builder.to_registers(), from_vars=True)
@@ -713,16 +742,33 @@ class ModbusServer(Routine):
 
         for i, (name, variable) in enumerate(self.readonly.items()):
 
-            value = variable._value
-
-            if isinstance(value, bool) or isinstance(value, np.bool_):
-                builder.add_32bit_uint(bool(value))
-            elif isinstance(value, int) or isinstance(value, np.integer):
-                builder.add_32bit_int(int(value))
-            elif isinstance(value, float) or isinstance(value, np.floating):
-                builder.add_32bit_float(float(value))
+            # encode the value into the 4 registers
+            if variable._value is None or variable.dtype is None:
+                builder.add_64bit_float(float('nan'))
+            elif issubclass(variable.dtype, Boolean):
+                builder.add_64bit_uint(variable._value)
+            elif issubclass(variable.dtype, Toggle):
+                builder.add_64bit_uint(variable._value)
+            elif issubclass(variable.dtype, Integer):
+                builder.add_64bit_int(variable._value)
+            elif issubclass(variable.dtype, Float):
+                builder.add_64bit_float(variable._value)
             else:
-                builder.add_32bit_float(float('nan'))
+                raise ValueError(
+                    f'unable to update modbus server registers from value '
+                    f'{variable._value} of variable {name} with data type '
+                    f'{variable.dtype}'
+                )
+
+            # encode the meta data
+            dtype_int = {
+                Boolean: 0,
+                Toggle: 1,
+                Integer: 2,
+                Float: 3
+            }.get(variable.dtype, -1)
+
+            builder.add_16bit_int(dtype_int)
 
         # from_vars kwarg added with setValues_decorator above
         self.slave.setValues(4, 0, builder.to_registers(), from_vars=True)

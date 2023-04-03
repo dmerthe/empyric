@@ -78,36 +78,6 @@ class Clock:
         return elapsed_time
 
 
-# Utility functions that help interpret values
-def is_on(value):
-    on_values = [1, '1', 'ON', 'On', 'on']
-
-    if value in on_values:
-        return True
-    else:
-        return False
-
-
-def is_off(value):
-    off_values = [0, '0', 'OFF', 'Off', 'off']
-
-    if value in off_values:
-        return True
-    else:
-        return False
-
-
-def to_number(value):
-    if isinstance(value, numbers.Number):
-        return value
-    elif isinstance(str):
-        return float(value)
-    elif isinstance(np.ndarray) and np.ndim(value) == 0:
-        return float(value)
-    else:
-        return np.nan
-
-
 def find_nearest(allowed, value, overestimate=False, underestimate=False):
     """
     Find the closest in a list of allowed values to a given value.
@@ -128,38 +98,6 @@ def find_nearest(allowed, value, overestimate=False, underestimate=False):
 
     if len(nearest) > 0:
         return allowed[nearest[0]]
-
-
-def recast(value):
-    """
-    Convert a value into the appropriate type for the information it contains
-    """
-
-    if value is None or value == '':
-        return None
-    elif np.ndim(value) > 0:  # value is an array
-        return np.array([recast(subval) for subval in value])
-    elif isinstance(value, numbers.Number) or type(value) is bool:
-        return value
-    elif type(value) is str:
-
-        if value.lower() == 'true':
-            return True
-        elif value.lower() == 'false':
-            return False
-        elif re.fullmatch('[0-9]+', value):  # integer
-            return int(value)
-        elif re.fullmatch('[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?', value):
-            # float
-            return float(value)
-        elif os.path.isfile(value):  # path in the current working directory
-            return os.path.abspath(value)
-        elif os.path.isfile(os.path.join('..', value)):  # ... up one level
-            return os.path.abspath(os.path.join('..', value))
-        else:
-            return value  # must be an actual string
-    else:
-        return None
 
 
 # Tools for handling sockets

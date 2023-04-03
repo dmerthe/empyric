@@ -2,6 +2,7 @@ import struct
 from empyric.tools import find_nearest
 from empyric.adapters import *
 from empyric.collection.instrument import *
+from empyric.types import Float, Array
 
 
 class TekScope(Instrument):
@@ -39,47 +40,47 @@ class TekScope(Instrument):
     )
 
     @setter
-    def set_horz_scale(self, scale):
+    def set_horz_scale(self, scale: Float):
         self.write('HOR:SCA %.3e' % scale)
 
     @setter
-    def set_horz_position(self, position):
+    def set_horz_position(self, position: Float):
         self.write('HOR:POS %.3e' % position)
 
     @setter
-    def set_ch1_scale(self, scale):
+    def set_ch1_scale(self, scale: Float):
         self.write('CH1:SCA %.3e' % scale)
 
     @setter
-    def set_ch2_scale(self, scale):
+    def set_ch2_scale(self, scale: Float):
         self.write('CH1:SCA %.3e' % scale)
 
     @setter
-    def set_ch3_scale(self, scale):
+    def set_ch3_scale(self, scale: Float):
         self.write('CH1:SCA %.3e' % scale)
 
     @setter
-    def set_ch4_scale(self, scale):
+    def set_ch4_scale(self, scale: Float):
         self.write('CH1:SCA %.3e' % scale)
 
     @setter
-    def set_ch1_position(self, position):
+    def set_ch1_position(self, position: Float):
         self.write('CH1:POS %.3e' % position)
 
     @setter
-    def set_ch2_position(self, position):
+    def set_ch2_position(self, position: Float):
         self.write('CH1:POS %.3e' % position)
 
     @setter
-    def set_ch3_position(self, position):
+    def set_ch3_position(self, position: Float):
         self.write('CH1:POS %.3e' % position)
 
     @setter
-    def set_ch4_position(self, position):
+    def set_ch4_position(self, position: Float):
         self.write('CH1:POS %.3e' % position)
 
     @setter
-    def set_trigger_level(self, level):
+    def set_trigger_level(self, level: Float):
         self.write('TRIG:MAI:LEV %.3e' % level)
 
     def _measure_channel(self, channel):
@@ -102,17 +103,17 @@ class TekScope(Instrument):
         ])
 
     @measurer
-    def measure_channel_1(self):
+    def measure_channel_1(self) -> Array:
         return self._measure_channel(1)
 
     @measurer
-    def measure_channel_2(self):
+    def measure_channel_2(self) -> Array:
         return self._measure_channel(2)
 
     @measurer
-    def measure_channel_3(self):
+    def measure_channel_3(self) -> Array:
         return self._measure_channel(3)
 
     @measurer
-    def measure_channel_4(self):
+    def measure_channel_4(self) -> Array:
         return self._measure_channel(4)

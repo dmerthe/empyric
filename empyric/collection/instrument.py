@@ -1,6 +1,7 @@
+import typing
 from functools import wraps
 from empyric.adapters import *
-from empyric.tools import recast
+from empyric.types import recast, _Type
 
 
 def setter(method):
@@ -20,18 +21,29 @@ def setter(method):
 
     knob = '_'.join(method.__name__.split('_')[1:])
 
+    type_hints = typing.get_type_hints(method)
+    type_hints.pop('self', None)
+    type_hints.pop('return', None)
+
+    if type_hints:
+        dtype = type_hints[list(type_hints)[0]]
+    else:
+        dtype = _Type
+
     @wraps(method)
     def wrapped_method(*args, **kwargs):
-        returned_value = method(*args, **kwargs)
+
         self = args[0]
-        value = recast(args[1])
+        value = args[1]
+
+        returned_value = method(*args, **kwargs)
 
         # The knob attribute is set to the returned value of the method, or
-        # the value argument if returned value is None
+        # the value argument if the returned value is None
         if returned_value is not None:
-            self.__setattr__(knob, returned_value)
+            self.__setattr__(knob, recast(returned_value, to=dtype))
         else:
-            self.__setattr__(knob, value)
+            self.__setattr__(knob, recast(value, to=dtype))
 
     return wrapped_method
 
@@ -47,10 +59,12 @@ def getter(method):
 
     knob = '_'.join(method.__name__.split('_')[1:])
 
+    dtype = typing.get_type_hints(method).get('return', _Type)
+
     @wraps(method)
     def wrapped_method(*args, **kwargs):
         self = args[0]
-        value = recast(method(*args, **kwargs))
+        value = recast(method(*args, **kwargs), to=dtype)
         self.__setattr__(knob, value)
 
         return value
@@ -69,11 +83,13 @@ def measurer(method):
 
     meter = '_'.join(method.__name__.split('_')[1:])
 
+    dtype = typing.get_type_hints(method).get('return', _Type)
+
     @wraps(method)
     def wrapped_method(*args, **kwargs):
         self = args[0]
-        value = recast(method(*args, **kwargs))
-        self.__setattr__('measured_' + meter, value)
+        value = recast(method(*args, **kwargs), to=dtype)
+        self.__setattr__(meter, value)
 
         return value
 
@@ -194,7 +210,7 @@ class Instrument:
         Alias for the adapter's write method
 
         :param args: any arguments for the adapter's write method, usually
-        including a command string
+                     including a command string
         :param kwargs: any arguments for the adapter's write method
         :return: whatever is returned by the adapter's write method
         """
@@ -222,7 +238,7 @@ class Instrument:
 
         return self.adapter.query(*args, **kwargs)
 
-    def set(self, knob, value):
+    def set(self, knob: str, value):
         """
         Set the value of a knob on the instrument
 
@@ -238,7 +254,7 @@ class Instrument:
 
         set_method(value)
 
-    def get(self, knob):
+    def get(self, knob: str):
         """
         Get the value of a knob on the instrument. If the instrument has a get
         method for the knob, a command will be sent to the instrument to
@@ -253,7 +269,7 @@ class Instrument:
         else:
             return getattr(self, knob.replace(' ', '_'))
 
-    def measure(self, meter):
+    def measure(self, meter: str):
         """
         Measure the value of a variable associated with this instrument
 

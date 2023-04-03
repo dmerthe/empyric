@@ -13,6 +13,7 @@ Routines
 
 .. autoclass:: empyric.routines.Maximization
 
+.. autoclass:: empyric.routines.SocketServer
 
-
+.. autoclass:: empyric.routines.ModbusServer
 
