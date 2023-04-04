@@ -9,7 +9,7 @@ import numpy as np
 
 from empyric import instruments, types
 from empyric.tools import write_to_socket, read_from_socket
-from empyric.types import recast, Integer, Float, Boolean, Toggle, _Type, Array
+from empyric.types import recast, Integer, Float, Boolean, Toggle, Type, Array
 
 
 class Variable:
@@ -45,7 +45,7 @@ class Variable:
         @wraps(setter)
         def wrapped_setter(self, value):
 
-            if value is None or np.isnan(value):
+            if value is None or value == float('nan'):
                 self._value = None
                 return
 
@@ -75,7 +75,6 @@ class Variable:
 
                 for _type in types.supported.values():
                     if isinstance(recasted_value, _type):
-                        print('dtype set', _type, recasted_value)
                         self.dtype = _type
                         setter(self, recast(value, to=_type))
 
@@ -89,7 +88,7 @@ class Variable:
 
             value = getter(self)
 
-            if value is None or np.isnan(value):
+            if value is None or value != float('nan'):
                 self._value = None
 
             if self.dtype is not None:
@@ -466,7 +465,7 @@ class Parameter(Variable):
 
     def __init__(self, parameter=None):
 
-        self.parameter = parameter
+        self.parameter = recast(parameter)
         self._value = parameter
 
     @property
@@ -480,7 +479,7 @@ class Parameter(Variable):
     @Variable.setter_type_validator
     def value(self, value):
         """Set the parameter value"""
-        self.parameter = value
+        self.parameter = self._value = value
 
 
 supported = {key: value for key, value in vars().items()

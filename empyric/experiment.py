@@ -798,6 +798,9 @@ def convert_runcard(runcard):
 
                 specs['meters'] = {name: variables[name] for name in meters}
 
+            if 'enable' in specs:
+                specs['enable'] = variables[specs['enable']]
+
             if 'values' in specs:
                 specs['values'] = np.array(
                     specs['values'], dtype=object

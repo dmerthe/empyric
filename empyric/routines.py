@@ -14,6 +14,7 @@ from empyric.tools import convert_time, autobind_socket, read_from_socket, \
     write_to_socket, get_ip_address
 from empyric.types import recast, Boolean, Integer, Float, Toggle, OFF, ON, \
     Array, String
+from empyric.variables import Parameter
 
 
 class Routine:
@@ -21,12 +22,18 @@ class Routine:
     Base class for all routines
     """
 
-    def __init__(self, knobs=None, values=None, start=0, end=np.inf):
+    def __init__(
+            self, knobs=None, values=None, enable=None, start=0, end=np.inf
+    ):
         """
 
         :param knobs: (Variable/1D array) knob variable(s) to be controlled
         :param values: (1D/2D array) array or list of values for each variable;
-        can be 1D iff there is one knob
+                                     can be 1D iff there is one knob
+        :param enable: (Variable) optional toggle or boolean variable that
+                                  enables or disables the routine; True/ON
+                                  enables the routine, False/OFF disables the
+                                  routine; default is `Parameter(True)`
         :param start: (float) time to start the routine
         :param end: (float) time to end the routine
         """
@@ -52,6 +59,11 @@ class Routine:
             self.values = np.array(
                 values, dtype=object
             ).reshape((len(self.knobs), -1))
+
+        if enable is not None:
+            self.enable = enable
+        else:
+            self.enable = Parameter(True)
 
         self.start = convert_time(start)
         self.end = convert_time(end)
@@ -82,7 +94,9 @@ class Set(Routine):
 
     def update(self, state):
 
-        if state['Time'] < self.start or state['Time'] > self.end:
+        if state['Time'] < self.start \
+                or state['Time'] > self.end \
+                or not self.enable.value:
             return  # no change
 
         for knob, value in zip(self.knobs.values(), self.values):
@@ -142,7 +156,7 @@ class Timecourse(Routine):
 
     def update(self, state):
 
-        if state['Time'] < self.start:
+        if state['Time'] < self.start or not self.enable.value:
             return
         elif state['Time'] > self.end:
             if not self.finished:
@@ -216,7 +230,9 @@ class Sequence(Routine):
 
     def update(self, state):
 
-        if state['Time'] < self.start or state['Time'] > self.end:
+        if state['Time'] < self.start \
+                or state['Time'] > self.end \
+                or not self.enable.value:
             return  # no change
 
         for knob, values in zip(self.knobs.values(), self.values):
@@ -277,7 +293,7 @@ class Minimization(Routine):
 
     def update(self, state):
 
-        if state['Time'] < self.start:
+        if state['Time'] < self.start or not self.enable.value:
             return
         elif state['Time'] > self.end:
             if not self.finished:

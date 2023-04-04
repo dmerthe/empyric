@@ -7,7 +7,7 @@ import datetime
 import tkinter as tk
 import pandas as pd
 
-from empyric.types import recast
+from empyric.types import recast, Type
 from empyric.routines import SocketServer, ModbusServer
 
 if sys.platform == 'darwin':
@@ -881,7 +881,11 @@ class ExperimentGUI:
     def _entry_enter(entry, variable, root):
         """Assigns the value to a variable if entered by the user"""
 
-        variable.value = recast(entry.get())
+        variable.value = recast(
+            entry.get(),
+            to=variable.dtype if variable.dtype is not None else Type
+        )
+
         root.focus()
 
     @staticmethod

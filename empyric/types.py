@@ -8,12 +8,12 @@ import numpy as np
 from typing import Any
 
 
-class _Type(ABC):
+class Type(ABC):
     """Abstract base class for all supported data types"""
     pass
 
 
-class Boolean(_Type):
+class Boolean(Type):
     """Abstract base class for all boolean types; `bool` and `np.bool_` are
     subclasses"""
     pass
@@ -23,7 +23,7 @@ Boolean.register(bool)
 Boolean.register(np.bool_)
 
 
-class Toggle(_Type):
+class Toggle(Type):
     """
     Convenience class for handling toggle variables, which are either off or on.
     """
@@ -60,17 +60,15 @@ class Toggle(_Type):
         else:
             if other in self.on_values:
                 return True
-            elif other in self.off_values:
-                return False
             else:
-                raise TypeError(f'{other} is not comparable to Toggle')
+                return False
 
 
 ON = Toggle('ON')
 OFF = Toggle('OFF')
 
 
-class Integer(_Type):
+class Integer(Type):
     """Abstract base class for all integer types; `int` and `np.integer` are
     subclasses"""
     pass
@@ -80,7 +78,7 @@ Integer.register(int)
 Integer.register(np.integer)
 
 
-class Float(_Type):
+class Float(Type):
     """Abstract base class for all float types; `float` and `np.floating` are
     subclasses"""
     pass
@@ -90,7 +88,7 @@ Float.register(float)
 Float.register(np.floating)
 
 
-class String(_Type):
+class String(Type):
     """Abstract base class for all string types; `str` and `np.str_` are
     subclasses"""
     pass
@@ -100,7 +98,7 @@ String.register(str)
 String.register(np.str_)
 
 
-class Array(_Type):
+class Array(Type):
     """
     Abstract base class for all array-like types, essentially any commonly
     used type that can be indexed; `list`, `tuple`, `numpy.ndarray`,
@@ -117,10 +115,10 @@ Array.register(pd.DataFrame)
 
 
 supported = {key: value for key, value in vars().items()
-             if type(value) is abc.ABCMeta and issubclass(value, _Type)}
+             if type(value) is abc.ABCMeta and issubclass(value, Type)}
 
 
-def recast(value: Any, to: type = _Type):
+def recast(value: Any, to: type = Type):
     """
     Convert a value into the appropriate type for the information it contains.
 
@@ -141,11 +139,11 @@ def recast(value: Any, to: type = _Type):
 
     :param value: (Any) the value whose type needs converting
     :param to: (_type) optional keyword argument indicating which type to
-                       convert to; default value is `_Type` which indicates
+                       convert to; default value is `Type` which indicates
                        that the type should be inferred based on the value.
     """
 
-    if to != _Type:
+    if to != Type:
 
         for dtype in np.array([to], dtype=object).flatten():
             try:
@@ -177,6 +175,8 @@ def recast(value: Any, to: type = _Type):
             return np_array.astype(type(recast(rep_elem)))
         elif isinstance(value, Boolean):
             return np.bool_(value)
+        elif isinstance(value, Toggle):
+            return value
         elif isinstance(value, Integer):
             return np.int64(value)
         elif isinstance(value, Float):
@@ -192,6 +192,8 @@ def recast(value: Any, to: type = _Type):
             elif re.fullmatch('[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?', value):
                 # float
                 return float(value)
+            elif value in (Toggle.on_values + Toggle.off_values):
+                return Toggle(value)
             elif os.path.isfile(value):  # path in the current working directory
                 return os.path.abspath(value)
             elif os.path.isfile(os.path.join('..', value)):  # ... up one level
