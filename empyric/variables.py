@@ -377,7 +377,7 @@ class Remote(Variable):
                     fcode, self.alias, count=4,
                     dtype=self.dtype_map[dtype]
                 )
-            print(self.alias, self.dtype, self._value)
+
         else:
             write_to_socket(self._socket, f'{self.alias} ?')
 
