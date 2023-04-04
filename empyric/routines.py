@@ -434,7 +434,7 @@ class SocketServer(Routine):
 
     def __init__(self, readwrite=None, readonly=None, **kwargs):
 
-        Routine.__init__(self, **kwargs)
+        Routine.__init__(self)
 
         self.readwrite = {}
         self.readonly = {}
@@ -609,7 +609,7 @@ class ModbusServer(Routine):
         if readonly:
             self.readonly = readonly
 
-        Routine.__init__(self, **kwargs)
+        Routine.__init__(self)
 
         # Check for PyModbus installation
         try:

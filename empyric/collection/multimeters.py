@@ -483,7 +483,7 @@ class LabJackT7(Instrument):
     )
 
     def _measure_AIN(self, n):
-        return self.read(4, 0*(2*int(n)), count=2, dtype='32bit_float')
+        return self.read(4, 2*n, count=2, dtype='32bit_float')
 
     @measurer
     def measure_AIN0(self) -> Float:
