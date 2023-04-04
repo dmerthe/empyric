@@ -167,13 +167,7 @@ def recast(value: Any, to: type = Type):
 
     else:
         # infer type
-        if value is None or value == '':
-            return None
-        elif isinstance(value, Array):  # value is an array
-            np_array = np.array(value)  # convert to numpy array
-            rep_elem = np_array.flatten()[0]  # representative element
-            return np_array.astype(type(recast(rep_elem)))
-        elif isinstance(value, Boolean):
+        if isinstance(value, Boolean):
             return np.bool_(value)
         elif isinstance(value, Toggle):
             return value
@@ -200,7 +194,14 @@ def recast(value: Any, to: type = Type):
                 return os.path.abspath(os.path.join('..', value))
             else:
                 return value  # must be an actual string
+        if isinstance(value, Array):  # value is an array
+            np_array = np.array(value)  # convert to numpy array
+            rep_elem = np_array.flatten()[0]  # representative element
+            return np_array.astype(type(recast(rep_elem)))
         else:
-            raise TypeError(
-                f'unable to recast value {value} of type {type(value)}'
+
+            print(
+                f'Warning: unable to recast value {value} of type {type(value)}'
             )
+
+            return None
