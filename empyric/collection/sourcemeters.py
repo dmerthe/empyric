@@ -141,8 +141,8 @@ class Keithley2400(Instrument):
         if output in [0, 'OFF', 'off']:
             self.write(':OUTP OFF')
 
-            # for some reason, this is needed to ensure output off
-            self.query(':OUTP?')
+            # # for some reason, this is needed to ensure output off
+            # self.query(':OUTP?')
 
         elif output in [1, 'ON', 'on']:
             self.write(':OUTP ON')
@@ -201,7 +201,7 @@ class Keithley2400(Instrument):
     @getter
     def get_voltage(self):
 
-        return self.query(':SOUR:VOLT:LEV?').split()
+        return float(self.query(':SOUR:VOLT:LEV?'))
 
     @setter
     def set_current(self, current):
@@ -238,6 +238,9 @@ class Keithley2400(Instrument):
 
     @getter
     def get_voltage_range(self):
+
+        if not hasattr(self, 'source'):
+            self.get_source()
 
         if self.source == 'voltage':
 
@@ -329,12 +332,15 @@ class Keithley2400(Instrument):
             self.write(':SENS:VOLT:NPLC %.2E' % nplc)
 
     @getter
-    def get_nplc(self, nplc):
+    def get_nplc(self):
+
+        if not hasattr(self, 'meter'):
+            self.get_meter()
 
         if self.meter == 'current':
-            return self.query(':SENS:CURR:NPLC?').split()
+            return float(self.query(':SENS:CURR:NPLC?'))
         elif self.meter == 'voltage':
-            return self.query(':SENS:VOLT:NPLC?').split()
+            return float(self.query(':SENS:VOLT:NPLC?'))
 
     @setter
     def set_delay(self, delay):
@@ -400,6 +406,8 @@ class Keithley2400(Instrument):
 
         if list_length % 100 > 0:
             sub_lists.append(self.fast_voltages[-(list_length % 100):])
+
+        self.set_meter('current')
 
         current_list = []
 
