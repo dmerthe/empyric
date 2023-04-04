@@ -474,7 +474,7 @@ class GPIB(Adapter):
     def timeout(self, timeout):
 
         if self.connected:
-            if self.lib == 'pyvisa':
+            if self.lib == 'pyvisa' or self.lib == 'prologix-gpib':
                 # pyvisa records timeouts in milliseconds
                 if timeout is None:
                     self.backend.timeout = None
@@ -483,6 +483,9 @@ class GPIB(Adapter):
                 self._timeout = timeout
             elif self.lib == 'linux-gpib':
                 self._timeout = self._linux_gpib_set_timeout(timeout)
+            elif self.lib == 'prologix-gpib':
+                self.backend.timeout = timeout
+                self._timeout = timeout
         else:
             self._timeout = None
 
@@ -662,6 +665,17 @@ class PrologixGPIBUSB:
         # set timeout to 0.5 seconds
         self.write('read_tmo_ms 500', to_controller=True)
 
+        # Do not append CR or LF to messages
+        self.write('eos 3', to_controller=True)
+
+        # Assert EOI with last byte to indicate end of data
+        self.write('eoi 1', to_controller=True)
+
+        # Append CR to responses from instruments to indicate message
+        # termination
+        self.write('eot_char 13', to_controller=True)
+        self.write('eot_enable 1', to_controller=True)
+
         self.address = None
         self.devices = []
 
@@ -695,7 +709,9 @@ class PrologixGPIBUSB:
         if not from_controller:
             self.write(f'read eoi', to_controller=True)
 
-        return self.serial_port.read_until(b'\r').decode().strip()
+        response = self.serial_port.read_until(b'\r').decode().strip()
+
+        return response
 
     def close(self):
         self.serial_port.close()
