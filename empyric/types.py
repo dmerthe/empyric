@@ -146,23 +146,26 @@ def recast(value: Any, to: type = _Type):
     """
 
     if to != _Type:
-        # recast to desired
-        if issubclass(to, Boolean):
-            return np.bool_(value)
-        elif issubclass(to, Toggle):
-            return Toggle(value)
-        elif issubclass(to, Integer):
-            return np.int64(value)
-        elif issubclass(to, Float):
-            return np.float64(value)
-        elif issubclass(to, String):
-            return np.str_(value)
-        elif issubclass(to, Array):
-            return np.array(value)
-        else:
-            raise TypeError(
-                'unsupported data type; see `empyric.types` for supported types'
-            )
+
+        for dtype in np.array([to], dtype=object).flatten():
+            try:
+                # recast to desired
+                if issubclass(dtype, Boolean):
+                    return np.bool_(value)
+                elif issubclass(dtype, Toggle):
+                    return Toggle(value)
+                elif issubclass(dtype, Integer):
+                    return np.int64(value)
+                elif issubclass(dtype, Float):
+                    return np.float64(value)
+                elif issubclass(dtype, String):
+                    return np.str_(value)
+                elif issubclass(dtype, Array) and np.ndim(value) > 0:
+                    return np.array(value)
+            except ValueError:
+                pass
+
+        raise TypeError(f'unable to recast value {value} to type(s) {to}')
 
     else:
         # infer type

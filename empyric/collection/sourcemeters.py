@@ -1,10 +1,13 @@
 import os
 import datetime
+import re
+
 import numpy as np
 import pandas as pd
 
-from empyric.collection.instrument import *
-from empyric.tools import is_on
+from empyric.collection.instrument import Instrument, setter, getter, measurer
+from empyric.adapters import GPIB
+from empyric.types import Toggle, ON, OFF, String, Float, Array
 
 
 class Keithley2400(Instrument):
@@ -58,17 +61,17 @@ class Keithley2400(Instrument):
 
     fast_voltages = []
 
-    # allowed current range settings
-    current_ranges = (1e-6, 10e-6, 100e-6, 1e-3, 10e-3, 100e-3, 1, 'AUTO')
+    #: allowed current range settings; zero indicate auto-range
+    current_ranges = (0.0, 1.e-6, 10.e-6, 100.e-6, 1.e-3, 10.e-3, 100.e-3, 1.)
 
-    # allowed voltage range settings
-    voltage_ranges = (0.2, 2, 20, 200, 'AUTO')
+    #: allowed voltage range settings; zero indicates auto-range
+    voltage_ranges = (0.0, 0.2, 2., 20., 200.)
 
-    # over-voltage protection level settings
-    ovp_levels = (20, 40, 60, 80, 100, 120, 140, 160, 210)
+    #: over-voltage protection level settings
+    ovp_levels = (20., 40., 60., 80., 100., 120., 140., 160., 210.)
 
     @setter
-    def set_source(self, variable):
+    def set_source(self, variable: String):
 
         if variable not in ['voltage', 'current']:
             raise ValueError('Source must be either "current" or "voltage"')
@@ -91,7 +94,7 @@ class Keithley2400(Instrument):
             self.voltage = None
 
     @getter
-    def get_source(self):
+    def get_source(self) -> String:
 
         if self.query('SOUR:FUNC?').strip() == 'VOLT':
             return 'voltage'
@@ -99,7 +102,7 @@ class Keithley2400(Instrument):
             return 'current'
 
     @setter
-    def set_meter(self, variable):
+    def set_meter(self, variable: String):
 
         if variable not in ['voltage', 'current']:
             raise ValueError('Source must be either "current" or "voltage"')
@@ -112,8 +115,10 @@ class Keithley2400(Instrument):
             self.write(':SENS:FUNC "CURR"')
             self.write(':FORM:ELEM CURR')
 
+        self.write(':TRIG:COUN 1')
+
     @getter
-    def get_meter(self):
+    def get_meter(self) -> String:
         if self.query(':SENS:FUNC?').strip() == 'VOLT:DC':
             return 'voltage'
         else:
@@ -121,123 +126,114 @@ class Keithley2400(Instrument):
 
 
     @setter
-    def set_remote_sense(self, on_or_off):
+    def set_remote_sense(self, state: Toggle):
 
-        self.set_output('OFF')
+        self.set_output(OFF)
 
-        if is_on(on_or_off):
+        if state.on:
             self.write(':SYST:RSEN ON')
         else:
             self.write(':SYST:RSEN OFF')
 
     @getter
-    def get_remote_sense(self):
+    def get_remote_sense(self) -> Toggle:
 
-        if is_on(self.query(':SYST:RSEN?').strip()):
-            return 'ON'
-        else:
-            return 'OFF'
+        state = Toggle(self.query(':SYST:RSEN?').strip())
+
+        return ON if state.on else OFF
 
     @setter
-    def set_output(self, output):
+    def set_output(self, output: Toggle):
 
-        if output in [0, 'OFF', 'off']:
+        if output:
+            self.write(':OUTP ON')
+        elif not output:
             self.write(':OUTP OFF')
 
-            output_off = int(self.query(':OUTP?').strip()) == 0
-
-            if not output_off:
+            if not int(self.query(':OUTP?').strip()) == 0:
                 raise RuntimeWarning(
                     f'unable to turn off output of {self.name}'
                 )
 
-        elif output in [1, 'ON', 'on']:
-            self.write(':OUTP ON')
         else:
-            raise ValueError(f'Ouput setting {output} not recognized!')
+            raise ValueError(f'Output setting {output} not recognized!')
 
     @getter
-    def get_output(self):
-
-        if is_on(self.query('OUTP?').strip()):
-            return 'ON'
-        else:
-            return 'OFF'
+    def get_output(self) -> Toggle:
+        return Toggle(self.query('OUTP?').strip())
 
     @measurer
-    def measure_voltage(self):
+    def measure_voltage(self) -> Float:
 
         if self.meter != 'voltage':
             self.set_meter('voltage')
 
-        if not is_on(self.output):
-            self.set_output('ON')
+        if not self.output:
+            self.set_output(ON)
 
         def validator(response):
             match = re.match('.\d\.\d+E.\d\d', response)
             return bool(match)
 
-        return self.query(':READ?', validator=validator)
+        return float(self.query(':READ?', validator=validator))
 
     @measurer
-    def measure_current(self):
+    def measure_current(self) -> Float:
 
         if self.meter != 'current':
             self.set_meter('current')
 
-        if not is_on(self.output):
-            self.set_output('ON')
-
-        self.write(':TRIG:COUN 1')
+        if not self.output:
+            self.set_output(ON)
 
         def validator(response):
             match = re.match('.\d\.\d+E.\d\d', response)
             return bool(match)
 
-        return self.query(':READ?', validator=validator)
+        return float(self.query(':READ?', validator=validator))
 
     @setter
-    def set_voltage(self, voltage):
+    def set_voltage(self, voltage: Float):
 
         if self.source != 'voltage':
             Warning(f'Switching source mode to voltage!')
             self.set_source('voltage')
 
-        if not is_on(self.output):
-            self.set_output('ON')
+        if not self.output:
+            self.set_output(ON)
 
         self.write(':SOUR:VOLT:LEV %.2E' % voltage)
 
     @getter
-    def get_voltage(self):
+    def get_voltage(self) -> Float:
 
         return float(self.query(':SOUR:VOLT:LEV?'))
 
     @setter
-    def set_current(self, current):
+    def set_current(self, current: Float):
 
         if self.source != 'current':
             Warning(f'Switching source mode to current!')
             self.set_source('current')
 
-        if not is_on(self.output):
+        if not self.output:
             self.set_output('ON')
 
         self.write(':SOUR:CURR:LEV %.2E' % current)
 
     @getter
-    def get_current(self):
+    def get_current(self) -> Float:
 
-        return self.query(':SOUR:CURR:LEV?').split()
+        return float(self.query(':SOUR:CURR:LEV?').split())
 
     @setter
-    def set_voltage_range(self, voltage_range):
+    def set_voltage_range(self, voltage_range: Float):
 
         if voltage_range in self.voltage_ranges:
             if self.source == 'voltage':
                 self.write(':SOUR:VOLT:RANGE %.2E' % voltage_range)
             else:
-                if voltage_range == 'AUTO':
+                if voltage_range == 0.0:
                     self.write(':SENS:VOLT:RANGE: AUTO ON')
                 else:
                     self.write(':SENS:VOLT:RANGE %.2E' % voltage_range)
@@ -248,29 +244,32 @@ class Keithley2400(Instrument):
             raise ValueError(first_line + second_line)
 
     @getter
-    def get_voltage_range(self):
+    def get_voltage_range(self) -> Float:
 
         if not hasattr(self, 'source'):
             self.get_source()
 
         if self.source == 'voltage':
 
-            if is_on(self.query(':SOUR:VOLT:RANGE:AUTO?').split()):
-                return 'AUTO'
+            if Toggle(self.query(':SOUR:VOLT:RANGE:AUTO?').split()):
+                return 0.0
             else:
-                return self.query(':SOUR:VOLT:RANG?').split()
+                return float(self.query(':SOUR:VOLT:RANG?').split())
 
         else:
-            if is_on(self.query(':SENS:VOLT:RANGE:AUTO?').split()):
-                return 'AUTO'
+            if Toggle(self.query(':SENS:VOLT:RANGE:AUTO?').split()):
+                return 0.0
             else:
-                return self.query(':SENS:VOLT:RANG?').split()
+                return float(self.query(':SENS:VOLT:RANG?').split())
 
     @setter
-    def set_voltage_limit(self, voltage_limit):
+    def set_voltage_limit(self, voltage_limit: Float):
+
+        if not hasattr(self, 'source'):
+            self.get_source()
 
         if self.source == 'voltage':
-            if int(voltage_limit) in self.ovp_levels:
+            if voltage_limit in self.ovp_levels:
                 self.write(':SOUR:VOLT:PROT %d' % int(voltage_limit))
             else:
                 first_line = f'{self.name} is sourcing voltage, but given ' \
@@ -282,21 +281,24 @@ class Keithley2400(Instrument):
             self.write(':SENS:VOLT:PROT %.2E' % voltage_limit)
 
     @getter
-    def get_voltage_limit(self):
+    def get_voltage_limit(self) -> Float:
+
+        if not hasattr(self, 'source'):
+            self.get_source()
 
         if self.source == 'voltage':
-            return self.query(':SOUR:VOLT:PROT?').split()
+            return float(self.query(':SOUR:VOLT:PROT?').split())
         else:
-            return self.query(':SENS:VOLT:PROT?').split()
+            return float(self.query(':SENS:VOLT:PROT?').split())
 
     @setter
-    def set_current_range(self, current_range):
+    def set_current_range(self, current_range: Float):
 
         if current_range in self.current_ranges:
             if self.source == 'current':
                 self.write(':SOUR:CURR:RANGE %.2E' % current_range)
             else:
-                if current_range == 'AUTO':
+                if current_range == 0.0:
                     self.write(':SENS:CURR:RANGE AUTO')
                 else:
                     self.write(':SENS:CURR:RANGE %.2E' % current_range)
@@ -307,35 +309,38 @@ class Keithley2400(Instrument):
             raise ValueError(first_line + second_line)
 
     @getter
-    def get_current_range(self):
+    def get_current_range(self) -> Float:
+
+        if not hasattr(self, 'source'):
+            self.get_source()
 
         if self.source == 'current':
 
-            if is_on(self.query(':SOUR:CURR:RANGE:AUTO?').split()):
-                return 'AUTO'
+            if Toggle(self.query(':SOUR:CURR:RANGE:AUTO?').split()):
+                return 0.0
             else:
-                return self.query(':SOUR:CURR:RANG?').split()
+                return float(self.query(':SOUR:CURR:RANG?').split())
 
         else:
-            if is_on(self.query(':SENS:CURR:RANGE:AUTO?').split()):
-                return 'AUTO'
+            if Toggle(self.query(':SENS:CURR:RANGE:AUTO?').split()):
+                return 0.0
             else:
-                return self.query(':SENS:CURR:RANG?').split()
+                return float(self.query(':SENS:CURR:RANG?').split())
 
     @setter
-    def set_current_limit(self, current_limit):
+    def set_current_limit(self, current_limit: Float):
         self.write(':SENS:CURR:PROT %.2E' % current_limit)
 
     @getter
-    def get_current_limit(self):
+    def get_current_limit(self) -> Float:
 
         if self.source == 'current':
-            return self.query(':SOUR:CURR:PROT?'.split())
+            return float(self.query(':SOUR:CURR:PROT?'.split()))
         else:
-            return self.query(':SENS:CURR:PROT?').split()
+            return float(self.query(':SENS:CURR:PROT?').split())
 
     @setter
-    def set_nplc(self, nplc):
+    def set_nplc(self, nplc: Float):
 
         if self.meter == 'current':
             self.write(':SENS:CURR:NPLC %.2E' % nplc)
@@ -343,7 +348,7 @@ class Keithley2400(Instrument):
             self.write(':SENS:VOLT:NPLC %.2E' % nplc)
 
     @getter
-    def get_nplc(self):
+    def get_nplc(self) -> Float:
 
         if not hasattr(self, 'meter'):
             self.get_meter()
@@ -354,15 +359,15 @@ class Keithley2400(Instrument):
             return float(self.query(':SENS:VOLT:NPLC?'))
 
     @setter
-    def set_delay(self, delay):
+    def set_delay(self, delay: Float):
         self.adapter.delay = delay
 
     @getter
-    def get_delay(self):
+    def get_delay(self) -> Float:
         return self.adapter.delay
 
     @setter
-    def set_fast_voltages(self, voltages):
+    def set_fast_voltages(self, voltages: [Array, String]):
 
         # import fast voltages, if specified as a path
         if type(voltages) == str:
@@ -399,7 +404,7 @@ class Keithley2400(Instrument):
             raise ValueError(f'invalid fast voltages: {voltages}')
 
     @measurer
-    def measure_fast_currents(self):
+    def measure_fast_currents(self) -> Array:
 
         list_length = len(self.fast_voltages)
 
@@ -451,11 +456,11 @@ class Keithley2400(Instrument):
         return np.array(current_list)
 
     @setter
-    def set_source_delay(self, delay):
+    def set_source_delay(self, delay: Float):
         self.write(':SOUR:DEL %.4E' % delay)
 
     @getter
-    def get_source_delay(self):
+    def get_source_delay(self) -> Float:
         return self.query(':SOUR:DEL?').split()
 
 
