@@ -3,6 +3,8 @@
 Routines
 =================================
 
+.. autoclass:: empyric.routines.Routine
+
 .. autoclass:: empyric.routines.Set
 
 .. autoclass:: empyric.routines.Timecourse

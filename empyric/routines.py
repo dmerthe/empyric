@@ -14,7 +14,7 @@ from empyric.tools import convert_time, autobind_socket, read_from_socket, \
     write_to_socket, get_ip_address
 from empyric.types import recast, Boolean, Integer, Float, Toggle, OFF, ON, \
     Array, String
-from empyric.variables import Parameter
+from empyric.variables import Parameter, Variable
 
 
 class Routine:
@@ -23,7 +23,8 @@ class Routine:
     """
 
     def __init__(
-            self, knobs=None, values=None, enable=None, start=0, end=np.inf
+            self, knobs: dict = None, values: dict = None,
+            enable: Variable = None, start=0.0, end=np.inf
     ):
         """
 

@@ -344,7 +344,7 @@ class Serial(Adapter):
         List all connected serial devices
 
         :param verbose: (bool) if True, list of devices will be printed
-        (defaults to True).
+                        (defaults to True).
 
         :return: (list of str) List of connected serial devices
         """

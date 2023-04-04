@@ -252,7 +252,7 @@ class Experiment:
         Save the experiment dataframe to a CSV file
 
         :param directory: (path) (optional) directory to save data to,
-        if different from working directory
+                          if different from working directory
         :return: None
         """
 
@@ -451,7 +451,7 @@ class Manager:
         status, while the experiment is run in a separate thread.
 
         :param directory: (path) (optional) directory in which to run the
-        experiment if different from the working directory
+                          experiment if different from the working directory
         :return: None
         """
 
