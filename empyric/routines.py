@@ -331,7 +331,6 @@ class Minimization(Routine):
 
             # Check if found (or returned to) minimum
             if self.better(meter_value) or self.revert:
-                self.revert = False
 
                 # Record this new optimal state
                 self.best_knobs = [state[knob] for knob in self.knobs]
@@ -351,6 +350,7 @@ class Minimization(Routine):
                 for knob, new_value in zip(self.knobs.values(), new_knobs):
                     knob.value = new_value
 
+                self.revert = False
             else:
 
                 for knob, best_val in zip(self.knobs.values(), self.best_knobs):
