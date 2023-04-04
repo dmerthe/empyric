@@ -689,7 +689,7 @@ class PrologixGPIBUSB:
                 self.devices.append(address)
 
         proper_message = message.encode() + b'\r'
-
+        print('write:', proper_message)
         if to_controller:
             proper_message = b'++' + proper_message
 
@@ -709,7 +709,9 @@ class PrologixGPIBUSB:
         if not from_controller:
             self.write(f'read eoi', to_controller=True)
 
-        return self.serial_port.read_until(b'\r').decode().strip()
+        response = self.serial_port.read_until(b'\r').decode().strip()
+        print('read:', response)
+        return response
 
     def close(self):
         self.serial_port.close()

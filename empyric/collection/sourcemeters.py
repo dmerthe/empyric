@@ -15,7 +15,7 @@ class Keithley2400(Instrument):
     name = 'Keithley2400'
 
     supported_adapters = (
-        (GPIB, {}),
+        (GPIB, {'delay': 0.1, 'timeout': 0.5}),
     )
 
     # Available knobs
@@ -75,7 +75,10 @@ class Keithley2400(Instrument):
 
         self.write(':SOUR:CLE:AUTO OFF')  # disable auto output-off
 
-        self.write(':SENS:FUNC:CONC OFF') # disable concurrent measurements
+        self.write(':SENS:FUNC:CONC OFF')  # disable concurrent measurements
+
+        # Disabling concurrent measurements sets instrument to measure voltage
+        self.set_meter(self.meter)
 
         self.set_output('OFF')
 
@@ -141,8 +144,12 @@ class Keithley2400(Instrument):
         if output in [0, 'OFF', 'off']:
             self.write(':OUTP OFF')
 
-            # # for some reason, this is needed to ensure output off
-            # self.query(':OUTP?')
+            output_off = int(self.query(':OUTP?').strip()) == 0
+
+            if not output_off:
+                raise RuntimeWarning(
+                    f'unable to turn off output of {self.name}'
+                )
 
         elif output in [1, 'ON', 'on']:
             self.write(':OUTP ON')
@@ -163,7 +170,8 @@ class Keithley2400(Instrument):
         if self.meter != 'voltage':
             self.set_meter('voltage')
 
-        self.set_output('ON')
+        if not is_on(self.output):
+            self.set_output('ON')
 
         def validator(response):
             match = re.match('.\d\.\d+E.\d\d', response)
@@ -177,7 +185,8 @@ class Keithley2400(Instrument):
         if self.meter != 'current':
             self.set_meter('current')
 
-        self.set_output('ON')
+        if not is_on(self.output):
+            self.set_output('ON')
 
         self.write(':TRIG:COUN 1')
 
@@ -194,7 +203,8 @@ class Keithley2400(Instrument):
             Warning(f'Switching source mode to voltage!')
             self.set_source('voltage')
 
-        self.set_output('ON')
+        if not is_on(self.output):
+            self.set_output('ON')
 
         self.write(':SOUR:VOLT:LEV %.2E' % voltage)
 
@@ -210,7 +220,8 @@ class Keithley2400(Instrument):
             Warning(f'Switching source mode to current!')
             self.set_source('current')
 
-        self.set_output('ON')
+        if not is_on(self.output):
+            self.set_output('ON')
 
         self.write(':SOUR:CURR:LEV %.2E' % current)
 
@@ -415,6 +426,7 @@ class Keithley2400(Instrument):
         self.adapter.timeout = None  # the response times can be long
 
         self.set_source('voltage')
+        self.set_meter('current')
         self.set_output('ON')
         self.write(':SOUR:VOLT:MODE LIST')
 
