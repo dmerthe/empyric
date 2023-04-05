@@ -58,7 +58,9 @@ class Toggle(Type):
         if hasattr(other, 'on'):
             return self.on == other.on
         else:
-            if other in self.on_values:
+            if self.on and other in self.on_values:
+                return True
+            elif not self.on and other in self.off_values:
                 return True
             else:
                 return False
