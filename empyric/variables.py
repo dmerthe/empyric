@@ -50,23 +50,7 @@ class Variable:
                 return
 
             if self.dtype is not None:
-
-                # if value and dtype are both numeric, but the type of value
-                # does not match dtype, then just make the conversion
-                if isinstance(value, numbers.Number):
-                    if issubclass(self.dtype, Integer):
-                        setter(self, np.int64(value))
-                    if issubclass(self.dtype, Float):
-                        setter(self, np.float64(value))
-                else:
-                    try:
-                        setter(self, recast(value, to=self.dtype))
-                    except ValueError:
-                        raise ValueError(
-                            f'unable to convert value {value} '
-                            f'to type {self.dtype}'
-                        )
-
+                setter(self, recast(value, to=self.dtype))
             else:
                 # if type is not explicitly defined upon construction,
                 # infer from first set value
@@ -76,7 +60,7 @@ class Variable:
                 for _type in types.supported.values():
                     if isinstance(recasted_value, _type):
                         self.dtype = _type
-                        setter(self, recast(value, to=_type))
+                        setter(self, recasted_value)
 
         return wrapped_setter
 
@@ -92,24 +76,7 @@ class Variable:
                 self._value = None
 
             if self.dtype is not None:
-
-                # if value and dtype are both numeric, but the type of value
-                # does not match dtype, then just make the conversion
-                if isinstance(value, numbers.Number):
-                    if issubclass(self.dtype, Integer):
-                        self._value = np.int64(value)
-                    if issubclass(self.dtype, Float):
-                        self._value = np.float64(value)
-                else:
-
-                    try:
-                        self._value = recast(value, to=self.dtype)
-                    except ValueError:
-                        raise ValueError(
-                            f'unable to convert value {value} '
-                            f'to type {self.dtype}'
-                        )
-
+                self._value = recast(value, to=self.dtype)
             else:
                 # if type is not explicitly defined upon construction,
                 # infer from first set value
@@ -119,7 +86,7 @@ class Variable:
                 for _type in types.supported.values():
                     if isinstance(recasted_value, _type):
                         self.dtype = _type
-                        self._value = recast(value, to=_type)
+                        self._value = recasted_value
 
             return self._value
 
@@ -152,7 +119,7 @@ class Knob(Variable):
         self.upper_limit = upper_limit
 
         # infer dtype from type hint of first argument of set method
-        set_method = getattr(instrument, 'set_'+knob)
+        set_method = getattr(instrument, 'set_'+knob.replace(' ', '_'))
         type_hints = typing.get_type_hints(set_method)
         type_hints.pop('return', None)  # exclude return type hint
 
