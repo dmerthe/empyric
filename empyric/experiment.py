@@ -422,7 +422,7 @@ class Manager:
         self.settings = converted_runcard['Settings']
         self.instruments = converted_runcard['Instruments']
         self.alarms = converted_runcard['Alarms']
-        self.plotter = converted_runcard['Plotter']
+        self.plotter = converted_runcard.get('Plotter', None)
 
         self.experiment = converted_runcard['Experiment']
 

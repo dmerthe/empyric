@@ -474,7 +474,9 @@ class ExperimentGUI:
                     if instrument.name not in self.instruments:
                         self.instruments[instrument.name] = instrument
 
-        if 'plots' in kwargs or 'plotter' in kwargs:
+        if ('plots' in kwargs and kwargs['plotter'] is not None) \
+                or ('plotter' in kwargs and kwargs['plotter'] is not None):
+
             if 'plotter' in kwargs:
                 self.plotter = kwargs['plotter']
             else:
