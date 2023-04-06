@@ -269,6 +269,30 @@ class Remote(Variable):
     """
     Variable controlled by an experiment (running a server routine) on a
     different process or computer.
+
+    The `remote` argument is generally the IP address and port of the server, in
+    the form '(ip address)::(port)'.
+
+    The `alias` argument identifies the particular variable on the server to
+    link to. For socket servers, this is simply the name of the variable on
+    the server. For Modbus servers, this is the starting address of the
+    holding or input register for a read/write or readonly variable,
+    respectively. For either set of registers, the starting address is 5*(n-1)
+    for the nth variable in the `readwrite` or `readonly` list/dictionary of
+    variables in the server routine definition.
+
+    The (optional) `protocol` argument indicates which kind of server to connect
+    to. Setting `protocol='modbus'` indicates a Modbus server (controlled by a
+    ModbusServer routine on the remote process/computer), and any other value
+    or no value indicates a socket server (controlled by a SocketServer
+    routine).
+
+    The `settable` argument is required for remote variables on a Modbus server,
+    and is not used for a socket server. If `settable` is set to True, then
+    the variable value is read from the holding registers (`readwrite`
+    variables), otherwise the variable value is read from the input registers
+    (`readonly` variables).
+
     """
 
     dtype_map = {
@@ -277,6 +301,8 @@ class Remote(Variable):
         Integer: '64bit_int',
         Float: '64bit_float'
     }
+
+    _settable = None  #: determined by the server
 
     def __init__(self,
                  remote=None,

@@ -120,7 +120,7 @@ supported = {key: value for key, value in vars().items()
              if type(value) is abc.ABCMeta and issubclass(value, Type)}
 
 
-def recast(value: Any, to: type = Type):
+def recast(value: Any, to: type = Type) -> Type:
     """
     Convert a value into the appropriate type for the information it contains.
 
@@ -137,10 +137,10 @@ def recast(value: Any, to: type = Type):
     just returns the same string.
 
     If the value argument does not fit into one of the above categories, a
-    `TypeError` is thrown.
+    warning will be printed and None will be returned.
 
     :param value: (Any) the value whose type needs converting
-    :param to: (_type) optional keyword argument indicating which type to
+    :param to: (Type) optional keyword argument indicating which type to
                        convert to; default value is `Type` which indicates
                        that the type should be inferred based on the value.
     """
