@@ -122,7 +122,11 @@ class Keithley6500(Instrument):
     name = 'Keithley6500'
 
     supported_adapters = (
-        (Socket, {'write_termination': '\n', 'timeout': 0.5}),
+        (Socket, {
+            'write_termination': '\n',
+            'read_termination': '\n',
+            'timeout': 0.5}
+         ),
     )
 
     knobs = (

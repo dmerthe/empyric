@@ -120,7 +120,7 @@ supported = {key: value for key, value in vars().items()
              if type(value) is abc.ABCMeta and issubclass(value, Type)}
 
 
-def recast(value: Any, to: type = Type) -> Type:
+def recast(value: Any, to: type = Type) -> [Type, None]:
     """
     Convert a value into the appropriate type for the information it contains.
 
@@ -165,7 +165,11 @@ def recast(value: Any, to: type = Type) -> Type:
             except ValueError:
                 pass
 
-        raise TypeError(f'unable to recast value {value} to type(s) {to}')
+        print(
+            f'Warning: unable to recast value {value} to type {to}'
+        )
+
+        return None
 
     else:
         # infer type
