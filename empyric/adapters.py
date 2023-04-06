@@ -1058,7 +1058,7 @@ class Modbus(Adapter):
 
     slave_id = 0
     # Byte and word order is either little-endian (<) or big-endian (>)
-    byte_order = '<'
+    byte_order = '>'
     word_order = '>'
 
     dtypes = [

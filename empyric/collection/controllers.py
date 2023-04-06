@@ -286,7 +286,7 @@ class MKSGSeries(Instrument):
 
     name = 'MKSGSeries'
 
-    supported_adapters = ((Modbus, {'byte_order': '>'}),)
+    supported_adapters = ((Modbus, {}),)
 
     knobs = (
         'setpoint',  # flow rate setpoint in SCCM
@@ -334,7 +334,7 @@ class AlicatMFC(Instrument):
     name = 'AlicatMFC'
 
     supported_adapters = (
-        (Modbus, {'byte_order': '>'}),
+        (Modbus, {}),
     )
 
     knobs = (

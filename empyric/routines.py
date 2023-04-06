@@ -717,7 +717,7 @@ class ModbusServer(Routine):
     async def _update_registers(self, update_variables=True):
 
         # Store readwrite variable values in holding registers (fc = 3)
-        builder = self._builder_cls()
+        builder = self._builder_cls(byteorder='>')
 
         for i, (name, variable) in enumerate(self.readwrite.items()):
 
