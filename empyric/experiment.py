@@ -831,6 +831,19 @@ def convert_runcard(runcard):
                     in zip(specs['knobs'].keys(), specs['values'])
                 ], dtype=object)
 
+            if 'rates' in specs:
+                specs['rates'] = np.array(
+                    specs['rates'], dtype=object
+                ).reshape((len(knobs), -1))
+
+                # Rates can be variables, specified by their names
+                for var_name in variables:
+                    where_variable = (specs['rates'] == var_name)
+                    # locate names of variables
+
+                    specs['rates'][where_variable] = variables[var_name]
+                    # replace variable names with variables
+
             # For Server routines
             readwrite = np.array([specs.get('readwrite', [])]).flatten()
             if readwrite.size > 0:

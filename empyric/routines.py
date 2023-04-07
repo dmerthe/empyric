@@ -23,13 +23,12 @@ class Routine:
     """
 
     def __init__(
-            self, knobs: dict = None, meters: dict = None, values: dict = None,
+            self, knobs: dict = None, values: dict = None,
             enable: Variable = None, start=0.0, end=np.inf
     ):
         """
 
         :param knobs: (Variable/1D array) knob variable(s) to be controlled
-        :param meters: (Variable/1d array) meter variables to be monitored
         :param values: (1D/2D array) array or list of values for each variable;
                                      can be 1D iff there is one knob
         :param enable: (Variable) optional toggle or boolean variable that
@@ -107,6 +106,82 @@ class Set(Routine):
                 knob.value = value._value
             else:
                 knob.value = value[0]
+
+
+class Ramp(Routine):
+    """
+    Ramps a set of knobs to given target values at given rates
+    """
+
+    def __init__(self, rates=None, **kwargs):
+        """
+        :param rates: (1D array) list of ramp rates
+        """
+
+        Routine.__init__(self, **kwargs)
+
+        if rates:
+
+            if len(self.knobs) > 1:
+                if np.ndim(rates) == 0:  # single rate for all knobs
+                    rates = [rates] * len(self.knobs)
+
+            self.rates = np.array(
+                rates, dtype=object
+            ).reshape((len(self.knobs), -1))
+
+        else:
+            raise AttributeError('Ramp routine requires rates!')
+
+        self.now = None
+        self.then = None
+
+    def update(self, state):
+
+        if state['Time'] < self.start \
+                or state['Time'] > self.end \
+                or not self.enable.value:
+            self.now = self.then = None
+            return
+        else:
+
+            if self.start_time is None:
+                self.start_time = state['Time']
+
+            self.now = state['Time']
+
+            for name, knob in self.knobs.items():
+
+                has_controller = isinstance(knob.controller, Routine)
+
+                if has_controller and knob.controller != self:
+                    controller = knob.controller
+                    if controller.start < state['Time'] < controller.end:
+                        raise RuntimeError(
+                            f"Knob {name} has more than one controlling "
+                            f"routine at time = {state['Time']} seconds!"
+                        )
+                else:
+                    knob.controller = self
+
+        knobs_rates_values = zip(self.knobs.keys(), self.rates, self.values)
+        for knob, rate, value in knobs_rates_values:
+
+            if isinstance(value, Variable):
+                value = value._value
+
+            if isinstance(rate, Variable):
+                rate = rate._value
+
+            if state[knob] != value:
+                sign = value - state[knob] / abs(value - state[knob])
+                step_value = state[knob] + sign*rate*(self.now - self.then)
+
+                if sign
+
+            self.knobs[knob].value = step_value
+
+        self.then = self.now
 
 
 class Timecourse(Routine):
