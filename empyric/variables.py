@@ -6,10 +6,12 @@ import time
 import typing
 from functools import wraps
 import numpy as np
+from empyric.collection.instrument import Instrument
 
 from empyric import instruments, types
 from empyric.tools import write_to_socket, read_from_socket
-from empyric.types import recast, Integer, Float, Boolean, Toggle, Type, Array
+from empyric.types import recast, Integer, Float, Boolean, Toggle, Type, Array, \
+    String
 
 
 class Variable:
@@ -97,21 +99,20 @@ class Knob(Variable):
     """
     Variable that can be directly controlled by an instrument, such as the
     voltage of a power supply.
+
+    The `instrument` argument specifies which instrument the knob is
+    associated with.
+
+    The `knob` argument is the label of the knob on the instrument.
     """
 
     _settable = True  #:
 
     def __init__(self,
-                 instrument=None,
-                 knob=None,
-                 lower_limit=None,
-                 upper_limit=None):
-
-        for required_kwarg in ['instrument', 'knob']:
-            if not required_kwarg:
-                raise AttributeError(
-                    f'missing "{required_kwarg}" keyword for Knob constructor'
-                )
+                 instrument: Instrument,
+                 knob: str,
+                 lower_limit: numbers.Number = None,
+                 upper_limit: numbers.Number = None):
 
         self.instrument = instrument
         self.knob = knob  # name of the knob on instrument
@@ -166,11 +167,16 @@ class Meter(Variable):
 
     Some meters can be controlled directly or indirectly through
     an associated (but distinct) knob.
+
+    The `instrument` argument specifies which instrument the meter is
+    associated with.
+
+    The `meter` argument is the label of the meter on the instrument.
     """
 
     _settable = False  #:
 
-    def __init__(self, instrument=None, meter=None):
+    def __init__(self, instrument: Instrument, meter: str):
 
         self.instrument = instrument
         self.meter = meter
@@ -201,6 +207,13 @@ class Expression(Variable):
     For example, the output power of a power supply could be recorded as an
     expression, where voltage is a knob and current is a meter:
     power = voltage * current.
+
+    The `expression` argument is a string that can be evaluated by the Python
+    interpreter, replacing symbols with the values of variables according to
+    the `definitions` argument.
+
+    The `definitions` argument is a dictionary mapping symbols in the
+    `expression` argument to variables.
     """
 
     _settable = False  #:
@@ -221,7 +234,7 @@ class Expression(Variable):
         'min(': 'np.nanmin('
     }
 
-    def __init__(self, expression=None, definitions=None):
+    def __init__(self, expression: str, definitions: dict = None):
 
         self.expression = expression
         self.definitions = definitions if definitions is not None else {}
@@ -305,10 +318,10 @@ class Remote(Variable):
     _settable = None  #: determined by the server
 
     def __init__(self,
-                 remote=None,
-                 alias=None,
-                 protocol=None,
-                 settable=False  # needed for modbus protocol
+                 remote: str,
+                 alias: [int, str],
+                 protocol: str = None,
+                 settable: bool = False  # needed for modbus protocol
                  ):
 
         self.remote = remote
@@ -452,11 +465,13 @@ class Parameter(Variable):
     Variable whose value is assigned directly by the user or indirectly with a
     routine. An example is a unit conversion factor such as 2.54 cm per inch, a
     numerical constant like pi or a setpoint for a control routine.
+
+    The `parameter` argument is the given value of the parameter.
     """
 
     _settable = True  #:
 
-    def __init__(self, parameter=None):
+    def __init__(self, parameter: [bool, str, numbers.Number]):
 
         self.parameter = recast(parameter)
         self._value = parameter
@@ -465,14 +480,14 @@ class Parameter(Variable):
     @Variable.getter_type_validator
     def value(self):
         """Value of the parameter"""
-        self._value = self.parameter
         return self._value
 
     @value.setter
     @Variable.setter_type_validator
     def value(self, value):
         """Set the parameter value"""
-        self.parameter = self._value = value
+        self.parameter = value
+        self._value = value
 
 
 supported = {key: value for key, value in vars().items()
