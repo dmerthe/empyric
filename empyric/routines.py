@@ -23,12 +23,13 @@ class Routine:
     """
 
     def __init__(
-            self, knobs: dict = None, values: dict = None,
+            self, knobs: dict = None, meters: dict = None, values: dict = None,
             enable: Variable = None, start=0.0, end=np.inf
     ):
         """
 
         :param knobs: (Variable/1D array) knob variable(s) to be controlled
+        :param meters: (Variable/1d array) meter variables to be monitored
         :param values: (1D/2D array) array or list of values for each variable;
                                      can be 1D iff there is one knob
         :param enable: (Variable) optional toggle or boolean variable that
@@ -261,15 +262,17 @@ class Minimization(Routine):
     of minimum when comparing configurations.
     """
 
+    best_meter = np.inf
+
     def __init__(self,
-                 meters=None, max_deltas=None, T0=1.0, T1=0.0,
+                 max_deltas=None, T0=1.0, T1=0.0,
                  recency_bias=0.5,
                  **kwargs):
 
         Routine.__init__(self, **kwargs)
 
-        if meters:
-            self.meter = tuple(meters.keys())[0]
+        if 'meters' in kwargs:
+            self.meter = tuple(kwargs['meters'].keys())[0]
         else:
             raise AttributeError(
                 f'{self.__name__} routine requires meters for feedback'
@@ -287,7 +290,6 @@ class Minimization(Routine):
         self.recency_bias = recency_bias
 
         self.best_knobs = [knob.value for knob in self.knobs.values()]
-        self.best_meter = np.nan
 
         self.revert = False  # going back?
         self.finished = False
@@ -380,6 +382,8 @@ class Maximization(Minimization):
     Maximize a set of meters/expressions influenced by a set of knobs;
     works the same way as Minimize.
     """
+
+    best_meter = -np.inf
 
     def better(self, meter_value):
 
