@@ -331,6 +331,10 @@ class Minimization(Routine):
                 # no action taken if knobs values are undefined
                 return
 
+            if np.isinf(self.best_meter):
+                # make best_meter finite if it is not
+                self.best_meter = meter_value
+
             # Check if found (or returned to) minimum
             if self.better(meter_value) or self.revert:
 
@@ -704,7 +708,9 @@ class ModbusServer(Routine):
 
                     variable = list(self.readwrite.values())[address//4]
 
-                    decoder = self._decoder_cls.fromRegisters(values)
+                    decoder = self._decoder_cls.fromRegisters(
+                        values, byteorder='>'
+                    )
 
                     if issubclass(variable.dtype, Boolean):
                         variable.value = decoder.decode_64bit_uint()
