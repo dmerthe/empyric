@@ -831,7 +831,7 @@ def convert_runcard(runcard):
                     in zip(specs['knobs'].keys(), specs['values'])
                 ], dtype=object)
 
-            if 'rates' in specs:
+            if 'rates' in specs:  # for Ramp routine
                 specs['rates'] = np.array(
                     specs['rates'], dtype=object
                 ).reshape((len(knobs), -1))

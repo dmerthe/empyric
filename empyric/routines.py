@@ -22,44 +22,55 @@ class Routine:
     Base class for all routines
     """
 
-    def __init__(
-            self, knobs: dict = None, values: dict = None,
-            enable: Variable = None, start=0.0, end=np.inf
-    ):
-        """
+    # def __init__(
+    #         self, knobs: dict = None, values: dict = None,
+    #         enable: Variable = None, start=0.0, end=np.inf
+    # ):
+    #     """
+    #
+    #     :param knobs: (Variable/1D array) knob variable(s) to be controlled
+    #     :param values: (1D/2D array) array or list of values for each variable;
+    #                                  can be 1D iff there is one knob
+    #     :param enable: (Variable) optional toggle or boolean variable that
+    #                               enables or disables the routine; True/ON
+    #                               enables the routine, False/OFF disables the
+    #                               routine; default is `Parameter(True)`
+    #     :param start: (float) time to start the routine
+    #     :param end: (float) time to end the routine
+    #     """
+    #
+    #     if knobs is not None:
+    #
+    #         self.knobs = knobs
+    #         # dictionary of the form, {..., name: variable, ...}
+    #
+    #         for knob in self.knobs.values():
+    #             knob.controller = None
+    #             # for keeping track of which routines are controlling knobs
+    #
+    #     if values is not None:
+    #
+    #         if len(self.knobs) > 1:
+    #             if np.ndim(values) == 1:  # single list of values for all knobs
+    #                 values = [values] * len(self.knobs)
+    #             elif np.shape(values)[0] == 1:
+    #                 # 1xN array with one N-element list of times for all knobs
+    #                 values = [values[0]] * len(self.knobs)
+    #
+    #         self.values = np.array(
+    #             values, dtype=object
+    #         ).reshape((len(self.knobs), -1))
+    #
+    #     if enable is not None:
+    #         self.enable = enable
+    #     else:
+    #         self.enable = Parameter(True)
+    #
+    #     self.start = convert_time(start)
+    #     self.end = convert_time(end)
 
-        :param knobs: (Variable/1D array) knob variable(s) to be controlled
-        :param values: (1D/2D array) array or list of values for each variable;
-                                     can be 1D iff there is one knob
-        :param enable: (Variable) optional toggle or boolean variable that
-                                  enables or disables the routine; True/ON
-                                  enables the routine, False/OFF disables the
-                                  routine; default is `Parameter(True)`
-        :param start: (float) time to start the routine
-        :param end: (float) time to end the routine
-        """
-
-        if knobs is not None:
-
-            self.knobs = knobs
-            # dictionary of the form, {..., name: variable, ...}
-
-            for knob in self.knobs.values():
-                knob.controller = None
-                # for keeping track of which routines are controlling knobs
-
-        if values is not None:
-
-            if len(self.knobs) > 1:
-                if np.ndim(values) == 1:  # single list of values for all knobs
-                    values = [values] * len(self.knobs)
-                elif np.shape(values)[0] == 1:
-                    # 1xN array with one N-element list of times for all knobs
-                    values = [values[0]] * len(self.knobs)
-
-            self.values = np.array(
-                values, dtype=object
-            ).reshape((len(self.knobs), -1))
+    def __init__(self,
+                 enable: Variable = None, start=0.0, end=np.inf, **kwargs):
 
         if enable is not None:
             self.enable = enable
@@ -68,6 +79,24 @@ class Routine:
 
         self.start = convert_time(start)
         self.end = convert_time(end)
+
+        for key, value in kwargs.items():
+            self.__setattr__(key.replace(' ', '_'), value)
+
+    @staticmethod
+    def update_wrapper(update):
+        """Checks that routine is enabled and running"""
+
+        @functools.wraps(update)
+        def wrapped_update(self, state):
+            if state['Time'] < self.start \
+                    or state['Time'] > self.end \
+                    or not self.enable.value:
+                return  # no change
+            else:
+                update(self, state)
+
+        return wrapped_update
 
     def update(self, state):
         """
@@ -93,16 +122,35 @@ class Set(Routine):
     Sets and keeps knobs at fixed values
     """
 
-    def update(self, state):
+    def __init__(self, knobs, values, **kwargs):
 
-        if state['Time'] < self.start \
-                or state['Time'] > self.end \
-                or not self.enable.value:
-            return  # no change
+        super().__init__(**kwargs)
+
+        self.knobs = knobs
+        # dictionary of the form, {..., name: variable, ...}
+
+        for knob in self.knobs.values():
+            if not hasattr(knob, 'controller'):
+                # for keeping track of which routines are controlling knobs
+                knob.controller = None
+
+        if len(self.knobs) > 1:
+            if np.ndim(values) == 1:  # single list of values for all knobs
+                values = [values] * len(self.knobs)
+            elif np.shape(values)[0] == 1:
+                # 1xN array with one N-element list of times for all knobs
+                values = [values[0]] * len(self.knobs)
+
+        self.values = np.array(
+            values, dtype=object
+        ).reshape((len(self.knobs), -1))
+
+    @Routine.update_wrapper
+    def update(self, state):
 
         for knob, value in zip(self.knobs.values(), self.values):
 
-            if 'Variable' in repr(value):
+            if isinstance(value, Variable):
                 knob.value = value._value
             else:
                 knob.value = value[0]
@@ -141,14 +189,16 @@ class Ramp(Routine):
         if state['Time'] < self.start \
                 or state['Time'] > self.end \
                 or not self.enable.value:
+
             self.now = self.then = None
             return
+
         else:
 
-            if self.start_time is None:
-                self.start_time = state['Time']
-
             self.now = state['Time']
+
+            if self.then is None:
+                self.then = state['Time']
 
             for name, knob in self.knobs.items():
 
@@ -164,24 +214,25 @@ class Ramp(Routine):
                 else:
                     knob.controller = self
 
-        knobs_rates_values = zip(self.knobs.keys(), self.rates, self.values)
-        for knob, rate, value in knobs_rates_values:
+            knobs_rates_values = zip(self.knobs.keys(), self.rates, self.values)
+            for knob, rate, target in knobs_rates_values:
+                print(target.dtype)
+                if isinstance(target, Variable):
+                    target = target._value
 
-            if isinstance(value, Variable):
-                value = value._value
+                if isinstance(rate, Variable):
+                    rate = rate._value
 
-            if isinstance(rate, Variable):
-                rate = rate._value
+                val_now = self.knobs[knob]._value
+                sign = (target - val_now) / abs(target - val_now)
+                val_nxt = val_now + sign*rate*(self.now - self.then)
 
-            if state[knob] != value:
-                sign = value - state[knob] / abs(value - state[knob])
-                step_value = state[knob] + sign*rate*(self.now - self.then)
+                if sign*val_now <= sign*target < sign*val_nxt:
+                    self.knobs[knob].value = target
+                else:
+                    self.knobs[knob].value = val_nxt
 
-                if sign
-
-            self.knobs[knob].value = step_value
-
-        self.then = self.now
+            self.then = state['Time']
 
 
 class Timecourse(Routine):
