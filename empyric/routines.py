@@ -25,19 +25,20 @@ class Routine:
     experiment. The knobs should be a dictionary of the form
     {..., name: variable, ...}.
 
-    The optional `enable` argument is an instance of `Variable` whose `value`
-    attribute evaluates to `True` or `False`, indicating whether the routine
-    should update or not.
-
     The optional `start` and `end` arguments indicate when the routine should
     start and end. The default values are 0 and infinity, respectively. When
     updating, the routine compares these values to the `Time` value of the
     given state.
+
+    All other arguments are fixed values or string dictionary keys,
+    corresponding the variables values of the controlling experiment.
     """
+
+    assert_control = True
 
     def __init__(self,
                  knobs: dict,
-                 enable: Variable = Parameter(True),
+                 enable: String = None,
                  start=0.0, end=np.inf, **kwargs):
 
         self.knobs = knobs
@@ -72,30 +73,41 @@ class Routine:
         @functools.wraps(update)
         def wrapped_update(self, state):
 
-            if not self.enable.value:
+            if self.enable is not None and not state[self.enable]:
                 for name, knob in self.knobs.items():
                     if knob._controller == self:
                         knob._controller = None
                 return
 
             elif state['Time'] < self.start:
+
                 if not self.prepped:
                     self.prep(state)
                     self.prepped = True
+
                 return
 
-            elif state['Time'] > self.end:
+            elif state['Time'] >= self.end:
+
                 if not self.finished:
                     self.finish(state)
                     self.finished = True
+
+                    # Release knobs from control
+                    for name, knob in self.knobs.items():
+                        if knob._controller == self:
+                            knob._controller = None
+
                 return
 
             else:
+
                 for name, knob in self.knobs.items():
                     if knob._controller and knob._controller != self:
                         # take no action if another routine has control
                         return
-                    else:
+                    elif self.assert_control:
+                        # assert control if needed
                         knob._controller = self
 
                 update(self, state)
@@ -104,7 +116,7 @@ class Routine:
 
     def update(self, state):
         """
-        Updates the knobs controlled by the routine
+        Updates the knobs controlled by the routine based on the given state.
 
         :param state: (dict/Series) state of the calling experiment or process
         in the form, {..., variable: value, ...}
@@ -122,14 +134,14 @@ class Routine:
 
     def prep(self, state):
         """
-        Do any needed preparation before the routine starts
+        Does any needed preparation before the routine starts
         """
 
         pass
 
     def finish(self, state):
         """
-        Make any final actions after the routine ends
+        Makes any final actions after the routine ends
         """
 
 
@@ -146,7 +158,7 @@ class Set(Routine):
 
     def __init__(self,
                  knobs: dict,
-                 values: [Array, Variable, String],
+                 values,
                  **kwargs):
 
         Routine.__init__(self, knobs, **kwargs)
@@ -162,9 +174,7 @@ class Set(Routine):
 
         for knob, value in zip(self.knobs.values(), self.values):
 
-            if isinstance(value, Variable):
-                value = value._value
-            elif isinstance(value, str):
+            if isinstance(value, str):
                 value = state[value]
 
             if value:
@@ -178,8 +188,8 @@ class Ramp(Routine):
 
     def __init__(self,
                  knobs: dict,
-                 targets: [Array, String],
-                 rates: [Array, String],
+                 targets,
+                 rates,
                  **kwargs):
         """
         :param rates: (1D array) list of ramp rates
@@ -243,16 +253,18 @@ class Timecourse(Routine):
 
     def __init__(self,
                  knobs: dict,
-                 times: Array,
-                 values: Array,
+                 times,
+                 values,
                  **kwargs):
         """
 
-        :param times: (1D/2D array) array or list of times relative to the start
-         time
+        :param times: (number/1D/2D array) array or list of times relative to
+                      the start time
+        :param values: (number/1D/2D array) array or list of values
         :param kwargs: keyword arguments for Routine
         """
 
+        # Infer start and end times from times argument, if not given
         if 'start' not in kwargs:
             kwargs['start'] = np.min(times)
 
@@ -260,8 +272,6 @@ class Timecourse(Routine):
             kwargs['end'] = np.max(times)
 
         Routine.__init__(self, knobs, **kwargs)
-
-        self.finished = False
 
         if np.ndim(times) == 1:  # single list of times for all knobs
             times = [times] * len(self.knobs)
@@ -355,12 +365,10 @@ class Sequence(Routine):
 
     def __init__(self,
                  knobs: dict,
-                 values: Array,
+                 values,
                  **kwargs):
 
         Routine.__init__(self, knobs, **kwargs)
-
-        self.finished = False
 
         if np.ndim(values) == 1:  # single list of times for all knobs
             values = [values] * len(self.knobs)
@@ -388,7 +396,12 @@ class Sequence(Routine):
     def update(self, state):
 
         for knob, values in zip(self.knobs.values(), self.values):
+
             value = values[self.iteration]
+
+            if isinstance(value, String):
+                value = state[value]
+
             knob.value = value
 
         self.iteration = (self.iteration + 1) % len(self.values[0])
@@ -421,8 +434,8 @@ class Minimization(Routine):
 
     def __init__(self,
                  knobs: dict,
-                 meter: String,
-                 max_deltas: [Array, Float] = None,
+                 meter,
+                 max_deltas=None,
                  T0=0.0, T1=0.0,
                  recency_bias=1.0,
                  **kwargs):
@@ -432,7 +445,7 @@ class Minimization(Routine):
         self.meter = meter
 
         if max_deltas:
-            self.max_deltas = np.array([max_deltas], dtype=np.float64).flatten()
+            self.max_deltas = np.array([max_deltas]).flatten()
         else:
             self.max_deltas = np.ones(len(self.knobs))
 
@@ -483,14 +496,12 @@ class Minimization(Routine):
 
             for knob, new_value in zip(self.knobs.values(), new_knobs):
                 knob.value = new_value
-                print('new value', knob, new_value)
             self.revert = False
 
         else:
 
             for knob, best_val in zip(self.knobs.values(), self.best_knobs):
                 knob.value = best_val
-                print('best_value', knob, best_val)
             self.revert = True
 
     def better(self, meter_value):
@@ -508,12 +519,6 @@ class Minimization(Routine):
             return (change < 0) or (np.exp(-change / self.T) > _rand)
         else:
             return change < 0
-
-    # def prep(self, state):
-    #
-    #     # initialize best configuration
-    #     self.best_meter = state[self.meter]
-    #     self.best_knobs = [state[knob] if state[] for knob in self.knobs]
 
 
 class Maximization(Minimization):
@@ -551,9 +556,12 @@ class SocketServer(Routine):
     experiment, via the `state` argument of the `update` method.
     """
 
+    assert_control = False
+
     def __init__(self, knobs: dict = None, **kwargs):
 
-        self.knobs = knobs if knobs else {}
+        if knobs is None:
+            knobs = {}
 
         Routine.__init__(self, knobs, **kwargs)
 
@@ -685,7 +693,13 @@ class SocketServer(Routine):
 
                     else:  # Setting a value
 
-                        if alias in self.knobs:
+                        knob_exists = alias in self.knobs
+
+                        is_free = not getattr(
+                            self.knobs[alias], '_controller', None
+                        )
+
+                        if knob_exists and is_free:
 
                             knob = self.knobs[alias]
 
@@ -725,25 +739,29 @@ class ModbusServer(Routine):
     Server routine for transmitting data to other experiments, local or remote,
     using the Modbus over TCP/IP protocol.
 
-    Variables accessible to the server are specified by providing
-    dictionaries of variables in the form, {..., name: variable, ...} as the
-    readwrite and/or readonly arguments. Any variables given in the
-    `readwrite` argumment will be readable and writeable by connected
-    clients. Variables given in the `readonly` argument will be read-only by
-    clients.
+    Any variables given in the `knobs` argument will be readable and writeable
+    by connected clients. All variable values provided as the `state` argument
+    of the `update` method can be read by clients.
 
     Because data is stored in statically assigned registers, only variables
     of boolean, toggle, integer or float types can be used. Variable values are
     stored in consecutive 4 registers (64 bits per value).
 
-    Readwrite variables will be stored in holding registers in the same order
-    as given in the argument, starting from address 0. Readonly variables will
-    be stored similarly in input registers.
+    Values of writeable variables (the `knobs` argument) will be stored in
+    holding registers in the same order as given in the argument, starting from
+    address 0. Values provided in the `state` argument of the `update` method
+    will be stored in input registers in the same order as defined therein,
+    starting from address 0. Each value in both sets of registers is stored as 5
+    consecutive registers, 4 registers for the 64-bit value and 1 register for
+    any metadata (i.e. data type).
     """
+
+    assert_control = False
 
     def __init__(self, knobs: dict = None, **kwargs):
 
-        self.knobs = knobs if knobs else {}
+        if knobs is None:
+            knobs = {}
 
         Routine.__init__(self, knobs, **kwargs)
 
@@ -767,19 +785,14 @@ class ModbusServer(Routine):
 
         DataBlock = datastore.ModbusSequentialDataBlock
 
-        # Map each variable to 4 sequential registers (64-bit encoding) + 1
-        # register which contains meta data
-        input_registers = DataBlock.create()
-        holding_registers = DataBlock(0, [0] * 5 * len(knobs))
-
         # Set up a PyModbus TCP Server
         datastore.ModbusSlaveContext.setValues = self.setValues_decorator(
             datastore.ModbusSlaveContext.setValues
         )
 
         self.slave = datastore.ModbusSlaveContext(
-                ir=input_registers,
-                hr=holding_registers
+                ir=DataBlock.create(),
+                hr=DataBlock.create()
             )
 
         self.context = datastore.ModbusServerContext(
@@ -817,8 +830,10 @@ class ModbusServer(Routine):
         @functools.wraps(setValues_method)
         def wrapped_method(self2, *args, from_vars=False):
             if from_vars:
+                # update context from variables
                 return setValues_method(self2, *args)
             else:
+                # update variables according to the request
 
                 fc_as_hex, address, values = args
 
@@ -829,25 +844,40 @@ class ModbusServer(Routine):
                     )
                 else:
 
-                    variable = list(self.knobs.values())[address//4]
+                    if self.knobs:
 
-                    decoder = self._decoder_cls.fromRegisters(
-                        values, byteorder='>'
-                    )
+                        variable = list(self.knobs.values())[address//4]
 
-                    if issubclass(variable.dtype, Boolean):
-                        variable.value = decoder.decode_64bit_uint()
-                    elif issubclass(variable.dtype, Toggle):
-                        int_value = decoder.decode_64bit_uint()
-                        variable.value = OFF if int_value == 0 else ON
-                    elif issubclass(variable.dtype, Integer):
-                        variable.value = decoder.decode_64bit_int()
-                    elif issubclass(variable.dtype, Float):
-                        variable.value = decoder.decode_64bit_float()
+                        controller = getattr(variable, '_controller', None)
+
+                        if controller:
+
+                            name = list(self.knobs.keys())[address // 4]
+
+                            print(
+                                f'Warning: an attempt was made to set {name}, '
+                                'but it is currently controlled by '
+                                f'{controller}.'
+                            )
+                            return
+
+                        decoder = self._decoder_cls.fromRegisters(
+                            values, byteorder='>'
+                        )
+
+                        if issubclass(variable.dtype, Boolean):
+                            variable.value = decoder.decode_64bit_uint()
+                        elif issubclass(variable.dtype, Toggle):
+                            int_value = decoder.decode_64bit_uint()
+                            variable.value = OFF if int_value == 0 else ON
+                        elif issubclass(variable.dtype, Integer):
+                            variable.value = decoder.decode_64bit_int()
+                        elif issubclass(variable.dtype, Float):
+                            variable.value = decoder.decode_64bit_float()
 
         return wrapped_method
 
-    async def _update_registers(self, update_variables=True):
+    async def _update_registers(self):
 
         # Store readwrite variable values in holding registers (fc = 3)
         builder = self._builder_cls(byteorder='>')
