@@ -775,7 +775,7 @@ def convert_runcard(runcard):
                 key.replace(' ', '_'): value for key, value in specs.items()
             }
 
-            # For Set, Timecourse and Sequence routines
+            # Convert list of knobs into dictionary
             knobs = np.array([specs.get('knobs', [])]).flatten()
             if knobs.size > 0:
                 for knob in knobs:
@@ -786,82 +786,6 @@ def convert_runcard(runcard):
                         )
 
                 specs['knobs'] = {name: variables[name] for name in knobs}
-
-            meters = np.array([specs.get('meters', [])]).flatten()
-            if meters.size > 0:
-                for meter in meters:
-                    if meter not in variables:
-                        raise KeyError(
-                            f'meter {meter} specified for routine {name} '
-                            f'is not in Variables!'
-                        )
-
-                specs['meters'] = {name: variables[name] for name in meters}
-
-            if 'enable' in specs:
-                specs['enable'] = variables[specs['enable']]
-
-            if 'values' in specs:
-                specs['values'] = np.array(
-                    specs['values'], dtype=object
-                ).reshape((len(knobs), -1))
-
-                # Values can be variables, specified by their names
-                for var_name in variables:
-                    where_variable = (specs['values'] == var_name)
-                    # locate names of variables
-
-                    specs['values'][where_variable] = variables[var_name]
-                    # replace variable names with variables
-
-                # Values can be specified in a CSV file
-                def is_csv(item):
-                    if type(item) == str:
-                        return '.csv' in item
-                    else:
-                        return False
-
-                def get_csv(path, column):
-                    df = pd.read_csv(recast(path))
-                    return df[column].values.flatten()
-
-                specs['values'] = np.array([
-                    get_csv(values[0], knob) if is_csv(values[0])
-                    else values for knob, values
-                    in zip(specs['knobs'].keys(), specs['values'])
-                ], dtype=object)
-
-            # For Server routines
-            readwrite = np.array([specs.get('readwrite', [])]).flatten()
-            if readwrite.size > 0:
-                for variable in readwrite:
-                    if variable not in variables:
-                        raise KeyError(
-                            f'Variable {variable} specified for routine {name} '
-                            'is not in Variables!'
-                        )
-
-                specs['readwrite'] = {
-                    name: variables[name] for name in readwrite
-                }
-
-            readonly = np.array([specs.get('readonly', [])]).flatten()
-            if readonly.size > 0:
-                for variable in readonly:
-                    if variable not in variables:
-                        raise KeyError(
-                            f'Variable {variable} specified for routine {name} '
-                            'is not in Variables!'
-                        )
-
-                specs['readonly'] = {
-                    name: variables[name] for name in readonly
-                }
-
-            if 'Server' in _type and len(readonly) == 0 and len(readwrite) == 0:
-                # Give readonly access to all variables if no variables
-                # specified
-                specs['readonly'] = variables
 
             routines[name] = available_routines[_type](**specs)
 

@@ -7,6 +7,7 @@ import asyncio
 import time
 import select
 import functools
+
 import numpy as np
 import pandas as pd
 
@@ -14,65 +15,108 @@ from empyric.tools import convert_time, autobind_socket, read_from_socket, \
     write_to_socket, get_ip_address
 from empyric.types import recast, Boolean, Integer, Float, Toggle, OFF, ON, \
     Array, String
+from empyric.types import supported as supported_types
 from empyric.variables import Parameter, Variable
 
 
 class Routine:
     """
-    Base class for all routines
+    A Routine updates a set of `knobs` based on a given state of a process or
+    experiment. The knobs should be a dictionary of the form
+    {..., name: variable, ...}.
+
+    The optional `start` and `end` arguments indicate when the routine should
+    start and end. The default values are 0 and infinity, respectively. When
+    updating, the routine compares these values to the `Time` value of the
+    given state.
+
+    All other arguments are fixed values or string dictionary keys,
+    corresponding the variables values of the controlling experiment.
     """
 
-    def __init__(
-            self, knobs: dict = None, meters: dict = None, values: dict = None,
-            enable: Variable = None, start=0.0, end=np.inf
-    ):
-        """
+    assert_control = True
 
-        :param knobs: (Variable/1D array) knob variable(s) to be controlled
-        :param meters: (Variable/1d array) meter variables to be monitored
-        :param values: (1D/2D array) array or list of values for each variable;
-                                     can be 1D iff there is one knob
-        :param enable: (Variable) optional toggle or boolean variable that
-                                  enables or disables the routine; True/ON
-                                  enables the routine, False/OFF disables the
-                                  routine; default is `Parameter(True)`
-        :param start: (float) time to start the routine
-        :param end: (float) time to end the routine
-        """
+    def __init__(self,
+                 knobs: dict,
+                 enable: String = None,
+                 start=0.0, end=np.inf, **kwargs):
 
-        if knobs is not None:
+        self.knobs = knobs
 
-            self.knobs = knobs
-            # dictionary of the form, {..., name: variable, ...}
+        for knob in self.knobs.values():
+            knob._controller = None  # to control access to knob
 
-            for knob in self.knobs.values():
-                knob.controller = None
-                # for keeping track of which routines are controlling knobs
-
-        if values is not None:
-
-            if len(self.knobs) > 1:
-                if np.ndim(values) == 1:  # single list of values for all knobs
-                    values = [values] * len(self.knobs)
-                elif np.shape(values)[0] == 1:
-                    # 1xN array with one N-element list of times for all knobs
-                    values = [values[0]] * len(self.knobs)
-
-            self.values = np.array(
-                values, dtype=object
-            ).reshape((len(self.knobs), -1))
-
-        if enable is not None:
-            self.enable = enable
-        else:
-            self.enable = Parameter(True)
-
+        self.enable = enable
         self.start = convert_time(start)
         self.end = convert_time(end)
+        self.prepped = False
+        self.finished = False
+
+        for key, value in kwargs.items():
+            self.__setattr__(key.replace(' ', '_'), value)
+
+    @staticmethod
+    def enabler(update):
+        """
+        Checks the enabling variable, start and stop times for the
+        routine. If the enable variable evaluates to `True` and the time is
+        between the start and stop times, the update method is called.
+
+        If the enabling variable does not evaluate to `True`, then the routine's
+        control of the knobs is revoked and no other action is taken.
+
+        Otherwise, if the time is before the start time, the routine's prep
+        method is called. If the time is after the end time, the routine's
+        cleanup method is called.
+        """
+
+        @functools.wraps(update)
+        def wrapped_update(self, state):
+
+            if self.enable is not None and not state[self.enable]:
+                for name, knob in self.knobs.items():
+                    if knob._controller == self:
+                        knob._controller = None
+                return
+
+            elif state['Time'] < self.start:
+
+                if not self.prepped:
+                    self.prep(state)
+                    self.prepped = True
+
+                return
+
+            elif state['Time'] >= self.end:
+
+                if not self.finished:
+                    self.finish(state)
+                    self.finished = True
+
+                    # Release knobs from control
+                    for name, knob in self.knobs.items():
+                        if knob._controller == self:
+                            knob._controller = None
+
+                return
+
+            else:
+
+                for name, knob in self.knobs.items():
+                    if knob._controller and knob._controller != self:
+                        # take no action if another routine has control
+                        return
+                    elif self.assert_control:
+                        # assert control if needed
+                        knob._controller = self
+
+                update(self, state)
+
+        return wrapped_update
 
     def update(self, state):
         """
-        Updates the knobs controlled by the routine
+        Updates the knobs controlled by the routine based on the given state.
 
         :param state: (dict/Series) state of the calling experiment or process
         in the form, {..., variable: value, ...}
@@ -88,25 +132,118 @@ class Routine:
 
         pass
 
+    def prep(self, state):
+        """
+        Does any needed preparation before the routine starts
+        """
+
+        pass
+
+    def finish(self, state):
+        """
+        Makes any final actions after the routine ends
+        """
+
 
 class Set(Routine):
     """
-    Sets and keeps knobs at fixed values
+    Sets `knobs` to the given values.
+
+    The `values` argument should be either a single value for all knobs or a 1D
+    array of values of the same length as the `knobs` argument. The values can
+    be fixed values such as numbers, variables whose values will be checked on
+    each update, or string corresponding to a key in the state, whose
+    corresponding value will be obtained on each update.
     """
 
-    def update(self, state):
+    def __init__(self,
+                 knobs: dict,
+                 values,
+                 **kwargs):
 
-        if state['Time'] < self.start \
-                or state['Time'] > self.end \
-                or not self.enable.value:
-            return  # no change
+        Routine.__init__(self, knobs, **kwargs)
+
+        if len(self.knobs) > 1 and np.ndim(values) == 0:
+            # One value for all knobs
+            self.values = [values] * len(self.knobs)
+        else:
+            self.values = values
+
+    @Routine.enabler
+    def update(self, state):
 
         for knob, value in zip(self.knobs.values(), self.values):
 
-            if 'Variable' in repr(value):
-                knob.value = value._value
+            if isinstance(value, str):
+                value = state[value]
+
+            if value:
+                knob.value = value
+
+
+class Ramp(Routine):
+    """
+    Ramps a set of knobs to given target values at given rates
+    """
+
+    def __init__(self,
+                 knobs: dict,
+                 targets,
+                 rates,
+                 **kwargs):
+        """
+        :param rates: (1D array) list of ramp rates
+        """
+
+        Routine.__init__(self, knobs, **kwargs)
+
+        if np.ndim(rates) == 0:  # single rate for all knobs
+            rates = [rates] * len(self.knobs)
+
+        if np.ndim(targets) == 0:  # single target for all knobs
+            targets = [targets] * len(self.knobs)
+
+        self.rates = rates
+        self.targets = targets
+
+        self.now = None
+        self.then = None
+
+    @Routine.enabler
+    def update(self, state):
+
+        self.now = state['Time']
+
+        if self.then is None:
+            self.then = state['Time']
+
+        for knob, rate, target in zip(self.knobs, self.rates, self.targets):
+
+            if isinstance(target, String):
+                target = state[target]
+
+            if isinstance(rate, String):
+                rate = state[rate]
+
+            val_now = self.knobs[knob]._value
+
+            if not isinstance(target, numbers.Number) \
+                    or not isinstance(rate, numbers.Number) \
+                    or not isinstance(val_now, numbers.Number) \
+                    or target == val_now:
+                # Do nothing if knob, rate or target are undefined
+                continue
+
+            sign = (target - val_now) / abs(target - val_now)
+
+            val_nxt = val_now + sign*rate*(self.now - self.then)
+
+            if sign*val_now <= sign*target < sign*val_nxt:
+                self.knobs[knob].value = target
             else:
-                knob.value = value[0]
+                self.knobs[knob].value = val_nxt
+
+        self.then = state['Time']
 
 
 class Timecourse(Routine):
@@ -114,81 +251,76 @@ class Timecourse(Routine):
     Ramps linearly through a series of values at given times
     """
 
-    def __init__(self, times=None, **kwargs):
+    def __init__(self,
+                 knobs: dict,
+                 times,
+                 values,
+                 **kwargs):
         """
 
-        :param times: (1D/2D array) array or list of times relative to the start
-         time
+        :param times: (number/1D/2D array) array or list of times relative to
+                      the start time
+        :param values: (number/1D/2D array) array or list of values
         :param kwargs: keyword arguments for Routine
         """
 
-        Routine.__init__(self, **kwargs)
+        # Infer start and end times from times argument, if not given
+        if 'start' not in kwargs:
+            kwargs['start'] = np.min(times)
 
-        if times:
+        if 'end' not in kwargs:
+            kwargs['end'] = np.max(times)
 
-            if len(self.knobs) > 1:
-                if np.ndim(times) == 1:  # single list of times for all knobs
-                    times = [times] * len(self.knobs)
-                elif np.shape(times)[0] == 1:
-                    # 1xN array with one N-element list of times for all knobs
-                    times = [times[0]] * len(self.knobs)
+        Routine.__init__(self, knobs, **kwargs)
 
-            self.times = np.array(
-                times, dtype=object
-            ).reshape((len(self.knobs), -1))
+        if np.ndim(times) == 1:  # single list of times for all knobs
+            times = [times] * len(self.knobs)
+        elif np.shape(times)[0] == 1:
+            # 1xN array with one N-element list of times for all knobs
+            times = [times[0]] * len(self.knobs)
 
-            # Values can be stored in a CSV file
-            for i, element in enumerate(self.times):
-                if type(element[0]) == str:
-                    if '.csv' in element[0]:
-                        df = pd.read_csv(element[0])
+        if np.ndim(values) == 1:  # single list of times for all knobs
+            values = [values] * len(self.knobs)
+        elif np.shape(values)[0] == 1:
+            # 1xN array with one N-element list of times for all knobs
+            values = [values[0]] * len(self.knobs)
 
-                        df = df[df.coloumns[0]]
+        self.times = np.array(
+            times, dtype=object
+        ).reshape((len(self.knobs), -1))
 
-                        self.times[i] = df.values.reshape(len(df))
+        self.times = np.array(convert_time(self.times)).astype(float)
 
-            self.times = np.array(convert_time(self.times)).astype(float)
+        self.values = np.array(
+            values, dtype=object
+        ).reshape((len(self.knobs), -1))
 
-        else:
-            raise AttributeError('Timecourse routine requires times!')
+        # Times and/or values can be stored in CSV files
+        for i, (t_elem, v_elem) in enumerate(zip(self.times, self.values)):
 
-        self.start = np.min(self.times)
-        self.end = np.max(self.times)
-        self.finished = False
+            if type(t_elem[0]) == str and '.csv' in t_elem[0]:
+                df = pd.read_csv(t_elem[0])
 
+                df = df['times']
+
+                self.times[i] = df.values.reshape(len(df))
+
+            if type(v_elem[0]) == str and '.csv' in v_elem[0]:
+                df = pd.read_csv(v_elem[0])
+
+                df = df['values']
+
+                self.values[i] = df.values.reshape(len(df))
+
+    @Routine.enabler
     def update(self, state):
 
-        if state['Time'] < self.start or not self.enable.value:
-            return
-        elif state['Time'] > self.end:
-            if not self.finished:
-                for knob, values in zip(self.knobs.values(), self.values):
-                    if knob.controller == self:
-                        knob.value = values[-1]
-                        # make sure to set the end value
+        knobs_times_values = zip(self.knobs, self.times, self.values)
+        for knob, times, values in knobs_times_values:
 
-                    knob.controller = None
-
-                self.finished = True
-
-            return
-        else:
-            for name, knob in self.knobs.items():
-
-                has_controller = isinstance(knob.controller, Routine)
-
-                if has_controller and knob.controller != self:
-                    controller = knob.controller
-                    if controller.start < state['Time'] < controller.end:
-                        raise RuntimeError(
-                            f"Knob {name} has more than one controlling "
-                            f"routine at time = {state['Time']} seconds!"
-                        )
-                else:
-                    knob.controller = self
-
-        knobs_times_values = zip(self.knobs.values(), self.times, self.values)
-        for variable, times, values in knobs_times_values:
+            if np.min(times) > state['Time'] \
+                    or np.max(times) < state['Time']:
+                continue
 
             j_last = np.argwhere(times <= state['Time']).flatten()[-1]
             j_next = np.argwhere(times > state['Time']).flatten()[0]
@@ -199,24 +331,30 @@ class Timecourse(Routine):
             last_value = values[j_last]
             next_value = values[j_next]
 
-            if 'Variable' in repr(last_value):
-                last_value = last_value._value
+            if isinstance(last_value, Variable):
                 # replace variable with value for past times
+                last_value = last_value._value
 
             last_is_number = isinstance(last_value, numbers.Number)
             next_is_number = isinstance(next_value, numbers.Number)
 
             if next_is_number and last_is_number:
                 # ramp linearly between numerical values
-                value = last_value + (
-                        next_value - last_value) * (state['Time'] - last_time
-                                                    ) / (next_time - last_time)
+                value = last_value + (next_value - last_value) \
+                        * (state['Time'] - last_time) / (next_time - last_time)
             else:
                 # stay at last value until next time,
                 # when value variable will be evaluated
                 value = last_value
 
-            variable.value = value
+            self.knobs[knob].value = value
+
+    def finish(self, state):
+
+        # Upon routine completion, set each knob to its final value
+        for knob, value in zip(self.knobs.values(), self.values[:, -1]):
+            if knob._controller is None or knob._controller == self:
+                knob.value = value
 
 
 class Sequence(Routine):
@@ -225,23 +363,55 @@ class Sequence(Routine):
     each knob must have the same length
     """
 
-    def __init__(self, **kwargs):
-        Routine.__init__(self, **kwargs)
+    def __init__(self,
+                 knobs: dict,
+                 values,
+                 **kwargs):
+
+        Routine.__init__(self, knobs, **kwargs)
+
+        if np.ndim(values) == 1:  # single list of times for all knobs
+            values = [values] * len(self.knobs)
+        elif np.shape(values)[0] == 1:
+            # 1xN array with one N-element list of times for all knobs
+            values = [values[0]] * len(self.knobs)
+
+        self.values = np.array(
+            values, dtype=object
+        ).reshape((len(self.knobs), -1))
+
+        # Times and/or values can be stored in CSV files
+        for i, v_elem in enumerate(self.values):
+
+            if type(v_elem[0]) == str and '.csv' in v_elem[0]:
+                df = pd.read_csv(v_elem[0])
+
+                df = df['values']
+
+                self.values[i] = df.values.reshape(len(df))
 
         self.iteration = 0
 
+    @Routine.enabler
     def update(self, state):
 
-        if state['Time'] < self.start \
-                or state['Time'] > self.end \
-                or not self.enable.value:
-            return  # no change
-
         for knob, values in zip(self.knobs.values(), self.values):
+
             value = values[self.iteration]
+
+            if isinstance(value, String):
+                value = state[value]
+
             knob.value = value
 
         self.iteration = (self.iteration + 1) % len(self.values[0])
+
+    def finish(self, state):
+
+        # Upon routine completion, set each knob to its final value
+        for knob, value in zip(self.knobs.values(), self.values[:, -1]):
+            if knob._controller is None or knob._controller == self:
+                knob.value = value
 
 
 class Minimization(Routine):
@@ -262,21 +432,17 @@ class Minimization(Routine):
     of minimum when comparing configurations.
     """
 
-    best_meter = np.inf
-
     def __init__(self,
-                 max_deltas=None, T0=1.0, T1=0.0,
-                 recency_bias=0.5,
+                 knobs: dict,
+                 meter,
+                 max_deltas=None,
+                 T0=0.0, T1=0.0,
+                 recency_bias=1.0,
                  **kwargs):
 
-        Routine.__init__(self, **kwargs)
+        Routine.__init__(self, knobs, **kwargs)
 
-        if 'meters' in kwargs:
-            self.meter = tuple(kwargs['meters'].keys())[0]
-        else:
-            raise AttributeError(
-                f'{self.__name__} routine requires meters for feedback'
-            )
+        self.meter = meter
 
         if max_deltas:
             self.max_deltas = np.array([max_deltas]).flatten()
@@ -286,90 +452,64 @@ class Minimization(Routine):
         self.T = T0
         self.T0 = T0
         self.T1 = T1
-
         self.recency_bias = recency_bias
 
+        self.best_meter = None
         self.best_knobs = [knob.value for knob in self.knobs.values()]
 
         self.revert = False  # going back?
-        self.finished = False
 
+    @Routine.enabler
     def update(self, state):
 
-        if state['Time'] < self.start or not self.enable.value:
+        if not self.prepped:
+            self.prep(state)
+
+        # Update temperature
+        self.T = self.T0 + (self.T1 - self.T0) \
+                 * (state['Time'] - self.start) / (self.end - self.start)
+
+        # Get meter values
+        meter_value = state[self.meter]
+
+        # Take no action if knobs values are undefined
+        if None in [state[knob] for knob in self.knobs] \
+                or np.nan in [state[knob] for knob in self.knobs]:
             return
-        elif state['Time'] > self.end:
-            if not self.finished:
 
-                for knob, best_val in zip(self.knobs.values(), self.best_knobs):
-                    if knob.controller == self:
+        # Check if found (or returned to) minimum
+        if self.better(meter_value) or self.revert:
 
-                        knob.value = best_val
-                        knob.controller = None
-
-                self.finished = True
-        else:
-
-            # Take control of knobs
-            for knob in self.knobs.values():
-                knob.controller = self
-
-            # Update temperature
-            self.T = self.T0 + (self.T1 - self.T0) \
-                     * (state['Time'] - self.start) / (self.end - self.start)
-
-            # Get meter values
-            meter_value = state[self.meter]
-
-            if meter_value is None or meter_value == np.nan:
-                # no action taken if meter value is undefined
-                return
-            elif None in [state[knob] for knob in self.knobs]:
-                # no action taken if knobs values are undefined
-                return
-            elif np.nan in [state[knob] for knob in self.knobs]:
-                # no action taken if knobs values are undefined
-                return
-
-            if np.isinf(self.best_meter):
-                # make best_meter finite if it is not
-                self.best_meter = meter_value
-
-            # Check if found (or returned to) minimum
-            if self.better(meter_value) or self.revert:
-
+            if self.revert and isinstance(self.best_meter, numbers.Number):
+                # taking moving average of best meter values
+                r = self.recency_bias
+                self.best_meter = r*meter_value + (1-r)*self.best_meter
+            else:
                 # Record this new optimal state
+                self.best_meter = meter_value
                 self.best_knobs = [state[knob] for knob in self.knobs]
 
-                if self.revert and isinstance(self.best_meter, numbers.Number):
-                    # moving average of repeated meter value measurements
-                    r = self.recency_bias
-                    self.best_meter = r*meter_value + (1-r)*self.best_meter
-                else:
-                    self.best_meter = meter_value
+            # Generate and apply new knob settings
+            new_knobs = self.best_knobs \
+                        + self.max_deltas \
+                        * (2 * np.random.rand(len(self.knobs)) - 1)
 
-                # Generate and apply new knob settings
-                new_knobs = self.best_knobs \
-                            + self.max_deltas \
-                            * (2 * np.random.rand(len(self.knobs)) - 1)
+            for knob, new_value in zip(self.knobs.values(), new_knobs):
+                knob.value = new_value
+            self.revert = False
 
-                for knob, new_value in zip(self.knobs.values(), new_knobs):
-                    knob.value = new_value
+        else:
 
-                self.revert = False
-            else:
-
-                for knob, best_val in zip(self.knobs.values(), self.best_knobs):
-                    knob.value = best_val
-
-                self.revert = True
+            for knob, best_val in zip(self.knobs.values(), self.best_knobs):
+                knob.value = best_val
+            self.revert = True
 
     def better(self, meter_value):
 
         if meter_value is None or meter_value == np.nan:
             return False
 
-        if self.best_meter == np.nan:
+        if self.best_meter is None or self.best_meter == np.nan:
             return False
 
         change = meter_value - self.best_meter
@@ -394,7 +534,7 @@ class Maximization(Minimization):
         if meter_value is None or meter_value == np.nan:
             return False
 
-        if self.best_meter == np.nan:
+        if self.best_meter is None or self.best_meter == np.nan:
             return False
 
         change = meter_value - self.best_meter
@@ -406,54 +546,24 @@ class Maximization(Minimization):
             return change > 0
 
 
-class ModelPredictiveControl(Routine):
-    """
-    (NOT IMPLEMENTED)
-    Simple model predictive control; learns the relationship between knob x
-    and meter y, assuming a linear model,
-
-    y(t) = y0 + int_{-inf}^{t} dt' m(t-t') x(t')
-
-    then sets x to minimize the error in y relative to setpoint, over some
-    time interval defined by cutoff.
-
-    """
-
-    def __init__(self, meters=None, **kwargs):
-        Routine.__init__(self, **kwargs)
-        self.meters = meters
-
-    def update(self, state):
-        pass
-
-
 class SocketServer(Routine):
     """
     Server routine for transmitting data to other experiments, local or remote,
     using the socket interface.
 
-    Variables accessible to the server are specified by providing
-    dictionaries of variables in the form, {..., name: variable, ...} as the
-    readwrite and/or readonly arguments. Any variables given in the
-    `readwrite` argumment will be readable and writeable by connected
-    clients. Variables given in the `readonly` argument will be read-only by
-    clients.
+    Any knobs given in the `knobs` argument can be read and set by clients.
+    Clients can also read the values of any variables of the controlling
+    experiment, via the `state` argument of the `update` method.
     """
 
-    def __init__(self, readwrite=None, readonly=None, **kwargs):
+    assert_control = False
 
-        Routine.__init__(self)
+    def __init__(self, knobs: dict = None, **kwargs):
 
-        self.readwrite = {}
-        self.readonly = {}
+        if knobs is None:
+            knobs = {}
 
-        if readwrite:
-            self.readwrite = readwrite
-
-        if readonly:
-            self.readonly = readonly
-
-        self.variables = {**self.readonly, **self.readwrite}
+        Routine.__init__(self, knobs, **kwargs)
 
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -466,6 +576,8 @@ class SocketServer(Routine):
         self.clients_queue.put({})
 
         self.running = True
+
+        self.state = {}
 
         self.acc_conn_thread = threading.Thread(
             target=self.accept_connections
@@ -535,35 +647,68 @@ class SocketServer(Routine):
                     alias = ' '.join(request.split(' ')[:-1])
                     value = request.split(' ')[-1]
 
-                    if alias not in self.variables:
+                    if alias not in self.knobs \
+                            and alias not in self.state:
+
                         outgoing_message = f'Error: invalid alias'
 
                     elif value == 'settable?':
 
-                        settable = self.variables[alias]._settable
+                        settable = (alias in self.knobs) \
+                                   and self.knobs[alias]._settable
 
-                        if alias in self.readwrite and settable:
+                        if settable:
                             outgoing_message = f'{alias} settable'
+                        elif alias in self.state:
+                            outgoing_message = f'{alias} read-only'
                         else:
-                            outgoing_message = f'{alias} readonly'
+                            outgoing_message = f'{alias} undefined'
 
                     elif value == 'dtype?':
 
-                        dtype = self.variables[alias].dtype
+                        if alias in self.knobs:
+                            dtype = self.knobs[alias].dtype
+                        elif alias in self.state:
+
+                            dtype = None
+                            for _type in supported_types.values():
+                                if isinstance(self.state[alias], _type):
+                                    dtype = _type
+
+                        else:
+                            dtype = None
 
                         outgoing_message = f'{alias} {dtype}'
 
                     elif value == '?':  # Query of value
-                        var = self.variables[alias]
-                        outgoing_message = f'{alias} {var.value}'
+
+                        if alias in self.knobs:
+                            _value = self.knobs[alias].value
+                        elif alias in self.state:
+                            _value = self.state[alias]
+                        else:
+                            _value = None
+
+                        outgoing_message = f'{alias} {_value}'
 
                     else:  # Setting a value
-                        if alias in self.readwrite:
-                            var = self.readwrite[alias]
-                            var.value = recast(value)
-                            outgoing_message = f'{alias} {var.value}'
+
+                        knob_exists = alias in self.knobs
+
+                        is_free = not getattr(
+                            self.knobs[alias], '_controller', None
+                        )
+
+                        if knob_exists and is_free:
+
+                            knob = self.knobs[alias]
+
+                            knob.value = recast(value, to=knob.dtype)
+
+                            outgoing_message = f'{alias} {knob.value}'
+
                         else:
-                            outgoing_message = f'Error: readonly variable'
+                            outgoing_message = f'Error: cannot set {alias}'
 
                 # Send outgoing message
                 if outgoing_message is not None:
@@ -580,6 +725,10 @@ class SocketServer(Routine):
 
             time.sleep(0.1)
 
+    @Routine.enabler
+    def update(self, state):
+        self.state = state
+
     def __del__(self):
         if self.running:
             self.terminate()
@@ -590,34 +739,33 @@ class ModbusServer(Routine):
     Server routine for transmitting data to other experiments, local or remote,
     using the Modbus over TCP/IP protocol.
 
-    Variables accessible to the server are specified by providing
-    dictionaries of variables in the form, {..., name: variable, ...} as the
-    readwrite and/or readonly arguments. Any variables given in the
-    `readwrite` argumment will be readable and writeable by connected
-    clients. Variables given in the `readonly` argument will be read-only by
-    clients.
+    Any variables given in the `knobs` argument will be readable and writeable
+    by connected clients. All variable values provided as the `state` argument
+    of the `update` method can be read by clients.
 
     Because data is stored in statically assigned registers, only variables
     of boolean, toggle, integer or float types can be used. Variable values are
     stored in consecutive 4 registers (64 bits per value).
 
-    Readwrite variables will be stored in holding registers in the same order
-    as given in the argument, starting from address 0. Readonly variables will
-    be stored similarly in input registers.
+    Values of writeable variables (the `knobs` argument) will be stored in
+    holding registers in the same order as given in the argument, starting from
+    address 0. Values provided in the `state` argument of the `update` method
+    will be stored in input registers in the same order as defined therein,
+    starting from address 0. Each value in both sets of registers is stored as 5
+    consecutive registers, 4 registers for the 64-bit value and 1 register for
+    any metadata (i.e. data type).
     """
 
-    def __init__(self, readwrite=None, readonly=None, **kwargs):
+    assert_control = False
 
-        self.readwrite = {}
-        self.readonly = {}
+    def __init__(self, knobs: dict = None, **kwargs):
 
-        if readwrite:
-            self.readwrite = readwrite
+        if knobs is None:
+            knobs = {}
 
-        if readonly:
-            self.readonly = readonly
+        Routine.__init__(self, knobs, **kwargs)
 
-        Routine.__init__(self)
+        self.state = {}
 
         # Check for PyModbus installation
         try:
@@ -637,26 +785,14 @@ class ModbusServer(Routine):
 
         DataBlock = datastore.ModbusSequentialDataBlock
 
-        # Map each variable to 2 sequential registers (64-bit encoding) + 1
-        # register which contains meta data
-        if self.readonly:
-            readonly_block = DataBlock(0, [0] * 5 * len(readonly))
-        else:
-            readonly_block = DataBlock.create()
-
-        if self.readwrite:
-            readwrite_block = DataBlock(0, [0] * 5 * len(readwrite))
-        else:
-            readwrite_block = DataBlock.create()
-
         # Set up a PyModbus TCP Server
         datastore.ModbusSlaveContext.setValues = self.setValues_decorator(
             datastore.ModbusSlaveContext.setValues
         )
 
         self.slave = datastore.ModbusSlaveContext(
-                ir=readonly_block,
-                hr=readwrite_block
+                ir=DataBlock.create(),
+                hr=DataBlock.create()
             )
 
         self.context = datastore.ModbusServerContext(
@@ -694,8 +830,10 @@ class ModbusServer(Routine):
         @functools.wraps(setValues_method)
         def wrapped_method(self2, *args, from_vars=False):
             if from_vars:
+                # update context from variables
                 return setValues_method(self2, *args)
             else:
+                # update variables according to the request
 
                 fc_as_hex, address, values = args
 
@@ -706,30 +844,45 @@ class ModbusServer(Routine):
                     )
                 else:
 
-                    variable = list(self.readwrite.values())[address//4]
+                    if self.knobs:
 
-                    decoder = self._decoder_cls.fromRegisters(
-                        values, byteorder='>'
-                    )
+                        variable = list(self.knobs.values())[address//4]
 
-                    if issubclass(variable.dtype, Boolean):
-                        variable.value = decoder.decode_64bit_uint()
-                    elif issubclass(variable.dtype, Toggle):
-                        int_value = decoder.decode_64bit_uint()
-                        variable.value = OFF if int_value == 0 else ON
-                    elif issubclass(variable.dtype, Integer):
-                        variable.value = decoder.decode_64bit_int()
-                    elif issubclass(variable.dtype, Float):
-                        variable.value = decoder.decode_64bit_float()
+                        controller = getattr(variable, '_controller', None)
+
+                        if controller:
+
+                            name = list(self.knobs.keys())[address // 4]
+
+                            print(
+                                f'Warning: an attempt was made to set {name}, '
+                                'but it is currently controlled by '
+                                f'{controller}.'
+                            )
+                            return
+
+                        decoder = self._decoder_cls.fromRegisters(
+                            values, byteorder='>'
+                        )
+
+                        if issubclass(variable.dtype, Boolean):
+                            variable.value = decoder.decode_64bit_uint()
+                        elif issubclass(variable.dtype, Toggle):
+                            int_value = decoder.decode_64bit_uint()
+                            variable.value = OFF if int_value == 0 else ON
+                        elif issubclass(variable.dtype, Integer):
+                            variable.value = decoder.decode_64bit_int()
+                        elif issubclass(variable.dtype, Float):
+                            variable.value = decoder.decode_64bit_float()
 
         return wrapped_method
 
-    async def _update_registers(self, update_variables=True):
+    async def _update_registers(self):
 
         # Store readwrite variable values in holding registers (fc = 3)
         builder = self._builder_cls(byteorder='>')
 
-        for i, (name, variable) in enumerate(self.readwrite.items()):
+        for i, (name, variable) in enumerate(self.knobs.items()):
 
             # encode the value into the 4 registers
             if variable._value is None or variable.dtype is None:
@@ -767,24 +920,29 @@ class ModbusServer(Routine):
         # Store readonly variable values in input registers (fc = 4)
         builder.reset()
 
-        for i, (name, variable) in enumerate(self.readonly.items()):
+        for i, (name, value) in enumerate(self.state.items()):
+
+            dtype = None
+            for _type in supported_types.values():
+                if isinstance(value, _type):
+                    dtype = _type
 
             # encode the value into the 4 registers
-            if variable._value is None or variable.dtype is None:
+            if value is None or dtype is None:
                 builder.add_64bit_float(float('nan'))
-            elif issubclass(variable.dtype, Boolean):
-                builder.add_64bit_uint(variable._value)
-            elif issubclass(variable.dtype, Toggle):
-                builder.add_64bit_uint(variable._value)
-            elif issubclass(variable.dtype, Integer):
-                builder.add_64bit_int(variable._value)
-            elif issubclass(variable.dtype, Float):
-                builder.add_64bit_float(variable._value)
+            elif dtype == Boolean:
+                builder.add_64bit_uint(value)
+            elif dtype == Toggle:
+                builder.add_64bit_uint(value)
+            elif dtype == Integer:
+                builder.add_64bit_int(value)
+            elif dtype == Float:
+                builder.add_64bit_float(value)
             else:
                 raise ValueError(
                     f'unable to update modbus server registers from value '
-                    f'{variable._value} of variable {name} with data type '
-                    f'{variable.dtype}'
+                    f'{value} of variable {name} with data type '
+                    f'{dtype}'
                 )
 
             # encode the meta data
@@ -793,7 +951,7 @@ class ModbusServer(Routine):
                 Toggle: 1,
                 Integer: 2,
                 Float: 3
-            }.get(variable.dtype, -1)
+            }.get(dtype, -1)
 
             builder.add_16bit_int(dtype_int)
 
@@ -821,6 +979,10 @@ class ModbusServer(Routine):
         except asyncio.exceptions.CancelledError:
             # Server shutdown cancels the _update_registers task
             pass
+
+    @Routine.enabler
+    def update(self, state):
+        self.state = state
 
     def terminate(self):
         asyncio.run(self.server.shutdown())
