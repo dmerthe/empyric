@@ -44,7 +44,7 @@ Routines:
  Maximization Routine:
   type: Maximization
   knobs: Some Parameter
-  meters: Some Metric
+  meter: Some Metric
   max deltas: 0.25
   T0: 0.01
   T1: 0

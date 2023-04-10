@@ -30,6 +30,8 @@ Variables:
  Knob a:
   instrument: Henon Mapper
   knob: a
+ Knob a Setpoint:
+  parameter: 1.4
  Knob b:
   instrument: Henon Mapper
   knob: b
@@ -68,10 +70,11 @@ Plots:
 
 Routines:
  Ramp Knob a:
-  type: Timecourse
+  type: Ramp
   knobs: Knob a
-  times: [3, 5]
-  values: [0.0, 1.4]
+  targets: Knob a Setpoint
+  rates: 0.7
+  start: 3
  Ramp Knob b:
   type: Timecourse
   knobs: Knob b

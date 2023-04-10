@@ -51,7 +51,7 @@ class Variable:
                 self._value = None
                 return
 
-            if self.dtype is not None:
+            elif self.dtype is not None:
                 setter(self, recast(value, to=self.dtype))
             else:
                 # if type is not explicitly defined upon construction,
@@ -74,10 +74,10 @@ class Variable:
 
             value = getter(self)
 
-            if value is None or value != float('nan'):
+            if value is None or value == float('nan'):
                 self._value = None
 
-            if self.dtype is not None:
+            elif self.dtype is not None:
                 self._value = recast(value, to=self.dtype)
             else:
                 # if type is not explicitly defined upon construction,
