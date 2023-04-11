@@ -10,7 +10,7 @@ Settings:
  step interval: 0.1
  plot interval: 1
  save interval: 10
- end: 60
+ end: 3 minutes
 
 Instruments:
  Dummy Instrument:
@@ -49,8 +49,9 @@ Routines:
   max deltas: 0.25
   T0: 0.01
   T1: 0
-  start: 5
-  end: 30
+  samples: 10
+  start: 0
+  end: 60
 
  Maximization Routine:
   type: Maximization
@@ -59,5 +60,6 @@ Routines:
   max deltas: 0.25
   T0: 0.01
   T1: 0
-  start: 30
-  end: 60
+  samples: 10
+  start: 90
+  end: 150

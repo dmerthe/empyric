@@ -430,6 +430,8 @@ class Minimization(Routine):
     indicating the maximum change per step for each knob; if not specified,
     defaults to a list of ones. The `T0` and `T1` argumnets are the initial and
     final temperatures; if not specified, defaults to T0 = 0.0 and T1 = 0.0.
+    The `samples` argument determines the number of meter values to average
+    together for each step.
     """
 
     def __init__(self,
@@ -437,7 +439,7 @@ class Minimization(Routine):
                  meter,
                  max_deltas=None,
                  T0=0.0, T1=0.0,
-                 recency_bias=1.0,
+                 samples=1,
                  **kwargs):
 
         Routine.__init__(self, knobs, **kwargs)
@@ -452,8 +454,9 @@ class Minimization(Routine):
         self.T = T0
         self.T0 = T0
         self.T1 = T1
-        self.recency_bias = recency_bias
+        self.samples = samples
 
+        self.meter_values = []
         self.best_meter = None
         self.best_knobs = [knob.value for knob in self.knobs.values()]
 
@@ -461,6 +464,11 @@ class Minimization(Routine):
 
     @Routine.enabler
     def update(self, state):
+
+        # Take no action if knobs values are undefined
+        if None in [state[knob] for knob in self.knobs] \
+                or np.nan in [state[knob] for knob in self.knobs]:
+            return
 
         if not self.prepped:
             self.prep(state)
@@ -472,22 +480,22 @@ class Minimization(Routine):
         # Get meter values
         meter_value = state[self.meter]
 
-        # Take no action if knobs values are undefined
-        if None in [state[knob] for knob in self.knobs] \
-                or np.nan in [state[knob] for knob in self.knobs]:
+        # Check for valid new meter value
+        if meter_value is not None and meter_value != np.nan:
+            self.meter_values.append(meter_value)
+        else:
+            return
+
+        # Check if enough samples have been measured
+        if len(self.meter_values) <= self.samples:
             return
 
         # Check if found (or returned to) minimum
-        if self.better(meter_value) or self.revert:
+        if self.better(np.mean(self.meter_values)) or self.revert:
 
-            if self.revert and isinstance(self.best_meter, numbers.Number):
-                # taking moving average of best meter values
-                r = self.recency_bias
-                self.best_meter = r*meter_value + (1-r)*self.best_meter
-            else:
-                # Record this new optimal state
-                self.best_meter = meter_value
-                self.best_knobs = [state[knob] for knob in self.knobs]
+            # Record this new (or past) optimal state
+            self.best_meter = np.mean(self.meter_values)
+            self.best_knobs = [state[knob] for knob in self.knobs]
 
             # Generate and apply new knob settings
             new_knobs = self.best_knobs \
@@ -496,12 +504,16 @@ class Minimization(Routine):
 
             for knob, new_value in zip(self.knobs.values(), new_knobs):
                 knob.value = new_value
+
+            self.meter_values = []
             self.revert = False
 
         else:
 
             for knob, best_val in zip(self.knobs.values(), self.best_knobs):
                 knob.value = best_val
+
+            self.meter_values = []
             self.revert = True
 
     def better(self, meter_value):
@@ -519,6 +531,11 @@ class Minimization(Routine):
             return (change < 0) or (np.exp(-change / self.T) > _rand)
         else:
             return change < 0
+
+    def finish(self, state):
+
+        for knob, best_val in zip(self.knobs.values(), self.best_knobs):
+            knob.value = best_val
 
 
 class Maximization(Minimization):
