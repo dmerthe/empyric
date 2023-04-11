@@ -476,7 +476,11 @@ class LabJackT7(Instrument):
     name = 'LabJackT7'
 
     supported_adapters = (
-        (Modbus, {'byte_order': '>'}),
+        (Modbus, {}),
+    )
+
+    knobs = (
+        'DIO0', 'DIO1', 'DIO2', 'DIO3', 'DIO4', 'DIO5', 'DIO6', 'DIO7'
     )
 
     meters = (
@@ -486,8 +490,78 @@ class LabJackT7(Instrument):
         'device temperature'
     )
 
-    def _measure_AIN(self, n):
-        return self.read(4, 2*n, count=2, dtype='32bit_float')
+    def _set_DION(self, n, value: Integer):
+        self.write(16, 2000 + n, value, dtype='16bit_uint')
+
+    def _get_DION(self, n) -> Integer:
+        return self.read(3, 2000 + n, count=1, dtype='16bit_uint')
+
+    def _measure_AIN(self, n) -> Float:
+        return self.read(3, 2*n, count=2, dtype='32bit_float')
+
+    @setter
+    def set_DIO0(self, value: Integer):
+        self._set_DION(0, value)
+
+    @getter
+    def get_DIO0(self) -> Integer:
+        return self._get_DION(0)
+
+    @setter
+    def set_DIO1(self, value: Integer):
+        self._set_DION(1, value)
+
+    @getter
+    def get_DIO1(self) -> Integer:
+        return self._get_DION(1)
+
+    @setter
+    def set_DIO2(self, value: Integer):
+        self._set_DION(2, value)
+
+    @getter
+    def get_DIO2(self) -> Integer:
+        return self._get_DION(2)
+
+    @setter
+    def set_DIO3(self, value: Integer):
+        self._set_DION(3, value)
+
+    @getter
+    def get_DIO3(self) -> Integer:
+        return self._get_DION(3)
+
+    @setter
+    def set_DIO4(self, value: Integer):
+        self._set_DION(4, value)
+
+    @getter
+    def get_DIO4(self) -> Integer:
+        return self._get_DION(4)
+
+    @setter
+    def set_DIO5(self, value: Integer):
+        self._set_DION(5, value)
+
+    @getter
+    def get_DIO5(self) -> Integer:
+        return self._get_DION(5)
+
+    @setter
+    def set_DIO6(self, value: Integer):
+        self._set_DION(6, value)
+
+    @getter
+    def get_DIO6(self) -> Integer:
+        return self._get_DION(6)
+
+    @setter
+    def set_DIO7(self, value: Integer):
+        self._set_DION(7, value)
+
+    @getter
+    def get_DIO7(self) -> Integer:
+        return self._get_DION(7)
 
     @measurer
     def measure_AIN0(self) -> Float:
