@@ -908,7 +908,7 @@ class ModbusServer(Routine):
             elif issubclass(variable.dtype, Boolean):
                 builder.add_64bit_uint(variable._value)
             elif issubclass(variable.dtype, Toggle):
-                builder.add_64bit_uint(variable._value)
+                builder.add_64bit_uint(int(variable._value))
             elif issubclass(variable.dtype, Integer):
                 builder.add_64bit_int(variable._value)
             elif issubclass(variable.dtype, Float):
