@@ -951,7 +951,7 @@ class ModbusServer(Routine):
             elif dtype == Boolean:
                 builder.add_64bit_uint(value)
             elif dtype == Toggle:
-                builder.add_64bit_uint(value)
+                builder.add_64bit_uint(int(value in Toggle.on_values))
             elif dtype == Integer:
                 builder.add_64bit_int(value)
             elif dtype == Float:
