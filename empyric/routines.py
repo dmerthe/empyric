@@ -21,8 +21,8 @@ from empyric.variables import Parameter, Variable
 
 class Routine:
     """
-    A Routine updates a set of `knobs` based on a given state of a process or
-    experiment. The knobs should be a dictionary of the form
+    A Routine periodically updates a set of `knobs` based on a given state of an
+    experiment. The knobs argument should be a dictionary of the form
     {..., name: variable, ...}.
 
     The optional `start` and `end` arguments indicate when the routine should
@@ -31,7 +31,7 @@ class Routine:
     given state.
 
     All other arguments are fixed values or string dictionary keys,
-    corresponding the variables values of the controlling experiment.
+    corresponding to variables values of the controlling experiment.
     """
 
     assert_control = True
@@ -149,11 +149,8 @@ class Set(Routine):
     """
     Sets `knobs` to the given values.
 
-    The `values` argument should be either a single value for all knobs or a 1D
-    array of values of the same length as the `knobs` argument. The values can
-    be fixed values such as numbers, variables whose values will be checked on
-    each update, or string corresponding to a key in the state, whose
-    corresponding value will be obtained on each update.
+    The `values` argument should be either a single key/value for all knobs or
+    a 1D array of keys/values of the same length as the `knobs` argument.
     """
 
     def __init__(self,
@@ -183,7 +180,10 @@ class Set(Routine):
 
 class Ramp(Routine):
     """
-    Ramps a set of knobs to given target values at given rates
+    Ramps the set of `knobs` to given `target` values at `given rates`.
+
+    The `target` or `rate` arguments can be single keys/values for all knobs, or
+    1D arrays of keys/values.
     """
 
     def __init__(self,
@@ -248,7 +248,11 @@ class Ramp(Routine):
 
 class Timecourse(Routine):
     """
-    Ramps linearly through a series of values at given times
+    Ramps the `knobs` linearly through a series of `values` at given `times`.
+
+    The `times` and `values` should be 1D or 2D arrays of values (or keys for
+    `values`); if 2D then the first dimension needs to have the same length as
+    the `knobs` argument.
     """
 
     def __init__(self,
@@ -258,9 +262,9 @@ class Timecourse(Routine):
                  **kwargs):
         """
 
-        :param times: (number/1D/2D array) array or list of times relative to
+        :param times: (1D/2D array) array or list of times relative to
                       the start time
-        :param values: (number/1D/2D array) array or list of values
+        :param values: (1D/2D array) array or list of values
         :param kwargs: keyword arguments for Routine
         """
 
@@ -359,8 +363,10 @@ class Timecourse(Routine):
 
 class Sequence(Routine):
     """
-    Passes knobs through a series of values regardless of time; each series for
-    each knob must have the same length
+    Passes the `knobs` through a series of `values` regardless of time.
+
+    The `values` should be a 1D or 2D array of keys/values; if 2D then the first
+    dimension needs to have the same length as the `knobs` argument.
     """
 
     def __init__(self,
@@ -416,20 +422,14 @@ class Sequence(Routine):
 
 class Minimization(Routine):
     """
-    Minimize a meter/expression influenced by a set of knobs, using simulated
-    annealing.
+    Minimize a `meter`(/expression) influenced by the set of `knobs`, using
+    simulated annealing.
 
-    Arguments:
-    - `knobs`: (required) dictionary containing the knobs to be varied
-    - `meters`: (required) dictionary whose first entry is the meter/expression
-    to minimize.
-    - `max_deltas`: (optional) list/array of same length as `knobs` indicating
-    the maximum change per step for each knob; if not are specified, defaults
-    to a list of ones.
-    -`T0` and `T1`: (optional) the initial and final temperatures; if not
-    specified, defaults to T0 = 1.0 and T1 = 0.0.
-    - `recency bias`: (optional) weight to assign most recent meter measurement
-    of minimum when comparing configurations.
+    The `meter` argument is the expression or meter to be minimized. The
+    `max_deltas` argument is an optional list/array of same length as `knobs`
+    indicating the maximum change per step for each knob; if not specified,
+    defaults to a list of ones. The `T0` and `T1` argumnets are the initial and
+    final temperatures; if not specified, defaults to T0 = 0.0 and T1 = 0.0.
     """
 
     def __init__(self,
@@ -523,8 +523,8 @@ class Minimization(Routine):
 
 class Maximization(Minimization):
     """
-    Maximize a set of meters/expressions influenced by a set of knobs;
-    works the same way as Minimize.
+    Maximize a `meter`/expression influenced by the set of knobs;
+    otherwise, works the same way as Minimize.
     """
 
     best_meter = -np.inf
@@ -753,7 +753,8 @@ class ModbusServer(Routine):
     will be stored in input registers in the same order as defined therein,
     starting from address 0. Each value in both sets of registers is stored as 5
     consecutive registers, 4 registers for the 64-bit value and 1 register for
-    any metadata (i.e. data type).
+    any metadata (i.e. data type). Note that the that `state` of an instance of
+    `Experiment` has `Time` as its first entry.
     """
 
     assert_control = False
