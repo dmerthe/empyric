@@ -1,5 +1,4 @@
-# This submodule defines the basic behavior of the key features of the
-# empyric package
+# Tools for defining and running experiments
 import collections
 import datetime
 import importlib
@@ -19,300 +18,13 @@ import pykwalify.errors
 from pykwalify.core import Core as YamlValidator
 from ruamel.yaml import YAML
 
+from empyric import variables as _variables
 from empyric import adapters as _adapters
 from empyric import graphics as _graphics
 from empyric import instruments as _instruments
 from empyric import routines as _routines
-from empyric.tools import convert_time, Clock, recast, write_to_socket, \
-    read_from_socket
-
-
-class Variable:
-    """
-    Basic representation of an experimental variable that comes in 4 kinds:
-    knob, meter, expression and parameter.
-
-    A knob is a variable that can be directly controlled by an instrument, e.g.
-    the voltage of a power supply.
-
-    A meter is a variable that is measured by an instrument, such as
-    temperature. Some meters can be controlled directly or indirectly through
-    an associated (but distinct) knob.
-
-    An expression is a variable that is not directly measured, but is
-    calculated based on other variables of the experiment. An example of an
-    expression is the output power of a power supply, where voltage is a knob
-    and current is a meter: power = voltage * current.
-
-    A remote variable is a variable controlled by an experiment (running a
-    server) on a different process or computer.
-
-    A parameter is a variable whose value is assigned directly by the user. An
-    example is a unit conversion factor such as 2.54 cm per inch, a numerical
-    constant like pi or a setpoint for a control routine.
-
-    The value types of variables are either numbers (floats and/or integers),
-    booleans, strings or arrays (containing some combination of the previous
-    three types).
-    """
-
-    # Abbreviated functions that can be used to evaluate expression variables
-    # parentheses are included to facilitate search for functions in expressions
-    expression_functions = {
-        'sqrt(': 'np.sqrt(',
-        'exp(': 'np.exp(',
-        'sin(': 'np.sin(',
-        'cos(': 'np.cos(',
-        'tan(': 'np.tan(',
-        'sum(': 'np.nansum(',
-        'mean(': 'np.nanmean(',
-        'rms(': 'np.nanstd(',
-        'std(': 'np.nanstd(',
-        'var(': 'np.nanvar(',
-        'diff(': 'np.diff(',
-        'max(': 'np.nanmax(',
-        'min(': 'np.nanmin('
-    }
-
-    def __init__(self,
-                 instrument=None, knob=None, meter=None,
-                 lower_limit=-np.inf, upper_limit=np.inf,
-                 expression=None, definitions=None,
-                 remote=None, alias=None,
-                 parameter=None
-                 ):
-        """
-        For knobs or meters, either an instrument or a server argument must be
-        given.
-
-        If an expression is given with symbols/terms representing other
-        variables, that mapping must be specified in the definitions argument.
-
-        :param instrument: (Instrument) instrument with the corresponding knob
-        or meter
-        :param knob: (str) instrument knob label, if variable is a knob
-        :param meter: (str) instrument meter label, if variable is a meter
-
-        :param expression: (str) expression for the variable in terms of other
-        variables, if variable is an expression
-        :param definitions: (dict) dictionary of the form {..., symbol:
-        variable, ...} mapping the symbols in the expression to other variable
-        objects; only used if type is 'expression'
-
-        :param remote: (str) address of the server of the variable controlling
-        the variable, in the form '[host name/ip address]::[port]'.
-        :param alias: (str) name of the variable on the server.
-
-        :param parameter (str) value of a user controlled parameter
-        """
-
-        self._value = None  # last known value of this variable
-
-        if meter:
-            self.meter = meter
-            self.type = 'meter'
-            self.settable = False
-
-        elif knob:
-            self.knob = knob
-            self.type = 'knob'
-            self.settable = True
-            self.lower_limit = lower_limit
-            self.upper_limit = upper_limit
-
-        elif expression:
-            self.expression = expression
-            self.type = 'expression'
-            self.settable = False
-
-            if definitions:
-                self.definitions = definitions
-            else:
-                self.definitions = {}
-
-        elif remote:
-            self.remote = remote
-            self.type = 'remote'
-            self.alias = alias
-
-            remote_ip, remote_port = remote.split('::')
-
-            self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-            self._socket.connect((remote_ip, int(remote_port)))
-
-            write_to_socket(self._socket, f'{self.alias} settable?')
-
-            response = read_from_socket(self._socket, timeout=None)
-
-            self.settable = response == f'{self.alias} settable'
-
-        elif parameter:
-            self.parameter = parameter
-            self._value = parameter
-            self.type = 'parameter'
-            self.settable = True
-
-        else:
-            raise ValueError(
-                'variable object must have a specified knob, meter or '
-                'expression, or assigned a value if a parameter!'
-            )
-
-        # time of last evaluation; used for expressions
-        self.last_evaluation = np.nan
-
-        # Check that knob or meter has been assigned an instrument
-        if hasattr(self, 'knob') or hasattr(self, 'meter'):
-            if not instrument:
-                raise AttributeError(
-                    f'{self.type} variable definition requires an instrument!'
-                )
-            self.instrument = instrument
-
-    @property
-    def value(self):
-
-        if hasattr(self, 'knob'):
-            self._value = self.instrument.get(self.knob)
-            self.last_evaluation = time.time()
-
-        elif hasattr(self, 'meter'):
-            self._value = self.instrument.measure(self.meter)
-            self.last_evaluation = time.time()
-
-        elif hasattr(self, 'expression'):
-
-            expression = self.expression
-
-            # carets represent exponents
-            expression = expression.replace('^', '**')
-
-            expr_vals = {}
-            for symbol, variable in self.definitions.items():
-                # take last known value
-
-                expr_vals[symbol] = variable._value
-
-                expression = expression.replace(
-                    symbol, f"expr_vals['{symbol}']"
-                )
-
-            for shorthand, longhand in self.expression_functions.items():
-                if shorthand in expression:
-                    expression = expression.replace(shorthand, longhand)
-
-            try:
-                if 'None' not in expression and 'nan' not in expression:
-                    self._value = eval(expression)
-                else:
-                    self._value = None
-            except BaseException as err:
-                print(f'Unable to evaluate expression {self.expression}:', err)
-                self._value = None
-
-            self.last_evaluation = time.time()
-
-        elif hasattr(self, 'remote'):
-            write_to_socket(self._socket, f'{self.alias} ?')
-
-            response = read_from_socket(self._socket)
-
-            try:
-                self._value = recast(response.split(' ')[-1])
-            except BaseException as error:
-                print(
-                    f'Warning: unable to retrieve value of {self.alias} '
-                    f'from server at {self.remote}; got error "{error}"'
-                )
-
-        elif hasattr(self, 'parameter'):
-
-            self._value = recast(self.parameter)
-
-        return self._value
-
-    @value.setter
-    def value(self, value):
-
-        if value is None:
-            # Do nothing if value is null
-            pass
-
-        elif isinstance(value, numbers.Number) and np.isnan(value):
-            pass
-
-        elif hasattr(self, 'knob'):
-
-            if value > self.upper_limit:
-                self.instrument.set(self.knob, self.upper_limit)
-            elif value < self.lower_limit:
-                self.instrument.set(self.knob, self.lower_limit)
-            else:
-                self.instrument.set(self.knob, value)
-
-            self._value = self.instrument.__getattribute__(
-                self.knob.replace(' ', '_')
-            )
-
-        elif hasattr(self, 'remote'):
-
-            write_to_socket(self._socket, f'{self.alias} {value}')
-
-            check = read_from_socket(self._socket)
-
-            if check == '' or check is None:
-                print(
-                    f'Warning: received no response from server at '
-                    f'{self.remote} while trying to set {self.alias}'
-                )
-            elif 'Error' in check:
-                print(
-                    f'Warning: got response "{check}" while trying to set '
-                    f'{self.alias} on server at {self.remote}'
-                )
-            else:
-                try:
-
-                    check_value = recast(check.split(f'{self.alias} ')[1])
-
-                    if value != check_value:
-                        print(
-                            f'Warning: attempted to set {self.alias} on server '
-                            f'at {self.remote} to {value} but checked value '
-                            f'is {check_value}'
-                        )
-
-                except ValueError as val_err:
-                    print(
-                        f'Warning: unable to check value while setting '
-                        f'{self.alias} on server at {self.remote}; '
-                        f'got error "{val_err}"'
-                    )
-                except IndexError as ind_err:
-                    print(
-                        f'Warning: unable to check value while setting '
-                        f'{self.alias} on server at {self.remote}; '
-                        f'got error "{ind_err}"'
-                    )
-
-        elif hasattr(self, 'parameter'):
-            self.parameter = value
-
-        else:
-            raise ValueError(
-                f'Attempt to set {self.type}! '
-                'Only knobs and parameters can be set.'
-            )
-
-    def __repr__(self):
-        return self.type[0].upper() + self.type[1:] + 'Variable'
-
-    def __del__(self):
-
-        if hasattr(self, 'remote'):
-            self._socket.shutdown(socket.SHUT_RDWR)
-            self._socket.close()
+from empyric.tools import convert_time, Clock
+from empyric.types import recast, Boolean, Toggle, Integer, Float
 
 
 class Experiment:
@@ -421,7 +133,11 @@ class Experiment:
 
             threads = {}
             for name, variable in self.variables.items():
-                if variable.type in ['knob', 'parameter']:
+
+                is_knob = isinstance(variable, _variables.Knob)
+                is_parameter = isinstance(variable, _variables.Parameter)
+
+                if is_knob or is_parameter:
                     threads[name] = threading.Thread(
                         target=self._update_variable, args=(name,)
                     )
@@ -498,7 +214,7 @@ class Experiment:
 
         try:
 
-            if self.variables[name].type == 'expression':
+            if isinstance(self.variables[name], _variables.Expression):
                 for dependee in self.variables[name].definitions:
                     event = self.eval_events[dependee]
                     event.wait()  # wait for dependee to be evaluated
@@ -536,7 +252,7 @@ class Experiment:
         Save the experiment dataframe to a CSV file
 
         :param directory: (path) (optional) directory to save data to,
-        if different from working directory
+                          if different from working directory
         :return: None
         """
 
@@ -636,7 +352,7 @@ class Alarm:
     """
 
     def __init__(self, condition, variables, protocol=None):
-        self.trigger_variable = Variable(
+        self.trigger_variable = _variables.Expression(
             expression=condition, definitions=variables
         )
 
@@ -706,7 +422,7 @@ class Manager:
         self.settings = converted_runcard['Settings']
         self.instruments = converted_runcard['Instruments']
         self.alarms = converted_runcard['Alarms']
-        self.plotter = converted_runcard['Plotter']
+        self.plotter = converted_runcard.get('Plotter', None)
 
         self.experiment = converted_runcard['Experiment']
 
@@ -735,7 +451,7 @@ class Manager:
         status, while the experiment is run in a separate thread.
 
         :param directory: (path) (optional) directory in which to run the
-        experiment if different from the working directory
+                          experiment if different from the working directory
         :return: None
         """
 
@@ -1005,15 +721,15 @@ def convert_runcard(runcard):
     for name, specs in runcard['Variables'].items():
         if 'meter' in specs:
             instrument = converted_runcard['Instruments'][specs['instrument']]
-            variables[name] = Variable(
+            variables[name] = _variables.Meter(
                 meter=specs['meter'], instrument=instrument
             )
         elif 'knob' in specs:
             instrument = converted_runcard['Instruments'][specs['instrument']]
-            variables[name] = Variable(
+            variables[name] = _variables.Knob(
                 knob=specs['knob'], instrument=instrument,
-                lower_limit=specs.get('lower limit', -np.inf),
-                upper_limit=specs.get('upper limit', np.inf)
+                lower_limit=specs.get('lower limit', None),
+                upper_limit=specs.get('upper limit', None)
             )
         elif 'expression' in specs:
             expression = specs['expression']
@@ -1025,20 +741,26 @@ def convert_runcard(runcard):
                 try:
                     definitions[var_name] = variables[var_name]
                 except KeyError as undefined:
-                    raise KeyError(f"variable {undefined} is not defined for expression '{name}'")
+                    raise KeyError(
+                        f"variable {undefined} is not defined for expression "
+                        f"'{name}'"
+                    )
 
-            variables[name] = Variable(
+            variables[name] = _variables.Expression(
                 expression=expression, definitions=definitions
             )
         elif 'remote' in specs:
             remote = specs['remote']
             alias = specs.get('alias', name)
+            protocol = specs.get('protocol', None)
+            settable = specs.get('settable', False)
 
-            variables[name] = Variable(
-                remote=remote, alias=alias
+            variables[name] = _variables.Remote(
+                remote=remote, alias=alias, protocol=protocol, settable=settable
             )
+
         elif 'parameter' in specs:
-            variables[name] = Variable(parameter=specs['parameter'])
+            variables[name] = _variables.Parameter(parameter=specs['parameter'])
 
     # Routines section
     available_routines = {**_routines.supported, **custom_routines}
@@ -1049,9 +771,11 @@ def convert_runcard(runcard):
             specs = specs.copy()  # avoids modifying the runcard
             _type = specs.pop('type')
 
-            specs = {key.replace(' ', '_'): value for key, value in specs.items()}
+            specs = {
+                key.replace(' ', '_'): value for key, value in specs.items()
+            }
 
-            # For Set, Timecourse and Sequence routines
+            # Convert list of knobs into dictionary
             knobs = np.array([specs.get('knobs', [])]).flatten()
             if knobs.size > 0:
                 for knob in knobs:
@@ -1062,77 +786,6 @@ def convert_runcard(runcard):
                         )
 
                 specs['knobs'] = {name: variables[name] for name in knobs}
-
-            meters = np.array([specs.get('meters', [])]).flatten()
-            if meters.size > 0:
-                for meter in meters:
-                    if meter not in variables:
-                        raise KeyError(
-                            f'meter {meter} specified for routine {name} '
-                            f'is not in Variables!'
-                        )
-
-                specs['meters'] = {name: variables[name] for name in meters}
-
-            if 'values' in specs:
-                specs['values'] = np.array(
-                    specs['values'], dtype=object
-                ).reshape((len(knobs), -1))
-
-                # Values can be variables, specified by their names
-                for var_name in variables:
-                    where_variable = (specs['values'] == var_name)
-                    # locate names of variables
-
-                    specs['values'][where_variable] = variables[var_name]
-                    # replace variable names with variables
-
-                # Values can be specified in a CSV file
-                def is_csv(item):
-                    if type(item) == str:
-                        return '.csv' in item
-                    else:
-                        return False
-
-                def get_csv(path, column):
-                    df = pd.read_csv(recast(path))
-                    return df[column].values.flatten()
-
-                specs['values'] = np.array([
-                    get_csv(values[0], knob) if is_csv(values[0])
-                    else values for knob, values
-                    in zip(specs['knobs'].keys(), specs['values'])
-                ], dtype=object)
-
-            # For Server routines
-            readwrite = np.array([specs.get('readwrite', [])]).flatten()
-            if readwrite.size > 0:
-                for variable in readwrite:
-                    if variable not in variables:
-                        raise KeyError(
-                            f'Variable {variable} specified for routine {name} '
-                            'is not in Variables!'
-                        )
-
-                specs['readwrite'] = {
-                    name: variables[name] for name in readwrite
-                }
-
-            readonly = np.array([specs.get('readonly', [])]).flatten()
-            if readonly.size > 0:
-                for variable in readonly:
-                    if variable not in variables:
-                        raise KeyError(
-                            f'Variable {variable} specified for routine {name} '
-                            'is not in Variables!'
-                        )
-
-                specs['readonly'] = {
-                    name: variables[name] for name in readonly
-                }
-
-            if _type == 'Server' and len(readonly) == 0 and len(readwrite) == 0:
-                specs['readwrite'] = variables
 
             routines[name] = available_routines[_type](**specs)
 

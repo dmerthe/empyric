@@ -15,9 +15,9 @@ Settings:
 
 Variables:
  Knob a: # This remote variable is settable (knob on server)
-  remote: 192.168.86.119::6174  # replace with the ip address and port of your server
+  remote: 10.0.2.9::6174  # replace with the ip address and port of your server
  Distance r: # This remote variable is not settable (expression on server)
-  remote: 192.168.86.119::6174  # replace with the ip address and port of your server
+  remote: 10.0.2.9::6174  # replace with the ip address and port of your server
 
 Plots:
  R Plot:

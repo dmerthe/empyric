@@ -152,8 +152,6 @@ class Adapter:
         """
         Establishes communications with the instrument through the appropriate
         backend.
-
-        :return: None
         """
         self.connected = True
 
@@ -163,9 +161,8 @@ class Adapter:
         Write a command.
 
         :param args: any arguments for the write method
-        :param validator: (callable) function that returns True if its input
-        looks right or False if it does not
         :param kwargs: any keyword arguments for the write method
+
         :return: (str/float/int/bool) instrument response, if valid
         """
 
@@ -181,9 +178,8 @@ class Adapter:
         Read an awaiting message.
 
         :param args: any arguments for the read method
-        :param validator: (callable) function that returns True if its input
-        looks right or False if it does not
         :param kwargs: any keyword arguments for the read method
+
         :return: (str/float/int/bool) instrument response, if valid
         """
 
@@ -198,9 +194,8 @@ class Adapter:
         Submit a query.
 
         :param args: any arguments for the query method
-        :param validator: (callable) function that returns True if its input
-        looks right or False if it does not
         :param kwargs: any keyword arguments for the query method
+
         :return: (str/float/int/bool) instrument response, if valid
         """
 
@@ -214,8 +209,6 @@ class Adapter:
     def disconnect(self):
         """
         Close communication port/channel
-
-        :return: None
         """
         self.connected = False
 
@@ -351,7 +344,7 @@ class Serial(Adapter):
         List all connected serial devices
 
         :param verbose: (bool) if True, list of devices will be printed
-        (defaults to True).
+                        (defaults to True).
 
         :return: (list of str) List of connected serial devices
         """
@@ -481,7 +474,7 @@ class GPIB(Adapter):
     def timeout(self, timeout):
 
         if self.connected:
-            if self.lib == 'pyvisa':
+            if self.lib == 'pyvisa' or self.lib == 'prologix-gpib':
                 # pyvisa records timeouts in milliseconds
                 if timeout is None:
                     self.backend.timeout = None
@@ -490,6 +483,9 @@ class GPIB(Adapter):
                 self._timeout = timeout
             elif self.lib == 'linux-gpib':
                 self._timeout = self._linux_gpib_set_timeout(timeout)
+            elif self.lib == 'prologix-gpib':
+                self.backend.timeout = timeout
+                self._timeout = timeout
         else:
             self._timeout = None
 
@@ -669,6 +665,17 @@ class PrologixGPIBUSB:
         # set timeout to 0.5 seconds
         self.write('read_tmo_ms 500', to_controller=True)
 
+        # Do not append CR or LF to messages
+        self.write('eos 3', to_controller=True)
+
+        # Assert EOI with last byte to indicate end of data
+        self.write('eoi 1', to_controller=True)
+
+        # Append CR to responses from instruments to indicate message
+        # termination
+        self.write('eot_char 13', to_controller=True)
+        self.write('eot_enable 1', to_controller=True)
+
         self.address = None
         self.devices = []
 
@@ -702,7 +709,9 @@ class PrologixGPIBUSB:
         if not from_controller:
             self.write(f'read eoi', to_controller=True)
 
-        return self.serial_port.read_until(b'\r').decode().strip()
+        response = self.serial_port.read_until(b'\r').decode().strip()
+
+        return response
 
     def close(self):
         self.serial_port.close()
@@ -711,6 +720,10 @@ class PrologixGPIBUSB:
 class PrologixGPIBLAN:
     """
     Wraps serial communications with the Prologix GPIB-ETHERNET adapter unit.
+
+    The IP address of the adapter unit can be found with Prologix's Netfinder
+    utility and GPIB configuration can be modified with Prologix's GPIB
+    Configurator.
     """
 
     @property
@@ -1045,7 +1058,7 @@ class Modbus(Adapter):
 
     slave_id = 0
     # Byte and word order is either little-endian (<) or big-endian (>)
-    byte_order = '<'
+    byte_order = '>'
     word_order = '>'
 
     dtypes = [
@@ -1129,21 +1142,6 @@ class Modbus(Adapter):
                     parity=self.parity,
                     stopbits=self.stop_bits,
                 )
-
-        # Enumerate modbus functions
-        self.functions = {
-            1: self.backend.read_coils,
-            2: self.backend.read_discrete_inputs,
-            3: self.backend.read_holding_registers,
-            4: self.backend.read_input_registers,
-
-            5: self.backend.write_coil,
-            6: self.backend.write_register,
-
-            15: self.backend.write_coils,
-            16: self.backend.write_registers
-
-        }
 
         # Get data reading/writing utility classes
         payload_module = importlib.import_module('.payload', package='pymodbus')
@@ -1236,24 +1234,32 @@ class Modbus(Adapter):
                 ', '.join(self.dtypes)
             )
 
+        # Enumerate modbus read functions
+        read_functions = {
+            1: self.backend.read_coils,
+            2: self.backend.read_discrete_inputs,
+            3: self.backend.read_holding_registers,
+            4: self.backend.read_input_registers,
+        }
+
         if func_code in [1, 2]:
             # Read coils or discrete inputs
 
-            response = self.functions[func_code](
+            response = read_functions[func_code](
                 address, count=count, slave=self.slave_id
             ).bits
 
-            coils = [bool(bit) for bit in response][:count]
+            bits = [bool(bit) for bit in response][:count]
 
-            if len(coils) == 1:
-                return coils[0]
+            if len(bits) == 1:
+                return bits[0]
             else:
-                return coils
+                return bits
 
         elif func_code in [3, 4]:
             # Read holding registers or input registers
 
-            registers = self.functions[func_code](
+            registers = read_functions[func_code](
                 address, count=count, slave=self.slave_id
             ).registers
 
@@ -1292,7 +1298,6 @@ class Modbus(Adapter):
 class Phidget(Adapter):
     """
     Handles communications with Phidget devices
-
     """
 
     delay = 0.2

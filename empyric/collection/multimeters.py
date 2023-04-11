@@ -2,6 +2,7 @@ import numbers, importlib
 import numpy as np
 from empyric.adapters import *
 from empyric.collection.instrument import *
+from empyric.types import Float, String, Integer, Array
 
 
 class Keithley2110(Instrument):
@@ -36,11 +37,11 @@ class Keithley2110(Instrument):
             self._mode = 'temperature'
 
     @setter
-    def set_voltage_range(self, voltage_range):
+    def set_voltage_range(self, voltage_range: Float):
 
-        allowed_voltage_ranges = (0.1, 1, 10, 100, 1000)
+        allowed_voltage_ranges = (0, 0.1, 1.0, 10.0, 100.0, 1000.0)
 
-        if voltage_range in allowed_voltage_ranges:
+        if voltage_range in allowed_voltage_ranges[1:]:
             self.write('VOLT:RANG %.2e' % voltage_range)
         elif isinstance(voltage_range, numbers.Number):
 
@@ -56,16 +57,16 @@ class Keithley2110(Instrument):
             Warning('Given voltage range not an option, '
                     f'setting to {allowed_voltage_ranges[nearest]} V instead')
 
-        elif voltage_range == 'AUTO':
+        elif voltage_range == 0.0:
             self.write('VOLT:RANG:AUTO')
         else:
             raise ValueError(
                 f'voltage range choice {voltage_range} not permitted!')
 
     @setter
-    def set_current_range(self, current_range):
+    def set_current_range(self, current_range: Float):
 
-        allowed_current_ranges = (0.01, 0.1, 1, 3, 10)
+        allowed_current_ranges = (0.0, .01, 0.1, 1.0, 3.0, 10.0)
 
         if current_range in allowed_current_ranges:
             self.write('CURR:RANG %.2e' % current_range)
@@ -82,26 +83,26 @@ class Keithley2110(Instrument):
             Warning('Given current range not an option, '
                     f'setting to {allowed_current_ranges[nearest]} A instead')
 
-        elif current_range == 'AUTO':
+        elif current_range == 0.0:
             self.write('CURR:RANG:AUTO')
         else:
             raise ValueError(
                 f'current range choice {current_range} not permitted!')
 
     @measurer
-    def measure_voltage(self):
+    def measure_voltage(self) -> Float:
         if self.mode != 'voltage':
             self.mode = 'voltage'
         return float(self.query('READ?'))
 
     @measurer
-    def measure_current(self):
+    def measure_current(self) -> Float:
         if self.mode != 'current':
             self.mode = 'current'
         return float(self.query('READ?'))
 
     @measurer
-    def measure_temperature(self):
+    def measure_temperature(self) -> Float:
         if self.mode != 'temperature':
             self.mode = 'temperature'
         return float(self.query('READ?'))
@@ -112,8 +113,8 @@ class Keithley6500(Instrument):
     Multimeter with 6.5 digits and high speed scanning and digitizing
     capabilities.
 
-    For socket, communication default port is 5025. If IP address is unknown, you can find and set it on the unit's
-    Communication --> LAN menu.
+    For socket communication default port is 5025. If IP address is unknown,
+    you can find or set it on the unit's Communication --> LAN menu.
 
     Uses TSP communication protocol.
     """
@@ -121,7 +122,11 @@ class Keithley6500(Instrument):
     name = 'Keithley6500'
 
     supported_adapters = (
-        (Socket, {'write_termination': '\n', 'timeout': 0.5}),
+        (Socket, {
+            'write_termination': '\n',
+            'read_termination': '\n',
+            'timeout': 0.5}
+         ),
     )
 
     knobs = (
@@ -141,9 +146,10 @@ class Keithley6500(Instrument):
     )
 
     _trig_src = 'trigger.EVENT_DISPLAY'
+    meter = None
 
     @setter
-    def set_meter(self, meter):
+    def set_meter(self, meter: String):
 
         if meter.lower() == 'voltage':
             self.write(f'dmm.measure.func = dmm.FUNC_DC_VOLTAGE')
@@ -159,7 +165,7 @@ class Keithley6500(Instrument):
         return meter.lower()
 
     @getter
-    def get_meter(self):
+    def get_meter(self) -> String:
 
         def validator(response):
             return re.match('dmm.FUNC', response)
@@ -182,91 +188,76 @@ class Keithley6500(Instrument):
         if meter in meter_dict:
             return meter_dict[meter]
         else:
-            return None
+            return ''
 
     @setter
-    def set_sample_count(self, count):
+    def set_sample_count(self, count: Integer):
 
         if 'fast' in self.meter:
-            self.write(f'dmm.digitize.count = {int(count)}')
+            self.write(f'dmm.digitize.count = {count}')
         else:
-            return np.nan
+            return 1
 
     @getter
-    def get_sample_count(self):
+    def get_sample_count(self) -> Integer:
 
         if 'fast' in self.meter:
             response = self.query('print(dmm.digitize.count)')
 
             if 'nil' in response:
-                return np.nan
+                return 0
             else:
                 return int(response)
         else:
-            return np.nan
+            return 1
 
     @setter
-    def set_sample_rate(self, rate):
+    def set_sample_rate(self, rate: Integer):
 
         if 'fast' in self.meter:
             self.write(f'dmm.digitize.samplerate = {rate}')
         else:
-            return np.nan
+            return 0
 
     @getter
-    def get_sample_rate(self):
+    def get_sample_rate(self) -> Integer:
 
         if 'fast' in self.meter:
 
             response = self.query(f'print(dmm.digitize.samplerate)')
 
             if 'nil' in response:
-                return np.nan
+                return 0
             else:
-                return recast(response)
+                return int(response)
         else:
-            return np.nan
+            return 0
 
     @setter
-    def set_nplc(self, nplc):
-
-        if 'fast' not in self.meter:
-            self.write(f'dmm.measure.nplc = {nplc}')
-        else:
-            return np.nan
+    def set_nplc(self, nplc: Integer):
+        self.write(f'dmm.measure.nplc = {nplc}')
 
     @getter
-    def get_nplc(self):
-
-        if 'fast' not in self.meter:
-            return recast(self.query('print(dmm.measure.nplc)'))
-        else:
-            return np.nan
+    def get_nplc(self) -> Integer:
+        return int(self.query('print(dmm.measure.nplc)'))
 
     @setter
-    def set_range(self, _range):
-
-        if 'fast' not in self.meter:
-            if _range.lower() == 'auto':
-                self.write('dmm.measure.autorange = dmm.ON')
-            else:
-                self.write(f'dmm.measure.range = {_range}')
+    def set_range(self, _range: Float):
+        if _range == 0.0:
+            self.write('dmm.measure.autorange = dmm.ON')
         else:
-            return np.nan
+            self.write(f'dmm.measure.range = {_range}')
 
     @getter
-    def get_range(self):
+    def get_range(self) -> Float:
 
-        if 'fast' not in self.meter:
-            if self.query('print(dmm.measure.autorange)') == 'dmm.ON':
-                return 'auto'
-            else:
-                return recast(self.query('print(dmm.measure.range)'))
+        if self.query('print(dmm.measure.autorange)') == 'dmm.ON':
+            return 0.0
         else:
-            return np.nan
+            return float(self.query('print(dmm.measure.range)'))
 
     @setter
-    def set_trigger_source(self, trigger_source):
+    def set_trigger_source(self, trigger_source: String):
 
         valid_sources = {
             'front panel': 'trigger.EVENT_DISPLAY',
@@ -281,11 +272,17 @@ class Keithley6500(Instrument):
             raise ValueError(f'invalid trigger source for {self.name}')
 
     @getter
-    def get_trigger_source(self):
-        return self._trig_src
+    def get_trigger_source(self) -> String:
+
+        trigger_sources = {
+            'trigger.EVENT_DISPLAY': 'front panel',
+            'trigger.EVENT_EXTERNAL': 'external in'
+        }
+
+        return trigger_sources[self._trig_src]
 
     @measurer
-    def measure_current(self):
+    def measure_current(self) -> Float:
 
         if self.meter != 'current':
             self.set_meter('current')
@@ -293,7 +290,7 @@ class Keithley6500(Instrument):
         return recast(self.query('print(dmm.measure.read())'))
 
     @measurer
-    def measure_voltage(self):
+    def measure_voltage(self) -> Float:
 
         if self.meter != 'voltage':
             self.set_meter('voltage')
@@ -356,10 +353,12 @@ class Keithley6500(Instrument):
             nbytes=np.inf
         )
 
-        return recast(readings.split(', '))
+        return np.array(
+            [np.float64(reading) for reading in readings.split(', ')]
+        )
 
     @measurer
-    def measure_fast_voltages(self):
+    def measure_fast_voltages(self) -> Array:
 
         if self.meter != 'fast voltages':
             self.set_meter('fast voltages')
@@ -369,7 +368,7 @@ class Keithley6500(Instrument):
         return fast_voltages
 
     @measurer
-    def measure_fast_currents(self):
+    def measure_fast_currents(self) -> Array:
 
         if self.meter != 'fast currents':
             self.set_meter('fast currents')
@@ -394,9 +393,9 @@ class LabJackU6(Instrument):
     knobs = ('DAC0 ', 'DAC1',)
 
     meters = (
-        'AIN0', 'AIN1', 'AIN2', 'AIN3', 'internal temperature', 'temperature 0',
-        # AIN0 / 41 uV / C
-        'temperature 1', 'temperature 2', 'temperature 3',)
+        'AIN0', 'AIN1', 'AIN2', 'AIN3', 'device temperature',
+        'temperature 0', 'temperature 1', 'temperature 2', 'temperature 3'
+    )
 
     def __init__(self, *args, **kwargs):
         u6 = importlib.import_module('u6')
@@ -414,63 +413,64 @@ class LabJackU6(Instrument):
         return self.backend.readRegister(register)
 
     @setter
-    def set_DAC0(self, value):
+    def set_DAC0(self, value: Float):
         self.write(5000, value)
 
     @setter
-    def set_DAC1(self, value):
+    def set_DAC1(self, value: Float):
         self.write(5002, value)
 
     @getter
-    def get_DAC0(self):
+    def get_DAC0(self) -> Float:
         self.read(5000)
 
     @getter
-    def get_DAC1(self):
+    def get_DAC1(self) -> Float:
         self.read(5002)
 
     @measurer
-    def measure_AIN0(self):
+    def measure_AIN0(self) -> Float:
         return self.read(0)
 
     @measurer
-    def measure_AIN1(self):
+    def measure_AIN1(self) -> Float:
         return self.read(2)
 
     @measurer
-    def measure_AIN2(self):
+    def measure_AIN2(self) -> Float:
         return self.read(4)
 
     @measurer
-    def measure_AIN3(self):
+    def measure_AIN3(self) -> Float:
         return self.read(6)
 
     @measurer
-    def measure_internal_temperature(self):
+    def measure_device_temperature(self) -> Float:
         return self.backend.getTemperature() - 273.15
 
     @measurer
-    def measure_temperature_0(self):
-        return self.read(0) / 37e-6 + self.measure_internal_temperature()
+    def measure_temperature_0(self) -> Float:
+        return self.read(0) / 37e-6 + self.measure_device_temperature()
 
     @measurer
-    def measure_temperature_1(self):
-        return self.read(2) / 37e-6 + self.measure_internal_temperature()
+    def measure_temperature_1(self) -> Float:
+        return self.read(2) / 37e-6 + self.measure_device_temperature()
 
     @measurer
-    def measure_temperature_2(self):
-        return self.read(4) / 37e-6 + self.measure_internal_temperature()
+    def measure_temperature_2(self) -> Float:
+        return self.read(4) / 37e-6 + self.measure_device_temperature()
 
     @measurer
-    def measure_temperature_3(self):
-        return self.read(6) / 37e-6 + self.measure_internal_temperature()
+    def measure_temperature_3(self) -> Float:
+        return self.read(6) / 37e-6 + self.measure_device_temperature()
 
 
 class LabJackT7(Instrument):
     """
     LabJack T7/T7-Pro DAQ
 
-    Only reading the default 14 inputs as voltages is currently supported, but this could easily be expanded.
+    Only reading the default 14 inputs as voltages is currently supported, but
+    this may eventually be expanded.
     """
 
     name = 'LabJackT7'
@@ -478,8 +478,6 @@ class LabJackT7(Instrument):
     supported_adapters = (
         (Modbus, {'byte_order': '>'}),
     )
-
-    knobs = ('DAC0 ', 'DAC1',)
 
     meters = (
         'AIN0', 'AIN1', 'AIN2', 'AIN3', 'AIN4', 'AIN5', 'AIN6',
@@ -489,70 +487,70 @@ class LabJackT7(Instrument):
     )
 
     def _measure_AIN(self, n):
-        return self.read(4, 0*(2*int(n)), count=2, dtype='32bit_float')
+        return self.read(4, 2*n, count=2, dtype='32bit_float')
 
     @measurer
-    def measure_AIN0(self):
+    def measure_AIN0(self) -> Float:
         return self._measure_AIN(0)
 
     @measurer
-    def measure_AIN1(self):
+    def measure_AIN1(self) -> Float:
         return self._measure_AIN(1)
 
     @measurer
-    def measure_AIN2(self):
+    def measure_AIN2(self) -> Float:
         return self._measure_AIN(2)
 
     @measurer
-    def measure_AIN3(self):
+    def measure_AIN3(self) -> Float:
         return self._measure_AIN(3)
 
     @measurer
-    def measure_AIN4(self):
+    def measure_AIN4(self) -> Float:
         return self._measure_AIN(4)
 
     @measurer
-    def measure_AIN5(self):
+    def measure_AIN5(self) -> Float:
         return self._measure_AIN(5)
 
     @measurer
-    def measure_AIN6(self):
+    def measure_AIN6(self) -> Float:
         return self._measure_AIN(6)
 
     @measurer
-    def measure_AIN7(self):
+    def measure_AIN7(self) -> Float:
         return self._measure_AIN(7)
 
     @measurer
-    def measure_AIN8(self):
+    def measure_AIN8(self) -> Float:
         return self._measure_AIN(8)
 
     @measurer
-    def measure_AIN9(self):
+    def measure_AIN9(self) -> Float:
         return self._measure_AIN(9)
 
     @measurer
-    def measure_AIN10(self):
+    def measure_AIN10(self) -> Float:
         return self._measure_AIN(10)
 
     @measurer
-    def measure_AIN11(self):
+    def measure_AIN11(self) -> Float:
         return self._measure_AIN(11)
 
     @measurer
-    def measure_AIN12(self):
+    def measure_AIN12(self) -> Float:
         return self._measure_AIN(12)
 
     @measurer
-    def measure_AIN13(self):
+    def measure_AIN13(self) -> Float:
         return self._measure_AIN(13)
 
     @measurer
-    def measure_AIN_all(self):
+    def measure_AIN_all(self) -> Array:
         """Reads all 14 analog inputs in a single call"""
         return self.read(4, 0, count=2*14, dtype='32bit_float')
 
     @measurer
-    def measure_device_temperature(self):
+    def measure_device_temperature(self) -> Float:
         """Device temperature in C"""
         return self.read(4, 60052, count=2, dtype='32bit_float') - 273.15

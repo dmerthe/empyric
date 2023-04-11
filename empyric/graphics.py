@@ -7,13 +7,13 @@ import datetime
 import tkinter as tk
 import pandas as pd
 
-from empyric.tools import recast
-from empyric.routines import Server
+from empyric.types import recast, Type
+from empyric.routines import SocketServer, ModbusServer
 
 if sys.platform == 'darwin':
     import matplotlib
 
-    matplotlib.use('TkAgg')  # works better on MacOS
+    matplotlib.use('TkAgg')  # works better on macOS
 
 import matplotlib.pyplot as plt
 from matplotlib.cm import ScalarMappable
@@ -460,10 +460,7 @@ class ExperimentGUI:
 
         self.variables = experiment.variables
 
-        if 'alarms' in kwargs:
-            self.alarms = {}
-        else:
-            self.alarms = kwargs['alarms']
+        self.alarms = kwargs.get('alarms', {})
 
         if 'instruments' in kwargs:
             self.instruments = kwargs['instruments']
@@ -477,7 +474,9 @@ class ExperimentGUI:
                     if instrument.name not in self.instruments:
                         self.instruments[instrument.name] = instrument
 
-        if 'plots' in kwargs or 'plotter' in kwargs:
+        if ('plots' in kwargs and kwargs['plotter'] is not None) \
+                or ('plotter' in kwargs and kwargs['plotter'] is not None):
+
             if 'plotter' in kwargs:
                 self.plotter = kwargs['plotter']
             else:
@@ -565,7 +564,7 @@ class ExperimentGUI:
                 row=i, column=1, sticky=tk.W, padx=10
             )
 
-            if self.variables[name].settable:
+            if self.variables[name]._settable:
                 entry = self.variable_entries[name]
                 variable = self.variables[name]
                 root = self.status_frame
@@ -590,6 +589,7 @@ class ExperimentGUI:
 
             i += 1
 
+        i += 1
         tk.Label(
             self.status_frame, text='', font=("Arial", 14, 'bold')
         ).grid(row=i, column=0, sticky=tk.E)
@@ -627,13 +627,15 @@ class ExperimentGUI:
         # Servers
         self.servers = {
             name: routine for name, routine in self.experiment.routines.items()
-            if isinstance(routine, Server)
+            if isinstance(routine, SocketServer)
+            or isinstance(routine, ModbusServer)
         }
 
         if self.servers:
 
             self.server_status_labels = {}
 
+            i += 1
             tk.Label(
                 self.status_frame, text='Servers', font=("Arial", 14, 'bold')
             ).grid(row=i, column=1)
@@ -712,7 +714,7 @@ class ExperimentGUI:
 
             # If stopped or holding allow user to edit knobs or parameters
             if self.experiment.stopped or self.experiment.holding:
-                if name != 'Time' and self.variables[name].settable:
+                if name != 'Time' and self.variables[name]._settable:
                     continue
 
             def write_entry(_entry, text):
@@ -770,7 +772,7 @@ class ExperimentGUI:
 
             # Settable variable values can be edited
             for name, entry in self.variable_entries.items():
-                if name != 'Time' and self.variables[name].settable:
+                if name != 'Time' and self.variables[name]._settable:
                     entry.config(state=tk.NORMAL)
 
         else:  # otherwise, experiment is running
@@ -881,7 +883,11 @@ class ExperimentGUI:
     def _entry_enter(entry, variable, root):
         """Assigns the value to a variable if entered by the user"""
 
-        variable.value = recast(entry.get())
+        variable.value = recast(
+            entry.get(),
+            to=variable.dtype if variable.dtype is not None else Type
+        )
+
         root.focus()
 
     @staticmethod
