@@ -776,12 +776,14 @@ class ModbusServer(Routine):
 
     assert_control = False
 
-    def __init__(self, knobs: dict = None, **kwargs):
+    def __init__(self, knobs: dict = None, meters=None, **kwargs):
 
         if knobs is None:
             knobs = {}
 
         Routine.__init__(self, knobs, **kwargs)
+
+        self.meters = meters
 
         self.state = {}
 
@@ -938,7 +940,12 @@ class ModbusServer(Routine):
         # Store readonly variable values in input registers (fc = 4)
         builder.reset()
 
-        for i, (name, value) in enumerate(self.state.items()):
+        if self.meters:
+            selection = self.meters
+        else:
+            selection = list(self.state)
+
+        for i, (name, value) in enumerate(self.state[selection].items()):
 
             dtype = None
             for _type in supported_types.values():

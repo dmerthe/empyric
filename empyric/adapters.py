@@ -1170,8 +1170,9 @@ class Modbus(Adapter):
 
         if dtype and dtype not in self.dtypes:
             raise TypeError(
-                'invalid dtype argument; must be one of:\n'
-                ', '.join(self.dtypes)
+                'invalid dtype argument; must be one of:\n' + ', '.join(
+                    self.dtypes
+                )
             )
 
         if '5' in str(func_code):
