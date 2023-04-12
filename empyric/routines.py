@@ -378,6 +378,9 @@ class Sequence(Routine):
 
         if np.ndim(values) == 1:  # single list of times for all knobs
             values = [values] * len(self.knobs)
+        elif (type(values) == str) and (".csv" in values.lower()):
+            df = pd.read_csv(values)
+            values = df.values[:,0]
         elif np.shape(values)[0] == 1:
             # 1xN array with one N-element list of times for all knobs
             values = [values[0]] * len(self.knobs)

@@ -224,7 +224,7 @@ class Keithley2400(Instrument):
     @getter
     def get_current(self) -> Float:
 
-        return float(self.query(':SOUR:CURR:LEV?').split())
+        return float(self.query(':SOUR:CURR:LEV?').strip())
 
     @setter
     def set_voltage_range(self, voltage_range: Float):
@@ -251,16 +251,16 @@ class Keithley2400(Instrument):
 
         if self.source == 'voltage':
 
-            if Toggle(self.query(':SOUR:VOLT:RANGE:AUTO?').split()):
+            if Toggle(self.query(':SOUR:VOLT:RANGE:AUTO?').strip()):
                 return 0.0
             else:
-                return float(self.query(':SOUR:VOLT:RANG?').split())
+                return float(self.query(':SOUR:VOLT:RANG?').strip())
 
         else:
-            if Toggle(self.query(':SENS:VOLT:RANGE:AUTO?').split()):
+            if Toggle(self.query(':SENS:VOLT:RANGE:AUTO?').strip()):
                 return 0.0
             else:
-                return float(self.query(':SENS:VOLT:RANG?').split())
+                return float(self.query(':SENS:VOLT:RANG?').strip())
 
     @setter
     def set_voltage_limit(self, voltage_limit: Float):
@@ -287,9 +287,9 @@ class Keithley2400(Instrument):
             self.get_source()
 
         if self.source == 'voltage':
-            return float(self.query(':SOUR:VOLT:PROT?').split())
+            return float(self.query(':SOUR:VOLT:PROT?').strip())
         else:
-            return float(self.query(':SENS:VOLT:PROT?').split())
+            return float(self.query(':SENS:VOLT:PROT?').strip())
 
     @setter
     def set_current_range(self, current_range: Float):
@@ -316,16 +316,16 @@ class Keithley2400(Instrument):
 
         if self.source == 'current':
 
-            if Toggle(self.query(':SOUR:CURR:RANGE:AUTO?').split()):
+            if Toggle(self.query(':SOUR:CURR:RANGE:AUTO?').strip()):
                 return 0.0
             else:
-                return float(self.query(':SOUR:CURR:RANG?').split())
+                return float(self.query(':SOUR:CURR:RANG?').strip())
 
         else:
-            if Toggle(self.query(':SENS:CURR:RANGE:AUTO?').split()):
+            if Toggle(self.query(':SENS:CURR:RANGE:AUTO?').strip()):
                 return 0.0
             else:
-                return float(self.query(':SENS:CURR:RANG?').split())
+                return float(self.query(':SENS:CURR:RANG?').strip())
 
     @setter
     def set_current_limit(self, current_limit: Float):
@@ -335,9 +335,9 @@ class Keithley2400(Instrument):
     def get_current_limit(self) -> Float:
 
         if self.source == 'current':
-            return float(self.query(':SOUR:CURR:PROT?'.split()))
+            return float(self.query(':SOUR:CURR:PROT?'.strip()))
         else:
-            return float(self.query(':SENS:CURR:PROT?').split())
+            return float(self.query(':SENS:CURR:PROT?').strip())
 
     @setter
     def set_nplc(self, nplc: Float):
@@ -461,7 +461,7 @@ class Keithley2400(Instrument):
 
     @getter
     def get_source_delay(self) -> Float:
-        return self.query(':SOUR:DEL?').split()
+        return self.query(':SOUR:DEL?').strip()
 
 
 class Keithley2460(Instrument):
