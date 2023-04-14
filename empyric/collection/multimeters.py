@@ -160,7 +160,8 @@ class Keithley6500(Instrument):
         elif meter.lower() == 'fast currents':
             self.write(f'dmm.digitize.func = dmm.FUNC_DIGITIZE_CURRENT')
         else:
-            raise ValueError(f'invalid meter "{meter}"')
+            raise print(f'Warning: invalid meter {meter} for Keithley6500')
+            return self.get_meter()
 
         return meter.lower()
 
@@ -235,11 +236,19 @@ class Keithley6500(Instrument):
 
     @setter
     def set_nplc(self, nplc: Integer):
-        self.write(f'dmm.measure.nplc = {nplc}')
+
+        if self.meter in ['voltage', 'current']:
+            self.write(f'dmm.measure.nplc = {nplc}')
+        else:
+            return 0
 
     @getter
     def get_nplc(self) -> Integer:
-        return int(self.query('print(dmm.measure.nplc)'))
+
+        if self.meter in ['voltage', 'current']:
+            return int(self.query('print(dmm.measure.nplc)'))
+        else:
+            return 0
 
     @setter
     def set_range(self, _range: Float):
@@ -300,16 +309,18 @@ class Keithley6500(Instrument):
     def _execute_fast_measurements(self):
 
         if 'fast' not in self.meter:
-            raise AttributeError(
-                f"meter for {self.name} must be 'fast voltages' or "
-                "'fast currents' to execute fast measurements"
-            )
+            return
+
+        trigger_src = {
+            'front panel': 'trigger.EVENT_DISPLAY',
+            'external in': 'trigger.EVENT_EXTERNAL'
+        }[self.get_trigger_source()]
 
         self.write(
             'trigger.model.setblock(1, trigger.BLOCK_BUFFER_CLEAR, '
             'defbuffer1)\n'
             'trigger.model.setblock(2, trigger.BLOCK_WAIT, '
-            f'{self._trig_src})\n'
+            f'{trigger_src})\n'
             'trigger.model.setblock(3, trigger.BLOCK_DELAY_CONSTANT, 0)\n'
             'trigger.model.setblock(4, trigger.BLOCK_MEASURE_DIGITIZE, '
             'defbuffer1)\n'

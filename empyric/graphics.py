@@ -7,7 +7,7 @@ import datetime
 import tkinter as tk
 import pandas as pd
 
-from empyric.types import recast, Type
+from empyric.types import recast, Type, Array
 from empyric.routines import SocketServer, ModbusServer
 
 if sys.platform == 'darwin':
@@ -1063,10 +1063,18 @@ class ConfigTestDialog(BasicDialog):
         self.knob_entries[knob].insert(0, str(value))
 
     def update_meter_entry(self, meter):
-        value = str(self.instrument.measure(meter))
+        value = self.instrument.measure(meter)
+
+        if np.ndim(value) == 1:  # store array data as CSV files
+            dataframe = pd.DataFrame({meter: value})
+            path = meter.replace(' ', '_') + '_'
+            now = datetime.datetime.now()
+            path += now.strftime('%Y%m%d-%H%M%S') + '.csv'
+            dataframe.to_csv(path)
+
         self.meter_entries[meter].config(state=tk.NORMAL)
         self.meter_entries[meter].delete(0, tk.END)
-        self.meter_entries[meter].insert(0, value)
+        self.meter_entries[meter].insert(0, str(value))
         self.meter_entries[meter].config(state='readonly')
 
     def body(self, master):

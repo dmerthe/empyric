@@ -74,9 +74,9 @@ class Variable:
 
             value = getter(self)
 
-            if not isinstance(value, Array) \
-                    and value is None or value == float('nan'):
+            if value is None or value == float('nan'):
                 self._value = None
+
             elif self.dtype is not None:
                 self._value = recast(value, to=self.dtype)
             else:
@@ -182,7 +182,7 @@ class Meter(Variable):
         self.meter = meter
 
         self.dtype = typing.get_type_hints(
-            getattr(instrument, 'measure_' + meter.replace(" ", "_"))
+            getattr(instrument, 'measure_' + meter.replace(' ', '_'))
         ).get('return', None)
 
         self._value = None
