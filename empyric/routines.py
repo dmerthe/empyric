@@ -461,7 +461,7 @@ class Minimization(Routine):
 
         self.meter_values = []
         self.best_meter = None
-        self.best_knobs = [knob.value for knob in self.knobs.values()]
+        self.best_knobs = [None for _ in self.knobs]
 
         self.revert = False  # going back?
 
@@ -475,6 +475,7 @@ class Minimization(Routine):
 
         if not self.prepped:
             self.prep(state)
+            self.prepped = True
 
         # Update temperature
         self.T = self.T0 + (self.T1 - self.T0) \
@@ -534,6 +535,11 @@ class Minimization(Routine):
             return (change < 0) or (np.exp(-change / self.T) > _rand)
         else:
             return change < 0
+
+    def prep(self, state):
+
+        self.best_knobs = [state[knob] for knob in self.knobs]
+        self.best_meter = state[self.meter]
 
     def finish(self, state):
 
