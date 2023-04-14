@@ -74,9 +74,9 @@ class Variable:
 
             value = getter(self)
 
-            if not isinstance(value, Array) and value is None or value == float('nan'):
+            if not isinstance(value, Array) \
+                    and value is None or value == float('nan'):
                 self._value = None
-
             elif self.dtype is not None:
                 self._value = recast(value, to=self.dtype)
             else:
