@@ -182,7 +182,7 @@ class Meter(Variable):
         self.meter = meter
 
         self.dtype = typing.get_type_hints(
-            getattr(instrument, 'measure_' + meter.replace(" ","_"))
+            getattr(instrument, 'measure_' + meter.replace(" ", "_"))
         ).get('return', None)
 
         self._value = None
