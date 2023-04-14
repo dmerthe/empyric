@@ -147,6 +147,9 @@ def recast(value: Any, to: type = Type) -> [Type, None]:
 
     if to != Type:
 
+        if value is None:
+            return None
+
         for dtype in np.array([to], dtype=object).flatten():
             try:
                 # recast to desired
