@@ -875,13 +875,13 @@ class ModbusServer(Routine):
 
                     if self.knobs:
 
-                        variable = list(self.knobs.values())[address//4]
+                        variable = list(self.knobs.values())[address // 5]
 
                         controller = getattr(variable, '_controller', None)
 
                         if controller:
 
-                            name = list(self.knobs.keys())[address // 4]
+                            name = list(self.knobs.keys())[address // 5]
 
                             print(
                                 f'Warning: an attempt was made to set {name}, '
@@ -898,7 +898,7 @@ class ModbusServer(Routine):
                             variable.value = decoder.decode_64bit_uint()
                         elif issubclass(variable.dtype, Toggle):
                             int_value = decoder.decode_64bit_uint()
-                            variable.value = OFF if int_value == 0 else ON
+                            variable.value = ON if int_value == 1 else OFF
                         elif issubclass(variable.dtype, Integer):
                             variable.value = decoder.decode_64bit_int()
                         elif issubclass(variable.dtype, Float):
@@ -913,21 +913,23 @@ class ModbusServer(Routine):
 
         for i, (name, variable) in enumerate(self.knobs.items()):
 
+            value = variable._value
+
             # encode the value into the 4 registers
-            if variable._value is None or variable.dtype is None:
+            if value is None or variable.dtype is None:
                 builder.add_64bit_float(float('nan'))
             elif issubclass(variable.dtype, Boolean):
-                builder.add_64bit_uint(variable._value)
+                builder.add_64bit_uint(value)
             elif issubclass(variable.dtype, Toggle):
-                builder.add_64bit_uint(int(variable._value))
+                builder.add_64bit_uint(int(value in Toggle.on_values))
             elif issubclass(variable.dtype, Integer):
-                builder.add_64bit_int(variable._value)
+                builder.add_64bit_int(value)
             elif issubclass(variable.dtype, Float):
-                builder.add_64bit_float(variable._value)
+                builder.add_64bit_float(value)
             else:
                 raise ValueError(
                     f'unable to update modbus server registers from value '
-                    f'{variable._value} of variable {name} with data type '
+                    f'{value} of variable {name} with data type '
                     f'{variable.dtype}'
                 )
 
