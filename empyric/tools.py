@@ -133,7 +133,8 @@ def autobind_socket(_socket):
     return ip_address, port
 
 
-def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1):
+def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1,
+                     decode=True):
     """
     Read from a socket, with care taken to get the whole message
     """
@@ -185,7 +186,10 @@ def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1):
         else:
             null_responses += 1
 
-    return message.decode().strip()
+    if decode:
+        return message.decode().strip()
+    else:
+        return message
 
 
 def write_to_socket(_socket, message, termination='\r', timeout=1):

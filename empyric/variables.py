@@ -47,9 +47,10 @@ class Variable:
         @wraps(setter)
         def wrapped_setter(self, value):
 
-            if value is None or value == float('nan'):
+            if not isinstance(value, Array) \
+                    and (value is None or value == float('nan')):
+
                 self._value = None
-                return
 
             elif self.dtype is not None:
                 setter(self, recast(value, to=self.dtype))
@@ -74,7 +75,9 @@ class Variable:
 
             value = getter(self)
 
-            if value is None or value == float('nan'):
+            if not isinstance(value, Array) \
+                    and (value is None or value == float('nan')):
+
                 self._value = None
 
             elif self.dtype is not None:
