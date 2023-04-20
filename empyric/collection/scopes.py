@@ -696,14 +696,18 @@ class SiglentSDS1000(Instrument):
 
         prior_timeout = self.adapter.timeout
 
-        self.adapter.timeout = 10  # data transmission may take extra time
+        self.adapter.timeout = 60  # data transmission may take extra time
 
-        response = self.read(decode=False)
+        def validator(response):
 
-        if response is None:
-            return None
-        elif len(response) == 0:
-            return None
+            if response is not None \
+                    and (len(response) > 0) \
+                    and ((b'C%d:WF DAT2,#9' % n) in response):
+                return True
+            else:
+                return False
+
+        response = self.read(decode=False, validator=validator)
 
         data = response.split(
             b'C%d:WF DAT2,#9' % n

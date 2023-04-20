@@ -721,8 +721,10 @@ def convert_runcard(runcard):
     for name, specs in runcard['Variables'].items():
         if 'meter' in specs:
             instrument = converted_runcard['Instruments'][specs['instrument']]
+            gate = specs.get('gate', None)
+            gate = variables[gate] if gate else None
             variables[name] = _variables.Meter(
-                meter=specs['meter'], instrument=instrument
+                meter=specs['meter'], instrument=instrument, gate=gate
             )
         elif 'knob' in specs:
             instrument = converted_runcard['Instruments'][specs['instrument']]

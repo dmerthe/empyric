@@ -11,7 +11,7 @@ from empyric.collection.instrument import Instrument
 from empyric import instruments, types
 from empyric.tools import write_to_socket, read_from_socket
 from empyric.types import recast, Integer, Float, Boolean, Toggle, Type, Array, \
-    String
+    String, ON
 
 
 class Variable:
@@ -175,14 +175,26 @@ class Meter(Variable):
     associated with.
 
     The `meter` argument is the label of the meter on the instrument.
+
+    The `gate` optional argument is another variable which gates measurements.
+    This is useful for situations where indefinitely continuous measurement of
+    the meter, as in the usual experiment loop, is not desirable. Generally,
+    it should be a variable of integer, boolean or toggle type. When the gate
+    variable evaluates to 1/True/On, the meter can be measured. Otherwise,
+    attempts to measure the meter will have no effect (`None` is returned).
     """
 
     _settable = False  #:
 
-    def __init__(self, instrument: Instrument, meter: str):
+    def __init__(self, instrument: Instrument, meter: str, gate=None):
 
         self.instrument = instrument
         self.meter = meter
+
+        if gate and isinstance(gate, Variable):
+            self.gate = gate
+        else:
+            self.gate = Parameter(ON)
 
         self.dtype = typing.get_type_hints(
             getattr(instrument, 'measure_' + meter.replace(' ', '_'))
@@ -196,6 +208,9 @@ class Meter(Variable):
         """
         Measured value of the meter of an instrument
         """
+
+        if not self.gate.value:
+            return None
 
         self._value = self.instrument.measure(self.meter)
         self.last_evaluation = time.time()
@@ -474,7 +489,7 @@ class Parameter(Variable):
 
     _settable = True  #:
 
-    def __init__(self, parameter: [bool, str, numbers.Number]):
+    def __init__(self, parameter: Type):
 
         self.parameter = recast(parameter)
         self._value = parameter
