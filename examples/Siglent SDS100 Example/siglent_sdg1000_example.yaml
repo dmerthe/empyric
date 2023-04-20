@@ -1,0 +1,81 @@
+Description:
+ name: Siglent SDS1000 Experiment
+ operator: Mike
+ platform: Test Stand 1
+ comments: Who is Mike? There is no Test Stand 1
+
+Settings:
+ step interval: 1
+ save interval: 10
+
+Instruments:
+
+ Oscilloscope:
+  type: SiglentSDS1000
+  address: '10.50.2.231::5025'
+
+Variables:
+
+ Horizontal Scale:
+  instrument: Oscilloscope
+  knob: horz scale
+
+ Horizontal Position:
+  instrument: Oscilloscope
+  knob: horz position
+
+ Channel 1 Scale:
+  instrument: Oscilloscope
+  knob: ch1 scale
+
+ Channel 1 Position:
+  instrument: Oscilloscope
+  knob: ch1 position
+
+ Channel 2 Scale:
+  instrument: Oscilloscope
+  knob: ch2 scale
+
+ Channel 2 Position:
+  instrument: Oscilloscope
+  knob: ch2 position
+
+ Channel 3 Scale:
+  instrument: Oscilloscope
+  knob: ch3 scale
+
+ Channel 3 Position:
+  instrument: Oscilloscope
+  knob: ch3 position
+
+ Channel 4 Scale:
+  instrument: Oscilloscope
+  knob: ch4 scale
+
+ Channel 4 Position:
+  instrument: Oscilloscope
+  knob: ch4 position
+
+ Trigger Source:
+  instrument: Oscilloscope
+  knob: trigger source
+
+ Trigger Level:
+  instrument: Oscilloscope
+  knob: trigger level
+
+ Channel 1 Waveform:
+  instrument: Oscilloscope
+  meter: ch1 waveform
+
+ Channel 2 Waveform:
+  instrument: Oscilloscope
+  meter: ch2 waveform
+
+ Channel 3 Waveform:
+  instrument: Oscilloscope
+  meter: ch3 waveform
+
+ Channel 4 Waveform:
+  instrument: Oscilloscope
+  meter: ch4 waveform

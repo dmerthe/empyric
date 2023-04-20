@@ -2,7 +2,7 @@ import struct
 from empyric.tools import find_nearest
 from empyric.adapters import *
 from empyric.collection.instrument import *
-from empyric.types import Float, Array
+from empyric.types import Float, Array, Integer
 
 
 class TekScope(Instrument):
@@ -524,6 +524,7 @@ class SiglentSDS1000(Instrument):
         'ch3 position',
         'ch4 scale',
         'ch4 position',
+        'trigger source'
         'trigger level'
     )
 
@@ -540,6 +541,8 @@ class SiglentSDS1000(Instrument):
         1e-3, 2e-3, 5e-3, 10e-3, 20e-3, 50e-3, 100e-3, 200e-3, 500e-3,
         1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0  # seconds
     ]
+
+    _trg_src = None
 
     # Time axis control
     @setter
@@ -663,12 +666,26 @@ class SiglentSDS1000(Instrument):
     @setter
     def set_trigger_level(self, level: Float):
 
-        self.write(f'TRLV {level}V')
+        trg_src = self.get_trigger_source()
+
+        self.write(f'C{trg_src}:TRLV {level}V')
 
     @getter
     def get_trigger_level(self) -> Float:
 
-        float(self.query('TRLV?').split('TRLV ')[-1][:-1])
+        trg_src = self.get_trigger_source()
+
+        return float(self.query(f'C{trg_src}:TRLV?').split('TRLV ')[-1][:-1])
+
+    @setter
+    def set_trigger_source(self, source: Integer):
+
+        self.write(f'TRSE EDGE,SR,C{int(source)},OFF')
+
+    @getter
+    def get_trigger_source(self) -> Integer:
+
+        return int(self.query('TRSE?').split('SR,C')[-1][0])
 
     # Channel measurements
     def _measure_chn_waveform(self, n):
