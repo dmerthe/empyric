@@ -117,6 +117,11 @@ class Keithley6500(Instrument):
     you can find or set it on the unit's Communication --> LAN menu.
 
     Uses TSP communication protocol.
+
+    The `range` knob has separate values for the basic measurements (meter =
+    'voltage' or 'current') and the digitized measurements (meter = 'fast
+    voltages' or 'fast currents'). Be sure to set the desired range after
+    switching meter types.
     """
 
     name = 'Keithley6500'
@@ -252,18 +257,33 @@ class Keithley6500(Instrument):
 
     @setter
     def set_range(self, _range: Float):
-        if _range == 0.0:
-            self.write('dmm.measure.autorange = dmm.ON')
+
+        meter = self.get_meter()
+
+        if meter in ['voltage', 'current']:
+            if _range == 0.0:
+                self.write('dmm.measure.autorange = dmm.ON')
+            else:
+                self.write(f'dmm.measure.range = {_range}')
+        elif meter in ['fast voltages', 'fast currents']:
+            self.write('dmm.digitize.range = %.3e' % _range)
         else:
-            self.write(f'dmm.measure.range = {_range}')
+            return self.get_range()
+
 
     @getter
     def get_range(self) -> Float:
 
-        if self.query('print(dmm.measure.autorange)') == 'dmm.ON':
-            return 0.0
-        else:
-            return float(self.query('print(dmm.measure.range)'))
+        meter = self.get_meter()
+
+        if meter in ['voltage', 'current']:
+            if self.query('print(dmm.measure.autorange)') == 'dmm.ON':
+                return 0.0
+            else:
+                return float(self.query('print(dmm.measure.range)'))
+
+        elif meter in ['fast voltages', 'fast currents']:
+            return float(self.query('print(dmm.digitize.range)'))
 
     @setter
     def set_trigger_source(self, trigger_source: String):
@@ -323,7 +343,7 @@ class Keithley6500(Instrument):
             f'{trigger_src})\n'
             'trigger.model.setblock(3, trigger.BLOCK_DELAY_CONSTANT, 0)\n'
             'trigger.model.setblock(4, trigger.BLOCK_MEASURE_DIGITIZE, '
-            'defbuffer1)\n'
+            'defbuffer1, dmm.digitize.count)\n'
             'trigger.model.initiate()\n'
         )
 
@@ -352,7 +372,7 @@ class Keithley6500(Instrument):
 
             running = state in running_states
 
-            time.sleep(0.5)
+            time.sleep(0.25)
 
         if state in failed_states:
             raise RuntimeError(

@@ -1050,27 +1050,30 @@ class ConfigTestDialog(BasicDialog):
 
     def set_knob_entry(self, knob):
         value = self.knob_entries[knob].get()
-        self.instrument.set(knob, recast(value))
+        self.instrument.set(knob.replace(' ', '_'), recast(value))
 
     def get_knob_entry(self, knob):
 
-        if hasattr(self.instrument, 'get_'+knob):
+        if hasattr(self.instrument, 'get_'+knob.replace(' ', '_')):
             value = self.instrument.get(knob)
         else:
-            value = getattr(self.instrument, knob)
+            value = getattr(self.instrument, knob.replace(' ', '_'))
 
         self.knob_entries[knob].delete(0, tk.END)
         self.knob_entries[knob].insert(0, str(value))
 
     def update_meter_entry(self, meter):
+
         value = self.instrument.measure(meter)
 
         if np.ndim(value) == 1:  # store array data as CSV files
             dataframe = pd.DataFrame({meter: value})
-            path = meter.replace(' ', '_') + '_'
+            path = self.instrument.name + '-' + meter.replace(' ', '_') + '_'
             now = datetime.datetime.now()
             path += now.strftime('%Y%m%d-%H%M%S') + '.csv'
             dataframe.to_csv(path)
+
+            value = path
 
         self.meter_entries[meter].config(state=tk.NORMAL)
         self.meter_entries[meter].delete(0, tk.END)
@@ -1116,11 +1119,11 @@ class ConfigTestDialog(BasicDialog):
             )
             self.set_buttons[knob].grid(row=i, column=2)
 
-            self.set_buttons[knob] = tk.Button(
+            self.get_buttons[knob] = tk.Button(
                 master, text='Get',
                 command=lambda knob=knob: self.get_knob_entry(knob)
             )
-            self.set_buttons[knob].grid(row=i, column=3)
+            self.get_buttons[knob].grid(row=i, column=3)
 
             i += 1
 

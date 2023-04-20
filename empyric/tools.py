@@ -168,7 +168,7 @@ def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1):
         part = b''
 
         try:
-            part = _socket.recv(1)
+            part = _socket.recv(4096)
         except ConnectionResetError as err:
             print(f'Warning: {err}')
             break
