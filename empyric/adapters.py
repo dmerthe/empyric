@@ -909,11 +909,11 @@ class Socket(Adapter):
 
         return 'Success'
 
-    def _read(self, nbytes=4096):
+    def _read(self, nbytes=None, decode=True):
 
         return read_from_socket(
             self.backend, nbytes=nbytes, termination=self.read_termination,
-            timeout=self.timeout
+            timeout=self.timeout, decode=decode
         )
 
     def _query(self, question, nbytes=4096):

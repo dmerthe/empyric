@@ -10,6 +10,7 @@ class TekScope(Instrument):
     Tektronix oscillscope of the TDS200, TDS1000/2000, TDS1000B/2000B,
     TPS2000 series
 
+    NOT TESTED
     """
 
     name = 'TekScope'
@@ -122,6 +123,8 @@ class TekScope(Instrument):
 class MulticompProScope(Instrument):
     """
     Multicomp Pro PC Oscilloscope.
+
+    NOT TESTED
     """
 
     supported_adapters = (
@@ -494,3 +497,236 @@ class MulticompProScope(Instrument):
         self.write(':WAV:END CH2')
 
         return data[1]
+
+
+class SiglentSDS1000(Instrument):
+    """
+    Siglent SDS1000 series digital oscilloscope
+    """
+
+    name = 'SiglentSDS1000'
+
+    supported_adapters = (
+        (Socket, {
+            'write_termination': '\n',
+            'read_termination': '\n'
+        }),
+    )
+
+    knobs = (
+        'horz scale',
+        'horz position',
+        'ch1 scale',
+        'ch1 position',
+        'ch2 scale',
+        'ch2 position',
+        'ch3 scale',
+        'ch3 position',
+        'ch4 scale',
+        'ch4 position',
+        'trigger level'
+    )
+
+    meters = (
+        'ch1 waveform',
+        'ch2 waveform',
+        'ch3 waveform',
+        'ch4 waveform'
+    )
+
+    horz_scales = [
+        1e-9, 2e-9, 5e-9, 10e-9, 20e-9, 50e-9, 100e-9, 200e-9, 500e-9,
+        1e-6, 2e-6, 5e-6, 10e-6, 20e-6, 50e-6, 100e-6, 200e-6, 500e-6,
+        1e-3, 2e-3, 5e-3, 10e-3, 20e-3, 50e-3, 100e-3, 200e-3, 500e-3,
+        1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0  # seconds
+    ]
+
+    # Time axis control
+    @setter
+    def set_horz_scale(self, scale: Float):
+
+        nearest_scale = find_nearest(
+            self.horz_scales, scale,
+            overestimate=True
+        )
+
+        self.write(f'TDIV {nearest_scale}S')
+
+        return nearest_scale
+
+    @getter
+    def get_horz_scale(self) -> Float:
+
+        return float(self.query('TDIV?').split('TDIV ')[-1][:-1])
+
+
+    @setter
+    def set_horz_position(self, position: Float):
+
+        self.write(f'TRDL {position}S')
+
+    @getter
+    def get_horz_position(self) -> Float:
+
+        return float(self.query('TRDL?').split('TRDL ')[-1][:-1])
+
+    # Channel control base functions
+    def _set_chn_scale(self, n, scale):
+
+        self.write('C%d:VDIV %.3eV' % (n, float(scale)))
+
+    def _get_chn_scale(self, n):
+
+        response = self.query('C%d:VDIV?' % n).split('C%d:VDIV ' % n)[-1][:-1]
+
+        return float(response)
+
+    def _set_chn_position(self, n, position):
+
+        self.write('C%d:OFST %.3eV' % (n, float(position)))
+
+    def _get_chn_position(self, n):
+
+        response = self.query('C%d:OFST?' % n).split('C%d:OFST ' % n)[-1][:-1]
+
+        return float(response)
+
+    # Channel 1 control
+    @setter
+    def set_ch1_scale(self, scale: Float):
+        self._set_chn_scale(1, scale)
+
+    @getter
+    def get_ch1_scale(self) -> Float:
+        return self._get_chn_scale(1)
+
+    @setter
+    def set_ch1_position(self, position: Float):
+        self._set_chn_position(1, position)
+
+    @getter
+    def get_ch1_position(self) -> Float:
+        return self._get_chn_position(1)
+
+    # Channel 2 control
+    @setter
+    def set_ch2_scale(self, scale: Float):
+        self._set_chn_scale(2, scale)
+
+    @getter
+    def get_ch2_scale(self) -> Float:
+        return self._get_chn_scale(2)
+
+    @setter
+    def set_ch2_position(self, position: Float):
+        self._set_chn_position(2, position)
+
+    @getter
+    def get_ch2_position(self) -> Float:
+        return self._get_chn_position(2)
+
+    # Channel 3 control
+    @setter
+    def set_ch3_scale(self, scale: Float):
+        self._set_chn_scale(3, scale)
+
+    @getter
+    def get_ch3_scale(self) -> Float:
+        return self._get_chn_scale(3)
+
+    @setter
+    def set_ch3_position(self, position: Float):
+        self._set_chn_position(3, position)
+
+    @getter
+    def get_ch3_position(self) -> Float:
+        return self._get_chn_position(3)
+
+    # Channel 4 control
+    @setter
+    def set_ch4_scale(self, scale: Float):
+        self._set_chn_scale(4, scale)
+
+    @getter
+    def get_ch4_scale(self) -> Float:
+        return self._get_chn_scale(4)
+
+    @setter
+    def set_ch4_position(self, position: Float):
+        self._set_chn_position(4, position)
+
+    @getter
+    def get_ch4_position(self) -> Float:
+        return self._get_chn_position(4)
+
+    # Trigger control
+    @setter
+    def set_trigger_level(self, level: Float):
+
+        self.write(f'TRLV {level}V')
+
+    @getter
+    def get_trigger_level(self) -> Float:
+
+        float(self.query('TRLV?').split('TRLV ')[-1][:-1])
+
+    # Channel measurements
+    def _measure_chn_waveform(self, n):
+
+        self.write('WFSU SP,0,NP,0,FP,0')  # setup to get all data points
+
+        self.write('C%d:WF? DAT2' % n)  # send data request
+
+        prior_timeout = self.adapter.timeout
+
+        self.adapter.timeout = 10  # data transmission may take extra time
+
+        response = self.read(decode=False)
+
+        if response is None:
+            return None
+        elif len(response) == 0:
+            return None
+
+        data = response.split(
+            b'C%d:WF DAT2,#9' % n
+        )[-1]
+
+        size, waveform, termination = int(data[:9]), data[9:-2], data[-2:]
+
+        if termination != b'\n\n' or len(waveform) != size:
+            print(
+                'Warning: truncated data received '
+                f'for channel {n} of {self.name}'
+            )
+            return None
+        elif not waveform:
+            return None
+
+        # convert bytes to integers
+        waveform = np.array(struct.unpack('b'*size, waveform), dtype=np.float64)
+
+        scale = self._get_chn_scale(n)
+        pos = self._get_chn_position(n)
+
+        waveform = (scale/25.0)*waveform - pos
+
+        self.adapter.timeout = prior_timeout  # put timeout back
+
+        return waveform
+
+    @measurer
+    def measure_ch1_waveform(self) -> Array:
+        return self._measure_chn_waveform(1)
+
+    @measurer
+    def measure_ch2_waveform(self) -> Array:
+        return self._measure_chn_waveform(2)
+
+    @measurer
+    def measure_ch3_waveform(self) -> Array:
+        return self._measure_chn_waveform(3)
+
+    @measurer
+    def measure_ch4_waveform(self) -> Array:
+        return self._measure_chn_waveform(4)
