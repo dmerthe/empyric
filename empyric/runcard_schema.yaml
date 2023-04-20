@@ -1,0 +1,85 @@
+map:
+
+  Description: {required: true, map: {
+    name: {type: str, required: true},
+    operator: {type: str},
+    platform: {type: str},
+    comments: {type: str}
+  }}
+
+  Settings: {map: {
+    follow-up: {type: str},
+    step interval: {type: any},
+    save interval: {type: any},
+    plot interval: {type: any},
+    end: {type: any}
+  }}
+
+  Instruments: {map: {
+    regex;(.+): {required: true, map: {  # instrument name
+      type: {type: str, required: true},
+      address: {type: any},
+      presets: {map: {
+        regex;(.+): {type: any}  # knob name and value
+      }},
+      postsets: {map: {
+        regex;(.+): {type: any}  # knob name and value
+      }},
+      regex;(.+): {type: any}
+    }}
+  }}
+
+  Variables: {required: true, map: {
+    regex;(.+): {required: true, map: {  # variable name
+
+      instrument: {type: str},  # for knob and meter type variables
+      knob: {type: str},  # for knob type variables
+      lower limit: {type: number},
+      upper limit: {type: number},
+      meter: {type: str},  # for meter type variables
+
+      parameter: {type: any},  # for parameter type variables
+
+      expression: {type: str},  # for expression variables
+      definitions: {map: {
+        regex;(.+): {type: any}  # references to other variables
+      }},
+
+      remote: {type: str},  # for remote variables
+      protocol: {type: any},
+      alias: {type: any},
+      dtype: {type: str},
+      settable: {type: bool}
+    }}
+  }}
+
+  Alarms: {map: {
+    regex;(.+): {required: true, map: {  # alarm name
+      protocol: {type: str},
+      condition: {type: str, required: true},
+      definitions: {map: {
+        regex;(.+): {type: str, required: true}
+      }}
+    }}
+  }}
+
+  Routines: {map: {
+    regex;(.+): {required: true, map: {  # routine name
+      type: {type: str, required: true},
+      regex;(.+): {type: any}
+    }}
+  }}
+
+  Plots: {map: {
+    regex;(.+): {required: true, map: {  # plot name
+      x: {type: any},
+      y: {type: any, required: true},
+      s: {type: any},  # for parametric plots
+      style: {type: str},
+      xlabel: {type:  str},
+      ylabel: {type: str},
+      configure: {map: {
+        regex;(.+): {type: any}  # keyword args passed to matplotlib
+      }}
+    }}
+  }}

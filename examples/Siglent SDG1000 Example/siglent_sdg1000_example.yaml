@@ -1,0 +1,75 @@
+Description:
+ name: Siglent Experiment
+ operator: Mike
+ platform: Test Stand 1
+ comments: Who is Mike? There is no Test Stand 1
+
+Settings:
+ step interval: 0.5
+ save interval: 10
+
+Instruments:
+ Function Generator:
+  type: SiglentSDG1000
+  address: '10.50.2.230::5025'
+  presets:
+   channel 1 waveform: PULSE
+   channel 2 waveform: PULSE
+
+Variables:
+
+ Channel 1 Output:
+  instrument: Function Generator
+  knob: channel 1 output
+ Channel 2 Output:
+  instrument: Function Generator
+  knob: channel 2 output
+
+ Channel 1 Load:
+  instrument: Function Generator
+  knob: channel 1 load
+ Channel 2 Load:
+  instrument: Function Generator
+  knob: channel 2 load
+
+ Channel 1 Waveform:
+  instrument: Function Generator
+  knob: channel 1 waveform
+ Channel 2 Waveform:
+  instrument: Function Generator
+  knob: channel 2 waveform
+
+ Channel 1 High Level:
+  instrument: Function Generator
+  knob: channel 1 high level
+ Channel 2 High Level:
+  instrument: Function Generator
+  knob: channel 2 high level
+
+ Channel 1 Low Level:
+  instrument: Function Generator
+  knob: channel 1 low level
+ Channel 2 LowLevel:
+  instrument: Function Generator
+  knob: channel 2 low level
+
+ Channel 1 Frequency:
+  instrument: Function Generator
+  knob: channel 1 frequency
+ Channel 2 Frequency:
+  instrument: Function Generator
+  knob: channel 2 frequency
+
+ Channel 1 Pulse Width:
+  instrument: Function Generator
+  knob: channel 1 pulse width
+ Channel 2 Pulse Width:
+  instrument: Function Generator
+  knob: channel 2 pulse width
+
+ Channel 1 Pulse Delay:
+  instrument: Function Generator
+  knob: channel 1 pulse delay
+ Channel 2 Pulse Delay:
+  instrument: Function Generator
+  knob: channel 2 pulse delay

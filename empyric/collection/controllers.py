@@ -1,5 +1,5 @@
 from empyric.adapters import *
-from empyric.tools import is_on, is_off
+from empyric.types import Toggle, ON, OFF, Float, Integer, String
 from empyric.collection.instrument import *
 
 
@@ -11,7 +11,7 @@ class OmegaCN7500(Instrument):
     name = 'OmegaCN7500'
 
     supported_adapters = (
-        (Modbus, {'slave_mode': 'rtu',
+        (ModbusSerial, {'slave_mode': 'rtu',
                   'baud_rate': 38400,
                   'parity': 'N',
                   'delay': 0.2}),
@@ -31,50 +31,52 @@ class OmegaCN7500(Instrument):
     )
 
     @setter
-    def set_output(self, state):
-        if state == 'ON':
-            self.backend.write_bit(0x814, 1)  # turn on output & start PID control
-        elif state == 'OFF':
-            self.backend.write_bit(0x814, 0)  # turn off output & stop PID control
+    def set_output(self, state: Toggle):
+        if state == ON:
+            # turn on output & start PID control
+            self.backend.write_bit(0x814, 1)
+        elif state == OFF:
+            # turn off output & stop PID control
+            self.backend.write_bit(0x814, 0)
 
     @setter
-    def set_setpoint(self, setpoint):
-        self.write(0x1001, 10*setpoint)
+    def set_setpoint(self, setpoint: Float):
+        self.write(0x1001, int(10*setpoint))
 
     @getter
-    def get_setpoint(self):
+    def get_setpoint(self) -> Float:
         return self.read(0x1001) / 10
 
     @setter
-    def set_proportional_band(self, P):
-        self.write(0x1009, int(P))
+    def set_proportional_band(self, P: Integer):
+        self.write(0x1009, P)
 
     @getter
-    def get_proportional_band(self):
+    def get_proportional_band(self) -> Integer:
         return self.read(0x1009)
 
     @setter
-    def set_integration_time(self, Ti):
-        self.write(0x100c, int(Ti))
+    def set_integration_time(self, Ti: Integer):
+        self.write(0x100c, Ti)
 
     @getter
-    def get_integration_time(self):
+    def get_integration_time(self) -> Integer:
         return self.read(0x100c)
 
     @setter
-    def set_derivative_time(self, Td):
-        self.write(0x100b, int(Td))
+    def set_derivative_time(self, Td: Integer):
+        self.write(0x100b, Td)
 
     @getter
-    def get_derivative_time(self):
+    def get_derivative_time(self) -> Integer:
         return self.read(0x100b)
 
     @measurer
-    def measure_temperature(self):
+    def measure_temperature(self) -> Float:
         return self.read(0x1000) / 10
 
     @measurer
-    def measure_power(self):
+    def measure_power(self) -> Float:
         return self.read(0x1000) / 10
 
 
@@ -86,7 +88,7 @@ class OmegaPlatinum(Instrument):
     name = "OmegaPlatinum"
 
     supported_adapters = (
-        (Modbus, {
+        (ModbusSerial, {
             'baud_rate': 19200,
             'parity': 'O'
         }),
@@ -119,62 +121,56 @@ class OmegaPlatinum(Instrument):
     inverse_TC_map = {v: k for k, v in TC_map.items()}
 
     @measurer
-    def measure_temperature(self):
+    def measure_temperature(self) -> Float:
         return self.read(0x0280, dtype='float')
 
     @measurer
-    def measure_power(self):
+    def measure_power(self) -> Float:
         return self.read(0x022A, dtype='float')
 
     @setter
-    def set_setpoint(self, setpoint):
+    def set_setpoint(self, setpoint: Float):
         self.write(0x02E2, setpoint, dtype='float')
 
     @getter
-    def get_setpoint(self):
+    def get_setpoint(self) -> Float:
         return self.read(0x02E2, dtype='float')
 
     @setter
-    def set_autotune(self, state):
-        if is_on(state):
+    def set_autotune(self, state: Toggle):
+        if state == ON:
             self.write(0x0243, 1)
-        elif is_off(state):
+        else:
             self.write(0x0243, 0)
 
     @setter
-    def set_output(self, state):
-        if is_on(state):
+    def set_output(self, state: Toggle):
+        if state == ON:
             self.write(0x0240, 6)
-        elif is_off(state):
+        else:
             self.write(0x0240, 8)
 
     @getter
-    def get_output(self):
+    def get_output(self) -> Toggle:
         state = self.read(0x0240)
         if state == 6 or state == 4:
-            return 'ON'
-        elif state == 8:
-            return 'OFF'
-        elif state == 1:
-            return 'IDLE'
-        elif state == 10:
-            return 'ALARM'
+            return ON
         else:
-            return float('nan')
+            return OFF
 
     @setter
-    def set_tc_type(self, _type):
+    def set_tc_type(self, _type: String):
         try:
             self.write(0x0283, OmegaPlatinum.TC_map[_type.upper()])
         except (KeyError, AttributeError):
             raise ValueError(f'{self.name}: Invalid thermocouple type {_type}')
 
     @getter
-    def get_tc_type(self):
+    def get_tc_type(self) -> String:
         try:
             return self.inverse_TC_map[self.read(0x0283)]
         except KeyError:
-            return None
+            return 'None'
 
 
 class RedLionPXU(Instrument):
@@ -185,7 +181,7 @@ class RedLionPXU(Instrument):
     name = 'RedLionPXU'
 
     supported_adapters = (
-        (Modbus, {'buad_rate': 38400}),
+        (ModbusSerial, {'buad_rate': 38400}),
     )
 
     knobs = (
@@ -200,29 +196,31 @@ class RedLionPXU(Instrument):
     )
 
     @setter
-    def set_output(self, state):
-        if state == 'ON':
-            self.backend.write_bit(0x11, 1)  # turn on output & start PID control
-        elif state == 'OFF':
-            self.backend.write_bit(0x11, 0)  # turn off output & stop PID control
+    def set_output(self, state: Toggle):
+        if state == ON:
+            # turn on output & start PID control
+            self.backend.write_bit(0x11, 1)
+        elif state == OFF:
+            # turn off output & stop PID control
+            self.backend.write_bit(0x11, 0)
 
     @setter
-    def set_setpoint(self, setpoint):
+    def set_setpoint(self, setpoint: Integer):
         self.write(0x1, int(setpoint))
 
     @measurer
-    def measure_temperature(self):
+    def measure_temperature(self) -> Integer:
         return self.read(0x0)
 
     @measurer
-    def measure_power(self):
+    def measure_power(self) -> Float:
         return self.read(0x8) / 10
 
     @setter
-    def set_autotune(self, state):
-        if state == 'ON':
+    def set_autotune(self, state: Toggle):
+        if state == ON:
             self.write(0xf, 1)
-        elif state == 'OFF':
+        elif state == OFF:
             self.write(0xf, 0)
 
 
@@ -234,7 +232,7 @@ class WatlowEZZone(Instrument):
     name = 'WatlowEZZone'
 
     supported_adapters = (
-        (Modbus, {'baud_rate': 9600}),
+        (ModbusSerial, {'baud_rate': 9600}),
     )
 
     knobs = (
@@ -246,37 +244,127 @@ class WatlowEZZone(Instrument):
     )
 
     @measurer
-    def measure_temperature(self):
-        return self.read(360, dtype='float', byte_order=3)  # swapped little-endian byte order (= 3 in minimalmodbus)
+    def measure_temperature(self) -> Float:
+        # swapped little-endian byte order (= 3 in minimalmodbus)
+        return self.read(360, dtype='float', byte_order=3)
 
     @getter
-    def get_setpoint(self):
+    def get_setpoint(self) -> Float:
         return self.read(2160, dtype='float', byte_order=3)
 
     @setter
-    def set_setpoint(self, setpoint):
+    def set_setpoint(self, setpoint: Float):
         return self.write(2160, setpoint, dtype='float', byte_order=3)
 
     @getter
-    def get_proportional_band(self):
+    def get_proportional_band(self) -> Float:
         return self.read(1890, dtype='float', byte_order=3)
 
     @setter
-    def set_proportional_band(self, band):
+    def set_proportional_band(self, band: Float):
         return self.write(1890, band, dtype='float', byte_order=3)
 
     @getter
-    def get_time_integral(self):
+    def get_time_integral(self) -> Float:
         return self.read(1894, dtype='float', byte_order=3)
 
     @setter
-    def set_time_integral(self, integral):
+    def set_time_integral(self, integral: Float):
         return self.write(1894, integral, dtype='float', byte_order=3)
 
     @getter
-    def get_time_derivative(self):
+    def get_time_derivative(self) -> Float:
         return self.read(1896, dtype='float', byte_order=3)
 
     @setter
-    def set_time_derivative(self, derivative):
+    def set_time_derivative(self, derivative: Float):
         return self.write(1896, derivative, dtype='float', byte_order=3)
+
+
+class MKSGSeries(Instrument):
+    """MKS G series mass flow controller"""
+
+    name = 'MKSGSeries'
+
+    supported_adapters = ((Modbus, {}),)
+
+    knobs = (
+        'setpoint',  # flow rate setpoint in SCCM
+        'ramp time'  # ramp time in milliseconds
+    )
+
+    meters = (
+        'flow rate',  # actual flow rate in SCCM
+        'valve position',  # valve position in percent
+        'temperature'  # temperature in degrees C
+    )
+
+    @setter
+    def set_setpoint(self, setpoint: Float):
+        self.write(16, 0xA000, setpoint, dtype='32bit_float')
+
+    @getter
+    def get_setpoint(self) -> Float:
+        return self.read(3, 0xA000, count=2, dtype='32bit_float')
+
+    @setter
+    def set_ramp_time(self, ramp_time: Float):
+        self.write(16, 0xA002, int(ramp_time), dtype='32bit_uint')
+
+    @getter
+    def get_ramp_time(self) -> Float:
+        return self.read(3, 0xA002, count=2, dtype='32bit_uint')
+
+    @measurer
+    def measure_flow_rate(self) -> Float:
+        return self.read(4, 0x4000, count=2, dtype='32bit_float')
+
+    @measurer
+    def measure_valve_position(self) -> Float:
+        return self.read(4, 0x4004, count=2, dtype='32bit_float')
+
+    @measurer
+    def measure_temperature(self) -> Float:
+        return self.read(4, 0x4002, count=2, dtype='32bit_float')
+
+
+class AlicatMFC(Instrument):
+    """Alicat mass flow controller"""
+
+    name = 'AlicatMFC'
+
+    supported_adapters = (
+        (Modbus, {}),
+    )
+
+    knobs = (
+        'setpoint',  # flow rate setpoint in SCCM
+    )
+
+    meters = (
+        'flow rate',  # actual flow rate in SCCM
+        'temperature',  # temperature in degrees C
+        'pressure'  
+        # pressure in PSI (absolute, gauge or differential,
+        # depending on device configuration)
+    )
+
+    @setter
+    def set_setpoint(self, setpoint: Float):
+        self.write(16, 1009, setpoint, dtype='32bit_float')
+
+    @getter
+    def get_setpoint(self) -> Float:
+        return self.read(3, 1009, count=2, dtype='32bit_float')
+
+    @measurer
+    def measure_flow_rate(self) -> Float:
+        return self.read(4, 1208, count=2, dtype='32bit_float')
+
+    @measurer
+    def measure_temperature(self) -> Float:
+        return self.read(4, 1204, count=2, dtype='32bit_float')
+
+    @measurer
+    def measure_pressure(self) -> Float:
+        return self.read(4, 1202, count=2, dtype='32bit_float')

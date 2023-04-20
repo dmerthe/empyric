@@ -2,7 +2,8 @@ import time
 import numpy as np
 from empyric.instruments import Instrument
 from empyric.instruments import setter, measurer
-from empyric.adapters import Adapter
+from empyric.adapters import Adapter, Modbus
+from empyric.types import Boolean, Toggle, Integer, Float, String, Array
 
 
 class Clock(Instrument):
@@ -32,11 +33,14 @@ class Clock(Instrument):
 
         Instrument.__init__(self, *args, **kwargs)
 
-        self.start_time = self.stop_time = time.time()  # clock is initially stopped
+        # Initially stopped
+        self.state = 'STOP'
+        self.start_time = self.stop_time = time.time()
+
         self.stoppage = 0  # total time during which the clock has been stopped
 
     @setter
-    def set_state(self, state):
+    def set_state(self, state: String):
         """
         Set the clock state:
 
@@ -51,10 +55,14 @@ class Clock(Instrument):
                 self.stoppage += time.time() - self.stop_time
                 self.stop_time = False
 
+            self.state = 'START'
+
         elif state == 'STOP':
 
             if not self.stop_time:
                 self.stop_time = time.time()
+
+            self.state = 'START'
 
         elif state == 'RESET':
 
@@ -64,12 +72,40 @@ class Clock(Instrument):
             if self.stop_time:
                 self.stop_time = self.start_time
 
-            return self.state  # return to either the START or STOP state once reset
+            return self.state  # return to START or STOP state once reset
 
     @measurer
-    def measure_time(self):
+    def measure_time(self) -> Float:
         """Measure the clock time"""
         return self._time
+
+
+class Echo(Instrument):
+    """
+    Virtual instrument with a single knob "input" and single meter "output",
+    useful for testing.
+
+    The "output" meter simply returns the value of the "input" knob.
+    """
+
+    name = 'Echo'
+
+    supported_adapters = (
+        (Adapter, {}),
+    )
+
+    knobs = ('input',)
+    presets = {'input': 0}
+
+    meters = ('output',)
+
+    @setter
+    def set_input(self, _input: Float):
+        pass
+
+    @measurer
+    def measure_output(self) -> Float:
+        return self.input
 
 
 class HenonMapper(Instrument):
@@ -100,7 +136,7 @@ class HenonMapper(Instrument):
     x, y = 0.63, 0.19  # near the unstable fixed point
 
     @setter
-    def set_a(self, value):
+    def set_a(self, value: Float):
         """
         Set the parameter a
 
@@ -110,7 +146,7 @@ class HenonMapper(Instrument):
         pass
 
     @setter
-    def set_b(self, value):
+    def set_b(self, value: Float):
         """
         Set the parameter b
 
@@ -120,16 +156,17 @@ class HenonMapper(Instrument):
         pass
 
     @measurer
-    def measure_x(self):
+    def measure_x(self) -> Float:
         """
         Measure the coordinate x.
-        Each call triggers a new iteration, with new values set for x and y based on the Henon Map. Therefore, each call
-        to ``measure_x`` should be followed by a call to ``measure_y``.
+        Each call triggers a new iteration, with new values set for x and y
+        based on the Henon Map. Therefore, each call to ``measure_x`` should
+        be followed by a call to ``measure_y``.
 
         :return: (float) current value of x
         """
 
-        x_new = 1 - self.a * self.x ** 2 + self.y
+        x_new = 1.0 - self.a * self.x ** 2 + self.y
         y_new = self.b * self.x
 
         self.x = x_new
@@ -138,10 +175,11 @@ class HenonMapper(Instrument):
         return self.x
 
     @measurer
-    def measure_y(self):
+    def measure_y(self) -> Float:
         """
         Measure the coordinate y.
-        Each call to ``measure_y`` should be preceded by a call to ``measure_x``.
+        Each call to ``measure_y`` should be preceded by a call to
+        ``measure_x``.
 
         :return: (float) current value of y
         """
@@ -192,27 +230,27 @@ class PIDController(Instrument):
         self.outputs = np.array([])
 
     @setter
-    def set_setpoint(self, setpoint):
+    def set_setpoint(self, setpoint: Float):
         """Set the process setpoint"""
         pass
 
     @setter
-    def set_proportional_gain(self, gain):
+    def set_proportional_gain(self, gain: Float):
         """Set the proportional gain"""
         pass
 
     @setter
-    def set_derivative_time(self, _time):
+    def set_derivative_time(self, _time: Float):
         """Set the derivative time"""
         pass
 
     @setter
-    def set_integral_time(self, _time):
+    def set_integral_time(self, _time: Float):
         """Set the integral time"""
         pass
 
     @setter
-    def set_input(self, input):
+    def set_input(self, input: Float):
         """Input the process value"""
 
         if len(self.times) == 0:
@@ -224,9 +262,10 @@ class PIDController(Instrument):
             self.inputs = np.concatenate([self.inputs, [input]])
 
     @measurer
-    def measure_output(self):
+    def measure_output(self) -> Float:
         """Get the controller output"""
-        if self.setpoint is None:  # Don't output anything unless the setpoint is defined
+        if self.setpoint is None:
+            # Don't output anything unless the setpoint is defined
             return None
 
         if len(self.outputs) < len(self.inputs):  # if input has been updated
@@ -237,14 +276,20 @@ class PIDController(Instrument):
             # Integral and derivative terms
             if len(self.times) > 1:
 
-                interval = np.argwhere(self.times >= self.times[-1] - self.integral_time).flatten()
+                interval = np.argwhere(
+                    self.times >= self.times[-1] - self.integral_time
+                ).flatten()
 
                 dt = np.diff(self.times[interval])
                 errors = (self.setpoints - self.inputs)[interval[1:]]
 
                 integral = np.sum(dt*errors)
 
-                derivative = -(self.inputs[-1] - self.inputs[-2]) / (self.times[-1] - self.times[-2])
+                derivative = -(
+                        self.inputs[-1] - self.inputs[-2]
+                ) / (
+                        self.times[-1] - self.times[-2]
+                )
             else:
                 integral = 0
                 derivative = 0
@@ -252,7 +297,9 @@ class PIDController(Instrument):
             tD = self.derivative_time
             tI = self.integral_time
 
-            output = self.proportional_gain*(error + tD*derivative + integral/tI)
+            output = self.proportional_gain*(
+                    error + tD*derivative + integral/tI
+            )
 
             self.outputs.append(output)
 
@@ -265,10 +312,11 @@ class RandomWalk(Instrument):
     """
     Virtual random walk process for testing controllers
 
-    Dynamics of the process value is determined by the mean, step and affinity knobs. The mean is the mean
-    value of the process in steady state, the step is the size of the step that the process can take in either direction upon each
-    measurement of the process value, and the affinity is the tendancy of the process value to return to its mean value
-    at each step.
+    Dynamics of the process value is determined by the mean, step and affinity
+    knobs. The mean is the mean value of the process in steady state, the step
+    is the size of the step that the process can take in either direction upon
+    each measurement of the process value, and the affinity is the tendancy of
+    the process value to return to its mean value at each step.
     """
 
     name = 'RandomWalk'
@@ -287,26 +335,30 @@ class RandomWalk(Instrument):
 
         Instrument.__init__(self,*args, **kwargs)
 
-        self.mean = 0
-        self.step = 1
+        self.mean = 0.
+        self.step = 1.
         self.affinity = 0.01
         self.value = self.mean
 
     @setter
-    def set_mean(self, mean):
+    def set_mean(self, mean: Float):
         pass
 
     @setter
-    def set_step(self, step):
+    def set_step(self, step: Float):
         pass
 
     @setter
-    def set_drift(self, drift):
+    def set_drift(self, drift: Float):
         pass
 
     @measurer
-    def measure_value(self):
-        self.value += np.random.choice([-self.step, self.step]) + self.affinity*(self.mean - self.value)
+    def measure_value(self) -> Float:
+
+        self.value += np.random.choice(
+            [-self.step, self.step]
+        ) + self.affinity*(self.mean - self.value)
+
         return self.value
 
 
@@ -326,9 +378,9 @@ class SimpleProcess(Instrument):
              'response time')
 
     presets = {
-        'setpoint': 0,
+        'setpoint': 0.0,
         'noise level': 0.1,
-        'response time': 10
+        'response time': 10.0
     }
 
     meters = ('value',)
@@ -342,7 +394,7 @@ class SimpleProcess(Instrument):
         self._time = self._clock.measure_time()
 
     @setter
-    def set_setpoint(self, setpoint):
+    def set_setpoint(self, setpoint: Float):
         if hasattr(self, '_time'):
             self.measure_value()
             self._clock.set_state('RESET')
@@ -350,18 +402,33 @@ class SimpleProcess(Instrument):
             self._value = setpoint
 
     @setter
-    def set_noise_level(self, noise_level):
+    def set_noise_level(self, noise_level: Float):
         pass
 
     @setter
-    def set_response_time(self, response_time):
+    def set_response_time(self, response_time: Float):
         pass
 
     @measurer
-    def measure_value(self):
+    def measure_value(self) -> Float:
 
         last_value = self._value
         t = self._clock.measure_time()  # time since last setpoint change
-        self._value = self.setpoint + (last_value - self.setpoint)*np.exp(-t / self.response_time)
+        self._value = self.setpoint + (
+                last_value - self.setpoint
+        )*np.exp(-t / self.response_time)
 
         return self._value + self.noise_level*(2*np.random.rand() - 1)
+
+
+class ModbusClient(Instrument):
+    """
+    Counterpart to the ModbusServer routine. Communicates with a ModbusServer
+    instance in other experiments to control variables.
+    """
+
+    name = 'DataClient'
+
+    supported_adapters = (
+        (Modbus, {}),
+    )

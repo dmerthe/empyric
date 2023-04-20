@@ -1,12 +1,7 @@
 .. _experiment-section:
 
-Variables & Experiments
+Experiments
 =================================
-
-.. autoclass:: empyric.experiment.Variable
-   :members:
-
-|
 
 .. autoclass:: empyric.experiment.Alarm
    :members:

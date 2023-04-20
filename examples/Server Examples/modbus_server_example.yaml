@@ -1,19 +1,17 @@
-# Basic runcard describing an experiment that measures the x and y values of a Henon Map.
-# To execute, run select_runcard.py in the examples directory, 
-# and then select this runcard from the file selection dialog.
+# Example showing how to set up a Server routine
+# Otherwise, works the same as the Henon Map Experiment example
 
 Description:
- name: Henon Map Experiment
- operator: Mike
- platform: Test Stand 1
- comments: Who is Mike? There is no Test Stand 1
+ name: Henon Map Experiment with Server
+ operator: Marie
+ platform: Bench 1
+ comments: A few neutrons never hurt anyone
 
 Settings:
- follow-up: henon_runcard_example.yaml  # experiment repeats ad infinitum
  step interval: 0.5
  plot interval: 5
  save interval: 10
- end: 60
+ end: 300
 
 Instruments:
  Henon Mapper:
@@ -30,8 +28,6 @@ Variables:
  Knob a:
   instrument: Henon Mapper
   knob: a
- Knob a Setpoint:
-  parameter: 1.4
  Knob b:
   instrument: Henon Mapper
   knob: b
@@ -70,13 +66,17 @@ Plots:
 
 Routines:
  Ramp Knob a:
-  type: Ramp
+  type: Timecourse
   knobs: Knob a
-  targets: Knob a Setpoint
-  rates: 0.7
-  start: 3
+  times: [3, 5]
+  values: [0.0, 1.4]
  Ramp Knob b:
   type: Timecourse
   knobs: Knob b
   times: [3, 5]
   values: [0.0, 0.3]
+ Server:
+  type: ModbusServer
+  knobs:
+   - Knob a
+   - Knob b

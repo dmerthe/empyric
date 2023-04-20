@@ -1,21 +1,87 @@
-import os, sys
+import argparse
+
+try:
+    import pytest
+except ImportError:
+    pytest = None
+
 from empyric.experiment import Manager
 
 
-def run_experiment():  # Run an experiment with a runcard
+# List of testable features.
+# Tests are invoked at the command line with `empyric --test <feature>`
+testable_features = [
+    'experiment',  # tests Variable, Experiment and Manager classes (default)
 
-    args = sys.argv[1:]
+    # Adpaters
+    'serial',
+    'gpib',
+    'usb',
+    'modbus',
+    'phidget'
+]
 
-    runcard = None
-    if len(args) > 0:
-        runcard = args[0]
 
-        if runcard == '.':
-            runcard = [path for path in os.listdir() if '.yaml' in path][0]
+def execute():
 
-    directory = None
-    if len(args) > 1:
-        directory = args[1]
+    parser = argparse.ArgumentParser(
+        description='Empyric Command Line Interface'
+    )
 
-    manager = Manager(runcard=runcard)
-    manager.run(directory=directory)
+    parser.add_argument(
+        '-r', '--runcard', type=str, required=False, default=None,
+        help="path of experiment runcard to execute"
+    )
+
+    parser.add_argument(
+        '-d', '--directory', type=str, default=None,
+        help='directory to write data and plots to'
+    )
+
+    parser.add_argument(
+        '-t', '--test', nargs='*',
+        help='test empyric installation and components'
+    )
+
+    args = parser.parse_args()
+
+    if args.test is not None:
+
+        if pytest is None:
+            raise ImportError('pytest is not installed')
+
+        if len(args.test) == 0:  # test main classes in experiment.py
+            pytest.main(
+                [
+                    '-r', 'A', '--pyargs', 'empyric.tests',
+                    '-k', 'test_experiment',
+                    '-q'
+                ]
+            )
+
+        elif all([feature in testable_features for feature in args.test]):
+            # test specified features
+            test_names = ['test_' + name for name in args.test]
+
+            pytest.main(
+                [
+                    '-r', 'A', '--pyargs', 'empyric.tests',
+                    '-k', ' or '.join(test_names),
+                    '-q'
+                ]
+            )
+
+        else:
+
+            raise NotImplementedError(
+                '\n' + '\n'.join(
+                    [
+                        f'Requested test of {feature} is not implement'
+                        for feature in args.test
+                        if feature not in testable_features
+                    ]
+                )
+            )
+    else:
+        manager = Manager(runcard=args.runcard)
+        manager.run(directory=args.directory)

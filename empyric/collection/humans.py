@@ -3,13 +3,15 @@ import time
 
 from empyric.adapters import *
 from empyric.collection.instrument import *
+from empyric.types import String, Float
 
 
 class ConsoleUser(Instrument):
     """
-    Virtual instrument that simply queries a human operator via the Python console
+    Virtual instrument that queries a human operator via the Python console
 
-    The prompt is what the user is asked; the cooldown is the minimum time between input requests
+    The prompt is what the user is asked; the cooldown is the minimum time
+    between input requests
     """
 
     name = 'ConsoleUser'
@@ -34,26 +36,21 @@ class ConsoleUser(Instrument):
     last_sent = float('-inf')
 
     @setter
-    def set_prompt(self, prompt):
+    def set_prompt(self, prompt: String):
         pass
 
     @setter
-    def set_cooldown(self, cooldown):
+    def set_cooldown(self, cooldown: Float):
         pass
 
     @measurer
-    def measure_response(self):
+    def measure_response(self) -> String:
 
-        new_message = (self.prompt != self.last_prompt)
+        new_prompt = (self.prompt != self.last_prompt)
 
-        if time.time() >= self.last_sent + self.cooldown or new_message:  # don't spam user
+        if time.time() >= self.last_sent + self.cooldown or new_prompt:
 
             response = input(self.prompt)
-
-            try:
-                response = float(response)
-            except ValueError:
-                pass
 
             self.last_prompt = self.prompt
 

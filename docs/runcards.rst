@@ -78,7 +78,7 @@ The optional ``Alarms`` section contains alarms which can monitor any of the var
       b: (Name of Another Variable)
       (character/string in the condition: referenced variable)
 
-The optional ``Plots`` section defines how to present collected data. Each plot specification requires a ``y`` entry. If no ``x`` entry is given, it assumed that the x-axis will be time. The optional ``xlabel`` and ``ylabel`` entries specify how to label the corresponding axes. A ``style`` can be selected from 'basic' (default simple plot), 'log' (logarithmic y-axis), 'symlog' (logarithmic y-axis for positive and negative values), 'averaged' (y values at the same x value are averaged together), 'errorbars' (same as averaged, but with error bars for the y values at the same x value), 'parametric' (parametric plot with a third parametric variable specified by an optional 'parameter' entry; if no parameter is specified, time will be assumed), 'order' (plot with arrows showing the order in which data was collected).
+The optional ``Plots`` section defines how to present collected data. Each plot specification requires a ``y`` entry. If no ``x`` entry is given, it assumed that the x-axis will be time. The optional ``xlabel`` and ``ylabel`` entries specify how to label the corresponding axes. A ``style`` can be selected from 'basic' (default simple plot), 'averaged' (y values at the same x value are averaged together), 'errorbars' (same as averaged, but with error bars for the y values at the same x value), and 'parametric' (parametric plot with a third parametric variable specified by an optional 'parameter' entry; if no parameter is specified, time will be assumed). An optional 'configure' entry can be provided, which is just a dictionary of keyword arguments to be given to the Matplotlib.pyplot.plot method used to generate all plots.
 
 .. code-block:: yaml
    
@@ -88,7 +88,7 @@ The optional ``Plots`` section defines how to present collected data. Each plot 
      y: (Variable on the y-axis)
      s: (Parametric Variable)  # only used for parametric plots
      style: (plot style, e.g. 'parametric'). # defaults to 'basic' if unspecified
-     options: (any other keyword arguments to pass to Matplotlib for plotting customization)
+     configure: (any other keyword arguments to pass to Matplotlib for plotting customization)
 
 The optional ``Routines`` section defines how the experiment traverses parameter space. A routine (see available routines in :ref:`routines-section`) sets its assigned knobs depending on the state of the experiment. In the example above, there are 2 routines, named 'Ramp Parameter' a and 'Ramp Parameter b', which are both of the ``Timecourse`` type. These ``Timecourse`` routines set the knob variables 'Parameter a' and 'Parameter b' to the values specified in the ``values`` entry at the times specified in the ``times`` entry. It is also possible to combine similar routines into a single routine. For example, the two routines in the above example can be combined into a single ``Timecourse`` routine that varies both of these parameters together:
 

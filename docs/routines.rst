@@ -3,6 +3,8 @@
 Routines
 =================================
 
+.. autoclass:: empyric.routines.Routine
+
 .. autoclass:: empyric.routines.Set
 
 .. autoclass:: empyric.routines.Timecourse
@@ -13,6 +15,7 @@ Routines
 
 .. autoclass:: empyric.routines.Maximization
 
+.. autoclass:: empyric.routines.SocketServer
 
-
+.. autoclass:: empyric.routines.ModbusServer
 
