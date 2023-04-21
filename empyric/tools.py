@@ -148,6 +148,10 @@ def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1,
     if not readable:
         return None
 
+    default_timeout = _socket.gettimeout()  # save default timeout
+
+    _socket.settimeout(timeout)
+
     if nbytes is None:
         nbytes = np.inf
 
@@ -185,6 +189,8 @@ def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1,
 
         else:
             null_responses += 1
+
+    _socket.settimeout(default_timeout)
 
     if decode:
         return message.decode().strip()

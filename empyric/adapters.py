@@ -881,18 +881,9 @@ class Socket(Adapter):
 
     read_termination = '\r'
     write_termination = '\r'
-    _timeout = 1
+    timeout = 1
 
     kwargs = ['read_termination', 'write_termination', 'timeout']
-
-    @property
-    def timeout(self):
-        return self._timeout
-
-    @timeout.setter
-    def timeout(self, timeout):
-        self._timeout = timeout
-        self.backend.settimeout(timeout)
 
     def connect(self):
 
@@ -901,7 +892,7 @@ class Socket(Adapter):
 
         self.backend = socket.socket()
 
-        self.backend.settimeout(self._timeout)
+        self.backend.settimeout(self.timeout)
 
         address = self.instrument.address
         remote_ip_address, remote_port = address.split('::')
@@ -913,7 +904,7 @@ class Socket(Adapter):
     def _write(self, message):
         write_to_socket(
             self.backend, message, termination=self.write_termination,
-            timeout=self._timeout
+            timeout=self.timeout
         )
 
         return 'Success'
@@ -922,13 +913,13 @@ class Socket(Adapter):
 
         return read_from_socket(
             self.backend, nbytes=nbytes, termination=self.read_termination,
-            timeout=self._timeout, decode=decode
+            timeout=self.timeout, decode=decode
         )
 
-    def _query(self, question, nbytes=4096):
+    def _query(self, question, nbytes=None, decode=True):
 
         self._write(question)
-        return self._read(nbytes=nbytes)
+        return self._read(nbytes=nbytes, decode=decode)
 
     def disconnect(self):
 

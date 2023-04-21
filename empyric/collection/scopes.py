@@ -692,37 +692,49 @@ class SiglentSDS1000(Instrument):
 
         self.write('WFSU SP,0,NP,0,FP,0')  # setup to get all data points
 
-        self.write('C%d:WF? DAT2' % n)  # send data request
-
-        prior_timeout = self.adapter.timeout
-
+        prior_timeout = self.adapter.timeout  # save normal timeout
         self.adapter.timeout = 60  # data transmission may take extra time
 
         def validator(response):
 
-            if response is not None \
-                    and (len(response) > 0) \
-                    and ((b'C%d:WF DAT2,#9' % n) in response):
-                return True
-            else:
+            if response is None:
+                return False
+            elif len(response) == 0:
+                return None
+
+            header = response[:14]
+
+            if header != (b'C%d:WF DAT2,#9' % n):
                 return False
 
-        response = self.read(decode=False, validator=validator)
+            size = response[14:23]
+
+            try:
+                size = int(size)
+            except ValueError:
+                return False
+
+            data = response[23:-2]
+
+            if len(data) != size:
+                return False
+
+            termination = response[-2:]
+
+            if termination != b'\n\n':
+                return False
+
+            return True
+
+        response = self.query(
+            'C%d:WF? DAT2' % n, decode=False, validator=validator
+        )
 
         data = response.split(
             b'C%d:WF DAT2,#9' % n
         )[-1]
 
-        size, waveform, termination = int(data[:9]), data[9:-2], data[-2:]
-
-        if termination != b'\n\n' or len(waveform) != size:
-            print(
-                'Warning: truncated data received '
-                f'for channel {n} of {self.name}'
-            )
-            return None
-        elif not waveform:
-            return None
+        size, waveform = int(data[:9]), data[9:-2]
 
         # convert bytes to integers
         waveform = np.array(struct.unpack('b'*size, waveform), dtype=np.float64)
