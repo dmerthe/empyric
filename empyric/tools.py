@@ -136,7 +136,16 @@ def autobind_socket(_socket):
 def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1,
                      decode=True):
     """
-    Read from a socket, with care taken to get the whole message
+    Read from a socket, with some effort taken to get the whole message.
+
+    :param _socket: (socket.Socket) socket to read from.
+    :param nbytes: (int) number of bytes to read; defaults to infinite.
+    :param termination: (str/bytes) expected message termination character(s).
+    :param timeout: (numbers.Number) communication timeout in seconds;
+                    used for both the `select.select` and `_socket.recv`
+                    functions.
+    :param decode: (bool) whether to return decoded string (True) or raw bytes
+                   message (False); defaults to True.
     """
 
     # Block until the socket is readable or until timeout
@@ -201,7 +210,12 @@ def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1,
 def write_to_socket(_socket, message, termination='\r', timeout=1):
     """
     Write a message to a socket, with care taken to get the whole message
-    transmitted
+    transmitted.
+
+    :param _socket: (socket.Socket) socket to write to.
+    :param message: (str) message to send.
+    :param termination: (str/bytes) expected message termination character(s).
+    :param timeout: (numbers.Number) timeout for `select.select` call.
     """
 
     # Block until the socket is writeable or until timeout

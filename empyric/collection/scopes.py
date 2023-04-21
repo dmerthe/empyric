@@ -524,7 +524,7 @@ class SiglentSDS1000(Instrument):
         'ch3 position',
         'ch4 scale',
         'ch4 position',
-        'trigger source'
+        'trigger source',
         'trigger level'
     )
 
@@ -694,33 +694,33 @@ class SiglentSDS1000(Instrument):
 
         prior_timeout = self.adapter.timeout  # save normal timeout
         self.adapter.timeout = 60  # data transmission may take extra time
+        self.adapter.read_termination = '\n\n'
 
         def validator(response):
+            """
+            Checks for correct header, size, message length and termination.
+            """
 
             if response is None:
                 return False
             elif len(response) == 0:
-                return None
+                return False
 
-            header = response[:14]
-
+            header = response[:13]
             if header != (b'C%d:WF DAT2,#9' % n):
                 return False
 
-            size = response[14:23]
-
+            size = response[13:22]
             try:
                 size = int(size)
             except ValueError:
                 return False
 
-            data = response[23:-2]
-
+            data = response[22:-2]
             if len(data) != size:
                 return False
 
             termination = response[-2:]
-
             if termination != b'\n\n':
                 return False
 
@@ -730,11 +730,11 @@ class SiglentSDS1000(Instrument):
             'C%d:WF? DAT2' % n, decode=False, validator=validator
         )
 
-        data = response.split(
-            b'C%d:WF DAT2,#9' % n
-        )[-1]
+        self.adapter.timeout = prior_timeout  # restore normal timeout
+        self.adapter.read_termination = '\n'  # restore normal read termination
 
-        size, waveform = int(data[:9]), data[9:-2]
+        header, size, waveform = response[:13], response[13:22], response[22:-2]
+        size = int(size)
 
         # convert bytes to integers
         waveform = np.array(struct.unpack('b'*size, waveform), dtype=np.float64)
@@ -743,8 +743,6 @@ class SiglentSDS1000(Instrument):
         pos = self._get_chn_position(n)
 
         waveform = (scale/25.0)*waveform - pos
-
-        self.adapter.timeout = prior_timeout  # put timeout back
 
         return waveform
 

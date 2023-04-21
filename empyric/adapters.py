@@ -44,6 +44,10 @@ def chaperone(method):
 
                     if validator and not validator(response):
 
+                        if hasattr(response, '__len__') and len(response) > 100:
+                            response = str(response[:50]) \
+                                       + '...' + str(response[-50:])
+
                         raise ValueError(
                             f'invalid response, {response}, '
                             f'from {method.__name__} method'
@@ -922,6 +926,11 @@ class Socket(Adapter):
         return self._read(nbytes=nbytes, decode=decode)
 
     def disconnect(self):
+
+        # Clear out any unread messages
+        unread = self._read(decode=False)
+        while unread:
+            unread = self._read(decode=False)
 
         self.backend.shutdown(socket.SHUT_RDWR)
         self.backend.close()
