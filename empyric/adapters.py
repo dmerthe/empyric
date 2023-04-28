@@ -78,6 +78,7 @@ def chaperone(method):
 
         # Getting here means that both repeats
         # and reconnects have been maxed out
+        self.busy = False
         raise AdapterError(
             f'Unable to communicate with {self.instrument.name}!'
         )
