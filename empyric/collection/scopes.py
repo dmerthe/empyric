@@ -2,7 +2,7 @@ import struct
 from empyric.tools import find_nearest
 from empyric.adapters import *
 from empyric.collection.instrument import *
-from empyric.types import Float, Array, Integer
+from empyric.types import Float, Array, Integer, String
 
 
 class TekScope(Instrument):
@@ -525,7 +525,9 @@ class SiglentSDS1000(Instrument):
         'ch4 scale',
         'ch4 position',
         'trigger source',
-        'trigger level'
+        'trigger level',
+        'acquire mode',
+        'averages'
     )
 
     meters = (
@@ -686,6 +688,44 @@ class SiglentSDS1000(Instrument):
     def get_trigger_source(self) -> Integer:
 
         return int(self.query('TRSE?').split('SR,C')[-1][0])
+
+    @setter
+    def set_acquire_mode(self, mode: String):
+
+        if mode.upper() in ['SAMPLING', 'PEAK_DETECT', 'HIGH_RES']:
+            self.write(f'ACQW {mode.upper()}')
+        elif mode.upper() == 'AVERAGE':
+
+            if not hasattr(self, 'averages'):
+                self.set_averages(4)
+
+            self.write(f'ACQW AVERAGE,{int(self.averages)}')
+
+        else:
+            return None
+
+    @getter
+    def get_acquire_mode(self) -> String:
+
+        response = self.query('ACQW?').split('ACQW ')[-1]
+
+        if 'AVERAGE' in response:
+            return 'AVERAGE'
+        else:
+            return response
+
+    @setter
+    def set_averages(self, averages: Integer):
+
+        valid = [4] + [2**i for i in range(4, 11)]
+
+        averages = find_nearest(valid, averages)
+
+        self.write(f'AVGA {averages}')
+
+    @getter
+    def get_averages(self) -> Integer:
+        return int(self.query('AVGA?').split('AVGA ')[-1])
 
     # Channel measurements
     def _measure_chn_waveform(self, n):
