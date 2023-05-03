@@ -407,7 +407,12 @@ class Remote(Variable):
             response = read_from_socket(self._socket)
 
             try:
+
+                if 'Error' in response:
+                    raise RuntimeError(response.split('Error: ')[-1])
+
                 self._value = recast(response.split(' ')[-1])
+
             except BaseException as error:
                 print(
                     f'Warning: unable to retrieve value of {self.alias} '

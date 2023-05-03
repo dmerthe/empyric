@@ -527,6 +527,7 @@ class SiglentSDS1000(Instrument):
         'trigger source',
         'trigger level',
         'acquire mode',
+        'memory size',
         'averages'
     )
 
@@ -715,6 +716,26 @@ class SiglentSDS1000(Instrument):
             return response
 
     @setter
+    def set_memory_size(self, size: Integer):
+
+        self.write(f'MSIZ {size}')
+
+        return self.get_memory_size()
+
+    @getter
+    def get_memory_size(self) -> Integer:
+
+        response = self.query('MSIZ?').split('MSIZ ')[-1]
+
+        if 'K' in response:
+            response = response.replace('K', '000')
+        elif 'M' in response:
+            response = response.replace('M', '000000')
+
+        return int(response)
+
+
+    @setter
     def set_averages(self, averages: Integer):
 
         valid = [4] + [2**i for i in range(4, 11)]
@@ -731,10 +752,6 @@ class SiglentSDS1000(Instrument):
     def _measure_chn_waveform(self, n):
 
         self.write('WFSU SP,0,NP,0,FP,0')  # setup to get all data points
-
-        prior_timeout = self.adapter.timeout  # save normal timeout
-        self.adapter.timeout = 60  # data transmission may take extra time
-        self.adapter.read_termination = '\n\n'
 
         def validator(response):
             """
@@ -766,8 +783,16 @@ class SiglentSDS1000(Instrument):
 
             return True
 
+        # response = header (22 bytes) + signal (memory_size bytes) + '\n\n'
+        response_length = 22 + self.get_memory_size() + 2
+
+        prior_timeout = self.adapter.timeout  # save normal timeout
+        self.adapter.timeout = 60  # data transmission may take extra time
+        self.adapter.read_termination = None
+
         response = self.query(
-            'C%d:WF? DAT2' % n, decode=False, validator=validator
+            'C%d:WF? DAT2' % n, decode=False, validator=validator,
+            nbytes=response_length
         )
 
         self.adapter.timeout = prior_timeout  # restore normal timeout
