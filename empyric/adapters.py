@@ -914,17 +914,19 @@ class Socket(Adapter):
 
         return 'Success'
 
-    def _read(self, nbytes=None, decode=True):
+    def _read(self, **kwargs):
 
         return read_from_socket(
-            self.backend, nbytes=nbytes, termination=self.read_termination,
-            timeout=self.timeout, decode=decode
+            self.backend,
+            termination=self.read_termination,
+            timeout=self.timeout,
+            **kwargs
         )
 
-    def _query(self, question, nbytes=None, decode=True):
+    def _query(self, question, **kwargs):
 
         self._write(question)
-        return self._read(nbytes=nbytes, decode=decode)
+        return self._read(**kwargs)
 
     def disconnect(self):
 

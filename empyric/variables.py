@@ -359,19 +359,20 @@ class Remote(Variable):
 
             write_to_socket(self._socket, f'{self.alias} settable?')
 
-            response = read_from_socket(self._socket, timeout=None)
-
+            response = read_from_socket(self._socket, timeout=60)
             self._settable = response == f'{self.alias} settable'
 
             # Get dtype
             write_to_socket(self._socket, f'{self.alias} dtype?')
 
-            response = read_from_socket(self._socket, timeout=None)
+            response = read_from_socket(self._socket, timeout=60)
 
-            try:
-                self.dtype = types.supported[response.split(' ')[-1]]
-            except KeyError:
-                self.dtype = None  # to be inferred based in values
+            if response is not None:
+                for dtype in types.supported:
+                    if str(dtype) in response.split(alias)[-1]:
+                        self.dtype = types.supported.get(dtype, None)
+            else:
+                self.dtype = None
 
     @property
     @Variable.getter_type_validator
@@ -404,14 +405,16 @@ class Remote(Variable):
         else:
             write_to_socket(self._socket, f'{self.alias} ?')
 
-            response = read_from_socket(self._socket)
+            response = read_from_socket(self._socket, timeout=60)
 
             try:
 
-                if 'Error' in response:
+                if response is None:
+                    self._value = None
+                elif 'Error' in response:
                     raise RuntimeError(response.split('Error: ')[-1])
-
-                self._value = recast(response.split(' ')[-1])
+                else:
+                    self._value = recast(response.split(' ')[-1])
 
             except BaseException as error:
                 print(
@@ -437,7 +440,7 @@ class Remote(Variable):
         else:
             write_to_socket(self._socket, f'{self.alias} {value}')
 
-            check = read_from_socket(self._socket)
+            check = read_from_socket(self._socket, timeout=60)
 
             if check == '' or check is None:
                 print(

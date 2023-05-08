@@ -641,6 +641,8 @@ class SocketServer(Routine):
             except socket.timeout:
                 pass
 
+            time.sleep(0.1)
+
         # Close sockets
         try:
             self.socket.shutdown(socket.SHUT_RDWR)
@@ -651,8 +653,12 @@ class SocketServer(Routine):
         clients = self.clients_queue.get()
 
         for address, client in clients.items():
-            client.shutdown(socket.SHUT_RDWR)
-            client.close()
+
+            try:
+                client.shutdown(socket.SHUT_RDWR)
+                client.close()
+            except ConnectionError:
+                pass
 
         # Return empty clients dict to queue so process_requests can exit
         self.clients_queue.put({})
@@ -662,13 +668,23 @@ class SocketServer(Routine):
 
             clients = self.clients_queue.get()
 
+            # Purge disconnected clients
+            clients = {
+                address: client for address, client in clients.items()
+                if client is not None
+            }
+
             for address, client in clients.items():
 
                 outgoing_message = None
 
-                request = read_from_socket(client)
+                try:
+                    request = read_from_socket(client, chunk_size=1)
+                except ConnectionError:
+                    clients[address] = None
+                    continue
 
-                if request:
+                if client and request:
 
                     alias = ' '.join(request.split(' ')[:-1])
                     value = request.split(' ')[-1]
@@ -745,11 +761,11 @@ class SocketServer(Routine):
 
                 if exceptional:
                     print(f'Client at {address} has a connection issue')
-                    clients.pop(address)
+                    clients[address] = None
 
             self.clients_queue.put(clients)
 
-            time.sleep(0.1)
+            time.sleep(0.01)
 
     @Routine.enabler
     def update(self, state):

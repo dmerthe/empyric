@@ -615,7 +615,9 @@ def validate_runcard(runcard):
 
         validate_runcard(runcard_path)
 
-        os.remove(runcard_path)
+        while not os.access(runcard_path, os.W_OK):
+            os.remove(runcard_path)
+            time.sleep(0.1)
 
         return True
 

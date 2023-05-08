@@ -718,7 +718,7 @@ class SiglentSDS1000(Instrument):
     @setter
     def set_memory_size(self, size: Integer):
 
-        self.write(f'MSIZ {size}')
+        self.write(f'MSIZ {int(size)}')
 
         return self.get_memory_size()
 
@@ -728,9 +728,9 @@ class SiglentSDS1000(Instrument):
         response = self.query('MSIZ?').split('MSIZ ')[-1]
 
         if 'K' in response:
-            response = response.replace('K', '000')
+            response = float(response.replace('K', 'e3'))
         elif 'M' in response:
-            response = response.replace('M', '000000')
+            response = float(response.replace('M', 'e6'))
 
         return int(response)
 
@@ -751,7 +751,42 @@ class SiglentSDS1000(Instrument):
     # Channel measurements
     def _measure_chn_waveform(self, n):
 
+        # Enable the channel
+        self.write('C%d:TRA ON' % n)
+
+        # Ready trigger
+        self.write('STOP')  # stop acquisition
+
+        self.write('TRMD SINGLE')  # set to single trigger mode
+
+        self.write('ARM')  # arm the trigger
+
+        # Wait for signal acquisition
+        signal_acquired = False
+        wait_time = 0
+        while not signal_acquired and wait_time < 30:
+            status = self.query('INR?')
+            signal_acquired = status == 'INR 1'
+            wait_time += 0.25
+            time.sleep(0.25)
+
         self.write('WFSU SP,0,NP,0,FP,0')  # setup to get all data points
+
+        def is_terminated(message):
+
+            try:
+                size = int(message[13:22])
+            except ValueError:
+                return False
+
+            data_length = len(message[22:-2])
+
+            if data_length == size:
+                return True
+            else:
+                return False
+
+        self.adapter.read_termination = is_terminated
 
         def validator(response):
             """
@@ -783,20 +818,13 @@ class SiglentSDS1000(Instrument):
 
             return True
 
-        # response = header (22 bytes) + signal (memory_size bytes) + '\n\n'
-        response_length = 22 + self.get_memory_size() + 2
-
-        prior_timeout = self.adapter.timeout  # save normal timeout
-        self.adapter.timeout = 60  # data transmission may take extra time
-        self.adapter.read_termination = None
-
         response = self.query(
-            'C%d:WF? DAT2' % n, decode=False, validator=validator,
-            nbytes=response_length
+            'C%d:WF? DAT2' % n, decode=False, validator=validator
         )
 
-        self.adapter.timeout = prior_timeout  # restore normal timeout
         self.adapter.read_termination = '\n'  # restore normal read termination
+
+        self.write('TRMD NORM')  # set to single trigger mode
 
         header, size, waveform = response[:13], response[13:22], response[22:-2]
         size = int(size)
