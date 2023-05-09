@@ -709,7 +709,7 @@ class SocketServer(Routine):
                     elif value == 'dtype?':
 
                         if alias in self.knobs:
-                            dtype = self.knobs[alias].dtype
+                            dtype = self.knobs[alias].type
                         elif alias in self.state:
 
                             dtype = None
@@ -745,7 +745,7 @@ class SocketServer(Routine):
 
                             knob = self.knobs[alias]
 
-                            knob.value = recast(value, to=knob.dtype)
+                            knob.value = recast(value, to=knob.type)
 
                             outgoing_message = f'{alias} {knob.value}'
 
@@ -932,21 +932,21 @@ class ModbusServer(Routine):
             value = variable._value
 
             # encode the value into the 4 registers
-            if value is None or variable.dtype is None:
+            if value is None or variable.type is None:
                 builder.add_64bit_float(float('nan'))
-            elif issubclass(variable.dtype, Boolean):
+            elif issubclass(variable.type, Boolean):
                 builder.add_64bit_uint(value)
-            elif issubclass(variable.dtype, Toggle):
+            elif issubclass(variable.type, Toggle):
                 builder.add_64bit_uint(int(value in Toggle.on_values))
-            elif issubclass(variable.dtype, Integer):
+            elif issubclass(variable.type, Integer):
                 builder.add_64bit_int(value)
-            elif issubclass(variable.dtype, Float):
+            elif issubclass(variable.type, Float):
                 builder.add_64bit_float(value)
             else:
                 raise ValueError(
                     f'unable to update modbus server registers from value '
                     f'{value} of variable {name} with data type '
-                    f'{variable.dtype}'
+                    f'{variable.type}'
                 )
 
             # encode the meta data
@@ -957,7 +957,7 @@ class ModbusServer(Routine):
                 Float: 3,
                 Array: 4,
                 String: 5,
-            }.get(variable.dtype, -1)
+            }.get(variable.type, -1)
 
             builder.add_16bit_int(meta_reg_val)
 

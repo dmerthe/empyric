@@ -885,7 +885,7 @@ class ExperimentGUI:
 
         variable.value = recast(
             entry.get(),
-            to=variable.dtype if variable.dtype is not None else Type
+            to=variable.type if variable.type is not None else Type
         )
 
         root.focus()

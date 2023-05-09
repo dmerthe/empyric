@@ -19,7 +19,7 @@ class Variable:
     experiment.
     """
 
-    dtype = None  #: the data type of the variable
+    type = None  #: the data type of the variable
 
     #: time since the epoch of last evaluation in seconds, being equal to the
     #: result of `time.time()` being called upon the most recent evaluation of
@@ -51,8 +51,8 @@ class Variable:
 
                 self._value = None
 
-            elif self.dtype is not None:
-                setter(self, recast(value, to=self.dtype))
+            elif self.type is not None:
+                setter(self, recast(value, to=self.type))
             else:
                 # if type is not explicitly defined upon construction,
                 # infer from first set value
@@ -61,7 +61,7 @@ class Variable:
 
                 for _type in types.supported.values():
                     if isinstance(recasted_value, _type):
-                        self.dtype = _type
+                        self.type = _type
                         setter(self, recasted_value)
 
         return wrapped_setter
@@ -79,8 +79,8 @@ class Variable:
 
                 self._value = None
 
-            elif self.dtype is not None:
-                self._value = recast(value, to=self.dtype)
+            elif self.type is not None:
+                self._value = recast(value, to=self.type)
             else:
                 # if type is not explicitly defined upon construction,
                 # infer from first set value
@@ -89,7 +89,7 @@ class Variable:
 
                 for _type in types.supported.values():
                     if isinstance(recasted_value, _type):
-                        self.dtype = _type
+                        self.type = _type
                         self._value = recasted_value
 
             return self._value
