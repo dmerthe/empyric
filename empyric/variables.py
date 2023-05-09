@@ -5,7 +5,7 @@ import socket
 import time
 import typing
 from functools import wraps
-import numpy as np
+import numpy as np  # functions used in Expression's eval call
 from empyric.collection.instrument import Instrument
 
 from empyric import instruments, types

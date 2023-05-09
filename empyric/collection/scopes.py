@@ -751,24 +751,27 @@ class SiglentSDS1000(Instrument):
     # Channel measurements
     def _measure_chn_waveform(self, n):
 
-        # Enable the channel
-        self.write('C%d:TRA ON' % n)
+        # Set trigger mode to NORMAL
+        if 'NORM' not in self.query('TRMD?'):
+            self.write('TRMD NORM')
 
-        # Ready trigger
-        self.write('STOP')  # stop acquisition
-
-        self.write('TRMD SINGLE')  # set to single trigger mode
-
-        self.write('ARM')  # arm the trigger
-
-        # Wait for signal acquisition
-        signal_acquired = False
-        wait_time = 0
-        while not signal_acquired and wait_time < 30:
+        # Wait for trigger
+        triggered = False
+        wait_time = 0.0
+        while not triggered and wait_time < 30.0:
             status = self.query('INR?')
-            signal_acquired = status == 'INR 1'
+            triggered = status == 'INR 8193'
             wait_time += 0.25
             time.sleep(0.25)
+
+        if not triggered:
+            return None
+
+        # Enable channel if needed
+        channel_enabled = 'ON' in self.query('C%d:TRA?' % n)
+        if not channel_enabled:
+            self.write('C%d:TRA ON' % n)
+            time.sleep(3)
 
         self.write('WFSU SP,0,NP,0,FP,0')  # setup to get all data points
 
@@ -854,3 +857,9 @@ class SiglentSDS1000(Instrument):
     @measurer
     def measure_ch4_waveform(self) -> Array:
         return self._measure_chn_waveform(4)
+
+    @measurer
+    def measure_sample_rate(self) -> Float:
+        return float(self.query('SARA?')[5:-4])
+
+
