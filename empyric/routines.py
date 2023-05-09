@@ -16,7 +16,7 @@ from empyric.tools import convert_time, autobind_socket, read_from_socket, \
 from empyric.types import recast, Boolean, Integer, Float, Toggle, OFF, ON, \
     Array, String
 from empyric.types import supported as supported_types
-from empyric.variables import Parameter, Variable
+from empyric.variables import Variable
 
 
 class Routine:

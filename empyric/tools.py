@@ -1,6 +1,4 @@
-import os
 import time
-import re
 import select
 import socket
 import numbers

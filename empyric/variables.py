@@ -10,8 +10,7 @@ from empyric.collection.instrument import Instrument
 
 from empyric import instruments, types
 from empyric.tools import write_to_socket, read_from_socket
-from empyric.types import recast, Integer, Float, Boolean, Toggle, Type, Array, \
-    String, ON
+from empyric.types import *
 
 
 class Variable:
