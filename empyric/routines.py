@@ -697,7 +697,7 @@ class SocketServer(Routine):
                     elif value == 'settable?':
 
                         settable = (alias in self.knobs) \
-                                   and self.knobs[alias]._settable
+                                   and self.knobs[alias].settable
 
                         if settable:
                             outgoing_message = f'{alias} settable'

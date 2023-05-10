@@ -13,7 +13,7 @@ from empyric.experiment import Manager
 testable_features = [
     'experiment',  # tests Variable, Experiment and Manager classes (default)
 
-    # Adpaters
+    # Adapters
     'serial',
     'gpib',
     'usb',

@@ -26,8 +26,12 @@ class Variable:
     #: the `value` property
     last_evaluation = None
 
-    _settable = None  #: whether the variable can be set by the user
+    _settable = False  #: whether the variable can be set by the user
     _value = None  #: last known value of the variable
+
+    @property
+    def settable(self):
+        return self._settable
 
     @property
     def value(self):
@@ -332,8 +336,6 @@ class Remote(Variable):
         Float: '64bit_float'
     }
 
-    _settable = None  #: determined by the server
-
     def __init__(self,
                  remote: str,
                  alias: [int, str],
@@ -382,7 +384,7 @@ class Remote(Variable):
 
         if self.protocol == 'modbus':
 
-            fcode = 3 if self._settable else 4
+            fcode = 3 if self.settable else 4
 
             dtype_int = self._client.read(
                 fcode, self.alias + 4, dtype='16bit_int'
