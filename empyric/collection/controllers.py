@@ -368,3 +368,117 @@ class AlicatMFC(Instrument):
     @measurer
     def measure_pressure(self) -> Float:
         return self.read(4, 1202, count=2, dtype='32bit_float')
+
+
+class SynaccessNetbooter(Instrument):
+
+    supported_adapters = (
+        (Socket, {
+            'write_termination': '\r\n',
+            'read_termination': None
+
+        }),
+    )
+
+    knobs = (
+        'port 1 toggle',
+        'port 2 toggle',
+        'port 3 toggle',
+        'port 4 toggle',
+        'port 5 toggle',
+    )
+
+    _initialized = False
+
+    def __init__(self, *args, **kwargs):
+
+        Instrument.__init__(self, *args, **kwargs)
+
+        # Dump Telnet preamble
+        self.read(decode=False, nbytes=36)
+
+    def _set_port_n_toggle(self, n, state):
+
+        if state != ON and state != OFF:
+            raise ValueError(
+                f'port toggle state of {self.name} must be '
+                f'either ON or OFF (Toggle type)'
+            )
+
+        if state == ON:
+            self.write('$A3 %d 1' % n)
+        elif state == OFF:
+            self.write('$A3 %d 0' % n)
+
+        # Get echo
+        echo = self.read(nbytes=9)
+        state_num = 1 if state == ON else 0
+        if echo != ('$A3 %d %d' % (n, state_num)):
+            print([echo])
+            raise ValueError(f'Unable to toggle port {n} of {self.name}')
+
+        # Get return code
+        return_code = self.read(nbytes=4, decode=False)
+        if return_code != b'$A0\x00':
+            raise ValueError(f'Unable to toggle port {n} of {self.name}')
+
+    def _get_port_n_toggle(self, n):
+
+        if not self._initialized:
+            # Dump Telnet preamble
+            self.adapter.read_termination = None
+            self.read(decode=False, nbytes=36)
+            self.adapter.read_termination = '\r\n'
+
+            self._initialized = True
+
+        def validator(response):
+            return re.search('A0,\d\d\d\d\d', response)
+
+        self.adapter.read_termination = None
+        status_message = self.query('$A5', nbytes=14, validator=validator)
+        self.adapter.read_termination = '\r\n'
+
+        port_n_toggle = ON if int(status_message[-n]) == 1 else OFF
+
+        return port_n_toggle
+
+    @setter
+    def set_port_1_toggle(self, state: Toggle):
+        return self._set_port_n_toggle(1, state)
+
+    @getter
+    def get_port_1_toggle(self) -> Toggle:
+        return self._get_port_n_toggle(1)
+
+    @setter
+    def set_port_2_toggle(self, state: Toggle):
+        return self._set_port_n_toggle(2, state)
+
+    @getter
+    def get_port_2_toggle(self) -> Toggle:
+        return self._get_port_n_toggle(2)
+
+    @setter
+    def set_port_3_toggle(self, state: Toggle):
+        return self._set_port_n_toggle(3, state)
+
+    @getter
+    def get_port_3_toggle(self) -> Toggle:
+        return self._get_port_n_toggle(3)
+
+    @setter
+    def set_port_4_toggle(self, state: Toggle):
+        return self._set_port_n_toggle(4, state)
+
+    @getter
+    def get_port_4_toggle(self) -> Toggle:
+        return self._get_port_n_toggle(4)
+
+    @setter
+    def set_port_5_toggle(self, state: Toggle):
+        return self._set_port_n_toggle(5, state)
+
+    @getter
+    def get_port_5_toggle(self) -> Toggle:
+        return self._get_port_n_toggle(5)
