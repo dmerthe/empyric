@@ -7,7 +7,7 @@ import datetime
 import tkinter as tk
 import pandas as pd
 
-from empyric.types import recast, Type, Array
+from empyric.types import recast, Type, Float
 from empyric.routines import SocketServer, ModbusServer
 
 if sys.platform == 'darwin':
@@ -732,17 +732,16 @@ class ExperimentGUI:
                     write_entry(
                         entry, str(datetime.timedelta(seconds=state['Time']))
                     )
-                else:
-                    if isinstance(state[name], numbers.Number):
-                        # display numbers neatly
-                        if state[name] == 0:
-                            write_entry(entry, '0.0')
-                        elif np.abs(np.log10(np.abs(state[name]))) > 3:
-                            write_entry(entry, '%.3e' % state[name])
-                        else:
-                            write_entry(entry, '%.3f' % state[name])
+                elif isinstance(state[name], Float):
+                    # display floating point numbers neatly
+                    if state[name] == 0.0:
+                        write_entry(entry, '0.0')
+                    elif np.abs(np.log10(np.abs(state[name]))) > 3:
+                        write_entry(entry, '%.3e' % state[name])
                     else:
-                        write_entry(entry, str(state[name]))
+                        write_entry(entry, '%.3f' % state[name])
+                else:
+                    write_entry(entry, str(state[name]))
 
         self.status_label.config(text=self.experiment.status)
 
