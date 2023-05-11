@@ -388,14 +388,7 @@ class SynaccessNetbooter(Instrument):
         'port 5 toggle',
     )
 
-    _initialized = False
-
-    def __init__(self, *args, **kwargs):
-
-        Instrument.__init__(self, *args, **kwargs)
-
-        # Dump Telnet preamble
-        self.read(decode=False, nbytes=36)
+    _initialized = False  # for catching Telnet handshake
 
     def _set_port_n_toggle(self, n, state):
 
@@ -414,7 +407,6 @@ class SynaccessNetbooter(Instrument):
         echo = self.read(nbytes=9)
         state_num = 1 if state == ON else 0
         if echo != ('$A3 %d %d' % (n, state_num)):
-            print([echo])
             raise ValueError(f'Unable to toggle port {n} of {self.name}')
 
         # Get return code
@@ -426,18 +418,13 @@ class SynaccessNetbooter(Instrument):
 
         if not self._initialized:
             # Dump Telnet preamble
-            self.adapter.read_termination = None
             self.read(decode=False, nbytes=36)
-            self.adapter.read_termination = '\r\n'
-
             self._initialized = True
 
         def validator(response):
             return re.search('A0,\d\d\d\d\d', response)
 
-        self.adapter.read_termination = None
         status_message = self.query('$A5', nbytes=14, validator=validator)
-        self.adapter.read_termination = '\r\n'
 
         port_n_toggle = ON if int(status_message[-n]) == 1 else OFF
 
