@@ -396,40 +396,29 @@ class SynaccessNetbooter(Instrument):
                 f'either ON or OFF (Toggle type)'
             )
 
-        # Dump buffer (this device sends out a Telnet handshake upon initial
-        # connection and periodically transmits null bytes, possibly as a
-        # keep-alive signal)
-        self.read(nbytes=np.inf, timeout=0.1)
-
         if state == ON:
             self.write('$A3 %d 1' % n)
         elif state == OFF:
             self.write('$A3 %d 0' % n)
-
-        # Get echo
-        echo = self.read(nbytes=9)
-        state_num = 1 if state == ON else 0
-        if echo[-9:].decode() != ('$A3 %d %d' % (n, state_num)):
-            raise ValueError(f'Unable to toggle port {n} of {self.name}')
-
-        # Get return code
-        return_code = self.read(nbytes=4, decode=False)
-        if return_code != b'$A0\x00':
-            raise ValueError(f'Unable to toggle port {n} of {self.name}')
 
     def _get_port_n_toggle(self, n):
 
         # Dump buffer (this device sends out a Telnet handshake upon initial
         # connection and periodically transmits null bytes, possibly as a
         # keep-alive signal)
-        self.read(nbytes=np.inf, timeout=0.1)
+        self.read(nbytes=np.inf, timeout=0.1, decode=False)
 
-        def validator(response):
-            return re.search('A0,\d\d\d\d\d', response)
+        def termination(message):
+            return re.search(b'A0,\d\d\d\d\d', message)
 
-        status_message = self.query('$A5', nbytes=14, validator=validator)
+        status_message = self.query(
+            '$A5', termination=termination, decode=False
+        )
 
-        port_n_toggle = ON if int(status_message[-n]) == 1 else OFF
+        # Port statuses are a sequence of 0s and 1s, starting from the right
+        statuses = re.search(b'A0,\d\d\d\d\d', status_message)[0]
+
+        port_n_toggle = ON if int(statuses.decode()[-n]) == 1 else OFF
 
         return port_n_toggle
 

@@ -916,10 +916,13 @@ class Socket(Adapter):
 
     def _read(self, **kwargs):
 
+        termination = kwargs.pop('termination', self.read_termination)
+        timeout = kwargs.pop('timeout', self.timeout)
+
         return read_from_socket(
             self.backend,
-            termination=self.read_termination,
-            timeout=self.timeout,
+            termination=termination,
+            timeout=timeout,
             **kwargs
         )
 
