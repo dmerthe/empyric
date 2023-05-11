@@ -388,8 +388,6 @@ class SynaccessNetbooter(Instrument):
         'port 5 toggle',
     )
 
-    _initialized = False  # for catching Telnet handshake
-
     def _set_port_n_toggle(self, n, state):
 
         if state != ON and state != OFF:
@@ -398,7 +396,9 @@ class SynaccessNetbooter(Instrument):
                 f'either ON or OFF (Toggle type)'
             )
 
-        # Dump buffer
+        # Dump buffer (this device sends out a Telnet handshake upon initial
+        # connection and periodically transmits null bytes, possibly as a
+        # keep-alive signal)
         self.read(nbytes=np.inf, timeout=0.1)
 
         if state == ON:
@@ -419,13 +419,15 @@ class SynaccessNetbooter(Instrument):
 
     def _get_port_n_toggle(self, n):
 
-        # Dump buffer
+        # Dump buffer (this device sends out a Telnet handshake upon initial
+        # connection and periodically transmits null bytes, possibly as a
+        # keep-alive signal)
         self.read(nbytes=np.inf, timeout=0.1)
 
         def validator(response):
             return re.search('A0,\d\d\d\d\d', response)
 
-        status_message = self.query('$A5', nbytes=np.inf, validator=validator)
+        status_message = self.query('$A5', nbytes=14, validator=validator)
 
         port_n_toggle = ON if int(status_message[-n]) == 1 else OFF
 
