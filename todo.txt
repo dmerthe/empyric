@@ -5,3 +5,4 @@
 - Change PrologixGPIBUSB backend to PyVISA
 - Add output limits to BrainboxesED560
 - Add remote-sense/4-wire to Keithley2400
+- Add Phidgets Humidity/Temperature Sensor 
