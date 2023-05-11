@@ -398,6 +398,9 @@ class SynaccessNetbooter(Instrument):
                 f'either ON or OFF (Toggle type)'
             )
 
+        # Dump buffer
+        self.read(nbytes=np.inf, timeout=0.1)
+
         if state == ON:
             self.write('$A3 %d 1' % n)
         elif state == OFF:
@@ -406,7 +409,7 @@ class SynaccessNetbooter(Instrument):
         # Get echo
         echo = self.read(nbytes=9)
         state_num = 1 if state == ON else 0
-        if echo != ('$A3 %d %d' % (n, state_num)):
+        if echo[-9:].decode() != ('$A3 %d %d' % (n, state_num)):
             raise ValueError(f'Unable to toggle port {n} of {self.name}')
 
         # Get return code
@@ -416,15 +419,13 @@ class SynaccessNetbooter(Instrument):
 
     def _get_port_n_toggle(self, n):
 
-        if not self._initialized:
-            # Dump Telnet preamble
-            self.read(decode=False, nbytes=36)
-            self._initialized = True
+        # Dump buffer
+        self.read(nbytes=np.inf, timeout=0.1)
 
         def validator(response):
             return re.search('A0,\d\d\d\d\d', response)
 
-        status_message = self.query('$A5', nbytes=14, validator=validator)
+        status_message = self.query('$A5', nbytes=np.inf, validator=validator)
 
         port_n_toggle = ON if int(status_message[-n]) == 1 else OFF
 
