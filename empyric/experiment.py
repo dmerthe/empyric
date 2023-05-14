@@ -143,7 +143,7 @@ class Experiment:
                 else:
                     self.state[name] = None
 
-            # Wait for all routine threads to finish
+            # Wait for all variable update threads to finish
             for name, thread in threads.items():
                 self.status = Experiment.RUNNING + f': retrieving {name}'
                 thread.join()
