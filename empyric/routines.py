@@ -706,21 +706,22 @@ class SocketServer(Routine):
                         else:
                             outgoing_message = f'{alias} undefined'
 
-                    elif value == 'dtype?':
+                    elif value == 'type?':
 
                         if alias in self.knobs:
-                            dtype = self.knobs[alias].type
+                            _type = self.knobs[alias].type
                         elif alias in self.state:
 
-                            dtype = None
-                            for _type in supported_types.values():
-                                if isinstance(self.state[alias], _type):
-                                    dtype = _type
+                            _type = None
+                            for supported_type in supported_types.values():
+                                value = self.state[alias]
+                                if isinstance(value, supported_type):
+                                    _type = supported_type
 
                         else:
-                            dtype = None
+                            _type = None
 
-                        outgoing_message = f'{alias} {dtype}'
+                        outgoing_message = f'{alias} {_type}'
 
                     elif value == '?':  # Query of value
 
@@ -810,7 +811,7 @@ class ModbusServer(Routine):
 
         self.meters = meters
 
-        self.state = {}
+        self.state = None  # set by update method
 
         # Check for PyModbus installation
         try:
@@ -910,19 +911,24 @@ class ModbusServer(Routine):
                             values, byteorder='>'
                         )
 
-                        if issubclass(variable.dtype, Boolean):
+                        if issubclass(variable._type, Boolean):
                             variable.value = decoder.decode_64bit_uint()
-                        elif issubclass(variable.dtype, Toggle):
+                        elif issubclass(variable._type, Toggle):
                             int_value = decoder.decode_64bit_uint()
                             variable.value = ON if int_value == 1 else OFF
-                        elif issubclass(variable.dtype, Integer):
+                        elif issubclass(variable._type, Integer):
                             variable.value = decoder.decode_64bit_int()
-                        elif issubclass(variable.dtype, Float):
+                        elif issubclass(variable._type, Float):
                             variable.value = decoder.decode_64bit_float()
 
         return wrapped_method
 
     async def _update_registers(self):
+
+        if self.state is None:  # do nothing if state is undefined
+            await asyncio.sleep(0.1)
+            asyncio.create_task(self._update_registers())
+            return
 
         # Store readwrite variable values in holding registers (fc = 3)
         builder = self._builder_cls(byteorder='>')
@@ -968,44 +974,44 @@ class ModbusServer(Routine):
         builder.reset()
 
         if self.meters:
-            selection = self.meters
+            selection = self.state[self.meters]
         else:
-            selection = list(self.state)
+            selection = self.state
 
-        for i, (name, value) in enumerate(self.state[selection].items()):
+        for i, (name, value) in enumerate(selection.items()):
 
-            dtype = None
-            for _type in supported_types.values():
-                if isinstance(value, _type):
-                    dtype = _type
+            _type = None
+            for supported_type in supported_types.values():
+                if isinstance(value, supported_type):
+                    _type = supported_type
 
             # encode the value into the 4 registers
-            if value is None or dtype is None:
+            if value is None or _type is None:
                 builder.add_64bit_float(float('nan'))
-            elif dtype == Boolean:
+            elif _type == Boolean:
                 builder.add_64bit_uint(value)
-            elif dtype == Toggle:
+            elif _type == Toggle:
                 builder.add_64bit_uint(int(value in Toggle.on_values))
-            elif dtype == Integer:
+            elif _type == Integer:
                 builder.add_64bit_int(value)
-            elif dtype == Float:
+            elif _type == Float:
                 builder.add_64bit_float(value)
             else:
                 raise ValueError(
                     f'unable to update modbus server registers from value '
                     f'{value} of variable {name} with data type '
-                    f'{dtype}'
+                    f'{_type}'
                 )
 
             # encode the meta data
-            dtype_int = {
+            type_int = {
                 Boolean: 0,
                 Toggle: 1,
                 Integer: 2,
                 Float: 3
-            }.get(dtype, -1)
+            }.get(_type, -1)
 
-            builder.add_16bit_int(dtype_int)
+            builder.add_16bit_int(type_int)
 
         # from_vars kwarg added with setValues_decorator above
         self.slave.setValues(4, 0, builder.to_registers(), from_vars=True)

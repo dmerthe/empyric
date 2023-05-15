@@ -522,13 +522,13 @@ class LabJackT7(Instrument):
     )
 
     def _set_DION(self, n, value: Integer):
-        self.write(16, 2000 + n, value, dtype='16bit_uint')
+        self.write(16, 2000 + n, value, _type='16bit_uint')
 
     def _get_DION(self, n) -> Integer:
-        return self.read(3, 2000 + n, count=1, dtype='16bit_uint')
+        return self.read(3, 2000 + n, count=1, _type='16bit_uint')
 
     def _measure_AIN(self, n) -> Float:
-        return self.read(3, 2*n, count=2, dtype='32bit_float')
+        return self.read(3, 2*n, count=2, _type='32bit_float')
 
     @setter
     def set_DIO0(self, value: Integer):
@@ -653,9 +653,9 @@ class LabJackT7(Instrument):
     @measurer
     def measure_AIN_all(self) -> Array:
         """Reads all 14 analog inputs in a single call"""
-        return self.read(4, 0, count=2*14, dtype='32bit_float')
+        return self.read(4, 0, count=2*14, _type='32bit_float')
 
     @measurer
     def measure_device_temperature(self) -> Float:
         """Device temperature in C"""
-        return self.read(4, 60052, count=2, dtype='32bit_float') - 273.15
+        return self.read(4, 60052, count=2, _type='32bit_float') - 273.15

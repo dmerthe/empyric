@@ -301,31 +301,31 @@ class MKSGSeries(Instrument):
 
     @setter
     def set_setpoint(self, setpoint: Float):
-        self.write(16, 0xA000, setpoint, dtype='32bit_float')
+        self.write(16, 0xA000, setpoint, _type='32bit_float')
 
     @getter
     def get_setpoint(self) -> Float:
-        return self.read(3, 0xA000, count=2, dtype='32bit_float')
+        return self.read(3, 0xA000, count=2, _type='32bit_float')
 
     @setter
     def set_ramp_time(self, ramp_time: Float):
-        self.write(16, 0xA002, int(ramp_time), dtype='32bit_uint')
+        self.write(16, 0xA002, int(ramp_time), _type='32bit_uint')
 
     @getter
     def get_ramp_time(self) -> Float:
-        return self.read(3, 0xA002, count=2, dtype='32bit_uint')
+        return self.read(3, 0xA002, count=2, _type='32bit_uint')
 
     @measurer
     def measure_flow_rate(self) -> Float:
-        return self.read(4, 0x4000, count=2, dtype='32bit_float')
+        return self.read(4, 0x4000, count=2, _type='32bit_float')
 
     @measurer
     def measure_valve_position(self) -> Float:
-        return self.read(4, 0x4004, count=2, dtype='32bit_float')
+        return self.read(4, 0x4004, count=2, _type='32bit_float')
 
     @measurer
     def measure_temperature(self) -> Float:
-        return self.read(4, 0x4002, count=2, dtype='32bit_float')
+        return self.read(4, 0x4002, count=2, _type='32bit_float')
 
 
 class AlicatMFC(Instrument):
@@ -351,23 +351,23 @@ class AlicatMFC(Instrument):
 
     @setter
     def set_setpoint(self, setpoint: Float):
-        self.write(16, 1009, setpoint, dtype='32bit_float')
+        self.write(16, 1009, setpoint, _type='32bit_float')
 
     @getter
     def get_setpoint(self) -> Float:
-        return self.read(3, 1009, count=2, dtype='32bit_float')
+        return self.read(3, 1009, count=2, _type='32bit_float')
 
     @measurer
     def measure_flow_rate(self) -> Float:
-        return self.read(4, 1208, count=2, dtype='32bit_float')
+        return self.read(4, 1208, count=2, _type='32bit_float')
 
     @measurer
     def measure_temperature(self) -> Float:
-        return self.read(4, 1204, count=2, dtype='32bit_float')
+        return self.read(4, 1204, count=2, _type='32bit_float')
 
     @measurer
     def measure_pressure(self) -> Float:
-        return self.read(4, 1202, count=2, dtype='32bit_float')
+        return self.read(4, 1202, count=2, _type='32bit_float')
 
 
 class SynaccessNetbooter(Instrument):

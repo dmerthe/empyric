@@ -1076,7 +1076,7 @@ class Modbus(Adapter):
     byte_order = '>'
     word_order = '>'
 
-    dtypes = [
+    types = [
         '8bit_uint', '16bit_uint', '32bit_uint', '64bit_uint',
         '8bit_int', '16bit_int', '32bit_int', '64bit_int',
         '16bit_float', '32bit_float', '64bit_float',
@@ -1169,13 +1169,13 @@ class Modbus(Adapter):
 
         self.connected = True
 
-    def _write(self, func_code, address, values, dtype=None):
+    def _write(self, func_code, address, values, _type=None):
         """
         Write values to coils (func_code = 5 [single] or 15 [multiple]) or
         holding registers (func_code = 6 [single] or 16 [multiple]).
 
-        The Modbus data type for decoding registers is specified by the `dtype`
-        argument. Valid values for `dtype` are listed in the `dtypes` attribute.
+        The Modbus data type for decoding registers is specified by the `_type`
+        argument. Valid values for `_type` are listed in the `_types` attribute.
         """
 
         values = np.array([values]).flatten()
@@ -1183,10 +1183,10 @@ class Modbus(Adapter):
         if func_code not in [5, 15, 6, 16]:
             raise ValueError(f'invalid Modbus function code {func_code}')
 
-        if dtype and dtype not in self.dtypes:
+        if _type and _type not in self.types:
             raise TypeError(
-                'invalid dtype argument; must be one of:\n' + ', '.join(
-                    self.dtypes
+                'invalid _type argument; must be one of:\n' + ', '.join(
+                    self.types
                 )
             )
 
@@ -1209,15 +1209,15 @@ class Modbus(Adapter):
         else:
             # Write registers
 
-            if dtype is None:
-                dtype = '16bit_uint'
+            if _type is None:
+                _type = '16bit_uint'
 
             builder = self._builder_cls(
                 byteorder=self.byte_order, wordorder=self.word_order
             )
 
             for value in values:
-                builder.__getattribute__('add_'+dtype)(value)
+                builder.__getattribute__('add_'+_type)(value)
 
             register_values = builder.to_registers()
 
@@ -1233,21 +1233,21 @@ class Modbus(Adapter):
                     'for writing coils/registers'
                 )
 
-    def _read(self, func_code, address, count=1, dtype=None):
+    def _read(self, func_code, address, count=1, _type=None):
         """
         Read from coils (func_code = 1), discrete inputs (func_code = 2),
         holding registers (func_code = 3), or input registers (func_code = 4).
 
         A single data unit is read by specifying the function code
         (`func_code`) and address; the data can be converted to the desired
-        data type (`dtype` = `int` or `float`). Multiple sequential addresses
+        data type (`_type` = `int` or `float`). Multiple sequential addresses
         are read by specifying the count.
         """
 
-        if dtype and dtype not in self.dtypes:
+        if _type and _type not in self.types:
             raise TypeError(
-                'invalid dtype argument; must be one of:\n'
-                ', '.join(self.dtypes)
+                'invalid _type argument; must be one of:\n'
+                ', '.join(self.types)
             )
 
         # Enumerate modbus read functions
@@ -1283,10 +1283,10 @@ class Modbus(Adapter):
                 registers, byteorder=self.byte_order, wordorder=self.word_order
             )
 
-            n_values = int(16 * count / (int(dtype.split('bit')[0])))
+            n_values = int(16 * count / (int(_type.split('bit')[0])))
 
             values = [
-                decoder.__getattribute__('decode_' + dtype)()
+                decoder.__getattribute__('decode_' + _type)()
                 for _ in range(n_values)
             ]
 

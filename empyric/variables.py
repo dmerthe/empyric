@@ -46,7 +46,7 @@ class Variable:
 
     @staticmethod
     def setter_type_validator(setter):
-        """Checks that set value is compatible with variable's dtype"""
+        """Checks that set value is compatible with variable's type"""
         @wraps(setter)
         def wrapped_setter(self, value):
 
@@ -72,7 +72,7 @@ class Variable:
 
     @staticmethod
     def getter_type_validator(getter):
-        """Checks that get value is compatible with variable's dtype"""
+        """Checks that get value is compatible with variable's type"""
         @wraps(getter)
         def wrapped_getter(self):
 
@@ -125,14 +125,14 @@ class Knob(Variable):
         self.lower_limit = lower_limit
         self.upper_limit = upper_limit
 
-        # infer dtype from type hint of first argument of set method
+        # infer type from type hint of first argument of set method
         set_method = getattr(instrument, 'set_'+knob.replace(' ', '_'))
         type_hints = typing.get_type_hints(set_method)
         type_hints.pop('return', None)  # exclude return type hint
 
         if type_hints:
             arg_hints = list(type_hints)
-            self.dtype = type_hints[arg_hints[0]]
+            self._type = type_hints[arg_hints[0]]
 
         self._value = None
 
@@ -199,7 +199,7 @@ class Meter(Variable):
         else:
             self.gate = Parameter(ON)
 
-        self.dtype = typing.get_type_hints(
+        self._type = typing.get_type_hints(
             getattr(instrument, 'measure_' + meter.replace(' ', '_'))
         ).get('return', None)
 
@@ -329,7 +329,7 @@ class Remote(Variable):
 
     """
 
-    dtype_map = {
+    type_map = {
         Toggle: '64bit_uint',
         Boolean: '64bit_uint',
         Integer: '64bit_int',
@@ -363,17 +363,17 @@ class Remote(Variable):
             response = read_from_socket(self._socket, timeout=60)
             self._settable = response == f'{self.alias} settable'
 
-            # Get dtype
-            write_to_socket(self._socket, f'{self.alias} dtype?')
+            # Get type
+            write_to_socket(self._socket, f'{self.alias} type?')
 
             response = read_from_socket(self._socket, timeout=60)
 
             if response is not None:
-                for dtype in types.supported:
-                    if str(dtype) in response.split(alias)[-1]:
-                        self.dtype = types.supported.get(dtype, None)
+                for _type in types.supported:
+                    if str(_type) in response.split(alias)[-1]:
+                        self._type = types.supported.get(_type, None)
             else:
-                self.dtype = None
+                self._type = None
 
     @property
     @Variable.getter_type_validator
@@ -386,21 +386,21 @@ class Remote(Variable):
 
             fcode = 3 if self.settable else 4
 
-            dtype_int = self._client.read(
-                fcode, self.alias + 4, dtype='16bit_int'
+            type_int = self._client.read(
+                fcode, self.alias + 4, _type='16bit_int'
             )
 
-            dtype = {
+            _type = {
                 0: Boolean,
                 1: Toggle,
                 2: Integer,
                 3: Float,
-            }.get(dtype_int, None)
+            }.get(type_int, None)
 
-            if dtype is not None:
+            if _type is not None:
                 self._value = self._client.read(
                     fcode, self.alias, count=4,
-                    dtype=self.dtype_map[dtype]
+                    _type=self.type_map[_type]
                 )
 
         else:
@@ -435,7 +435,7 @@ class Remote(Variable):
         if self.protocol == 'modbus':
 
             self._client.write(
-                16, self.alias, value, dtype=self.dtype_map[self.dtype]
+                16, self.alias, value, _type=self.type_map[self.type]
             )
 
         else:
