@@ -395,17 +395,20 @@ class Manager:
             if self.runcard == '':
                 raise ValueError('a valid runcard was not selected!')
 
-        if isinstance(self.runcard, str) and os.path.exists(self.runcard):
+        if isinstance(self.runcard, str):
+            if os.path.exists(self.runcard):
+                dirname = os.path.dirname(self.runcard)
+                if dirname != '':
+                    os.chdir(os.path.dirname(self.runcard))
+                    # go to runcard directory to put data in same location
 
-            dirname = os.path.dirname(self.runcard)
-            if dirname != '':
-                os.chdir(os.path.dirname(self.runcard))
-                # go to runcard directory to put data in same location
-
-            yaml = YAML()
-            with open(self.runcard, 'rb') as runcard_file:
-                self.runcard = yaml.load(runcard_file)  # load the runcard
-
+                yaml = YAML()
+                with open(self.runcard, 'rb') as runcard_file:
+                    self.runcard = yaml.load(runcard_file)  # load the runcard
+            else:
+                raise FileNotFoundError(
+                    f'invalid runcard path "{self.runcard}"'
+                )
         elif isinstance(self.runcard, dict):
             pass
         else:
@@ -603,7 +606,8 @@ def validate_runcard(runcard):
     is_ordereddict = isinstance(runcard, collections.OrderedDict)
 
     if is_dict or is_ordereddict:
-        # create temporary runcard YAML file
+
+        # Create temporary runcard YAML file for PyKwalify to validate
         yaml = YAML()
 
         runcard_path = f'tmp_runcard_{time.time()}.yaml'
@@ -613,9 +617,11 @@ def validate_runcard(runcard):
 
         validate_runcard(runcard_path)
 
+        # Wait until temporary file has write access, then delete
         while not os.access(runcard_path, os.W_OK):
-            os.remove(runcard_path)
             time.sleep(0.1)
+
+        os.remove(runcard_path)
 
         return True
 
