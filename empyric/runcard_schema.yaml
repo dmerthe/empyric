@@ -46,7 +46,7 @@ map:
         regex;(.+): {type: any}  # references to other variables
       }},
 
-      remote: {type: str},  # for remote variables
+      server: {type: str},  # for remote variables
       protocol: {type: any},
       alias: {type: any},
       dtype: {type: str},

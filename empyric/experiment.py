@@ -757,14 +757,14 @@ def convert_runcard(runcard):
             variables[name] = _variables.Expression(
                 expression=expression, definitions=definitions
             )
-        elif 'remote' in specs:
-            remote = specs['remote']
+        elif 'server' in specs:
+            server = specs['server']
             alias = specs.get('alias', name)
             protocol = specs.get('protocol', None)
             settable = specs.get('settable', False)
 
             variables[name] = _variables.Remote(
-                remote=remote, alias=alias, protocol=protocol, settable=settable
+                server=server, alias=alias, protocol=protocol, settable=settable
             )
 
         elif 'parameter' in specs:

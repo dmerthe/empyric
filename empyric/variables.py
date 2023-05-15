@@ -304,8 +304,8 @@ class Remote(Variable):
     Variable controlled by an experiment (running a server routine) on a
     different process or computer.
 
-    The `remote` argument is generally the IP address and port of the server, in
-    the form '(ip address)::(port)'.
+    The `server` argument is the IP address and port of the server,
+    in the form '(ip address)::(port)'.
 
     The `alias` argument identifies the particular variable on the server to
     link to. For socket servers, this is simply the name of the variable on
@@ -337,26 +337,26 @@ class Remote(Variable):
     }
 
     def __init__(self,
-                 remote: str,
+                 server: str,
                  alias: [int, str],
                  protocol: str = None,
                  settable: bool = False  # needed for modbus protocol
                  ):
 
-        self.remote = remote
+        self.server = server
         self.alias = alias
         self.protocol = protocol
 
         if protocol == 'modbus':
-            self._client = instruments.ModbusClient(remote)
+            self._client = instruments.ModbusClient(server)
             self._settable = settable
 
         else:
-            remote_ip, remote_port = remote.split('::')
+            server_ip, server_port = server.split('::')
 
             self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-            self._socket.connect((remote_ip, int(remote_port)))
+            self._socket.connect((server_ip, int(server_port)))
 
             write_to_socket(self._socket, f'{self.alias} settable?')
 
@@ -420,7 +420,7 @@ class Remote(Variable):
             except BaseException as error:
                 print(
                     f'Warning: unable to retrieve value of {self.alias} '
-                    f'from server at {self.remote}; got error "{error}"'
+                    f'from server at {self.server}; got error "{error}"'
                 )
 
         return self._value
@@ -446,12 +446,12 @@ class Remote(Variable):
             if check == '' or check is None:
                 print(
                     f'Warning: received no response from server at '
-                    f'{self.remote} while trying to set {self.alias}'
+                    f'{self.server} while trying to set {self.alias}'
                 )
             elif 'Error' in check:
                 print(
                     f'Warning: got response "{check}" while trying to set '
-                    f'{self.alias} on server at {self.remote}'
+                    f'{self.alias} on server at {self.server}'
                 )
             else:
                 try:
@@ -461,20 +461,20 @@ class Remote(Variable):
                     if value != check_value:
                         print(
                             f'Warning: attempted to set {self.alias} on '
-                            f'server at {self.remote} to {value} but '
+                            f'server at {self.server} to {value} but '
                             f'checked value is {check_value}'
                         )
 
                 except ValueError as val_err:
                     print(
                         f'Warning: unable to check value while setting '
-                        f'{self.alias} on server at {self.remote}; '
+                        f'{self.alias} on server at {self.server}; '
                         f'got error "{val_err}"'
                     )
                 except IndexError as ind_err:
                     print(
                         f'Warning: unable to check value while setting '
-                        f'{self.alias} on server at {self.remote}; '
+                        f'{self.alias} on server at {self.server}; '
                         f'got error "{ind_err}"'
                     )
 
