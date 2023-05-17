@@ -161,14 +161,16 @@ class Adapter:
         self.connected = True
 
     @chaperone
-    def write(self, *args, **kwargs):
+    def write(self, *args, validator=None, **kwargs):
         """
         Write a command.
 
         :param args: any arguments for the write method
+        :param validator: (callable) function that returns True if its input
+                          looks right or False if it does not
         :param kwargs: any keyword arguments for the write method
 
-        :return: (str/float/int/bool) instrument response, if valid
+        :return: (str) literal 'Success' if write operation is successful
         """
 
         if hasattr(self, '_write'):
@@ -178,14 +180,16 @@ class Adapter:
                 self.__name__ + " adapter has no _write method")
 
     @chaperone
-    def read(self, *args, **kwargs):
+    def read(self, *args, validator=None, **kwargs):
         """
         Read an awaiting message.
 
         :param args: any arguments for the read method
+        :param validator: (callable) function that returns True if its input
+                          looks right or False if it does not
         :param kwargs: any keyword arguments for the read method
 
-        :return: (str/float/int/bool) instrument response, if valid
+        :return: instrument response
         """
 
         if hasattr(self, '_read'):
@@ -194,14 +198,16 @@ class Adapter:
             raise AttributeError(self.__name__ + " adapter has no _read method")
 
     @chaperone
-    def query(self, *args, **kwargs):
+    def query(self, *args, validator=None, **kwargs):
         """
         Submit a query.
 
         :param args: any arguments for the query method
+        :param validator: (callable) function that returns True if its input
+                          looks right or False if it does not
         :param kwargs: any keyword arguments for the query method
 
-        :return: (str/float/int/bool) instrument response, if valid
+        :return: instrument response
         """
 
         if hasattr(self, '_query'):
@@ -878,7 +884,7 @@ class USB(Adapter):
 
 class Socket(Adapter):
     """
-    Handles communications between sockets using the built-in socket module
+    Handles communications between sockets using Python's built-in socket module
     """
 
     ip_address = None
@@ -1055,7 +1061,7 @@ class ModbusSerial(Adapter):
 class Modbus(Adapter):
     """
     Handles communication with instruments via the Modbus communication
-    protocol, over either TCP or serial ports.
+    protocol, over either TCP or serial ports, using PyModbus.
     """
 
     kwargs = (

@@ -100,7 +100,10 @@ def find_nearest(allowed, value, overestimate=False, underestimate=False):
 
 # Tools for handling sockets
 def get_ip_address(remote_ip='8.8.8.8', remote_port=80):
-    """Connect to Google's DNS Server to resolve IP address"""
+    """
+    Connect to a server to resolve IP address; defaults to Google's DNS server
+    if `remote_ip` and `remote_port` are not specified
+    """
 
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as tst_sock:
         tst_sock.connect((remote_ip, remote_port))
