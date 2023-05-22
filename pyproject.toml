@@ -2,12 +2,11 @@
 name = "empyric"
 version = "0.1.0"
 description = "A package for experiment automation"
-authors = ["Daniel Merthe <dmerthe@gmail.com>", "Daniel Merthe <dmerthe@avalanche.energy>", "Jake Nixon <jnixon@avalanche.energy>"]
+authors = ["Daniel Merthe <dmerthe@gmail.com>"]
 readme = "README.md"
 repository = "https://github.com/dmerthe/empyric"
 packages = [
-    { include = "empyric/runcard_schema.yaml" },
-    { include = "empyric"}
+    { include = "empyric"},
 ]
 classifiers = [
         "Programming Language :: Python :: 3",

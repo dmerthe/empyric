@@ -1,0 +1,82 @@
+# Basic runcard describing an experiment that measures the x and y values of a Henon Map.
+# To execute, run select_runcard.py in the examples directory, 
+# and then select this runcard from the file selection dialog.
+
+Description:
+ name: Henon Map Experiment
+ operator: Mike
+ platform: Test Stand 1
+ comments: Who is Mike? There is no Test Stand 1
+
+Settings:
+ follow-up: henon_runcard_example.yaml  # experiment repeats ad infinitum
+ step interval: 0.5
+ plot interval: 5
+ save interval: 10
+ end: 60
+
+Instruments:
+ Henon Mapper:
+  type: HenonMapper
+  address: 1
+  presets:
+   a: 0
+   b: 0
+  postsets:
+   a: 0
+   b: 0
+
+Variables:
+ Knob a:
+  instrument: Henon Mapper
+  knob: a
+ Knob a Setpoint:
+  parameter: 1.4
+ Knob b:
+  instrument: Henon Mapper
+  knob: b
+ Coordinate x:
+  instrument: Henon Mapper
+  meter: x
+ Coordinate y:
+  instrument: Henon Mapper
+  meter: y
+ Distance r:
+  expression: 'sqrt(x^2 + y^2)'
+  definitions:
+   x: Coordinate x
+   y: Coordinate y
+
+Alarms:
+ r > 1:
+  condition: 'Distance r > 1'
+  protocol: hold
+
+Plots:
+ Henon Map:
+  x: Coordinate x
+  y: Coordinate y
+  xlabel: 'X'
+  ylabel: 'Y'
+  style: parametric
+  configure:
+   linestyle: None
+   marker: 'o'
+   markersize: 3
+
+ Y Plot:
+  x: Time
+  y: Coordinate y
+
+Routines:
+ Ramp Knob a:
+  type: Ramp
+  knobs: Knob a
+  targets: Knob a Setpoint
+  rates: 0.7
+  start: 3
+ Ramp Knob b:
+  type: Timecourse
+  knobs: Knob b
+  times: [3, 5]
+  values: [0.0, 0.3]
