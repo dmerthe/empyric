@@ -1,4 +1,5 @@
 import setuptools
+import os
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
@@ -14,6 +15,15 @@ setuptools.setup(
     url="https://github.com/dmerthe/empyric",
     packages=setuptools.find_packages(),
     package_data={'': ['*.yaml']},
+    data_files=[
+        ('tests', [
+            os.path.join(
+                'examples',
+                'Henon Map Experiment',
+                'henon_runcard_example.yaml'
+            )
+        ])
+    ],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",

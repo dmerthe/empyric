@@ -12,6 +12,7 @@ from empyric.experiment import Manager
 # Tests are invoked at the command line with `empyric --test <feature>`
 testable_features = [
     'experiment',  # tests Variable, Experiment and Manager classes (default)
+    'variable',  # tests Knob, Meter, Parameter and Expression
 
     # Adapters
     'serial',
@@ -76,7 +77,7 @@ def execute():
             raise NotImplementedError(
                 '\n' + '\n'.join(
                     [
-                        f'Requested test of {feature} is not implement'
+                        f'Requested test of {feature} is not implemented'
                         for feature in args.test
                         if feature not in testable_features
                     ]
