@@ -13,4 +13,4 @@ Each wrapped write, read and query method accepts a ``validator`` function as an
 
 .. automodule:: empyric.adapters
    :members:
-   :exclude-members: chaperone, PrologixGPIBUSB, PrologixGPIBLAN, supported, kwargs
+   :exclude-members: chaperone, PrologixGPIBUSB, PrologixGPIBLAN, supported, kwargs, cls

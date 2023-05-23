@@ -2,10 +2,8 @@
 import collections
 import datetime
 import importlib
-import numbers
 import os
 import pathlib
-import socket
 import sys
 import threading
 import time
@@ -145,7 +143,7 @@ class Experiment:
                 else:
                     self.state[name] = None
 
-            # Wait for all routine threads to finish
+            # Wait for all variable update threads to finish
             for name, thread in threads.items():
                 self.status = Experiment.RUNNING + f': retrieving {name}'
                 thread.join()
@@ -252,7 +250,7 @@ class Experiment:
         Save the experiment dataframe to a CSV file
 
         :param directory: (path) (optional) directory to save data to,
-        if different from working directory
+                          if different from working directory
         :return: None
         """
 
@@ -397,17 +395,20 @@ class Manager:
             if self.runcard == '':
                 raise ValueError('a valid runcard was not selected!')
 
-        if isinstance(self.runcard, str) and os.path.exists(self.runcard):
+        if isinstance(self.runcard, str):
+            if os.path.exists(self.runcard):
+                dirname = os.path.dirname(self.runcard)
+                if dirname != '':
+                    os.chdir(os.path.dirname(self.runcard))
+                    # go to runcard directory to put data in same location
 
-            dirname = os.path.dirname(self.runcard)
-            if dirname != '':
-                os.chdir(os.path.dirname(self.runcard))
-                # go to runcard directory to put data in same location
-
-            yaml = YAML()
-            with open(self.runcard, 'rb') as runcard_file:
-                self.runcard = yaml.load(runcard_file)  # load the runcard
-
+                yaml = YAML()
+                with open(self.runcard, 'rb') as runcard_file:
+                    self.runcard = yaml.load(runcard_file)  # load the runcard
+            else:
+                raise FileNotFoundError(
+                    f'invalid runcard path "{self.runcard}"'
+                )
         elif isinstance(self.runcard, dict):
             pass
         else:
@@ -422,7 +423,7 @@ class Manager:
         self.settings = converted_runcard['Settings']
         self.instruments = converted_runcard['Instruments']
         self.alarms = converted_runcard['Alarms']
-        self.plotter = converted_runcard['Plotter']
+        self.plotter = converted_runcard.get('Plotter', None)
 
         self.experiment = converted_runcard['Experiment']
 
@@ -451,7 +452,7 @@ class Manager:
         status, while the experiment is run in a separate thread.
 
         :param directory: (path) (optional) directory in which to run the
-        experiment if different from the working directory
+                          experiment if different from the working directory
         :return: None
         """
 
@@ -605,7 +606,8 @@ def validate_runcard(runcard):
     is_ordereddict = isinstance(runcard, collections.OrderedDict)
 
     if is_dict or is_ordereddict:
-        # create temporary runcard YAML file
+
+        # Create temporary runcard YAML file for PyKwalify to validate
         yaml = YAML()
 
         runcard_path = f'tmp_runcard_{time.time()}.yaml'
@@ -614,6 +616,10 @@ def validate_runcard(runcard):
             yaml.dump(runcard, runcard_file)
 
         validate_runcard(runcard_path)
+
+        # Wait until temporary file has write access, then delete
+        while not os.access(runcard_path, os.W_OK):
+            time.sleep(0.1)
 
         os.remove(runcard_path)
 
@@ -721,8 +727,10 @@ def convert_runcard(runcard):
     for name, specs in runcard['Variables'].items():
         if 'meter' in specs:
             instrument = converted_runcard['Instruments'][specs['instrument']]
+            gate = specs.get('gate', None)
+            gate = variables[gate] if gate else None
             variables[name] = _variables.Meter(
-                meter=specs['meter'], instrument=instrument
+                meter=specs['meter'], instrument=instrument, gate=gate
             )
         elif 'knob' in specs:
             instrument = converted_runcard['Instruments'][specs['instrument']]
@@ -749,14 +757,14 @@ def convert_runcard(runcard):
             variables[name] = _variables.Expression(
                 expression=expression, definitions=definitions
             )
-        elif 'remote' in specs:
-            remote = specs['remote']
+        elif 'server' in specs:
+            server = specs['server']
             alias = specs.get('alias', name)
             protocol = specs.get('protocol', None)
             settable = specs.get('settable', False)
 
             variables[name] = _variables.Remote(
-                remote=remote, alias=alias, protocol=protocol, settable=settable
+                server=server, alias=alias, protocol=protocol, settable=settable
             )
 
         elif 'parameter' in specs:
@@ -775,7 +783,7 @@ def convert_runcard(runcard):
                 key.replace(' ', '_'): value for key, value in specs.items()
             }
 
-            # For Set, Timecourse and Sequence routines
+            # Convert list of knobs into dictionary
             knobs = np.array([specs.get('knobs', [])]).flatten()
             if knobs.size > 0:
                 for knob in knobs:
@@ -786,79 +794,6 @@ def convert_runcard(runcard):
                         )
 
                 specs['knobs'] = {name: variables[name] for name in knobs}
-
-            meters = np.array([specs.get('meters', [])]).flatten()
-            if meters.size > 0:
-                for meter in meters:
-                    if meter not in variables:
-                        raise KeyError(
-                            f'meter {meter} specified for routine {name} '
-                            f'is not in Variables!'
-                        )
-
-                specs['meters'] = {name: variables[name] for name in meters}
-
-            if 'values' in specs:
-                specs['values'] = np.array(
-                    specs['values'], dtype=object
-                ).reshape((len(knobs), -1))
-
-                # Values can be variables, specified by their names
-                for var_name in variables:
-                    where_variable = (specs['values'] == var_name)
-                    # locate names of variables
-
-                    specs['values'][where_variable] = variables[var_name]
-                    # replace variable names with variables
-
-                # Values can be specified in a CSV file
-                def is_csv(item):
-                    if type(item) == str:
-                        return '.csv' in item
-                    else:
-                        return False
-
-                def get_csv(path, column):
-                    df = pd.read_csv(recast(path))
-                    return df[column].values.flatten()
-
-                specs['values'] = np.array([
-                    get_csv(values[0], knob) if is_csv(values[0])
-                    else values for knob, values
-                    in zip(specs['knobs'].keys(), specs['values'])
-                ], dtype=object)
-
-            # For Server routines
-            readwrite = np.array([specs.get('readwrite', [])]).flatten()
-            if readwrite.size > 0:
-                for variable in readwrite:
-                    if variable not in variables:
-                        raise KeyError(
-                            f'Variable {variable} specified for routine {name} '
-                            'is not in Variables!'
-                        )
-
-                specs['readwrite'] = {
-                    name: variables[name] for name in readwrite
-                }
-
-            readonly = np.array([specs.get('readonly', [])]).flatten()
-            if readonly.size > 0:
-                for variable in readonly:
-                    if variable not in variables:
-                        raise KeyError(
-                            f'Variable {variable} specified for routine {name} '
-                            'is not in Variables!'
-                        )
-
-                specs['readonly'] = {
-                    name: variables[name] for name in readonly
-                }
-
-            if 'Server' in _type and len(readonly) == 0 and len(readwrite) == 0:
-                # Give readonly access to all variables if no variables
-                # specified
-                specs['readonly'] = variables
 
             routines[name] = available_routines[_type](**specs)
 

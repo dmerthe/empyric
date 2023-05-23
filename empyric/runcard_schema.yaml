@@ -34,9 +34,10 @@ map:
 
       instrument: {type: str},  # for knob and meter type variables
       knob: {type: str},  # for knob type variables
-      lower limit: {type: number},
-      upper limit: {type: number},
+      lower limit: {type: number},  # for knob type variables
+      upper limit: {type: number},  # for knob type variables
       meter: {type: str},  # for meter type variables
+      gate: {type: str},  # for meter variables
 
       parameter: {type: any},  # for parameter type variables
 
@@ -45,7 +46,7 @@ map:
         regex;(.+): {type: any}  # references to other variables
       }},
 
-      remote: {type: str},  # for remote variables
+      server: {type: str},  # for remote variables
       protocol: {type: any},
       alias: {type: any},
       dtype: {type: str},

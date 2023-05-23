@@ -1,6 +1,4 @@
-import os
 import time
-import re
 import select
 import socket
 import numbers
@@ -102,7 +100,10 @@ def find_nearest(allowed, value, overestimate=False, underestimate=False):
 
 # Tools for handling sockets
 def get_ip_address(remote_ip='8.8.8.8', remote_port=80):
-    """Connect to Google's DNS Server to resolve IP address"""
+    """
+    Connect to a server to resolve IP address; defaults to Google's DNS server
+    if `remote_ip` and `remote_port` are not specified
+    """
 
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as tst_sock:
         tst_sock.connect((remote_ip, remote_port))
@@ -133,9 +134,24 @@ def autobind_socket(_socket):
     return ip_address, port
 
 
-def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1):
+def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1,
+                     decode=True, chunk_size=4096):
     """
-    Read from a socket, with care taken to get the whole message
+    Read from a socket, with some effort taken to get the whole message.
+
+    :param _socket: (socket.Socket) socket to read from.
+    :param nbytes: (int) number of bytes to read; defaults to infinite.
+    :param termination: (str/bytes/callable) if str or bytes, expected message
+                        termination character(s); if callable, a function that
+                        takes a message as its sole argument and returns True if
+                        the message indicates that it is terminated, and False
+                        otherwise.
+    :param timeout: (numbers.Number) communication timeout in seconds;
+                    used for both the `select.select` and `_socket.recv`
+                    functions.
+    :param decode: (bool) whether to return decoded string (True) or raw bytes
+                   message (False); defaults to True.
+    :param chunk_size: (int) number of bytes to read on each call to recv method.
     """
 
     # Block until the socket is readable or until timeout
@@ -146,6 +162,10 @@ def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1):
 
     if not readable:
         return None
+
+    default_timeout = _socket.gettimeout()  # save default timeout
+
+    _socket.settimeout(timeout)
 
     if nbytes is None:
         nbytes = np.inf
@@ -161,14 +181,30 @@ def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1):
     if type(termination) == str:
         termination = termination.encode()
 
+    def is_terminated(message):
+
+        if isinstance(termination, bytes):
+            return termination in message
+        elif callable(termination):
+            return termination(message)
+        else:
+            return False
+
     message = b''
 
     while len(message) < nbytes and null_responses < max_nulls:
 
         part = b''
 
+        remaining_bytes = nbytes - len(message)
+
         try:
-            part = _socket.recv(1)
+
+            if remaining_bytes < chunk_size:
+                part = _socket.recv(remaining_bytes)
+            else:
+                part = _socket.recv(chunk_size)
+
         except ConnectionResetError as err:
             print(f'Warning: {err}')
             break
@@ -179,19 +215,29 @@ def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1):
 
             message = message + part
 
-            if termination is not None and termination in message:
+            if is_terminated(message):
                 break
 
         else:
             null_responses += 1
 
-    return message.decode().strip()
+    _socket.settimeout(default_timeout)
+
+    if decode:
+        return message.decode().strip()
+    else:
+        return message
 
 
 def write_to_socket(_socket, message, termination='\r', timeout=1):
     """
     Write a message to a socket, with care taken to get the whole message
-    transmitted
+    transmitted.
+
+    :param _socket: (socket.Socket) socket to write to.
+    :param message: (str) message to send.
+    :param termination: (str/bytes) expected message termination character(s).
+    :param timeout: (numbers.Number) timeout for `select.select` call.
     """
 
     # Block until the socket is writeable or until timeout

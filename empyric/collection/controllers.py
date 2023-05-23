@@ -286,7 +286,7 @@ class MKSGSeries(Instrument):
 
     name = 'MKSGSeries'
 
-    supported_adapters = ((Modbus, {'byte_order': '>'}),)
+    supported_adapters = ((Modbus, {}),)
 
     knobs = (
         'setpoint',  # flow rate setpoint in SCCM
@@ -301,31 +301,31 @@ class MKSGSeries(Instrument):
 
     @setter
     def set_setpoint(self, setpoint: Float):
-        self.write(16, 0xA000, setpoint, dtype='32bit_float')
+        self.write(16, 0xA000, setpoint, _type='32bit_float')
 
     @getter
     def get_setpoint(self) -> Float:
-        return self.read(3, 0xA000, count=2, dtype='32bit_float')
+        return self.read(3, 0xA000, count=2, _type='32bit_float')
 
     @setter
     def set_ramp_time(self, ramp_time: Float):
-        self.write(16, 0xA002, int(ramp_time), dtype='32bit_uint')
+        self.write(16, 0xA002, int(ramp_time), _type='32bit_uint')
 
     @getter
     def get_ramp_time(self) -> Float:
-        return self.read(3, 0xA002, count=2, dtype='32bit_uint')
+        return self.read(3, 0xA002, count=2, _type='32bit_uint')
 
     @measurer
     def measure_flow_rate(self) -> Float:
-        return self.read(4, 0x4000, count=2, dtype='32bit_float')
+        return self.read(4, 0x4000, count=2, _type='32bit_float')
 
     @measurer
     def measure_valve_position(self) -> Float:
-        return self.read(4, 0x4004, count=2, dtype='32bit_float')
+        return self.read(4, 0x4004, count=2, _type='32bit_float')
 
     @measurer
     def measure_temperature(self) -> Float:
-        return self.read(4, 0x4002, count=2, dtype='32bit_float')
+        return self.read(4, 0x4002, count=2, _type='32bit_float')
 
 
 class AlicatMFC(Instrument):
@@ -334,7 +334,7 @@ class AlicatMFC(Instrument):
     name = 'AlicatMFC'
 
     supported_adapters = (
-        (Modbus, {'byte_order': '>'}),
+        (Modbus, {}),
     )
 
     knobs = (
@@ -351,20 +351,113 @@ class AlicatMFC(Instrument):
 
     @setter
     def set_setpoint(self, setpoint: Float):
-        self.write(16, 1009, setpoint, dtype='32bit_float')
+        self.write(16, 1009, setpoint, _type='32bit_float')
 
     @getter
     def get_setpoint(self) -> Float:
-        return self.read(3, 1009, count=2, dtype='32bit_float')
+        return self.read(3, 1009, count=2, _type='32bit_float')
 
     @measurer
     def measure_flow_rate(self) -> Float:
-        return self.read(4, 1208, count=2, dtype='32bit_float')
+        return self.read(4, 1208, count=2, _type='32bit_float')
 
     @measurer
     def measure_temperature(self) -> Float:
-        return self.read(4, 1204, count=2, dtype='32bit_float')
+        return self.read(4, 1204, count=2, _type='32bit_float')
 
     @measurer
     def measure_pressure(self) -> Float:
-        return self.read(4, 1202, count=2, dtype='32bit_float')
+        return self.read(4, 1202, count=2, _type='32bit_float')
+
+
+class SynaccessNetbooter(Instrument):
+
+    supported_adapters = (
+        (Socket, {
+            'write_termination': '\r\n',
+            'read_termination': None
+
+        }),
+    )
+
+    knobs = (
+        'port 1 toggle',
+        'port 2 toggle',
+        'port 3 toggle',
+        'port 4 toggle',
+        'port 5 toggle',
+    )
+
+    def _set_port_n_toggle(self, n, state):
+
+        if state != ON and state != OFF:
+            raise ValueError(
+                f'port toggle state of {self.name} must be '
+                f'either ON or OFF (Toggle type)'
+            )
+
+        if state == ON:
+            self.write('$A3 %d 1' % n)
+        elif state == OFF:
+            self.write('$A3 %d 0' % n)
+
+    def _get_port_n_toggle(self, n):
+
+        # Dump buffer (this device sends out a Telnet handshake upon initial
+        # connection and periodically transmits null bytes, possibly as a
+        # keep-alive signal)
+        self.read(nbytes=np.inf, timeout=0.1, decode=False)
+
+        def termination(message):
+            return re.search(b'A0,\d\d\d\d\d', message)
+
+        status_message = self.query(
+            '$A5', termination=termination, decode=False
+        )
+
+        # Port statuses are a sequence of 0s and 1s, starting from the right
+        statuses = re.search(b'A0,\d\d\d\d\d', status_message)[0]
+
+        port_n_toggle = ON if int(statuses.decode()[-n]) == 1 else OFF
+
+        return port_n_toggle
+
+    @setter
+    def set_port_1_toggle(self, state: Toggle):
+        return self._set_port_n_toggle(1, state)
+
+    @getter
+    def get_port_1_toggle(self) -> Toggle:
+        return self._get_port_n_toggle(1)
+
+    @setter
+    def set_port_2_toggle(self, state: Toggle):
+        return self._set_port_n_toggle(2, state)
+
+    @getter
+    def get_port_2_toggle(self) -> Toggle:
+        return self._get_port_n_toggle(2)
+
+    @setter
+    def set_port_3_toggle(self, state: Toggle):
+        return self._set_port_n_toggle(3, state)
+
+    @getter
+    def get_port_3_toggle(self) -> Toggle:
+        return self._get_port_n_toggle(3)
+
+    @setter
+    def set_port_4_toggle(self, state: Toggle):
+        return self._set_port_n_toggle(4, state)
+
+    @getter
+    def get_port_4_toggle(self) -> Toggle:
+        return self._get_port_n_toggle(4)
+
+    @setter
+    def set_port_5_toggle(self, state: Toggle):
+        return self._set_port_n_toggle(5, state)
+
+    @getter
+    def get_port_5_toggle(self) -> Toggle:
+        return self._get_port_n_toggle(5)

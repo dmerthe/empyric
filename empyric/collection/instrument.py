@@ -1,7 +1,7 @@
 import typing
 from functools import wraps
 from empyric.adapters import *
-from empyric.types import recast, _Type
+from empyric.types import recast, Type
 
 
 def setter(method):
@@ -28,7 +28,7 @@ def setter(method):
     if type_hints:
         dtype = type_hints[list(type_hints)[0]]
     else:
-        dtype = _Type
+        dtype = Type
 
     @wraps(method)
     def wrapped_method(*args, **kwargs):
@@ -59,7 +59,7 @@ def getter(method):
 
     knob = '_'.join(method.__name__.split('_')[1:])
 
-    dtype = typing.get_type_hints(method).get('return', _Type)
+    dtype = typing.get_type_hints(method).get('return', Type)
 
     @wraps(method)
     def wrapped_method(*args, **kwargs):
@@ -83,7 +83,7 @@ def measurer(method):
 
     meter = '_'.join(method.__name__.split('_')[1:])
 
-    dtype = typing.get_type_hints(method).get('return', _Type)
+    dtype = typing.get_type_hints(method).get('return', Type)
 
     @wraps(method)
     def wrapped_method(*args, **kwargs):

@@ -3,33 +3,10 @@
 import os
 import time
 import glob
-from empyric.experiment import Variable, Experiment, validate_runcard, Manager
+from empyric.variables import Knob, Meter
+from empyric.experiment import Experiment, validate_runcard, Manager
 from empyric.routines import Timecourse
-from empyric.instruments import Clock, Echo
-
-
-def test_variable():
-    """
-    Test experiment.Variable
-    """
-
-    clock = Clock()
-
-    test_knob = Variable(instrument=clock, knob='state')
-
-    test_meter = Variable(instrument=clock, meter='time')
-
-    test_parameter = Variable(parameter=5)
-
-    test_expression = Variable(
-        expression='time + offset',
-        definitions={'time': test_meter, 'offset': test_parameter}
-    )
-
-    assert test_knob.value == 'STOP'
-    assert test_meter.value == 0
-    assert test_parameter.value == 5
-    assert test_expression.value == 5
+from empyric.instruments import Echo
 
 
 def test_experiment(tmp_path):
@@ -41,8 +18,8 @@ def test_experiment(tmp_path):
 
     echo = Echo()
 
-    echo_in = Variable(instrument=echo, knob='input')
-    echo_out = Variable(instrument=echo, meter='output')
+    echo_in = Knob(instrument=echo, knob='input')
+    echo_out = Meter(instrument=echo, meter='output')
 
     variables = {'Echo In': echo_in, 'Echo Out': echo_out}
 
@@ -70,14 +47,25 @@ def test_experiment(tmp_path):
 
 
 # Use Henon runcard example for testing
+tests_dir = os.path.dirname(__file__)
+
 test_runcard_path = os.path.abspath(
     os.path.join(
-        '.', 'examples', 'Henon Map Experiment', 'henon_runcard_example.yaml'
+        tests_dir, 'henon_runcard_example.yaml'
     )
 )
 
-
 def test_runcard_validation():
+
+    try:
+        assert os.path.isfile(test_runcard_path)
+    except AssertionError:
+        raise AssertionError(
+            "test runcard 'henon_runcard_example.yaml' was not found in "
+            "installed package. This is normally configured by pip running "
+            "setup.py. For a proper install, please use pip or similar."
+        )
+
     assert validate_runcard(test_runcard_path)
 
 

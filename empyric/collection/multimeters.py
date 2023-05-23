@@ -117,12 +117,21 @@ class Keithley6500(Instrument):
     you can find or set it on the unit's Communication --> LAN menu.
 
     Uses TSP communication protocol.
+
+    The `range` knob has separate values for the basic measurements (meter =
+    'voltage' or 'current') and the digitized measurements (meter = 'fast
+    voltages' or 'fast currents'). Be sure to set the desired range after
+    switching meter types.
     """
 
     name = 'Keithley6500'
 
     supported_adapters = (
-        (Socket, {'write_termination': '\n', 'timeout': 0.5}),
+        (Socket, {
+            'write_termination': '\n',
+            'read_termination': '\n',
+            'timeout': 0.5}
+         ),
     )
 
     knobs = (
@@ -156,7 +165,8 @@ class Keithley6500(Instrument):
         elif meter.lower() == 'fast currents':
             self.write(f'dmm.digitize.func = dmm.FUNC_DIGITIZE_CURRENT')
         else:
-            raise ValueError(f'invalid meter "{meter}"')
+            raise print(f'Warning: invalid meter {meter} for Keithley6500')
+            return self.get_meter()
 
         return meter.lower()
 
@@ -231,26 +241,49 @@ class Keithley6500(Instrument):
 
     @setter
     def set_nplc(self, nplc: Integer):
-        self.write(f'dmm.measure.nplc = {nplc}')
+
+        if self.meter in ['voltage', 'current']:
+            self.write(f'dmm.measure.nplc = {nplc}')
+        else:
+            return 0
 
     @getter
     def get_nplc(self) -> Integer:
-        return int(self.query('print(dmm.measure.nplc)'))
+
+        if self.meter in ['voltage', 'current']:
+            return int(self.query('print(dmm.measure.nplc)'))
+        else:
+            return 0
 
     @setter
     def set_range(self, _range: Float):
-        if _range == 0.0:
-            self.write('dmm.measure.autorange = dmm.ON')
+
+        meter = self.get_meter()
+
+        if meter in ['voltage', 'current']:
+            if _range == 0.0:
+                self.write('dmm.measure.autorange = dmm.ON')
+            else:
+                self.write(f'dmm.measure.range = {_range}')
+        elif meter in ['fast voltages', 'fast currents']:
+            self.write('dmm.digitize.range = %.3e' % _range)
         else:
-            self.write(f'dmm.measure.range = {_range}')
+            return self.get_range()
+
 
     @getter
     def get_range(self) -> Float:
 
-        if self.query('print(dmm.measure.autorange)') == 'dmm.ON':
-            return 0.0
-        else:
-            return float(self.query('print(dmm.measure.range)'))
+        meter = self.get_meter()
+
+        if meter in ['voltage', 'current']:
+            if self.query('print(dmm.measure.autorange)') == 'dmm.ON':
+                return 0.0
+            else:
+                return float(self.query('print(dmm.measure.range)'))
+
+        elif meter in ['fast voltages', 'fast currents']:
+            return float(self.query('print(dmm.digitize.range)'))
 
     @setter
     def set_trigger_source(self, trigger_source: String):
@@ -296,19 +329,21 @@ class Keithley6500(Instrument):
     def _execute_fast_measurements(self):
 
         if 'fast' not in self.meter:
-            raise AttributeError(
-                f"meter for {self.name} must be 'fast voltages' or "
-                "'fast currents' to execute fast measurements"
-            )
+            return
+
+        trigger_src = {
+            'front panel': 'trigger.EVENT_DISPLAY',
+            'external in': 'trigger.EVENT_EXTERNAL'
+        }[self.get_trigger_source()]
 
         self.write(
             'trigger.model.setblock(1, trigger.BLOCK_BUFFER_CLEAR, '
             'defbuffer1)\n'
             'trigger.model.setblock(2, trigger.BLOCK_WAIT, '
-            f'{self._trig_src})\n'
+            f'{trigger_src})\n'
             'trigger.model.setblock(3, trigger.BLOCK_DELAY_CONSTANT, 0)\n'
             'trigger.model.setblock(4, trigger.BLOCK_MEASURE_DIGITIZE, '
-            'defbuffer1)\n'
+            'defbuffer1, dmm.digitize.count)\n'
             'trigger.model.initiate()\n'
         )
 
@@ -337,7 +372,7 @@ class Keithley6500(Instrument):
 
             running = state in running_states
 
-            time.sleep(0.5)
+            time.sleep(0.25)
 
         if state in failed_states:
             raise RuntimeError(
@@ -472,7 +507,11 @@ class LabJackT7(Instrument):
     name = 'LabJackT7'
 
     supported_adapters = (
-        (Modbus, {'byte_order': '>'}),
+        (Modbus, {}),
+    )
+
+    knobs = (
+        'DIO0', 'DIO1', 'DIO2', 'DIO3', 'DIO4', 'DIO5', 'DIO6', 'DIO7'
     )
 
     meters = (
@@ -482,8 +521,78 @@ class LabJackT7(Instrument):
         'device temperature'
     )
 
-    def _measure_AIN(self, n):
-        return self.read(4, 0*(2*int(n)), count=2, dtype='32bit_float')
+    def _set_DION(self, n, value: Integer):
+        self.write(16, 2000 + n, value, _type='16bit_uint')
+
+    def _get_DION(self, n) -> Integer:
+        return self.read(3, 2000 + n, count=1, _type='16bit_uint')
+
+    def _measure_AIN(self, n) -> Float:
+        return self.read(3, 2*n, count=2, _type='32bit_float')
+
+    @setter
+    def set_DIO0(self, value: Integer):
+        self._set_DION(0, value)
+
+    @getter
+    def get_DIO0(self) -> Integer:
+        return self._get_DION(0)
+
+    @setter
+    def set_DIO1(self, value: Integer):
+        self._set_DION(1, value)
+
+    @getter
+    def get_DIO1(self) -> Integer:
+        return self._get_DION(1)
+
+    @setter
+    def set_DIO2(self, value: Integer):
+        self._set_DION(2, value)
+
+    @getter
+    def get_DIO2(self) -> Integer:
+        return self._get_DION(2)
+
+    @setter
+    def set_DIO3(self, value: Integer):
+        self._set_DION(3, value)
+
+    @getter
+    def get_DIO3(self) -> Integer:
+        return self._get_DION(3)
+
+    @setter
+    def set_DIO4(self, value: Integer):
+        self._set_DION(4, value)
+
+    @getter
+    def get_DIO4(self) -> Integer:
+        return self._get_DION(4)
+
+    @setter
+    def set_DIO5(self, value: Integer):
+        self._set_DION(5, value)
+
+    @getter
+    def get_DIO5(self) -> Integer:
+        return self._get_DION(5)
+
+    @setter
+    def set_DIO6(self, value: Integer):
+        self._set_DION(6, value)
+
+    @getter
+    def get_DIO6(self) -> Integer:
+        return self._get_DION(6)
+
+    @setter
+    def set_DIO7(self, value: Integer):
+        self._set_DION(7, value)
+
+    @getter
+    def get_DIO7(self) -> Integer:
+        return self._get_DION(7)
 
     @measurer
     def measure_AIN0(self) -> Float:
@@ -544,9 +653,9 @@ class LabJackT7(Instrument):
     @measurer
     def measure_AIN_all(self) -> Array:
         """Reads all 14 analog inputs in a single call"""
-        return self.read(4, 0, count=2*14, dtype='32bit_float')
+        return self.read(4, 0, count=2*14, _type='32bit_float')
 
     @measurer
     def measure_device_temperature(self) -> Float:
         """Device temperature in C"""
-        return self.read(4, 60052, count=2, dtype='32bit_float') - 273.15
+        return self.read(4, 60052, count=2, _type='32bit_float') - 273.15

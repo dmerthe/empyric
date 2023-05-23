@@ -12,10 +12,12 @@ Settings:
 Instruments:
  Sourcemeter:
   type: Keithley2400
-  address: 1  # replace with your GPIB address
+  address: 10  # replace with your GPIB
+  prologix address: 'COM5'  # delete or replace with your own
   presets:
    voltage range: 20
-   current range: 1
+   current limit: 1.05e-3
+   current range: 1e-3
    fast voltages: 'fast voltages.csv'
 
 Variables:

@@ -77,10 +77,6 @@ Routines:
   values: [0.0, 0.3]
  Server:
   type: SocketServer
-  readwrite:
+  knobs:  # variables that can be set
    - Knob a
    - Knob b
-  readonly:
-   - Coordinate x
-   - Coordinate y
-   - Distance r

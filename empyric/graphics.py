@@ -7,7 +7,7 @@ import datetime
 import tkinter as tk
 import pandas as pd
 
-from empyric.types import recast
+from empyric.types import recast, Type, Float
 from empyric.routines import SocketServer, ModbusServer
 
 if sys.platform == 'darwin':
@@ -460,10 +460,7 @@ class ExperimentGUI:
 
         self.variables = experiment.variables
 
-        if 'alarms' in kwargs:
-            self.alarms = {}
-        else:
-            self.alarms = kwargs['alarms']
+        self.alarms = kwargs.get('alarms', {})
 
         if 'instruments' in kwargs:
             self.instruments = kwargs['instruments']
@@ -477,7 +474,9 @@ class ExperimentGUI:
                     if instrument.name not in self.instruments:
                         self.instruments[instrument.name] = instrument
 
-        if 'plots' in kwargs or 'plotter' in kwargs:
+        if ('plots' in kwargs and kwargs['plotter'] is not None) \
+                or ('plotter' in kwargs and kwargs['plotter'] is not None):
+
             if 'plotter' in kwargs:
                 self.plotter = kwargs['plotter']
             else:
@@ -565,7 +564,7 @@ class ExperimentGUI:
                 row=i, column=1, sticky=tk.W, padx=10
             )
 
-            if self.variables[name]._settable:
+            if self.variables[name].settable:
                 entry = self.variable_entries[name]
                 variable = self.variables[name]
                 root = self.status_frame
@@ -590,6 +589,7 @@ class ExperimentGUI:
 
             i += 1
 
+        i += 1
         tk.Label(
             self.status_frame, text='', font=("Arial", 14, 'bold')
         ).grid(row=i, column=0, sticky=tk.E)
@@ -635,6 +635,7 @@ class ExperimentGUI:
 
             self.server_status_labels = {}
 
+            i += 1
             tk.Label(
                 self.status_frame, text='Servers', font=("Arial", 14, 'bold')
             ).grid(row=i, column=1)
@@ -713,7 +714,7 @@ class ExperimentGUI:
 
             # If stopped or holding allow user to edit knobs or parameters
             if self.experiment.stopped or self.experiment.holding:
-                if name != 'Time' and self.variables[name]._settable:
+                if name != 'Time' and self.variables[name].settable:
                     continue
 
             def write_entry(_entry, text):
@@ -731,17 +732,16 @@ class ExperimentGUI:
                     write_entry(
                         entry, str(datetime.timedelta(seconds=state['Time']))
                     )
-                else:
-                    if isinstance(state[name], numbers.Number):
-                        # display numbers neatly
-                        if state[name] == 0:
-                            write_entry(entry, '0.0')
-                        elif np.abs(np.log10(np.abs(state[name]))) > 3:
-                            write_entry(entry, '%.3e' % state[name])
-                        else:
-                            write_entry(entry, '%.3f' % state[name])
+                elif isinstance(state[name], Float):
+                    # display floating point numbers neatly
+                    if state[name] == 0.0:
+                        write_entry(entry, '0.0')
+                    elif np.abs(np.log10(np.abs(state[name]))) > 3:
+                        write_entry(entry, '%.3e' % state[name])
                     else:
-                        write_entry(entry, str(state[name]))
+                        write_entry(entry, '%.3f' % state[name])
+                else:
+                    write_entry(entry, str(state[name]))
 
         self.status_label.config(text=self.experiment.status)
 
@@ -771,7 +771,7 @@ class ExperimentGUI:
 
             # Settable variable values can be edited
             for name, entry in self.variable_entries.items():
-                if name != 'Time' and self.variables[name]._settable:
+                if name != 'Time' and self.variables[name].settable:
                     entry.config(state=tk.NORMAL)
 
         else:  # otherwise, experiment is running
@@ -882,7 +882,11 @@ class ExperimentGUI:
     def _entry_enter(entry, variable, root):
         """Assigns the value to a variable if entered by the user"""
 
-        variable.value = recast(entry.get())
+        variable.value = recast(
+            entry.get(),
+            to=variable.type if variable.type is not None else Type
+        )
+
         root.focus()
 
     @staticmethod
@@ -1045,23 +1049,34 @@ class ConfigTestDialog(BasicDialog):
 
     def set_knob_entry(self, knob):
         value = self.knob_entries[knob].get()
-        self.instrument.set(knob, recast(value))
+        self.instrument.set(knob.replace(' ', '_'), recast(value))
 
     def get_knob_entry(self, knob):
 
-        if hasattr(self.instrument, 'get_'+knob):
+        if hasattr(self.instrument, 'get_'+knob.replace(' ', '_')):
             value = self.instrument.get(knob)
         else:
-            value = getattr(self.instrument, knob)
+            value = getattr(self.instrument, knob.replace(' ', '_'))
 
         self.knob_entries[knob].delete(0, tk.END)
         self.knob_entries[knob].insert(0, str(value))
 
     def update_meter_entry(self, meter):
-        value = str(self.instrument.measure(meter))
+
+        value = self.instrument.measure(meter)
+
+        if np.ndim(value) == 1:  # store array data as CSV files
+            dataframe = pd.DataFrame({meter: value})
+            path = self.instrument.name + '-' + meter.replace(' ', '_') + '_'
+            now = datetime.datetime.now()
+            path += now.strftime('%Y%m%d-%H%M%S') + '.csv'
+            dataframe.to_csv(path)
+
+            value = path
+
         self.meter_entries[meter].config(state=tk.NORMAL)
         self.meter_entries[meter].delete(0, tk.END)
-        self.meter_entries[meter].insert(0, value)
+        self.meter_entries[meter].insert(0, str(value))
         self.meter_entries[meter].config(state='readonly')
 
     def body(self, master):
@@ -1103,11 +1118,11 @@ class ConfigTestDialog(BasicDialog):
             )
             self.set_buttons[knob].grid(row=i, column=2)
 
-            self.set_buttons[knob] = tk.Button(
+            self.get_buttons[knob] = tk.Button(
                 master, text='Get',
                 command=lambda knob=knob: self.get_knob_entry(knob)
             )
-            self.set_buttons[knob].grid(row=i, column=3)
+            self.get_buttons[knob].grid(row=i, column=3)
 
             i += 1
 

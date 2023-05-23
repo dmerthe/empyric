@@ -34,6 +34,7 @@ Supported Instruments
    instruments/humans
    instruments/controllers
    instruments/supplies
+   instruments/generators
    instruments/multimeters
    instruments/sourcemeters
    instruments/thermometers

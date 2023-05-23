@@ -44,6 +44,10 @@ def chaperone(method):
 
                     if validator and not validator(response):
 
+                        if hasattr(response, '__len__') and len(response) > 100:
+                            response = str(response[:50]) \
+                                       + '...' + str(response[-50:])
+
                         raise ValueError(
                             f'invalid response, {response}, '
                             f'from {method.__name__} method'
@@ -74,6 +78,7 @@ def chaperone(method):
 
         # Getting here means that both repeats
         # and reconnects have been maxed out
+        self.busy = False
         raise AdapterError(
             f'Unable to communicate with {self.instrument.name}!'
         )
@@ -156,14 +161,16 @@ class Adapter:
         self.connected = True
 
     @chaperone
-    def write(self, *args, **kwargs):
+    def write(self, *args, validator=None, **kwargs):
         """
         Write a command.
 
         :param args: any arguments for the write method
+        :param validator: (callable) function that returns True if its input
+                          looks right or False if it does not
         :param kwargs: any keyword arguments for the write method
 
-        :return: (str/float/int/bool) instrument response, if valid
+        :return: (str) literal 'Success' if write operation is successful
         """
 
         if hasattr(self, '_write'):
@@ -173,14 +180,16 @@ class Adapter:
                 self.__name__ + " adapter has no _write method")
 
     @chaperone
-    def read(self, *args, **kwargs):
+    def read(self, *args, validator=None, **kwargs):
         """
         Read an awaiting message.
 
         :param args: any arguments for the read method
+        :param validator: (callable) function that returns True if its input
+                          looks right or False if it does not
         :param kwargs: any keyword arguments for the read method
 
-        :return: (str/float/int/bool) instrument response, if valid
+        :return: instrument response
         """
 
         if hasattr(self, '_read'):
@@ -189,14 +198,16 @@ class Adapter:
             raise AttributeError(self.__name__ + " adapter has no _read method")
 
     @chaperone
-    def query(self, *args, **kwargs):
+    def query(self, *args, validator=None, **kwargs):
         """
         Submit a query.
 
         :param args: any arguments for the query method
+        :param validator: (callable) function that returns True if its input
+                          looks right or False if it does not
         :param kwargs: any keyword arguments for the query method
 
-        :return: (str/float/int/bool) instrument response, if valid
+        :return: instrument response
         """
 
         if hasattr(self, '_query'):
@@ -344,7 +355,7 @@ class Serial(Adapter):
         List all connected serial devices
 
         :param verbose: (bool) if True, list of devices will be printed
-        (defaults to True).
+                        (defaults to True).
 
         :return: (list of str) List of connected serial devices
         """
@@ -474,7 +485,7 @@ class GPIB(Adapter):
     def timeout(self, timeout):
 
         if self.connected:
-            if self.lib == 'pyvisa':
+            if self.lib == 'pyvisa' or self.lib == 'prologix-gpib':
                 # pyvisa records timeouts in milliseconds
                 if timeout is None:
                     self.backend.timeout = None
@@ -483,6 +494,9 @@ class GPIB(Adapter):
                 self._timeout = timeout
             elif self.lib == 'linux-gpib':
                 self._timeout = self._linux_gpib_set_timeout(timeout)
+            elif self.lib == 'prologix-gpib':
+                self.backend.timeout = timeout
+                self._timeout = timeout
         else:
             self._timeout = None
 
@@ -662,6 +676,17 @@ class PrologixGPIBUSB:
         # set timeout to 0.5 seconds
         self.write('read_tmo_ms 500', to_controller=True)
 
+        # Do not append CR or LF to messages
+        self.write('eos 3', to_controller=True)
+
+        # Assert EOI with last byte to indicate end of data
+        self.write('eoi 1', to_controller=True)
+
+        # Append CR to responses from instruments to indicate message
+        # termination
+        self.write('eot_char 13', to_controller=True)
+        self.write('eot_enable 1', to_controller=True)
+
         self.address = None
         self.devices = []
 
@@ -695,7 +720,9 @@ class PrologixGPIBUSB:
         if not from_controller:
             self.write(f'read eoi', to_controller=True)
 
-        return self.serial_port.read_until(b'\r').decode().strip()
+        response = self.serial_port.read_until(b'\r').decode().strip()
+
+        return response
 
     def close(self):
         self.serial_port.close()
@@ -857,7 +884,7 @@ class USB(Adapter):
 
 class Socket(Adapter):
     """
-    Handles communications between sockets using the built-in socket module
+    Handles communications between sockets using Python's built-in socket module
     """
 
     ip_address = None
@@ -893,19 +920,29 @@ class Socket(Adapter):
 
         return 'Success'
 
-    def _read(self, nbytes=4096):
+    def _read(self, **kwargs):
+
+        termination = kwargs.pop('termination', self.read_termination)
+        timeout = kwargs.pop('timeout', self.timeout)
 
         return read_from_socket(
-            self.backend, nbytes=nbytes, termination=self.read_termination,
-            timeout=self.timeout
+            self.backend,
+            termination=termination,
+            timeout=timeout,
+            **kwargs
         )
 
-    def _query(self, question, nbytes=4096):
+    def _query(self, question, **kwargs):
 
         self._write(question)
-        return self._read(nbytes=nbytes)
+        return self._read(**kwargs)
 
     def disconnect(self):
+
+        # Clear out any unread messages
+        unread = self._read(decode=False, nbytes=np.inf)
+        while unread:
+            unread = self._read(decode=False, nbytes=np.inf)
 
         self.backend.shutdown(socket.SHUT_RDWR)
         self.backend.close()
@@ -1024,7 +1061,7 @@ class ModbusSerial(Adapter):
 class Modbus(Adapter):
     """
     Handles communication with instruments via the Modbus communication
-    protocol, over either TCP or serial ports.
+    protocol, over either TCP or serial ports, using PyModbus.
     """
 
     kwargs = (
@@ -1042,10 +1079,10 @@ class Modbus(Adapter):
 
     slave_id = 0
     # Byte and word order is either little-endian (<) or big-endian (>)
-    byte_order = '<'
+    byte_order = '>'
     word_order = '>'
 
-    dtypes = [
+    types = [
         '8bit_uint', '16bit_uint', '32bit_uint', '64bit_uint',
         '8bit_int', '16bit_int', '32bit_int', '64bit_int',
         '16bit_float', '32bit_float', '64bit_float',
@@ -1138,13 +1175,13 @@ class Modbus(Adapter):
 
         self.connected = True
 
-    def _write(self, func_code, address, values, dtype=None):
+    def _write(self, func_code, address, values, _type=None):
         """
         Write values to coils (func_code = 5 [single] or 15 [multiple]) or
         holding registers (func_code = 6 [single] or 16 [multiple]).
 
-        The Modbus data type for decoding registers is specified by the `dtype`
-        argument. Valid values for `dtype` are listed in the `dtypes` attribute.
+        The Modbus data type for decoding registers is specified by the `_type`
+        argument. Valid values for `_type` are listed in the `_types` attribute.
         """
 
         values = np.array([values]).flatten()
@@ -1152,10 +1189,11 @@ class Modbus(Adapter):
         if func_code not in [5, 15, 6, 16]:
             raise ValueError(f'invalid Modbus function code {func_code}')
 
-        if dtype and dtype not in self.dtypes:
+        if _type and _type not in self.types:
             raise TypeError(
-                'invalid dtype argument; must be one of:\n'
-                ', '.join(self.dtypes)
+                'invalid _type argument; must be one of:\n' + ', '.join(
+                    self.types
+                )
             )
 
         if '5' in str(func_code):
@@ -1177,15 +1215,15 @@ class Modbus(Adapter):
         else:
             # Write registers
 
-            if dtype is None:
-                dtype = '16bit_uint'
+            if _type is None:
+                _type = '16bit_uint'
 
             builder = self._builder_cls(
                 byteorder=self.byte_order, wordorder=self.word_order
             )
 
             for value in values:
-                builder.__getattribute__('add_'+dtype)(value)
+                builder.__getattribute__('add_'+_type)(value)
 
             register_values = builder.to_registers()
 
@@ -1201,21 +1239,21 @@ class Modbus(Adapter):
                     'for writing coils/registers'
                 )
 
-    def _read(self, func_code, address, count=1, dtype=None):
+    def _read(self, func_code, address, count=1, _type=None):
         """
         Read from coils (func_code = 1), discrete inputs (func_code = 2),
         holding registers (func_code = 3), or input registers (func_code = 4).
 
         A single data unit is read by specifying the function code
         (`func_code`) and address; the data can be converted to the desired
-        data type (`dtype` = `int` or `float`). Multiple sequential addresses
+        data type (`_type` = `int` or `float`). Multiple sequential addresses
         are read by specifying the count.
         """
 
-        if dtype and dtype not in self.dtypes:
+        if _type and _type not in self.types:
             raise TypeError(
-                'invalid dtype argument; must be one of:\n'
-                ', '.join(self.dtypes)
+                'invalid _type argument; must be one of:\n'
+                ', '.join(self.types)
             )
 
         # Enumerate modbus read functions
@@ -1251,10 +1289,10 @@ class Modbus(Adapter):
                 registers, byteorder=self.byte_order, wordorder=self.word_order
             )
 
-            n_values = int(16 * count / (int(dtype.split('bit')[0])))
+            n_values = int(16 * count / (int(_type.split('bit')[0])))
 
             values = [
-                decoder.__getattribute__('decode_' + dtype)()
+                decoder.__getattribute__('decode_' + _type)()
                 for _ in range(n_values)
             ]
 
