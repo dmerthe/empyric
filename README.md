@@ -56,15 +56,15 @@ The real purpose of Empyric is to simplify and standardize construction of an ex
 
 Here is an example showing how to define and use experiment variables in Empyric:
 ```
-from empyric.experiment import Variable
+from empyric.variables import Knob, Meter, Parameter, Expression
 from empyric.instruments import Keithley2400
 
 keithley2400 = Keithley2400(1)
 
-voltage = Variable(instrument=keithley2400, knob='voltage')
-current = Variable(instrument=keithley2400, meter='current')
-milliwatt = Variable(parameter = 1e-3)
-power = Variable(expression='V * I / mW', definitions={'V':voltage, 'I':current, 'mW':milliwatt})
+voltage = Knob(instrument=keithley2400, knob='voltage')
+current = Meter(instrument=keithley2400, meter='current')
+milliwatt = Parameter(parameter = 1e-3)
+power = Expression(expression='V * I / mW', definitions={'V':voltage, 'I':current, 'mW':milliwatt})
 
 voltage.value = 10 # sets the voltage of the Keithley 2400 to 10 V
 
@@ -77,7 +77,7 @@ Assigning a value to the `value` property of a knob-type variable commands the c
 ```
 import time
 
-# ... define knob1 and knob2 as instances of Variable from above
+# ... define knob1 and knob2 as instances of Knob from above
 
 knobs = {'Knob 1': knob1, 'Knob 2': knob2}
 values = [10, 20]
