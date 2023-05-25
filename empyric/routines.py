@@ -268,13 +268,6 @@ class Timecourse(Routine):
         :param kwargs: keyword arguments for Routine
         """
 
-        # Infer start and end times from times argument, if not given
-        if 'start' not in kwargs:
-            kwargs['start'] = np.min(times)
-
-        if 'end' not in kwargs:
-            kwargs['end'] = np.max(times)
-
         Routine.__init__(self, knobs, **kwargs)
 
         if np.ndim(times) == 1:  # single list of times for all knobs
@@ -315,6 +308,13 @@ class Timecourse(Routine):
                 df = df['values']
 
                 self.values[i] = df.values.reshape(len(df))
+
+        # Infer start and end times from times argument, if not given
+        if 'start' not in kwargs:
+            kwargs['start'] = np.min(times)
+
+        if 'end' not in kwargs:
+            kwargs['end'] = np.max(times)
 
     @Routine.enabler
     def update(self, state):
