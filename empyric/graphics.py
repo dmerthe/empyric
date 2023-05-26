@@ -6,6 +6,7 @@ import numpy as np
 import datetime
 import tkinter as tk
 import pandas as pd
+import pandas.errors
 
 from empyric.types import recast, Type, Float
 from empyric.routines import SocketServer, ModbusServer
@@ -399,9 +400,24 @@ class Plotter:
             for i, element in enumerate(row):
 
                 if type(element) == str and os.path.isfile(element):
-                    expanded_element = list(
-                        pd.read_csv(element)[labels[i]].values
-                    )
+
+                    file_read = False
+                    attempt = 0
+                    while not file_read:
+                        try:
+                            expanded_element = list(
+                                pd.read_csv(element)[labels[i]].values
+                            )
+
+                            file_read = True
+                        except pandas.errors.EmptyDataError:
+
+                            if attempt > 3:
+                                expanded_element = [np.nan]
+                                break
+
+                            attempt += 1
+                            plt.pause(1)
 
                 elif np.ndim(element) == 1:
 

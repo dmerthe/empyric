@@ -270,51 +270,40 @@ class Timecourse(Routine):
 
         Routine.__init__(self, knobs, **kwargs)
 
-        if np.ndim(times) == 1:  # single list of times for all knobs
-            times = [times] * len(self.knobs)
-        elif np.shape(times)[0] == 1:
-            # 1xN array with one N-element list of times for all knobs
-            times = [times[0]] * len(self.knobs)
+        if np.ndim(times) == 0:  # single value or file path
+            self.times = [[times]] * len(self.knobs)
+        elif np.ndim(times) == 1:  # single list of times for all knobs
+            self.times = [times] * len(self.knobs)
+        else:
+            self.times = times
 
-        if np.ndim(values) == 1:  # single list of times for all knobs
-            values = [values] * len(self.knobs)
-        elif np.shape(values)[0] == 1:
-            # 1xN array with one N-element list of times for all knobs
-            values = [values[0]] * len(self.knobs)
-
-        self.times = np.array(
-            times, dtype=object
-        ).reshape((len(self.knobs), -1))
-
-        self.times = np.array(convert_time(self.times)).astype(float)
-
-        self.values = np.array(
-            values, dtype=object
-        ).reshape((len(self.knobs), -1))
+        if np.ndim(values) == 0:  # single value or file path
+            self.values = [[values]] * len(self.knobs)
+        elif np.ndim(values) == 1:  # single list of values for all knobs
+            self.values = [values] * len(self.knobs)
+        else:
+            self.values = values
 
         # Times and/or values can be stored in CSV files
         for i, (t_elem, v_elem) in enumerate(zip(self.times, self.values)):
 
             if type(t_elem[0]) == str and '.csv' in t_elem[0]:
                 df = pd.read_csv(t_elem[0])
-
-                df = df['times']
-
-                self.times[i] = df.values.reshape(len(df))
+                self.times[i] = df['times'].values
 
             if type(v_elem[0]) == str and '.csv' in v_elem[0]:
                 df = pd.read_csv(v_elem[0])
+                self.values[i] = [recast(val) for val in df['values'].values]
 
-                df = df['values']
-
-                self.values[i] = df.values.reshape(len(df))
+        self.times = np.array(convert_time(self.times)).astype(float)
+        self.values = np.array(self.values, dtype=object)
 
         # Infer start and end times from times argument, if not given
         if 'start' not in kwargs:
-            kwargs['start'] = np.min(times)
+            self.start = np.min(self.times)
 
         if 'end' not in kwargs:
-            kwargs['end'] = np.max(times)
+            self.end = np.max(self.times)
 
     @Routine.enabler
     def update(self, state):
@@ -335,9 +324,10 @@ class Timecourse(Routine):
             last_value = values[j_last]
             next_value = values[j_next]
 
-            if isinstance(last_value, Variable):
-                # replace variable with value for past times
-                last_value = last_value._value
+            if last_value in list(state.keys()):
+                # if last_value is a variable name,
+                # use that variable's value from state
+                last_value = state[last_value]
 
             last_is_number = isinstance(last_value, numbers.Number)
             next_is_number = isinstance(next_value, numbers.Number)
@@ -376,28 +366,20 @@ class Sequence(Routine):
 
         Routine.__init__(self, knobs, **kwargs)
 
-        if np.ndim(values) == 1:  # single list of times for all knobs
-            values = [values] * len(self.knobs)
-        elif (type(values) == str) and (".csv" in values.lower()):
-            df = pd.read_csv(values)
-            values = df.values[:, 0]
-        elif np.shape(values)[0] == 1:
-            # 1xN array with one N-element list of times for all knobs
-            values = [values[0]] * len(self.knobs)
-
-        self.values = np.array(
-            values, dtype=object
-        ).reshape((len(self.knobs), -1))
+        if np.ndim(values) == 0:  # single value or file path
+            self.values = [[values]] * len(self.knobs)
+        elif np.ndim(values) == 1:  # single list of values for all knobs
+            self.values = [values] * len(self.knobs)
+        else:
+            self.values = values
 
         # Times and/or values can be stored in CSV files
         for i, v_elem in enumerate(self.values):
-
             if type(v_elem[0]) == str and '.csv' in v_elem[0]:
                 df = pd.read_csv(v_elem[0])
+                self.values[i] = [recast(val) for val in df['values'].values]
 
-                df = df['values']
-
-                self.values[i] = df.values.reshape(len(df))
+        self.values = np.array(self.values, dtype=object)
 
         self.iteration = 0
 
