@@ -5,6 +5,18 @@ import re
 from typing import Any
 import numpy as np
 
+Boolean = (bool, np.bool_)
+
+Integer = (int, np.integer)
+
+Float = (float, np.floating)
+
+String = (str, np.str_)
+
+Scalar = (Boolean, Integer, Float, String)
+
+Array = (list, tuple, np.ndarray)
+
 
 class Toggle:
     """
@@ -53,7 +65,7 @@ ON = Toggle('ON')
 OFF = Toggle('OFF')
 
 
-def recast(value: Any, to: type = None) -> [Any, None]:
+def recast(value: Any, to: type = None) -> (Any, None):
     """
     Convert a value into the appropriate type for the information it contains.
 
