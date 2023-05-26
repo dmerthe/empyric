@@ -2,7 +2,7 @@
 
 import os
 import re
-from typing import Any
+from typing import Any, Union
 import numpy as np
 
 Boolean = (bool, np.bool_)
@@ -98,17 +98,17 @@ def recast(value: Any, to: type = None) -> (Any, None):
         for dtype in np.array([to], dtype=object).flatten():
             try:
                 # recast to desired
-                if issubclass(dtype, Boolean):
+                if issubclass(dtype, Union[bool, np.bool_]):
                     return np.bool_(value)
                 elif issubclass(dtype, Toggle):
                     return Toggle(value)
-                elif issubclass(dtype, Integer):
+                elif issubclass(dtype, Union[int, np.integer]):
                     return np.int64(value)
-                elif issubclass(dtype, Float):
+                elif issubclass(dtype, Union[float, np.floating]):
                     return np.float64(value)
-                elif issubclass(dtype, String):
+                elif issubclass(dtype, Union[str, np.str_]):
                     return np.str_(value)
-                elif issubclass(dtype, Array) and np.ndim(value) > 0:
+                elif issubclass(dtype, Union[list, tuple, np.array]):
                     return np.array(value)
             except ValueError:
                 pass
@@ -121,15 +121,15 @@ def recast(value: Any, to: type = None) -> (Any, None):
 
     else:
         # infer type
-        if isinstance(value, Boolean):
+        if isinstance(value, Union[bool, np.bool_]):
             return np.bool_(value)
         elif isinstance(value, Toggle):
             return value
-        elif isinstance(value, Integer):
+        elif isinstance(value, Union[int, np.integer]):
             return np.int64(value)
-        elif isinstance(value, Float):
+        elif isinstance(value, Union[float, np.floating]):
             return np.float64(value)
-        elif isinstance(value, String):
+        elif isinstance(value, Union[str, np.str_]):
 
             if value.lower() == 'true':
                 return np.bool_(True)
@@ -148,7 +148,7 @@ def recast(value: Any, to: type = None) -> (Any, None):
                 return os.path.abspath(os.path.join('..', value))
             else:
                 return value  # must be an actual string
-        if isinstance(value, Array):  # value is an array
+        if isinstance(value, Union[list, tuple, np.array]):  # value is an array
             np_array = np.array(value)  # convert to numpy array
             rep_elem = np_array.flatten()[0]  # representative element
             return np_array.astype(type(recast(rep_elem)))
