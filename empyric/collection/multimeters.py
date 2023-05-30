@@ -181,14 +181,14 @@ class Keithley6500(Instrument):
 
     @setter
     def set_sample_count(self, count: Integer):
-        if "fast" in self.meter:
+        if "fast" in self.meter: # pylint: disable=unsupported-membership-test
             self.write(f"dmm.digitize.count = {count}")
         else:
             return 1
 
     @getter
     def get_sample_count(self) -> Integer:
-        if "fast" in self.meter:
+        if "fast" in self.meter: # pylint: disable=unsupported-membership-test
             response = self.query("print(dmm.digitize.count)")
 
             if "nil" in response:
@@ -200,15 +200,15 @@ class Keithley6500(Instrument):
 
     @setter
     def set_sample_rate(self, rate: Integer):
-        if "fast" in self.meter:
+        if "fast" in self.meter: # pylint: disable=unsupported-membership-test
             self.write(f"dmm.digitize.samplerate = {rate}")
         else:
             return 0
 
     @getter
     def get_sample_rate(self) -> Integer:
-        if "fast" in self.meter:
-            response = self.query(f"print(dmm.digitize.samplerate)")
+        if "fast" in self.meter: # pylint: disable=unsupported-membership-test
+            response = self.query("print(dmm.digitize.samplerate)")
 
             if "nil" in response:
                 return 0
@@ -296,7 +296,7 @@ class Keithley6500(Instrument):
         return recast(self.query("print(dmm.measure.read())"))
 
     def _execute_fast_measurements(self):
-        if "fast" not in self.meter:
+        if "fast" not in self.meter: # pylint: disable=unsupported-membership-test
             return
 
         trigger_src = {

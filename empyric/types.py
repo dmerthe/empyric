@@ -5,7 +5,7 @@ import re
 from abc import ABC
 import pandas as pd
 import numpy as np
-from typing import Any
+from typing import Any, Union
 
 
 class Type(ABC):
@@ -33,7 +33,7 @@ class Toggle(Type):
     on_values = [True, 1, "1", "ON", "On", "on"]
     off_values = [False, 0, "0", "OFF", "Off", "off"]
 
-    def __init__(self, state: [str, bool, int, type]):
+    def __init__(self, state: Union[str, bool, int, type]):
         if hasattr(state, "on"):
             self.on = state.on
         elif state in self.on_values:
@@ -125,7 +125,7 @@ supported = {
 }
 
 
-def recast(value: Any, to: type = Type) -> [Type, None]:
+def recast(value: Any, to: type = Type) -> Union[Type, None]:
     """
     Convert a value into the appropriate type for the information it contains.
 

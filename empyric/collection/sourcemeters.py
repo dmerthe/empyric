@@ -1,6 +1,7 @@
 import os
 import datetime
 import re
+from typing import Union
 
 import numpy as np
 import pandas as pd
@@ -338,7 +339,7 @@ class Keithley2400(Instrument):
         return self.adapter.delay
 
     @setter
-    def set_fast_voltages(self, voltages: [Array, String]):
+    def set_fast_voltages(self, voltages: Union[Array, String]):
         # import fast voltages, if specified as a path
         if type(voltages) == str:
             is_csv = ".csv" in voltages.lower()
@@ -627,8 +628,8 @@ class Keithley2460(Instrument):
     def measure_fast_currents(self):
         try:
             self.fast_voltages
-        except AttributeError:
-            raise ValueError("Fast IV sweep voltages have not been set!")
+        except AttributeError as exc:
+            raise ValueError("Fast IV sweep voltages have not been set!") from exc
 
         if len(self.fast_voltages) == 0:
             raise ValueError("Fast IV sweep voltages have not been set!")
@@ -639,14 +640,14 @@ class Keithley2460(Instrument):
 
         if list_length >= 100:
             sub_lists = [
-                self.fast_voltages[i * 100 : (i + 1) * 100]
+                self.fast_voltages[i * 100 : (i + 1) * 100] # pylint: disable=unsubscriptable-object
                 for i in range(list_length // 100)
             ]
         else:
             sub_lists = []
 
         if list_length % 100 > 0:
-            sub_lists.append(self.fast_voltages[-(list_length % 100) :])
+            sub_lists.append(self.fast_voltages[-(list_length % 100) :]) # pylint: disable=unsubscriptable-object
 
         current_list = []
 
