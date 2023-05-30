@@ -47,12 +47,12 @@ class Variable:
     @staticmethod
     def setter_type_validator(setter):
         """Checks that set value is compatible with variable's type"""
+
         @wraps(setter)
         def wrapped_setter(self, value):
-
-            if not isinstance(value, Array) \
-                    and (value is None or value == float('nan')):
-
+            if not isinstance(value, Array) and (
+                value is None or value == float("nan")
+            ):
                 self._value = None
 
             elif self.type is not None:
@@ -73,14 +73,14 @@ class Variable:
     @staticmethod
     def getter_type_validator(getter):
         """Checks that get value is compatible with variable's type"""
+
         @wraps(getter)
         def wrapped_getter(self):
-
             value = getter(self)
 
-            if not isinstance(value, Array) \
-                    and (value is None or value == float('nan')):
-
+            if not isinstance(value, Array) and (
+                value is None or value == float("nan")
+            ):
                 self._value = None
 
             elif self.type is not None:
@@ -114,21 +114,22 @@ class Knob(Variable):
 
     _settable = True  #:
 
-    def __init__(self,
-                 instrument: Instrument,
-                 knob: str,
-                 lower_limit: numbers.Number = None,
-                 upper_limit: numbers.Number = None):
-
+    def __init__(
+        self,
+        instrument: Instrument,
+        knob: str,
+        lower_limit: numbers.Number = None,
+        upper_limit: numbers.Number = None,
+    ):
         self.instrument = instrument
         self.knob = knob  # name of the knob on instrument
         self.lower_limit = lower_limit
         self.upper_limit = upper_limit
 
         # infer type from type hint of first argument of set method
-        set_method = getattr(instrument, 'set_'+knob.replace(' ', '_'))
+        set_method = getattr(instrument, "set_" + knob.replace(" ", "_"))
         type_hints = typing.get_type_hints(set_method)
-        type_hints.pop('return', None)  # exclude return type hint
+        type_hints.pop("return", None)  # exclude return type hint
 
         if type_hints:
             arg_hints = list(type_hints)
@@ -162,9 +163,7 @@ class Knob(Variable):
         else:
             self.instrument.set(self.knob, value)
 
-        self._value = self.instrument.__getattribute__(
-            self.knob.replace(' ', '_')
-        )
+        self._value = self.instrument.__getattribute__(self.knob.replace(" ", "_"))
 
 
 class Meter(Variable):
@@ -190,7 +189,6 @@ class Meter(Variable):
     _settable = False  #:
 
     def __init__(self, instrument: Instrument, meter: str, gate=None):
-
         self.instrument = instrument
         self.meter = meter
 
@@ -200,8 +198,8 @@ class Meter(Variable):
             self.gate = Parameter(ON)
 
         self._type = typing.get_type_hints(
-            getattr(instrument, 'measure_' + meter.replace(' ', '_'))
-        ).get('return', None)
+            getattr(instrument, "measure_" + meter.replace(" ", "_"))
+        ).get("return", None)
 
         self._value = None
 
@@ -240,23 +238,22 @@ class Expression(Variable):
     _settable = False  #:
 
     _functions = {
-        'sqrt(': 'np.sqrt(',
-        'exp(': 'np.exp(',
-        'sin(': 'np.sin(',
-        'cos(': 'np.cos(',
-        'tan(': 'np.tan(',
-        'sum(': 'np.nansum(',
-        'mean(': 'np.nanmean(',
-        'rms(': 'np.nanstd(',
-        'std(': 'np.nanstd(',
-        'var(': 'np.nanvar(',
-        'diff(': 'np.diff(',
-        'max(': 'np.nanmax(',
-        'min(': 'np.nanmin('
+        "sqrt(": "np.sqrt(",
+        "exp(": "np.exp(",
+        "sin(": "np.sin(",
+        "cos(": "np.cos(",
+        "tan(": "np.tan(",
+        "sum(": "np.nansum(",
+        "mean(": "np.nanmean(",
+        "rms(": "np.nanstd(",
+        "std(": "np.nanstd(",
+        "var(": "np.nanvar(",
+        "diff(": "np.diff(",
+        "max(": "np.nanmax(",
+        "min(": "np.nanmin(",
     }
 
     def __init__(self, expression: str, definitions: dict = None):
-
         self.expression = expression
         self.definitions = definitions if definitions is not None else {}
 
@@ -270,27 +267,24 @@ class Expression(Variable):
         expression = self.expression
 
         # carets represent exponents
-        expression = expression.replace('^', '**')
+        expression = expression.replace("^", "**")
 
         for symbol, variable in self.definitions.items():
-
-            expression = expression.replace(
-                symbol, f"({variable._value})"
-            )
+            expression = expression.replace(symbol, f"({variable._value})")
 
         for shorthand, longhand in self._functions.items():
             if shorthand in expression:
                 expression = expression.replace(shorthand, longhand)
 
         try:
-            if 'None' not in expression and 'nan' not in expression:
+            if "None" not in expression and "nan" not in expression:
                 self._value = eval(expression)
             else:
                 self._value = None
         except BaseException as err:
             print(
-                f'Unable to evaluate expression {self.expression} due to '
-                f'error: ', err
+                f"Unable to evaluate expression {self.expression} due to " f"error: ",
+                err,
             )
             self._value = None
 
@@ -330,41 +324,41 @@ class Remote(Variable):
     """
 
     type_map = {
-        Toggle: '64bit_uint',
-        Boolean: '64bit_uint',
-        Integer: '64bit_int',
-        Float: '64bit_float'
+        Toggle: "64bit_uint",
+        Boolean: "64bit_uint",
+        Integer: "64bit_int",
+        Float: "64bit_float",
     }
 
-    def __init__(self,
-                 server: str,
-                 alias: [int, str],
-                 protocol: str = None,
-                 settable: bool = False  # needed for modbus protocol
-                 ):
-
+    def __init__(
+        self,
+        server: str,
+        alias: [int, str],
+        protocol: str = None,
+        settable: bool = False,  # needed for modbus protocol
+    ):
         self.server = server
         self.alias = alias
         self.protocol = protocol
 
-        if protocol == 'modbus':
+        if protocol == "modbus":
             self._client = instruments.ModbusClient(server)
             self._settable = settable
 
         else:
-            server_ip, server_port = server.split('::')
+            server_ip, server_port = server.split("::")
 
             self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
             self._socket.connect((server_ip, int(server_port)))
 
-            write_to_socket(self._socket, f'{self.alias} settable?')
+            write_to_socket(self._socket, f"{self.alias} settable?")
 
             response = read_from_socket(self._socket, timeout=60)
-            self._settable = response == f'{self.alias} settable'
+            self._settable = response == f"{self.alias} settable"
 
             # Get type
-            write_to_socket(self._socket, f'{self.alias} type?')
+            write_to_socket(self._socket, f"{self.alias} type?")
 
             response = read_from_socket(self._socket, timeout=60)
 
@@ -382,13 +376,10 @@ class Remote(Variable):
         Value of the remote variable on a server
         """
 
-        if self.protocol == 'modbus':
-
+        if self.protocol == "modbus":
             fcode = 3 if self.settable else 4
 
-            type_int = self._client.read(
-                fcode, self.alias + 4, _type='16bit_int'
-            )
+            type_int = self._client.read(fcode, self.alias + 4, _type="16bit_int")
 
             _type = {
                 0: Boolean,
@@ -399,27 +390,25 @@ class Remote(Variable):
 
             if _type is not None:
                 self._value = self._client.read(
-                    fcode, self.alias, count=4,
-                    _type=self.type_map[_type]
+                    fcode, self.alias, count=4, _type=self.type_map[_type]
                 )
 
         else:
-            write_to_socket(self._socket, f'{self.alias} ?')
+            write_to_socket(self._socket, f"{self.alias} ?")
 
             response = read_from_socket(self._socket, timeout=60)
 
             try:
-
                 if response is None:
                     self._value = None
-                elif 'Error' in response:
-                    raise RuntimeError(response.split('Error: ')[-1])
+                elif "Error" in response:
+                    raise RuntimeError(response.split("Error: ")[-1])
                 else:
-                    self._value = recast(response.split(' ')[-1])
+                    self._value = recast(response.split(" ")[-1])
 
             except BaseException as error:
                 print(
-                    f'Warning: unable to retrieve value of {self.alias} '
+                    f"Warning: unable to retrieve value of {self.alias} "
                     f'from server at {self.server}; got error "{error}"'
                 )
 
@@ -432,55 +421,50 @@ class Remote(Variable):
         Set the value of a remote variable
         """
 
-        if self.protocol == 'modbus':
-
-            self._client.write(
-                16, self.alias, value, _type=self.type_map[self.type]
-            )
+        if self.protocol == "modbus":
+            self._client.write(16, self.alias, value, _type=self.type_map[self.type])
 
         else:
-            write_to_socket(self._socket, f'{self.alias} {value}')
+            write_to_socket(self._socket, f"{self.alias} {value}")
 
             check = read_from_socket(self._socket, timeout=60)
 
-            if check == '' or check is None:
+            if check == "" or check is None:
                 print(
-                    f'Warning: received no response from server at '
-                    f'{self.server} while trying to set {self.alias}'
+                    f"Warning: received no response from server at "
+                    f"{self.server} while trying to set {self.alias}"
                 )
-            elif 'Error' in check:
+            elif "Error" in check:
                 print(
                     f'Warning: got response "{check}" while trying to set '
-                    f'{self.alias} on server at {self.server}'
+                    f"{self.alias} on server at {self.server}"
                 )
             else:
                 try:
-
-                    check_value = recast(check.split(f'{self.alias} ')[1])
+                    check_value = recast(check.split(f"{self.alias} ")[1])
 
                     if value != check_value:
                         print(
-                            f'Warning: attempted to set {self.alias} on '
-                            f'server at {self.server} to {value} but '
-                            f'checked value is {check_value}'
+                            f"Warning: attempted to set {self.alias} on "
+                            f"server at {self.server} to {value} but "
+                            f"checked value is {check_value}"
                         )
 
                 except ValueError as val_err:
                     print(
-                        f'Warning: unable to check value while setting '
-                        f'{self.alias} on server at {self.server}; '
+                        f"Warning: unable to check value while setting "
+                        f"{self.alias} on server at {self.server}; "
                         f'got error "{val_err}"'
                     )
                 except IndexError as ind_err:
                     print(
-                        f'Warning: unable to check value while setting '
-                        f'{self.alias} on server at {self.server}; '
+                        f"Warning: unable to check value while setting "
+                        f"{self.alias} on server at {self.server}; "
                         f'got error "{ind_err}"'
                     )
 
     def __del__(self):
-
-        if self.protocol == 'modbus':
+        if self.protocol == "modbus":
             self._client.disconnect()
         else:
             self._socket.shutdown(socket.SHUT_RDWR)
@@ -499,7 +483,6 @@ class Parameter(Variable):
     _settable = True  #:
 
     def __init__(self, parameter: Type):
-
         self.parameter = recast(parameter)
         self._value = parameter
 
@@ -517,5 +500,8 @@ class Parameter(Variable):
         self._value = value
 
 
-supported = {key: value for key, value in vars().items()
-             if type(value) is type and issubclass(value, Variable)}
+supported = {
+    key: value
+    for key, value in vars().items()
+    if type(value) is type and issubclass(value, Variable)
+}

@@ -14,9 +14,9 @@ class Keithley2110(Instrument):
 
     supported_adapters = ((USB, {}),)
 
-    knobs = ('voltage range', 'current range')
+    knobs = ("voltage range", "current range")
 
-    meters = ('voltage', 'current', 'temperature')
+    meters = ("voltage", "current", "temperature")
 
     _mode = None
 
@@ -26,86 +26,87 @@ class Keithley2110(Instrument):
 
     @mode.setter
     def mode(self, mode):
-        if mode == 'voltage':
+        if mode == "voltage":
             self.write('FUNC "VOLT"')
-            self._mode = 'voltage'
-        if mode == 'current':
+            self._mode = "voltage"
+        if mode == "current":
             self.write('FUNC "CURR"')
-            self._mode = 'current'
-        if mode == 'temperature':
+            self._mode = "current"
+        if mode == "temperature":
             self.write('FUNC "TCO"')
-            self._mode = 'temperature'
+            self._mode = "temperature"
 
     @setter
     def set_voltage_range(self, voltage_range: Float):
-
         allowed_voltage_ranges = (0, 0.1, 1.0, 10.0, 100.0, 1000.0)
 
         if voltage_range in allowed_voltage_ranges[1:]:
-            self.write('VOLT:RANG %.2e' % voltage_range)
+            self.write("VOLT:RANG %.2e" % voltage_range)
         elif isinstance(voltage_range, numbers.Number):
-
             # Find nearest encapsulating voltage range
             try:
-                nearest = np.argwhere(voltage_range <= np.array(
-                    allowed_voltage_ranges)).flatten()[0]
+                nearest = np.argwhere(
+                    voltage_range <= np.array(allowed_voltage_ranges)
+                ).flatten()[0]
             except IndexError:
                 nearest = -1
 
             self.set_voltage_range(allowed_voltage_ranges[nearest])
 
-            Warning('Given voltage range not an option, '
-                    f'setting to {allowed_voltage_ranges[nearest]} V instead')
+            Warning(
+                "Given voltage range not an option, "
+                f"setting to {allowed_voltage_ranges[nearest]} V instead"
+            )
 
         elif voltage_range == 0.0:
-            self.write('VOLT:RANG:AUTO')
+            self.write("VOLT:RANG:AUTO")
         else:
-            raise ValueError(
-                f'voltage range choice {voltage_range} not permitted!')
+            raise ValueError(f"voltage range choice {voltage_range} not permitted!")
 
     @setter
     def set_current_range(self, current_range: Float):
-
-        allowed_current_ranges = (0.0, .01, 0.1, 1.0, 3.0, 10.0)
+        allowed_current_ranges = (0.0, 0.01, 0.1, 1.0, 3.0, 10.0)
 
         if current_range in allowed_current_ranges:
-            self.write('CURR:RANG %.2e' % current_range)
+            self.write("CURR:RANG %.2e" % current_range)
         elif isinstance(current_range, numbers.Number):
             # Find nearest encapsulating current range
             try:
-                nearest = np.argwhere(current_range <= np.array(
-                    allowed_current_ranges)).flatten()[0]
+                nearest = np.argwhere(
+                    current_range <= np.array(allowed_current_ranges)
+                ).flatten()[0]
             except IndexError:
                 nearest = -1
 
             self.set_current_range(allowed_current_ranges[nearest])
 
-            Warning('Given current range not an option, '
-                    f'setting to {allowed_current_ranges[nearest]} A instead')
+            Warning(
+                "Given current range not an option, "
+                f"setting to {allowed_current_ranges[nearest]} A instead"
+            )
 
         elif current_range == 0.0:
-            self.write('CURR:RANG:AUTO')
+            self.write("CURR:RANG:AUTO")
         else:
-            raise ValueError(
-                f'current range choice {current_range} not permitted!')
+            raise ValueError(f"current range choice {current_range} not permitted!")
 
     @measurer
     def measure_voltage(self) -> Float:
-        if self.mode != 'voltage':
-            self.mode = 'voltage'
-        return float(self.query('READ?'))
+        if self.mode != "voltage":
+            self.mode = "voltage"
+        return float(self.query("READ?"))
 
     @measurer
     def measure_current(self) -> Float:
-        if self.mode != 'current':
-            self.mode = 'current'
-        return float(self.query('READ?'))
+        if self.mode != "current":
+            self.mode = "current"
+        return float(self.query("READ?"))
 
     @measurer
     def measure_temperature(self) -> Float:
-        if self.mode != 'temperature':
-            self.mode = 'temperature'
-        return float(self.query('READ?'))
+        if self.mode != "temperature":
+            self.mode = "temperature"
+        return float(self.query("READ?"))
 
 
 class Keithley6500(Instrument):
@@ -124,93 +125,73 @@ class Keithley6500(Instrument):
     switching meter types.
     """
 
-    name = 'Keithley6500'
+    name = "Keithley6500"
 
     supported_adapters = (
-        (Socket, {
-            'write_termination': '\n',
-            'read_termination': '\n',
-            'timeout': 0.5}
-         ),
+        (Socket, {"write_termination": "\n", "read_termination": "\n", "timeout": 0.5}),
     )
 
-    knobs = (
-        'meter',
-        'nplc',
-        'range',
-        'sample count',
-        'sample rate',
-        'trigger_source'
-    )
+    knobs = ("meter", "nplc", "range", "sample count", "sample rate", "trigger_source")
 
-    meters = (
-        'voltage',
-        'current',
-        'fast voltages',
-        'fast currents'
-    )
+    meters = ("voltage", "current", "fast voltages", "fast currents")
 
-    _trig_src = 'trigger.EVENT_DISPLAY'
+    _trig_src = "trigger.EVENT_DISPLAY"
     meter = None
 
     @setter
     def set_meter(self, meter: String):
-
-        if meter.lower() == 'voltage':
-            self.write(f'dmm.measure.func = dmm.FUNC_DC_VOLTAGE')
-        elif meter.lower() == 'current':
-            self.write(f'dmm.measure.func = dmm.FUNC_DC_CURRENT')
-        elif meter.lower() == 'fast voltages':
-            self.write(f'dmm.digitize.func = dmm.FUNC_DIGITIZE_VOLTAGE')
-        elif meter.lower() == 'fast currents':
-            self.write(f'dmm.digitize.func = dmm.FUNC_DIGITIZE_CURRENT')
+        if meter.lower() == "voltage":
+            self.write(f"dmm.measure.func = dmm.FUNC_DC_VOLTAGE")
+        elif meter.lower() == "current":
+            self.write(f"dmm.measure.func = dmm.FUNC_DC_CURRENT")
+        elif meter.lower() == "fast voltages":
+            self.write(f"dmm.digitize.func = dmm.FUNC_DIGITIZE_VOLTAGE")
+        elif meter.lower() == "fast currents":
+            self.write(f"dmm.digitize.func = dmm.FUNC_DIGITIZE_CURRENT")
         else:
-            raise print(f'Warning: invalid meter {meter} for Keithley6500')
+            raise print(f"Warning: invalid meter {meter} for Keithley6500")
             return self.get_meter()
 
         return meter.lower()
 
     @getter
     def get_meter(self) -> String:
-
         def validator(response):
-            return re.match('dmm.FUNC', response)
+            return re.match("dmm.FUNC", response)
 
-        meter = self.query('print(dmm.measure.func)', validator=validator)
+        meter = self.query("print(dmm.measure.func)", validator=validator)
 
-        if 'dmm.FUNC_NONE' in meter:
-            meter = self.query('print(dmm.digitize.func)')
+        if "dmm.FUNC_NONE" in meter:
+            meter = self.query("print(dmm.digitize.func)")
 
-            if 'dmm.FUNC_NONE' in meter:
-                raise ValueError(f'meter is undefined for {self.name}')
+            if "dmm.FUNC_NONE" in meter:
+                raise ValueError(f"meter is undefined for {self.name}")
 
         meter_dict = {
-            'dmm.FUNC_DC_CURRENT': 'current',
-            'dmm.FUNC_DC_VOLTAGE': 'voltage',
-            'dmm.FUNC_DIGITIZE_CURRENT': 'fast currents',
-            'dmm.FUNC_DIGITIZE_VOLTAGE': 'fast voltages'
+            "dmm.FUNC_DC_CURRENT": "current",
+            "dmm.FUNC_DC_VOLTAGE": "voltage",
+            "dmm.FUNC_DIGITIZE_CURRENT": "fast currents",
+            "dmm.FUNC_DIGITIZE_VOLTAGE": "fast voltages",
         }
 
         if meter in meter_dict:
             return meter_dict[meter]
         else:
-            return ''
+            return ""
 
     @setter
     def set_sample_count(self, count: Integer):
-
-        if 'fast' in self.meter:
-            self.write(f'dmm.digitize.count = {count}')
+        if "fast" in self.meter:
+            self.write(f"dmm.digitize.count = {count}")
         else:
             return 1
 
     @getter
     def get_sample_count(self) -> Integer:
+        if "fast" in self.meter:
+            response = self.query("print(dmm.digitize.count)")
 
-        if 'fast' in self.meter:
-            response = self.query('print(dmm.digitize.count)')
-
-            if 'nil' in response:
+            if "nil" in response:
                 return 0
             else:
                 return int(response)
@@ -219,20 +200,17 @@ class Keithley6500(Instrument):
 
     @setter
     def set_sample_rate(self, rate: Integer):
-
-        if 'fast' in self.meter:
-            self.write(f'dmm.digitize.samplerate = {rate}')
+        if "fast" in self.meter:
+            self.write(f"dmm.digitize.samplerate = {rate}")
         else:
             return 0
 
     @getter
     def get_sample_rate(self) -> Integer:
+        if "fast" in self.meter:
+            response = self.query(f"print(dmm.digitize.samplerate)")
 
-        if 'fast' in self.meter:
-
-            response = self.query(f'print(dmm.digitize.samplerate)')
-
-            if 'nil' in response:
+            if "nil" in response:
                 return 0
             else:
                 return int(response)
@@ -241,158 +219,141 @@ class Keithley6500(Instrument):
 
     @setter
     def set_nplc(self, nplc: Integer):
-
-        if self.meter in ['voltage', 'current']:
-            self.write(f'dmm.measure.nplc = {nplc}')
+        if self.meter in ["voltage", "current"]:
+            self.write(f"dmm.measure.nplc = {nplc}")
         else:
             return 0
 
     @getter
     def get_nplc(self) -> Integer:
-
-        if self.meter in ['voltage', 'current']:
-            return int(self.query('print(dmm.measure.nplc)'))
+        if self.meter in ["voltage", "current"]:
+            return int(self.query("print(dmm.measure.nplc)"))
         else:
             return 0
 
     @setter
     def set_range(self, _range: Float):
-
         meter = self.get_meter()
 
-        if meter in ['voltage', 'current']:
+        if meter in ["voltage", "current"]:
             if _range == 0.0:
-                self.write('dmm.measure.autorange = dmm.ON')
+                self.write("dmm.measure.autorange = dmm.ON")
             else:
-                self.write(f'dmm.measure.range = {_range}')
-        elif meter in ['fast voltages', 'fast currents']:
-            self.write('dmm.digitize.range = %.3e' % _range)
+                self.write(f"dmm.measure.range = {_range}")
+        elif meter in ["fast voltages", "fast currents"]:
+            self.write("dmm.digitize.range = %.3e" % _range)
         else:
             return self.get_range()
 
-
     @getter
     def get_range(self) -> Float:
-
         meter = self.get_meter()
 
-        if meter in ['voltage', 'current']:
-            if self.query('print(dmm.measure.autorange)') == 'dmm.ON':
+        if meter in ["voltage", "current"]:
+            if self.query("print(dmm.measure.autorange)") == "dmm.ON":
                 return 0.0
             else:
-                return float(self.query('print(dmm.measure.range)'))
+                return float(self.query("print(dmm.measure.range)"))
 
-        elif meter in ['fast voltages', 'fast currents']:
-            return float(self.query('print(dmm.digitize.range)'))
+        elif meter in ["fast voltages", "fast currents"]:
+            return float(self.query("print(dmm.digitize.range)"))
 
     @setter
     def set_trigger_source(self, trigger_source: String):
-
         valid_sources = {
-            'front panel': 'trigger.EVENT_DISPLAY',
-            'front': 'trigger.EVENT_DISPLAY',
-            'external in': 'trigger.EVENT_EXTERNAL',
-            'ext': 'trigger.EVENT_EXTERNAL'
+            "front panel": "trigger.EVENT_DISPLAY",
+            "front": "trigger.EVENT_DISPLAY",
+            "external in": "trigger.EVENT_EXTERNAL",
+            "ext": "trigger.EVENT_EXTERNAL",
         }
 
         if trigger_source.lower() in valid_sources:
             self._trig_src = valid_sources[trigger_source.lower()]
         else:
-            raise ValueError(f'invalid trigger source for {self.name}')
+            raise ValueError(f"invalid trigger source for {self.name}")
 
     @getter
     def get_trigger_source(self) -> String:
-
         trigger_sources = {
-            'trigger.EVENT_DISPLAY': 'front panel',
-            'trigger.EVENT_EXTERNAL': 'external in'
+            "trigger.EVENT_DISPLAY": "front panel",
+            "trigger.EVENT_EXTERNAL": "external in",
         }
 
         return trigger_sources[self._trig_src]
 
     @measurer
     def measure_current(self) -> Float:
+        if self.meter != "current":
+            self.set_meter("current")
 
-        if self.meter != 'current':
-            self.set_meter('current')
-
-        return recast(self.query('print(dmm.measure.read())'))
+        return recast(self.query("print(dmm.measure.read())"))
 
     @measurer
     def measure_voltage(self) -> Float:
+        if self.meter != "voltage":
+            self.set_meter("voltage")
 
-        if self.meter != 'voltage':
-            self.set_meter('voltage')
-
-        return recast(self.query('print(dmm.measure.read())'))
+        return recast(self.query("print(dmm.measure.read())"))
 
     def _execute_fast_measurements(self):
-
-        if 'fast' not in self.meter:
+        if "fast" not in self.meter:
             return
 
         trigger_src = {
-            'front panel': 'trigger.EVENT_DISPLAY',
-            'external in': 'trigger.EVENT_EXTERNAL'
+            "front panel": "trigger.EVENT_DISPLAY",
+            "external in": "trigger.EVENT_EXTERNAL",
         }[self.get_trigger_source()]
 
         self.write(
-            'trigger.model.setblock(1, trigger.BLOCK_BUFFER_CLEAR, '
-            'defbuffer1)\n'
-            'trigger.model.setblock(2, trigger.BLOCK_WAIT, '
-            f'{trigger_src})\n'
-            'trigger.model.setblock(3, trigger.BLOCK_DELAY_CONSTANT, 0)\n'
-            'trigger.model.setblock(4, trigger.BLOCK_MEASURE_DIGITIZE, '
-            'defbuffer1, dmm.digitize.count)\n'
-            'trigger.model.initiate()\n'
+            "trigger.model.setblock(1, trigger.BLOCK_BUFFER_CLEAR, "
+            "defbuffer1)\n"
+            "trigger.model.setblock(2, trigger.BLOCK_WAIT, "
+            f"{trigger_src})\n"
+            "trigger.model.setblock(3, trigger.BLOCK_DELAY_CONSTANT, 0)\n"
+            "trigger.model.setblock(4, trigger.BLOCK_MEASURE_DIGITIZE, "
+            "defbuffer1, dmm.digitize.count)\n"
+            "trigger.model.initiate()\n"
         )
 
         running = True
 
         running_states = [
-            'trigger.STATE_BUILDING',
-            'trigger.STATE_RUNNING',
-            'trigger.STATE_PAUSED',
-            'trigger.STATE_WAITING'
+            "trigger.STATE_BUILDING",
+            "trigger.STATE_RUNNING",
+            "trigger.STATE_PAUSED",
+            "trigger.STATE_WAITING",
         ]
 
         failed_states = [
-            'trigger.STATE_ABORTING',
-            'trigger.STATE_ABORTED',
-            'trigger.STATE_FAILED'
+            "trigger.STATE_ABORTING",
+            "trigger.STATE_ABORTED",
+            "trigger.STATE_FAILED",
         ]
 
-        state = ''
+        state = ""
 
         while running:
+            self.write("state, state, block_num = trigger.model.state()")
 
-            self.write('state, state, block_num = trigger.model.state()')
-
-            state = self.query('print(state)')
+            state = self.query("print(state)")
 
             running = state in running_states
 
             time.sleep(0.25)
 
         if state in failed_states:
-            raise RuntimeError(
-                f'fast measurement failed; trigger state is "{state}"'
-            )
+            raise RuntimeError(f'fast measurement failed; trigger state is "{state}"')
 
         readings = self.query(
-            'printbuffer(1, defbuffer1.n, defbuffer1.readings)',
-            nbytes=np.inf
+            "printbuffer(1, defbuffer1.n, defbuffer1.readings)", nbytes=np.inf
         )
 
-        return np.array(
-            [np.float64(reading) for reading in readings.split(', ')]
-        )
+        return np.array([np.float64(reading) for reading in readings.split(", ")])
 
     @measurer
     def measure_fast_voltages(self) -> Array:
-
-        if self.meter != 'fast voltages':
-            self.set_meter('fast voltages')
+        if self.meter != "fast voltages":
+            self.set_meter("fast voltages")
 
         fast_voltages = self._execute_fast_measurements()
 
@@ -400,9 +361,8 @@ class Keithley6500(Instrument):
 
     @measurer
     def measure_fast_currents(self) -> Array:
-
-        if self.meter != 'fast currents':
-            self.set_meter('fast currents')
+        if self.meter != "fast currents":
+            self.set_meter("fast currents")
 
         fast_currents = self._execute_fast_measurements()
 
@@ -414,26 +374,36 @@ class LabJackU6(Instrument):
     LabJack U6 Multi-function DAQ
     """
 
-    name = 'LabJackU6'
+    name = "LabJackU6"
 
     supported_adapters = (
         # custom setup below until I can get serial or modbus comms to work
         (Adapter, {}),
     )
 
-    knobs = ('DAC0 ', 'DAC1',)
+    knobs = (
+        "DAC0 ",
+        "DAC1",
+    )
 
     meters = (
-        'AIN0', 'AIN1', 'AIN2', 'AIN3', 'device temperature',
-        'temperature 0', 'temperature 1', 'temperature 2', 'temperature 3'
+        "AIN0",
+        "AIN1",
+        "AIN2",
+        "AIN3",
+        "device temperature",
+        "temperature 0",
+        "temperature 1",
+        "temperature 2",
+        "temperature 3",
     )
 
     def __init__(self, *args, **kwargs):
-        u6 = importlib.import_module('u6')
+        u6 = importlib.import_module("u6")
         self.backend = u6.U6()
 
-        if len(args) == 0 and 'address' not in kwargs:
-            kwargs['address'] = str(self.backend.serialNumber)
+        if len(args) == 0 and "address" not in kwargs:
+            kwargs["address"] = str(self.backend.serialNumber)
 
         Instrument.__init__(self, *args, **kwargs)
 
@@ -504,31 +474,39 @@ class LabJackT7(Instrument):
     this may eventually be expanded.
     """
 
-    name = 'LabJackT7'
+    name = "LabJackT7"
 
-    supported_adapters = (
-        (Modbus, {}),
-    )
+    supported_adapters = ((Modbus, {}),)
 
-    knobs = (
-        'DIO0', 'DIO1', 'DIO2', 'DIO3', 'DIO4', 'DIO5', 'DIO6', 'DIO7'
-    )
+    knobs = ("DIO0", "DIO1", "DIO2", "DIO3", "DIO4", "DIO5", "DIO6", "DIO7")
 
     meters = (
-        'AIN0', 'AIN1', 'AIN2', 'AIN3', 'AIN4', 'AIN5', 'AIN6',
-        'AIN7', 'AIN8', 'AIN9', 'AIN10', 'AIN11', 'AIN12', 'AIN13',
-        'AIN all',
-        'device temperature'
+        "AIN0",
+        "AIN1",
+        "AIN2",
+        "AIN3",
+        "AIN4",
+        "AIN5",
+        "AIN6",
+        "AIN7",
+        "AIN8",
+        "AIN9",
+        "AIN10",
+        "AIN11",
+        "AIN12",
+        "AIN13",
+        "AIN all",
+        "device temperature",
     )
 
     def _set_DION(self, n, value: Integer):
-        self.write(16, 2000 + n, value, _type='16bit_uint')
+        self.write(16, 2000 + n, value, _type="16bit_uint")
 
     def _get_DION(self, n) -> Integer:
-        return self.read(3, 2000 + n, count=1, _type='16bit_uint')
+        return self.read(3, 2000 + n, count=1, _type="16bit_uint")
 
     def _measure_AIN(self, n) -> Float:
-        return self.read(3, 2*n, count=2, _type='32bit_float')
+        return self.read(3, 2 * n, count=2, _type="32bit_float")
 
     @setter
     def set_DIO0(self, value: Integer):
@@ -653,9 +631,9 @@ class LabJackT7(Instrument):
     @measurer
     def measure_AIN_all(self) -> Array:
         """Reads all 14 analog inputs in a single call"""
-        return self.read(4, 0, count=2*14, _type='32bit_float')
+        return self.read(4, 0, count=2 * 14, _type="32bit_float")
 
     @measurer
     def measure_device_temperature(self) -> Float:
         """Device temperature in C"""
-        return self.read(4, 60052, count=2, _type='32bit_float') - 273.15
+        return self.read(4, 60052, count=2, _type="32bit_float") - 273.15

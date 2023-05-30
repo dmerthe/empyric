@@ -14,5 +14,8 @@ from empyric.collection.generators import *
 from empyric.collection.scopes import *
 from empyric.collection.io import *
 
-supported = {key: value for key, value in vars().items()
-             if type(value) is type and issubclass(value, Instrument)}
+supported = {
+    key: value
+    for key, value in vars().items()
+    if type(value) is type and issubclass(value, Instrument)
+}
