@@ -339,8 +339,11 @@ class Plotter:
             fig.cbar.ax.tick_params(labelsize='small')
 
             try:
+                # Optimize plot layout using the figure's layout engine
                 fig.get_layout_engine().execute(fig)
             except AttributeError:  # sometimes happens for reasons
+                pass
+            except ZeroDivisionError:  # sometimes happens for reasons
                 pass
 
             plt.pause(0.01)

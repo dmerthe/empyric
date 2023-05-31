@@ -406,6 +406,8 @@ class Keithley2400(Instrument):
     @measurer
     def measure_fast_currents(self) -> Array:
 
+        self._busy = True
+
         list_length = len(self.fast_voltages)
 
         if list_length == 0:
@@ -427,9 +429,6 @@ class Keithley2400(Instrument):
 
         current_list = []
 
-        normal_timeout = self.adapter.timeout
-        self.adapter.timeout = None  # the response times can be long
-
         self.set_source('voltage')
         self.set_meter('current')
         self.set_output('ON')
@@ -443,15 +442,26 @@ class Keithley2400(Instrument):
             self.write(':SOUR:LIST:VOLT ' + voltage_str)
             self.write(':TRIG:COUN %d' % len(voltage_list))
 
-            raw_response = self.query(':READ?').strip()
-            current_list += [
-                float(current_str) for current_str in raw_response.split(',')
-            ]
+            raw_response = self.query(':READ?', timeout=60)
 
-        self.adapter.timeout = normal_timeout  # put it back
+            if raw_response is not None:
+
+                raw_response = raw_response.strip()
+
+                current_list += [
+                    float(current_str) for current_str
+                    in raw_response.split(',')
+                ]
+
+            else:
+                # truncated data; nullify measurement
+                current_list = [np.nan for _ in self.fast_voltages]
+                break
 
         self.write(':SOUR:VOLT:MODE FIX')
         self.write(':TRIG:COUN 1')
+
+        self._busy = False
 
         return np.array(current_list)
 
@@ -461,7 +471,11 @@ class Keithley2400(Instrument):
 
     @getter
     def get_source_delay(self) -> Float:
-        return self.query(':SOUR:DEL?').strip()
+
+        response = self.query(':SOUR:DEL?')
+
+        if response is not None:
+            return response.strip()
 
 
 class Keithley2460(Instrument):

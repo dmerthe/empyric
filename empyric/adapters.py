@@ -350,7 +350,7 @@ class Serial(Adapter):
         return 'Serial'
 
     @classmethod
-    def list(cls, verbose=True):
+    def list(cls):
         """
         List all connected serial devices
 
@@ -362,14 +362,10 @@ class Serial(Adapter):
 
         if cls.lib == 'pyvisa':
 
-            pyvisa = importlib.import_module('serial')
+            pyvisa = importlib.import_module('pyvisa')
             resource_manager = pyvisa.ResourceManager()
 
             devices = resource_manager.list_resources()
-
-            if verbose:
-                print('Connected serial devices (via PyVISA)')
-                print('\n'.join(devices))
 
         elif cls.lib == 'pyserial':
 
@@ -378,10 +374,6 @@ class Serial(Adapter):
             ).comports
 
             devices = [port.device for port in list_ports()]
-
-            if verbose:
-                print('Connected serial devices (via PySerial)')
-                print('\n'.join(devices))
 
         else:
             raise AdapterError(cls.no_lib_msg)
