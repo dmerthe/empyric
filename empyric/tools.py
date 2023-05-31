@@ -27,21 +27,28 @@ def convert_time(time_value):
     elif isinstance(time_value, str):
         # times can be specified in the runcard with units, such as minutes,
         # hours or days, e.g. "6 hours"
-        time_parts = time_value.split(' ')
+        time_parts = time_value.split(" ")
 
         if len(time_parts) == 1:
             return float(time_parts[0])
         elif len(time_parts) == 2:
             value, unit = time_parts
             value = float(value)
-            return value * {
-                'seconds': 1, 'second': 1,
-                'minutes': 60, 'minute': 60,
-                'hours': 3600, 'hour': 3600,
-                'days': 86400, 'day': 86400
-            }[unit]
+            return (
+                value
+                * {
+                    "seconds": 1,
+                    "second": 1,
+                    "minutes": 60,
+                    "minute": 60,
+                    "hours": 3600,
+                    "hour": 3600,
+                    "days": 86400,
+                    "day": 86400,
+                }[unit]
+            )
         else:
-            raise ValueError(f'Unrecognized time format for {time_value}!')
+            raise ValueError(f"Unrecognized time format for {time_value}!")
 
 
 class Clock:
@@ -50,7 +57,6 @@ class Clock:
     """
 
     def __init__(self):
-
         self.start_time = self.stop_time = time.time()  # initially stopped
         self.stoppage = 0  # total time during which the clock has been stopped
 
@@ -99,7 +105,7 @@ def find_nearest(allowed, value, overestimate=False, underestimate=False):
 
 
 # Tools for handling sockets
-def get_ip_address(remote_ip='8.8.8.8', remote_port=80):
+def get_ip_address(remote_ip="8.8.8.8", remote_port=80):
     """
     Connect to a server to resolve IP address; defaults to Google's DNS server
     if `remote_ip` and `remote_port` are not specified
@@ -129,13 +135,14 @@ def autobind_socket(_socket):
             pass
 
     if not bound:
-        raise IOError(f'unable to bind socket at {ip_address} to any port!')
+        raise IOError(f"unable to bind socket at {ip_address} to any port!")
 
     return ip_address, port
 
 
-def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1,
-                     decode=True, chunk_size=4096):
+def read_from_socket(
+    _socket, nbytes=None, termination="\r", timeout=1, decode=True, chunk_size=4096
+):
     """
     Read from a socket, with some effort taken to get the whole message.
 
@@ -172,7 +179,7 @@ def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1,
 
         if termination is None:
             raise ValueError(
-                'nbytes must be a non-negative integer if termination is None'
+                "nbytes must be a non-negative integer if termination is None"
             )
 
     null_responses = 0
@@ -182,7 +189,6 @@ def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1,
         termination = termination.encode()
 
     def is_terminated(message):
-
         if isinstance(termination, bytes):
             return termination in message
         elif callable(termination):
@@ -190,29 +196,26 @@ def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1,
         else:
             return False
 
-    message = b''
+    message = b""
 
     while len(message) < nbytes and null_responses < max_nulls:
-
-        part = b''
+        part = b""
 
         remaining_bytes = nbytes - len(message)
 
         try:
-
             if remaining_bytes < chunk_size:
                 part = _socket.recv(remaining_bytes)
             else:
                 part = _socket.recv(chunk_size)
 
         except ConnectionResetError as err:
-            print(f'Warning: {err}')
+            print(f"Warning: {err}")
             break
         except socket.timeout:
             pass
 
         if len(part) > 0:
-
             message = message + part
 
             if is_terminated(message):
@@ -229,7 +232,7 @@ def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1,
         return message
 
 
-def write_to_socket(_socket, message, termination='\r', timeout=1):
+def write_to_socket(_socket, message, termination="\r", timeout=1):
     """
     Write a message to a socket, with care taken to get the whole message
     transmitted.
@@ -258,7 +261,6 @@ def write_to_socket(_socket, message, termination='\r', timeout=1):
     total_sent = 0
 
     while total_sent < msg_len and failures < max_failures:
-
         sent = _socket.send(bytes_message[total_sent:])
 
         if sent == 0:
@@ -267,8 +269,6 @@ def write_to_socket(_socket, message, termination='\r', timeout=1):
         total_sent = total_sent + sent
 
     if total_sent < msg_len:
-        raise IOError(
-            f'Socket connection to {_socket.getsockname()} is broken!'
-        )
+        raise IOError(f"Socket connection to {_socket.getsockname()} is broken!")
 
     return total_sent

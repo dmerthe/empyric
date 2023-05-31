@@ -5,17 +5,19 @@ import re
 from abc import ABC
 import pandas as pd
 import numpy as np
-from typing import Any
+from typing import Any, Union
 
 
 class Type(ABC):
     """Abstract base class for all supported data types"""
+
     pass
 
 
 class Boolean(Type):
     """Abstract base class for all boolean types; `bool` and `np.bool_` are
     subclasses"""
+
     pass
 
 
@@ -28,21 +30,18 @@ class Toggle(Type):
     Convenience class for handling toggle variables, which are either off or on.
     """
 
-    on_values = [True, 1, '1', 'ON', 'On', 'on']
-    off_values = [False, 0, '0', 'OFF', 'Off', 'off']
+    on_values = [True, 1, "1", "ON", "On", "on"]
+    off_values = [False, 0, "0", "OFF", "Off", "off"]
 
-    def __init__(self, state: [str, bool, int, type]):
-
-        if hasattr(state, 'on'):
+    def __init__(self, state: Union[str, bool, int, type]):
+        if hasattr(state, "on"):
             self.on = state.on
         elif state in self.on_values:
             self.on = True
         elif state in self.off_values:
             self.on = False
         else:
-            raise ValueError(
-                f'toggle was initialized with invalid state {state}'
-            )
+            raise ValueError(f"toggle was initialized with invalid state {state}")
 
     def __bool__(self):
         return True if self.on else False
@@ -51,11 +50,10 @@ class Toggle(Type):
         return 1 if self.on else 0
 
     def __str__(self):
-        return 'ON' if self.on else 'OFF'
+        return "ON" if self.on else "OFF"
 
     def __eq__(self, other):
-
-        if hasattr(other, 'on'):
+        if hasattr(other, "on"):
             return self.on == other.on
         else:
             if self.on and other in self.on_values:
@@ -66,13 +64,14 @@ class Toggle(Type):
                 return False
 
 
-ON = Toggle('ON')
-OFF = Toggle('OFF')
+ON = Toggle("ON")
+OFF = Toggle("OFF")
 
 
 class Integer(Type):
     """Abstract base class for all integer types; `int` and `np.integer` are
     subclasses"""
+
     pass
 
 
@@ -83,6 +82,7 @@ Integer.register(np.integer)
 class Float(Type):
     """Abstract base class for all float types; `float` and `np.floating` are
     subclasses"""
+
     pass
 
 
@@ -93,6 +93,7 @@ Float.register(np.floating)
 class String(Type):
     """Abstract base class for all string types; `str` and `np.str_` are
     subclasses"""
+
     pass
 
 
@@ -106,6 +107,7 @@ class Array(Type):
     used type that can be indexed; `list`, `tuple`, `numpy.ndarray`,
     `pandas.Series` and `pandas.Dataframe` are subclasses
     """
+
     pass
 
 
@@ -116,11 +118,14 @@ Array.register(pd.Series)
 Array.register(pd.DataFrame)
 
 
-supported = {key: value for key, value in vars().items()
-             if type(value) is abc.ABCMeta and issubclass(value, Type)}
+supported = {
+    key: value
+    for key, value in vars().items()
+    if type(value) is abc.ABCMeta and issubclass(value, Type)
+}
 
 
-def recast(value: Any, to: type = Type) -> [Type, None]:
+def recast(value: Any, to: type = Type) -> Union[Type, None]:
     """
     Convert a value into the appropriate type for the information it contains.
 
@@ -146,7 +151,6 @@ def recast(value: Any, to: type = Type) -> [Type, None]:
     """
 
     if to != Type:
-
         if value is None:
             return None
 
@@ -168,9 +172,7 @@ def recast(value: Any, to: type = Type) -> [Type, None]:
             except ValueError:
                 pass
 
-        print(
-            f'Warning: unable to recast value {value} to type {to}'
-        )
+        print(f"Warning: unable to recast value {value} to type {to}")
 
         return None
 
@@ -185,22 +187,21 @@ def recast(value: Any, to: type = Type) -> [Type, None]:
         elif isinstance(value, Float):
             return np.float64(value)
         elif isinstance(value, String):
-
-            if value.lower() == 'true':
+            if value.lower() == "true":
                 return np.bool_(True)
-            elif value.lower() == 'false':
+            elif value.lower() == "false":
                 return np.bool_(False)
-            elif re.fullmatch('[0-9]+', value):  # integer
+            elif re.fullmatch("[0-9]+", value):  # integer
                 return np.int64(value)
-            elif re.fullmatch('[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?', value):
+            elif re.fullmatch("[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?", value):
                 # float
                 return float(value)
             elif value in (Toggle.on_values + Toggle.off_values):
                 return Toggle(value)
             elif os.path.isfile(value):  # path in the current working directory
                 return os.path.abspath(value)
-            elif os.path.isfile(os.path.join('..', value)):  # ... up one level
-                return os.path.abspath(os.path.join('..', value))
+            elif os.path.isfile(os.path.join("..", value)):  # ... up one level
+                return os.path.abspath(os.path.join("..", value))
             else:
                 return value  # must be an actual string
         if isinstance(value, Array):  # value is an array
@@ -208,9 +209,6 @@ def recast(value: Any, to: type = Type) -> [Type, None]:
             rep_elem = np_array.flatten()[0]  # representative element
             return np_array.astype(type(recast(rep_elem)))
         else:
-
-            print(
-                f'Warning: unable to recast value {value} of type {type(value)}'
-            )
+            print(f"Warning: unable to recast value {value} of type {type(value)}")
 
             return None

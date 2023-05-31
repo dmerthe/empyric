@@ -11,10 +11,24 @@ import functools
 import numpy as np
 import pandas as pd
 
-from empyric.tools import convert_time, autobind_socket, read_from_socket, \
-    write_to_socket, get_ip_address
-from empyric.types import recast, Boolean, Integer, Float, Toggle, OFF, ON, \
-    Array, String
+from empyric.tools import (
+    convert_time,
+    autobind_socket,
+    read_from_socket,
+    write_to_socket,
+    get_ip_address,
+)
+from empyric.types import (
+    recast,
+    Boolean,
+    Integer,
+    Float,
+    Toggle,
+    OFF,
+    ON,
+    Array,
+    String,
+)
 from empyric.types import supported as supported_types
 from empyric.variables import Variable
 
@@ -36,11 +50,9 @@ class Routine:
 
     assert_control = True
 
-    def __init__(self,
-                 knobs: dict,
-                 enable: String = None,
-                 start=0.0, end=np.inf, **kwargs):
-
+    def __init__(
+        self, knobs: dict, enable: String = None, start=0.0, end=np.inf, **kwargs
+    ):
         self.knobs = knobs
 
         for knob in self.knobs.values():
@@ -53,7 +65,7 @@ class Routine:
         self.finished = False
 
         for key, value in kwargs.items():
-            self.__setattr__(key.replace(' ', '_'), value)
+            self.__setattr__(key.replace(" ", "_"), value)
 
     @staticmethod
     def enabler(update):
@@ -72,23 +84,20 @@ class Routine:
 
         @functools.wraps(update)
         def wrapped_update(self, state):
-
             if self.enable is not None and not state[self.enable]:
                 for name, knob in self.knobs.items():
                     if knob._controller == self:
                         knob._controller = None
                 return
 
-            elif state['Time'] < self.start:
-
+            elif state["Time"] < self.start:
                 if not self.prepped:
                     self.prep(state)
                     self.prepped = True
 
                 return
 
-            elif state['Time'] >= self.end:
-
+            elif state["Time"] >= self.end:
                 if not self.finished:
                     self.finish(state)
                     self.finished = True
@@ -101,7 +110,6 @@ class Routine:
                 return
 
             else:
-
                 for name, knob in self.knobs.items():
                     if knob._controller and knob._controller != self:
                         # take no action if another routine has control
@@ -153,11 +161,7 @@ class Set(Routine):
     a 1D array of keys/values of the same length as the `knobs` argument.
     """
 
-    def __init__(self,
-                 knobs: dict,
-                 values,
-                 **kwargs):
-
+    def __init__(self, knobs: dict, values, **kwargs):
         Routine.__init__(self, knobs, **kwargs)
 
         if len(self.knobs) > 1 and np.ndim(values) == 0:
@@ -168,9 +172,7 @@ class Set(Routine):
 
     @Routine.enabler
     def update(self, state):
-
         for knob, value in zip(self.knobs.values(), self.values):
-
             if isinstance(value, str):
                 value = state[value]
 
@@ -186,11 +188,7 @@ class Ramp(Routine):
     1D arrays of keys/values.
     """
 
-    def __init__(self,
-                 knobs: dict,
-                 targets,
-                 rates,
-                 **kwargs):
+    def __init__(self, knobs: dict, targets, rates, **kwargs):
         """
         :param rates: (1D array) list of ramp rates
         """
@@ -211,14 +209,12 @@ class Ramp(Routine):
 
     @Routine.enabler
     def update(self, state):
-
-        self.now = state['Time']
+        self.now = state["Time"]
 
         if self.then is None:
-            self.then = state['Time']
+            self.then = state["Time"]
 
         for knob, rate, target in zip(self.knobs, self.rates, self.targets):
-
             if isinstance(target, String):
                 target = state[target]
 
@@ -227,23 +223,25 @@ class Ramp(Routine):
 
             val_now = self.knobs[knob]._value
 
-            if not isinstance(target, numbers.Number) \
-                    or not isinstance(rate, numbers.Number) \
-                    or not isinstance(val_now, numbers.Number) \
-                    or target == val_now:
+            if (
+                not isinstance(target, numbers.Number)
+                or not isinstance(rate, numbers.Number)
+                or not isinstance(val_now, numbers.Number)
+                or target == val_now
+            ):
                 # Do nothing if knob, rate or target are undefined
                 continue
 
             sign = (target - val_now) / abs(target - val_now)
 
-            val_nxt = val_now + sign*rate*(self.now - self.then)
+            val_nxt = val_now + sign * rate * (self.now - self.then)
 
-            if sign*val_now <= sign*target < sign*val_nxt:
+            if sign * val_now <= sign * target < sign * val_nxt:
                 self.knobs[knob].value = target
             else:
                 self.knobs[knob].value = val_nxt
 
-        self.then = state['Time']
+        self.then = state["Time"]
 
 
 class Timecourse(Routine):
@@ -255,11 +253,7 @@ class Timecourse(Routine):
     the `knobs` argument.
     """
 
-    def __init__(self,
-                 knobs: dict,
-                 times,
-                 values,
-                 **kwargs):
+    def __init__(self, knobs: dict, times, values, **kwargs):
         """
 
         :param times: (1D/2D array) array or list of times relative to
@@ -286,37 +280,33 @@ class Timecourse(Routine):
 
         # Times and/or values can be stored in CSV files
         for i, (t_elem, v_elem) in enumerate(zip(self.times, self.values)):
-
-            if type(t_elem[0]) == str and '.csv' in t_elem[0]:
+            if type(t_elem[0]) == str and ".csv" in t_elem[0]:
                 df = pd.read_csv(t_elem[0])
-                self.times[i] = df['times'].values
+                self.times[i] = df["times"].values
 
-            if type(v_elem[0]) == str and '.csv' in v_elem[0]:
+            if type(v_elem[0]) == str and ".csv" in v_elem[0]:
                 df = pd.read_csv(v_elem[0])
-                self.values[i] = [recast(val) for val in df['values'].values]
+                self.values[i] = [recast(val) for val in df["values"].values]
 
         self.times = np.array(convert_time(self.times)).astype(float)
         self.values = np.array(self.values, dtype=object)
 
         # Infer start and end times from times argument, if not given
-        if 'start' not in kwargs:
+        if "start" not in kwargs:
             self.start = np.min(self.times)
 
-        if 'end' not in kwargs:
+        if "end" not in kwargs:
             self.end = np.max(self.times)
 
     @Routine.enabler
     def update(self, state):
-
         knobs_times_values = zip(self.knobs, self.times, self.values)
         for knob, times, values in knobs_times_values:
-
-            if np.min(times) > state['Time'] \
-                    or np.max(times) < state['Time']:
+            if np.min(times) > state["Time"] or np.max(times) < state["Time"]:
                 continue
 
-            j_last = np.argwhere(times <= state['Time']).flatten()[-1]
-            j_next = np.argwhere(times > state['Time']).flatten()[0]
+            j_last = np.argwhere(times <= state["Time"]).flatten()[-1]
+            j_next = np.argwhere(times > state["Time"]).flatten()[0]
 
             last_time = times[j_last]
             next_time = times[j_next]
@@ -334,8 +324,9 @@ class Timecourse(Routine):
 
             if next_is_number and last_is_number:
                 # ramp linearly between numerical values
-                value = last_value + (next_value - last_value) \
-                        * (state['Time'] - last_time) / (next_time - last_time)
+                value = last_value + (next_value - last_value) * (
+                    state["Time"] - last_time
+                ) / (next_time - last_time)
             else:
                 # stay at last value until next time,
                 # when value variable will be evaluated
@@ -344,7 +335,6 @@ class Timecourse(Routine):
             self.knobs[knob].value = value
 
     def finish(self, state):
-
         # Upon routine completion, set each knob to its final value
         for knob, value in zip(self.knobs.values(), self.values[:, -1]):
             if knob._controller is None or knob._controller == self:
@@ -359,11 +349,7 @@ class Sequence(Routine):
     dimension needs to have the same length as the `knobs` argument.
     """
 
-    def __init__(self,
-                 knobs: dict,
-                 values,
-                 **kwargs):
-
+    def __init__(self, knobs: dict, values, **kwargs):
         Routine.__init__(self, knobs, **kwargs)
 
         if np.ndim(values) == 0:  # single value or file path
@@ -375,9 +361,9 @@ class Sequence(Routine):
 
         # Times and/or values can be stored in CSV files
         for i, v_elem in enumerate(self.values):
-            if type(v_elem[0]) == str and '.csv' in v_elem[0]:
+            if type(v_elem[0]) == str and ".csv" in v_elem[0]:
                 df = pd.read_csv(v_elem[0])
-                self.values[i] = [recast(val) for val in df['values'].values]
+                self.values[i] = [recast(val) for val in df["values"].values]
 
         self.values = np.array(self.values, dtype=object)
 
@@ -385,9 +371,7 @@ class Sequence(Routine):
 
     @Routine.enabler
     def update(self, state):
-
         for knob, values in zip(self.knobs.values(), self.values):
-
             value = values[self.iteration]
 
             if isinstance(value, String):
@@ -398,7 +382,6 @@ class Sequence(Routine):
         self.iteration = (self.iteration + 1) % len(self.values[0])
 
     def finish(self, state):
-
         # Upon routine completion, set each knob to its final value
         for knob, value in zip(self.knobs.values(), self.values[:, -1]):
             if knob._controller is None or knob._controller == self:
@@ -419,14 +402,9 @@ class Minimization(Routine):
     together for each step.
     """
 
-    def __init__(self,
-                 knobs: dict,
-                 meter,
-                 max_deltas=None,
-                 T0=0.0, T1=0.0,
-                 samples=1,
-                 **kwargs):
-
+    def __init__(
+        self, knobs: dict, meter, max_deltas=None, T0=0.0, T1=0.0, samples=1, **kwargs
+    ):
         Routine.__init__(self, knobs, **kwargs)
 
         self.meter = meter
@@ -449,10 +427,10 @@ class Minimization(Routine):
 
     @Routine.enabler
     def update(self, state):
-
         # Take no action if knobs values are undefined
-        if None in [state[knob] for knob in self.knobs] \
-                or np.nan in [state[knob] for knob in self.knobs]:
+        if None in [state[knob] for knob in self.knobs] or np.nan in [
+            state[knob] for knob in self.knobs
+        ]:
             return
 
         if not self.prepped:
@@ -460,8 +438,9 @@ class Minimization(Routine):
             self.prepped = True
 
         # Update temperature
-        self.T = self.T0 + (self.T1 - self.T0) \
-                 * (state['Time'] - self.start) / (self.end - self.start)
+        self.T = self.T0 + (self.T1 - self.T0) * (state["Time"] - self.start) / (
+            self.end - self.start
+        )
 
         # Get meter values
         meter_value = state[self.meter]
@@ -478,15 +457,14 @@ class Minimization(Routine):
 
         # Check if found (or returned to) minimum
         if self.better(np.mean(self.meter_values)) or self.revert:
-
             # Record this new (or past) optimal state
             self.best_meter = np.mean(self.meter_values)
             self.best_knobs = [state[knob] for knob in self.knobs]
 
             # Generate and apply new knob settings
-            new_knobs = self.best_knobs \
-                        + self.max_deltas \
-                        * (2 * np.random.rand(len(self.knobs)) - 1)
+            new_knobs = self.best_knobs + self.max_deltas * (
+                2 * np.random.rand(len(self.knobs)) - 1
+            )
 
             for knob, new_value in zip(self.knobs.values(), new_knobs):
                 knob.value = new_value
@@ -495,7 +473,6 @@ class Minimization(Routine):
             self.revert = False
 
         else:
-
             for knob, best_val in zip(self.knobs.values(), self.best_knobs):
                 knob.value = best_val
 
@@ -503,7 +480,6 @@ class Minimization(Routine):
             self.revert = True
 
     def better(self, meter_value):
-
         if meter_value is None or meter_value == np.nan:
             return False
 
@@ -519,12 +495,10 @@ class Minimization(Routine):
             return change < 0
 
     def prep(self, state):
-
         self.best_knobs = [state[knob] for knob in self.knobs]
         self.best_meter = state[self.meter]
 
     def finish(self, state):
-
         for knob, best_val in zip(self.knobs.values(), self.best_knobs):
             knob.value = best_val
 
@@ -538,7 +512,6 @@ class Maximization(Minimization):
     best_meter = -np.inf
 
     def better(self, meter_value):
-
         if meter_value is None or meter_value == np.nan:
             return False
 
@@ -567,7 +540,6 @@ class SocketServer(Routine):
     assert_control = False
 
     def __init__(self, knobs: dict = None, **kwargs):
-
         if knobs is None:
             knobs = {}
 
@@ -587,20 +559,15 @@ class SocketServer(Routine):
 
         self.state = {}
 
-        self.acc_conn_thread = threading.Thread(
-            target=self.accept_connections
-        )
+        self.acc_conn_thread = threading.Thread(target=self.accept_connections)
 
         self.acc_conn_thread.start()
 
-        self.proc_requ_thread = threading.Thread(
-            target=self.process_requests
-        )
+        self.proc_requ_thread = threading.Thread(target=self.process_requests)
 
         self.proc_requ_thread.start()
 
     def terminate(self):
-
         # Kill client handling threads
         self.running = False
         self.acc_conn_thread.join()
@@ -608,7 +575,6 @@ class SocketServer(Routine):
 
     def accept_connections(self):
         while self.running:
-
             try:
                 (client, address) = self.socket.accept()
 
@@ -618,7 +584,7 @@ class SocketServer(Routine):
 
                 self.clients_queue.put(clients)
 
-                print(f'Client at {address} has connected')
+                print(f"Client at {address} has connected")
 
             except socket.timeout:
                 pass
@@ -635,7 +601,6 @@ class SocketServer(Routine):
         clients = self.clients_queue.get()
 
         for address, client in clients.items():
-
             try:
                 client.shutdown(socket.SHUT_RDWR)
                 client.close()
@@ -647,17 +612,16 @@ class SocketServer(Routine):
 
     def process_requests(self):
         while self.running:
-
             clients = self.clients_queue.get()
 
             # Purge disconnected clients
             clients = {
-                address: client for address, client in clients.items()
+                address: client
+                for address, client in clients.items()
                 if client is not None
             }
 
             for address, client in clients.items():
-
                 outgoing_message = None
 
                 try:
@@ -667,33 +631,26 @@ class SocketServer(Routine):
                     continue
 
                 if client and request:
+                    alias = " ".join(request.split(" ")[:-1])
+                    value = request.split(" ")[-1]
 
-                    alias = ' '.join(request.split(' ')[:-1])
-                    value = request.split(' ')[-1]
+                    if alias not in self.knobs and alias not in self.state:
+                        outgoing_message = f"Error: invalid alias"
 
-                    if alias not in self.knobs \
-                            and alias not in self.state:
-
-                        outgoing_message = f'Error: invalid alias'
-
-                    elif value == 'settable?':
-
-                        settable = (alias in self.knobs) \
-                                   and self.knobs[alias].settable
+                    elif value == "settable?":
+                        settable = (alias in self.knobs) and self.knobs[alias].settable
 
                         if settable:
-                            outgoing_message = f'{alias} settable'
+                            outgoing_message = f"{alias} settable"
                         elif alias in self.state:
-                            outgoing_message = f'{alias} read-only'
+                            outgoing_message = f"{alias} read-only"
                         else:
-                            outgoing_message = f'{alias} undefined'
+                            outgoing_message = f"{alias} undefined"
 
-                    elif value == 'type?':
-
+                    elif value == "type?":
                         if alias in self.knobs:
                             _type = self.knobs[alias].type
                         elif alias in self.state:
-
                             _type = None
                             for supported_type in supported_types.values():
                                 value = self.state[alias]
@@ -703,10 +660,9 @@ class SocketServer(Routine):
                         else:
                             _type = None
 
-                        outgoing_message = f'{alias} {_type}'
+                        outgoing_message = f"{alias} {_type}"
 
-                    elif value == '?':  # Query of value
-
+                    elif value == "?":  # Query of value
                         if alias in self.knobs:
                             _value = self.knobs[alias].value
                         elif alias in self.state:
@@ -714,26 +670,22 @@ class SocketServer(Routine):
                         else:
                             _value = None
 
-                        outgoing_message = f'{alias} {_value}'
+                        outgoing_message = f"{alias} {_value}"
 
                     else:  # Setting a value
-
                         knob_exists = alias in self.knobs
 
-                        is_free = not getattr(
-                            self.knobs[alias], '_controller', None
-                        )
+                        is_free = not getattr(self.knobs[alias], "_controller", None)
 
                         if knob_exists and is_free:
-
                             knob = self.knobs[alias]
 
                             knob.value = recast(value, to=knob.type)
 
-                            outgoing_message = f'{alias} {knob.value}'
+                            outgoing_message = f"{alias} {knob.value}"
 
                         else:
-                            outgoing_message = f'Error: cannot set {alias}'
+                            outgoing_message = f"Error: cannot set {alias}"
 
                 # Send outgoing message
                 if outgoing_message is not None:
@@ -743,7 +695,7 @@ class SocketServer(Routine):
                 exceptional = client in select.select([], [], [client], 0)[2]
 
                 if exceptional:
-                    print(f'Client at {address} has a connection issue')
+                    print(f"Client at {address} has a connection issue")
                     clients[address] = None
 
             self.clients_queue.put(clients)
@@ -785,7 +737,6 @@ class ModbusServer(Routine):
     assert_control = False
 
     def __init__(self, knobs: dict = None, meters=None, **kwargs):
-
         if knobs is None:
             knobs = {}
 
@@ -797,16 +748,16 @@ class ModbusServer(Routine):
 
         # Check for PyModbus installation
         try:
-            importlib.import_module('pymodbus')
+            importlib.import_module("pymodbus")
         except ModuleNotFoundError:
             raise ModuleNotFoundError(
-                'pymodbus must be installed to run a Modbus server'
+                "pymodbus must be installed to run a Modbus server"
             )
 
         # Import tools from pymodbus
-        datastore = importlib.import_module('.datastore', package='pymodbus')
-        device = importlib.import_module('.device', package='pymodbus')
-        payload = importlib.import_module('.payload', package='pymodbus')
+        datastore = importlib.import_module(".datastore", package="pymodbus")
+        device = importlib.import_module(".device", package="pymodbus")
+        payload = importlib.import_module(".payload", package="pymodbus")
 
         self._builder_cls = payload.BinaryPayloadBuilder
         self._decoder_cls = payload.BinaryPayloadDecoder
@@ -819,14 +770,10 @@ class ModbusServer(Routine):
         )
 
         self.slave = datastore.ModbusSlaveContext(
-                ir=DataBlock.create(),
-                hr=DataBlock.create()
-            )
-
-        self.context = datastore.ModbusServerContext(
-            slaves=self.slave,
-            single=True
+            ir=DataBlock.create(), hr=DataBlock.create()
         )
+
+        self.context = datastore.ModbusServerContext(slaves=self.slave, single=True)
 
         self.identity = device.ModbusDeviceIdentification(
             info_name={
@@ -839,8 +786,8 @@ class ModbusServer(Routine):
 
         # Run server
         self.server = None  # assigned in _run_async_server
-        self.ip_address = kwargs.get('address', get_ip_address())
-        self.port = kwargs.get('port', 502)
+        self.ip_address = kwargs.get("address", get_ip_address())
+        self.port = kwargs.get("port", 502)
 
         self.server_thread = threading.Thread(
             target=asyncio.run, args=(self._run_async_server(),)
@@ -867,31 +814,26 @@ class ModbusServer(Routine):
 
                 if fc_as_hex != 16:
                     print(
-                        f'Warning: an attempt was made to write to a readonly '
-                        f'register at address {address}'
+                        f"Warning: an attempt was made to write to a readonly "
+                        f"register at address {address}"
                     )
                 else:
-
                     if self.knobs:
-
                         variable = list(self.knobs.values())[address // 5]
 
-                        controller = getattr(variable, '_controller', None)
+                        controller = getattr(variable, "_controller", None)
 
                         if controller:
-
                             name = list(self.knobs.keys())[address // 5]
 
                             print(
-                                f'Warning: an attempt was made to set {name}, '
-                                'but it is currently controlled by '
-                                f'{controller}.'
+                                f"Warning: an attempt was made to set {name}, "
+                                "but it is currently controlled by "
+                                f"{controller}."
                             )
                             return
 
-                        decoder = self._decoder_cls.fromRegisters(
-                            values, byteorder='>'
-                        )
+                        decoder = self._decoder_cls.fromRegisters(values, byteorder=">")
 
                         if issubclass(variable._type, Boolean):
                             variable.value = decoder.decode_64bit_uint()
@@ -906,22 +848,20 @@ class ModbusServer(Routine):
         return wrapped_method
 
     async def _update_registers(self):
-
         if self.state is None:  # do nothing if state is undefined
             await asyncio.sleep(0.1)
             asyncio.create_task(self._update_registers())
             return
 
         # Store readwrite variable values in holding registers (fc = 3)
-        builder = self._builder_cls(byteorder='>')
+        builder = self._builder_cls(byteorder=">")
 
         for i, (name, variable) in enumerate(self.knobs.items()):
-
             value = variable._value
 
             # encode the value into the 4 registers
             if value is None or variable.type is None:
-                builder.add_64bit_float(float('nan'))
+                builder.add_64bit_float(float("nan"))
             elif issubclass(variable.type, Boolean):
                 builder.add_64bit_uint(value)
             elif issubclass(variable.type, Toggle):
@@ -932,9 +872,9 @@ class ModbusServer(Routine):
                 builder.add_64bit_float(value)
             else:
                 raise ValueError(
-                    f'unable to update modbus server registers from value '
-                    f'{value} of variable {name} with data type '
-                    f'{variable.type}'
+                    f"unable to update modbus server registers from value "
+                    f"{value} of variable {name} with data type "
+                    f"{variable.type}"
                 )
 
             # encode the meta data
@@ -961,7 +901,6 @@ class ModbusServer(Routine):
             selection = self.state
 
         for i, (name, value) in enumerate(selection.items()):
-
             _type = None
             for supported_type in supported_types.values():
                 if isinstance(value, supported_type):
@@ -969,7 +908,7 @@ class ModbusServer(Routine):
 
             # encode the value into the 4 registers
             if value is None or _type is None:
-                builder.add_64bit_float(float('nan'))
+                builder.add_64bit_float(float("nan"))
             elif _type == Boolean:
                 builder.add_64bit_uint(value)
             elif _type == Toggle:
@@ -980,18 +919,13 @@ class ModbusServer(Routine):
                 builder.add_64bit_float(value)
             else:
                 raise ValueError(
-                    f'unable to update modbus server registers from value '
-                    f'{value} of variable {name} with data type '
-                    f'{_type}'
+                    f"unable to update modbus server registers from value "
+                    f"{value} of variable {name} with data type "
+                    f"{_type}"
                 )
 
             # encode the meta data
-            type_int = {
-                Boolean: 0,
-                Toggle: 1,
-                Integer: 2,
-                Float: 3
-            }.get(_type, -1)
+            type_int = {Boolean: 0, Toggle: 1, Integer: 2, Float: 3}.get(_type, -1)
 
             builder.add_16bit_int(type_int)
 
@@ -1003,15 +937,12 @@ class ModbusServer(Routine):
         asyncio.create_task(self._update_registers())
 
     async def _run_async_server(self):
-
         asyncio.create_task(self._update_registers())
 
-        server = importlib.import_module('.server', package='pymodbus')
+        server = importlib.import_module(".server", package="pymodbus")
 
         self.server = server.ModbusTcpServer(
-            self.context,
-            identity=self.identity,
-            address=(self.ip_address, self.port)
+            self.context, identity=self.identity, address=(self.ip_address, self.port)
         )
 
         try:
@@ -1028,5 +959,8 @@ class ModbusServer(Routine):
         asyncio.run(self.server.shutdown())
 
 
-supported = {key: value for key, value in vars().items()
-             if type(value) is type and issubclass(value, Routine)}
+supported = {
+    key: value
+    for key, value in vars().items()
+    if type(value) is type and issubclass(value, Routine)
+}
