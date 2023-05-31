@@ -30,6 +30,9 @@ class SiglentSDG1000(Instrument):
         "channel 2 pulse width",
         "channel 1 pulse delay",
         "channel 2 pulse delay",
+        'channel 1 invert',
+        'channel 2 invert',
+        'equal phase'
     )
 
     wave_forms = ("SINE", "SQUARE", "RAMP", "PULSE", "NOISE", "ARB", "DC", "PRBS", "IQ")
@@ -78,6 +81,10 @@ class SiglentSDG1000(Instrument):
             [f"{key.upper()},{value}" for key, value in kwargs.items()]
         )
 
+        # Changing the waveform parameters can cause the relative phase
+        # of the two channels to shift
+        self.equal_phase = OFF
+
         self.write(parameter_string)
 
     def _get_channel_n_waveform(self, n):
@@ -91,6 +98,22 @@ class SiglentSDG1000(Instrument):
         waveform_dict = {key: value for key, value in zip(keys, values)}
 
         return waveform_dict
+
+    def _set_channel_n_invert(self, n, state: Toggle):
+
+        if state == ON:
+            self.write('C%d:INVT ON' % n)
+        elif state == OFF:
+            self.write('C%d:INVT OFF' % n)
+
+    def _get_channel_n_invert(self, n):
+
+        response = self.query('C%d:INVT?' % n)
+
+        if 'ON' in response:
+            return ON
+        if 'OFF' in response:
+            return OFF
 
     # Output
     @setter
@@ -276,3 +299,27 @@ class SiglentSDG1000(Instrument):
         delay_str = self._get_channel_n_waveform(2).get("DLY", "nan")
 
         return float(delay_str.replace("S", ""))
+
+    # Output inversion
+    @setter
+    def set_channel_1_invert(self, state: Toggle):
+        self._set_channel_n_invert(1, state)
+
+    @getter
+    def get_channel_1_invert(self) -> Toggle:
+        return self._get_channel_n_invert(1)
+
+    @setter
+    def set_channel_2_invert(self, state: Toggle):
+        self._set_channel_n_invert(2, state)
+
+    @getter
+    def get_channel_2_invert(self) -> Toggle:
+        return self._get_channel_n_invert(2)
+
+    # Equalize phase of both channels
+    @setter
+    def set_equal_phase(self, state: Toggle):
+
+        if state == ON:
+            self.write('EQPHASE')
