@@ -3,9 +3,9 @@
 
 For more details, [read the docs](https://empyric.readthedocs.io/en/latest/).
 
-Empyric, at its most basic level, is an easy to use Python interface for communication with and controlling scientific instruments, such as digital multimeters, digital oscilloscopes, and power supplies. On top of that is a general purpose experiment-building architecture, which allows the user to combine process control, measurements and data plotting in a highly customizable fashion, using a straightforward "runcard" formalism, which additionally serves the purpose of experiment documentation.
+Empyric, at its most basic level, is an easy-to-use Python interface for communication with and controlling laboratory instruments, such as digital multimeters, oscilloscopes, and power supplies. On top of that is a general purpose experiment-building architecture, which allows the user to combine process control, measurements and data plotting in a highly customizable fashion, using a straightforward "runcard" formalism, which additionally serves the purpose of experiment documentation.
 
-The preferred method of installing Empyric is via pip:
+Empyric can be installed with pip:
 ```commandline
 pip install empyric
 ```
@@ -19,8 +19,8 @@ from empyric.instruments import Keithley2400
 
 keithley2400 = Keithley2400(1)  # if GPIB address is 1
 
-kiethley2400.set('voltage', 10)
-current = keithley2400.measure('current')
+kiethley2400.set_voltage(10)  # sets output voltage to 10 volts
+current = keithley2400.measure_current()  # measures current in amperes
 ```
 
 Communication with instruments is facilitated through Empyric's library of *adapters*. If you have an instrument that is not in the Empyric library but which uses one of the more common communication protocols (Serial, GPIB, USBTMC, Modbus, etc.), you can still make use of Empyric's adapters, which automatically manage many of the underlying details of the communication backends:
@@ -34,22 +34,22 @@ class MyInstrument(Instrument):
 	Basic template of an instrument object in Empyric
 	"""
 
-	name = 'My Instrument'
+	name = 'MyInstrument'
 	
 	supported_adapters = ((Modbus, {'baud_rate':115200}),)
 	
-	knobs = ('knob',)
-	meters = ('meter',)
+	knobs = ('some knob',)
+	meters = ('some meter',)
 	
-	def set_knob(self, value):
-		# ... set your knob
+	def set_some_knob(self, value):
+		# set your knob
 	
-	def measure_meter(self):
-		# ... measure your meter
+	def measure_some_meter(self):
+		# measure your meter
 	
 instrument = MyInstrument('COM5::1')  # connect to your instrument
 
-meter_value = instrument.measure_meter()  # take a measurement
+some_meter_value = instrument.measure_some_meter()  # take a measurement
 
 ```
 
@@ -57,9 +57,9 @@ meter_value = instrument.measure_meter()  # take a measurement
 
 The real purpose of Empyric is to simplify and standardize construction of an experiment, and automate its execution. The two main elements of an experiment are its *variables* which are controlled and/or measured by your instruments, and *routines* which are the various processes that you run on your controllable variables.
 
-*Variables* come in four flavors: knobs, meters, expressions and parameters. A knob is a variable that you can directly control through an instrument, such as voltage from a power supply. A meter is a variable that you directly measure through an instrument, such as temperature from a thermocouple. In some cases, a meter can be controlled indirectly through a feedback loop. For example, PID temperature controllers provide a temperature knob (the setpoint) as well as a temperature meter (the actual temperature measured with a thermocouple or RTD). An expression is a variable that is evaluated in terms of other experiment variables, such as the power delivered by a power supply being the product of the voltage knob value and the current meter value. A parameter is a user-defined value that is relevant to the experiment, such as a unit conversion factor, a variable setpoint (e.g. used in a routine) or a quantity that must be manually logged.
+*Variables* come in five flavors: knobs, meters, expressions, parameters and remotes. A knob is a variable that you can directly control through an instrument, such as voltage from a power supply. A meter is a variable that you directly measure through an instrument, such as temperature from a thermocouple. In some cases, a meter can be controlled indirectly through a feedback loop. For example, PID temperature controllers provide a temperature knob (the setpoint) as well as a temperature meter (the actual temperature measured with a thermocouple or RTD). An expression is a variable that is evaluated in terms of other experiment variables, such as the power delivered by a power supply being the product of the voltage knob value and the current meter value. A parameter is a user-defined value that is relevant to the experiment, such as a unit conversion factor, a variable setpoint (e.g. used in a routine) or a quantity that must be manually logged. A remote variable is a variable defined in another experiment with a server routine running, that can be read or controlled remotely. A variable's value can be read and set through its `value` property.
 
-Here is an example showing how to define and use experiment variables in Empyric:
+Here is an example showing how to define and use variables in Empyric:
 ```
 from empyric.variables import Knob, Meter, Parameter, Expression
 from empyric.instruments import Keithley2400
@@ -76,9 +76,8 @@ voltage.value = 10 # sets the voltage of the Keithley 2400 to 10 V
 # Obtain 10 measurements of current, voltage and power sourced by a Keithley 2400
 measurements = [[current.value, voltage.value, power.value] for i in range(10)]
 ```
-Assigning a value to the `value` property of a knob-type variable commands the corresponding instrument to set the associated knob accordingly, and the value is stored in the corresponding attribute of the instrument (`[instrument].[knob]`). Calling the `value` property of a meter-type variable commands the corresponding instrument to record a measurement of the associated meter, and then return the value as well as store it as an attribute of the instrument  (`[instrument].measured_[meter]`). Calling the `value` property of an expression-type variable retrieves the values of the variables that define it from the stored attributes of the corresponding knobs, meters and other expressions; it does not trigger any new measurements. Therefore, for repeated calls, be sure to trigger measurements or retrievals of the values of any defining variables prior to each evaluation of the expression.
 
-*Routines* allow one to define the trajectory that an experiment takes through parameter space over the duration of the experiment. Every routine has a start and end, assigned variables and assigned values. Routines update their associated variables based on a given state, containing the current time (in seconds) and values of all variables. The most basic routine is the `Hold` routine:
+*Routines* allow one to define the trajectory that an experiment takes through parameter space over the duration of the experiment. Every routine has a set of knobs that it updates based on a given state, containing the current time (in seconds) and values of all relevant variables. The most basic routine is the `Set` routine:
 ```
 import time
 
@@ -106,4 +105,4 @@ while state['Time'] <= 60:
 	print(state)  # prints "{'Time': ..., 'Knob 1': 10, 'Knob 2': 20}"
 ```
 
-An *Experiment* monitors a set of variables as a set of routines takes action on them. In Empyric, the `Experiment` object is an iterable that updates routines and records data on each iteration. It also has `start`, `hold` and `stop` methods which initiate/resume the experiment, holds routines while continuing to measure meters, and stops all routines and measurements, respectively. The `terminate` method saves the collected data to a file in the working directory and raises the `StopIteration` exception. An experiment will terminate automatically when all routines are finished. See henon_python_eaxmple.py in the 'examples/Henon Map Experiment' directory to see how a basic experiment is set up as a python script. This particular example uses a virtual instrument (`HenonMapper`), so the only requirement to run it is having Python installed along with the usual scientific packages (numpy, scipy, pandas and matplotlib).
+An *Experiment* monitors a set of variables as a set of routines takes action on them. In Empyric, the `Experiment` object is an iterable that updates routines and records data on each iteration, which has a defined state. It also has `start`, `hold` and `stop` methods which initiate/resume the experiment, holds routines while continuing to measure meters, and stops all routines and measurements, respectively. The `terminate` method saves the collected data to a file in the working directory and raises the `StopIteration` exception. An experiment will terminate automatically when all routines are finished. See henon_python_eaxmple.py in the 'examples/Henon Map Experiment' directory to see how a basic experiment is set up as a python script. This particular example uses a virtual instrument (`HenonMapper`), so the only requirement to run it is having Python installed along with the usual scientific packages (numpy, scipy, pandas and matplotlib).
