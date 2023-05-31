@@ -797,7 +797,9 @@ def convert_runcard(runcard):
                 if var_name in condition:
                     temp_name = "".join(
                         [
-                            alphabet[np.random.randint(0, len(alphabet))] # pylint: disable=invalid-sequence-index
+                            alphabet[
+                                np.random.randint(0, len(alphabet))
+                            ]  # pylint: disable=invalid-sequence-index
                             for i in range(3)
                         ]
                     )
@@ -805,7 +807,9 @@ def convert_runcard(runcard):
                         # make sure temp_name is not repeated
                         temp_name = "".join(
                             [
-                                alphabet[np.random.randint(0, len(alphabet))] # pylint: disable=invalid-sequence-index
+                                alphabet[
+                                    np.random.randint(0, len(alphabet))
+                                ]  # pylint: disable=invalid-sequence-index
                                 for i in range(3)
                             ]
                         )

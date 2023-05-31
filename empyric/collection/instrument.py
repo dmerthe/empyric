@@ -78,7 +78,7 @@ def getter(method):
             value = recast(method(*args, **kwargs), to=dtype)
         except AttributeError as err:
             # catches most errors caused by the adapter returning None
-            if 'NoneType' in str(err):
+            if "NoneType" in str(err):
                 value = None
             else:
                 raise AttributeError(err)
@@ -117,7 +117,7 @@ def measurer(method):
             value = recast(method(*args, **kwargs), to=dtype)
         except AttributeError as err:
             # catches most errors caused by the adapter returning None
-            if 'NoneType' in str(err):
+            if "NoneType" in str(err):
                 value = None
             else:
                 raise AttributeError(err)
