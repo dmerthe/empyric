@@ -333,7 +333,7 @@ class Remote(Variable):
     def __init__(
         self,
         server: str,
-        alias: Union[int, str],
+        alias: [int, str],
         protocol: str = None,
         settable: bool = False,  # needed for modbus protocol
     ):

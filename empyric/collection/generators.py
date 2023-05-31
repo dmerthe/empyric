@@ -3,7 +3,6 @@
 from empyric.adapters import Socket
 from empyric.instruments import Instrument, setter, getter, measurer
 from empyric.types import ON, OFF, Toggle, Integer, String, Float, recast
-from typing import Union
 
 
 class SiglentSDG1000(Instrument):
@@ -174,7 +173,7 @@ class SiglentSDG1000(Instrument):
 
     # Waveform high level
     @setter
-    def set_channel_1_high_level(self, high_level: Union[Float, String]):
+    def set_channel_1_high_level(self, high_level: [Float, String]):
         self._set_channel_n_waveform(1, hlev=f"{high_level}")
 
     @getter
@@ -184,7 +183,7 @@ class SiglentSDG1000(Instrument):
         return float(high_level_str.replace("V", ""))
 
     @setter
-    def set_channel_2_high_level(self, high_level: Union[Float, String]):
+    def set_channel_2_high_level(self, high_level: [Float, String]):
         self._set_channel_n_waveform(2, hlev=f"{high_level}")
 
     @getter
@@ -195,7 +194,7 @@ class SiglentSDG1000(Instrument):
 
     # Waveform low level
     @setter
-    def set_channel_1_low_level(self, low_level: Union[Float, String]):
+    def set_channel_1_low_level(self, low_level: [Float, String]):
         self._set_channel_n_waveform(1, llev=f"{low_level}")
 
     @getter
@@ -205,7 +204,7 @@ class SiglentSDG1000(Instrument):
         return float(low_level_str.replace("V", ""))
 
     @setter
-    def set_channel_2_low_level(self, low_level: Union[Float, String]):
+    def set_channel_2_low_level(self, low_level: [Float, String]):
         self._set_channel_n_waveform(2, llev=f"{low_level}")
 
     @getter
@@ -216,7 +215,7 @@ class SiglentSDG1000(Instrument):
 
     # Waveform frequency
     @setter
-    def set_channel_1_frequency(self, frequency: Union[Float, String]):
+    def set_channel_1_frequency(self, frequency: [Float, String]):
         self._set_channel_n_waveform(1, frq=f"{frequency}")
 
     @getter
@@ -226,7 +225,7 @@ class SiglentSDG1000(Instrument):
         return float(freq_str.replace("HZ", ""))
 
     @setter
-    def set_channel_2_frequency(self, frequency: Union[Float, String]):
+    def set_channel_2_frequency(self, frequency: [Float, String]):
         self._set_channel_n_waveform(2, frq=f"{frequency}")
 
     @getter
@@ -237,7 +236,7 @@ class SiglentSDG1000(Instrument):
 
     # Pulse width
     @setter
-    def set_channel_1_pulse_width(self, width: Union[Float, String]):
+    def set_channel_1_pulse_width(self, width: [Float, String]):
         self._set_channel_n_waveform(1, width=f"{width}")
 
     @getter
@@ -247,7 +246,7 @@ class SiglentSDG1000(Instrument):
         return float(width_str.replace("S", ""))
 
     @setter
-    def set_channel_2_pulse_width(self, width: Union[Float, String]):
+    def set_channel_2_pulse_width(self, width: [Float, String]):
         self._set_channel_n_waveform(2, width=f"{width}")
 
     @getter
@@ -258,7 +257,7 @@ class SiglentSDG1000(Instrument):
 
     # Pulse delay
     @setter
-    def set_channel_1_pulse_delay(self, delay: Union[Float, String]):
+    def set_channel_1_pulse_delay(self, delay: [Float, String]):
         self._set_channel_n_waveform(1, dly=f"{delay}")
 
     @getter
@@ -268,7 +267,7 @@ class SiglentSDG1000(Instrument):
         return float(delay_str.replace("S", ""))
 
     @setter
-    def set_channel_2_pulse_delay(self, delay: Union[Float, String]):
+    def set_channel_2_pulse_delay(self, delay: [Float, String]):
         self._set_channel_n_waveform(2, dly=f"{delay}")
 
     @getter
