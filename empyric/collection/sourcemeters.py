@@ -1,6 +1,7 @@
 import os
 import datetime
 import re
+from typing import Union
 
 import numpy as np
 import pandas as pd
@@ -338,7 +339,7 @@ class Keithley2400(Instrument):
         return self.adapter.delay
 
     @setter
-    def set_fast_voltages(self, voltages: [Array, String]):
+    def set_fast_voltages(self, voltages: Union[Array, String]):
         # import fast voltages, if specified as a path
         if type(voltages) == str:
             is_csv = ".csv" in voltages.lower()
