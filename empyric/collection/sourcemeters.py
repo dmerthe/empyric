@@ -373,7 +373,11 @@ class Keithley2400(Instrument):
 
     @measurer
     def measure_fast_currents(self) -> Array:
+
         self._busy = True
+
+        normal_timeout = self.adapter.timeout
+        self.adapter.timeout = 60  # measurements can take a while
 
         list_length = len(self.fast_voltages)
 
@@ -405,7 +409,7 @@ class Keithley2400(Instrument):
             self.write(":SOUR:LIST:VOLT " + voltage_str)
             self.write(":TRIG:COUN %d" % len(voltage_list))
 
-            raw_response = self.query(":READ?", timeout=60)
+            raw_response = self.query(":READ?")
 
             if raw_response is not None:
                 raw_response = raw_response.strip()
@@ -421,6 +425,8 @@ class Keithley2400(Instrument):
 
         self.write(":SOUR:VOLT:MODE FIX")
         self.write(":TRIG:COUN 1")
+
+        self.adapter.timeout = normal_timeout
 
         self._busy = False
 
