@@ -16,6 +16,7 @@ def setter(method):
     attribute.
 
     :param method: (callable) method to be wrapped
+
     :return: wrapped method
     """
 
@@ -35,6 +36,9 @@ def setter(method):
         self = args[0]
         value = args[1]
 
+        while self._busy:
+            time.sleep(0.01)
+
         returned_value = method(*args, **kwargs)
 
         # The knob attribute is set to the returned value of the method, or
@@ -43,6 +47,8 @@ def setter(method):
             self.__setattr__(knob, recast(returned_value, to=dtype))
         else:
             self.__setattr__(knob, recast(value, to=dtype))
+
+        self._busy = False
 
     return wrapped_method
 
@@ -53,6 +59,7 @@ def getter(method):
     retrieved knob values.
 
     :param method: (callable) method to be wrapped
+
     :return: wrapped method
     """
 
@@ -63,8 +70,22 @@ def getter(method):
     @wraps(method)
     def wrapped_method(*args, **kwargs):
         self = args[0]
-        value = recast(method(*args, **kwargs), to=dtype)
+
+        while self._busy:
+            time.sleep(0.01)
+
+        try:
+            value = recast(method(*args, **kwargs), to=dtype)
+        except AttributeError as err:
+            # catches most errors caused by the adapter returning None
+            if 'NoneType' in str(err):
+                value = None
+            else:
+                raise AttributeError(err)
+
         self.__setattr__(knob, value)
+
+        self._busy = False
 
         return value
 
@@ -77,6 +98,7 @@ def measurer(method):
     measured value.
 
     :param method: (callable) method to be wrapped
+
     :return: wrapped method
     """
 
@@ -87,8 +109,22 @@ def measurer(method):
     @wraps(method)
     def wrapped_method(*args, **kwargs):
         self = args[0]
-        value = recast(method(*args, **kwargs), to=dtype)
+
+        while self._busy:
+            time.sleep(0.01)
+
+        try:
+            value = recast(method(*args, **kwargs), to=dtype)
+        except AttributeError as err:
+            # catches most errors caused by the adapter returning None
+            if 'NoneType' in str(err):
+                value = None
+            else:
+                raise AttributeError(err)
+
         self.__setattr__(meter, value)
+
+        self._busy = False
 
         return value
 
@@ -130,6 +166,11 @@ class Instrument:
     postsets = {}
 
     meters = tuple()
+
+    # Flag for blocking concurrent operations; useful for set, get or measure
+    # methods that involve multiple adapter operations that might overlap in
+    # time with those of other set, get or measure calls.
+    _busy = False
 
     def __init__(
         self, address=None, adapter=None, presets=None, postsets=None, **kwargs

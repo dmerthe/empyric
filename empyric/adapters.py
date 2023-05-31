@@ -18,10 +18,11 @@ def chaperone(method):
     """
 
     def wrapped_method(self, *args, validator=None, **kwargs):
+
         if not self.connected:
             raise AdapterError(
-                "Adapter is not connected for instrument "
-                f"at address {self.instrument.address}"
+                'Adapter is not connected for instrument '
+                f'at address {self.instrument.address}'
             )
 
         while self.busy:  # wait for turn to talk to the instrument
@@ -36,34 +37,38 @@ def chaperone(method):
 
         while reconnects <= self.max_reconnects:
             while attempts < self.max_attempts:
+
                 try:
+
                     response = method(self, *args, **kwargs)
 
                     if validator and not validator(response):
-                        if hasattr(response, "__len__") and len(response) > 100:
-                            response = str(response[:50]) + "..." + str(response[-50:])
+
+                        if hasattr(response, '__len__') and len(response) > 100:
+                            response = str(response[:50]) \
+                                       + '...' + str(response[-50:])
 
                         raise ValueError(
-                            f"invalid response, {response}, "
-                            f"from {method.__name__} method"
+                            f'invalid response, {response}, '
+                            f'from {method.__name__} method'
                         )
 
                     elif attempts > 0 or reconnects > 0:
-                        print("Resolved")
+                        print('Resolved')
 
                     self.busy = False
                     return response
 
                 except BaseException as err:
                     print(
-                        f"Encountered {err} while trying "
-                        f"to talk to {self.instrument.name}"
-                        "\nRetrying..."
+                        f'Encountered {err} while trying '
+                        f'to talk to {self.instrument.name}'
+                        '\nRetrying...'
                     )
                     attempts += 1
 
             # repeats have maxed out, so try reconnecting with the instrument
-            print("Reconnecting...")
+            print('Reconnecting...')
             self.disconnect()
             time.sleep(self.delay)
             self.connect()
@@ -74,7 +79,9 @@ def chaperone(method):
         # Getting here means that both repeats
         # and reconnects have been maxed out
         self.busy = False
-        raise AdapterError(f"Unable to communicate with {self.instrument.name}!")
+        raise AdapterError(
+            f'Unable to communicate with {self.instrument.name}!'
+        )
 
     wrapped_method.__doc__ = method.__doc__  # keep method doc string
 
@@ -101,15 +108,17 @@ class Adapter:
     kwargs = []
 
     # Library used by adapter; overwritten in children classes.
-    lib = "python"
+    lib = 'python'
 
     # If upon instantiation no valid library is found for adapter, raise
     # AdapterError with the following message; overwritten in children classes.
-    no_lib_msg = "no valid library found for adapter; " "check library installation"
+    no_lib_msg = 'no valid library found for adapter; ' \
+                 'check library installation'
 
     delay = 0.1  # delay between successive communication attempts
 
     def __init__(self, instrument, **kwargs):
+
         if self.lib is None:
             # determined by class attribute `lib`
             raise AdapterError(self.no_lib_msg)
@@ -136,13 +145,13 @@ class Adapter:
             try:
                 self.disconnect()
             except BaseException as err:
-                print(f"Error while disconnecting {self.instrument.name}:", err)
+                print(f'Error while disconnecting {self.instrument.name}:', err)
                 pass
 
     # All methods below should be overwritten in child class definitions
 
     def __repr__(self):
-        return "Adapter"
+        return 'Adapter'
 
     def connect(self):
         """
@@ -164,10 +173,11 @@ class Adapter:
         :return: (str) literal 'Success' if write operation is successful
         """
 
-        if hasattr(self, "_write"):
+        if hasattr(self, '_write'):
             return self._write(*args, **kwargs)
         else:
-            raise AttributeError(self.__name__ + " adapter has no _write method")
+            raise AttributeError(
+                self.__name__ + " adapter has no _write method")
 
     @chaperone
     def read(self, *args, validator=None, **kwargs):
@@ -182,7 +192,7 @@ class Adapter:
         :return: instrument response
         """
 
-        if hasattr(self, "_read"):
+        if hasattr(self, '_read'):
             return self._read(*args, **kwargs)
         else:
             raise AttributeError(self.__name__ + " adapter has no _read method")
@@ -200,10 +210,12 @@ class Adapter:
         :return: instrument response
         """
 
-        if hasattr(self, "_query"):
+        if hasattr(self, '_query'):
             return self._query(*args, **kwargs)
         else:
-            raise AttributeError(self.__name__ + " adapter has no _query method")
+            raise AttributeError(
+                self.__name__ + " adapter has no _query method"
+            )
 
     def disconnect(self):
         """
@@ -221,36 +233,32 @@ class Serial(Adapter):
     baud_rate = 9600
     timeout = 0.1
     delay = 0.1
-    parity = "N"
+    parity = 'N'
     stop_bits = 1
-    read_termination = "\n"
-    write_termination = "\r"
+    read_termination = '\n'
+    write_termination = '\r'
 
     kwargs = [
-        "baud_rate",
-        "timeout",
-        "delay",
-        "byte_size",
-        "parity",
-        "stop_bits",
+        'baud_rate', 'timeout', 'delay', 'byte_size', 'parity', 'stop_bits',
     ]
 
     # Get serial library
-    if importlib.util.find_spec("pyvisa"):
-        lib = "pyvisa"
-    elif importlib.util.find_spec("serial"):
-        lib = "pyserial"
+    if importlib.util.find_spec('pyvisa'):
+        lib = 'pyvisa'
+    elif importlib.util.find_spec('serial'):
+        lib = 'pyserial'
     else:
         lib = None
 
-    no_lib_msg = (
-        "No serial library was found! " "Please install either PySerial or PyVISA."
-    )
+    no_lib_msg = 'No serial library was found! ' \
+                 'Please install either PySerial or PyVISA.'
 
     def connect(self):
+
         # First try connecting with PyVISA
-        if self.lib == "pyvisa":
-            pyvisa = importlib.import_module("pyvisa")
+        if self.lib == 'pyvisa':
+
+            pyvisa = importlib.import_module('pyvisa')
 
             self.backend = pyvisa.open_resource(
                 self.instrument.address,
@@ -259,55 +267,60 @@ class Serial(Adapter):
                 parity=self.parity,
                 timeout=self.timeout,
                 write_termination=self.write_termination,
-                read_terimation=self.read_termination,
+                read_terimation=self.read_termination
             )
 
         # Then try connecting with PySerial
-        elif self.lib == "pyserial":
-            serial = importlib.import_module("serial")
+        elif self.lib == 'pyserial':
+
+            serial = importlib.import_module('serial')
 
             self.backend = serial.Serial(
                 port=self.instrument.address,
                 baudrate=self.baud_rate,
                 stopbits=self.stop_bits,
                 parity=self.parity,
-                timeout=self.timeout,
+                timeout=self.timeout
             )
 
         else:
-            raise AdapterError(f"invalid library specification, {self.lib}")
+            raise AdapterError(f'invalid library specification, {self.lib}')
 
         self.connected = True
 
     def _write(self, message):
-        if self.lib == "pyvisa":
+
+        if self.lib == 'pyvisa':
             self.backend.write(message)
-        elif self.lib == "pyserial":
+        elif self.lib == 'pyserial':
             self.backend.write((message + self.write_termination).encode())
 
         return "Success"
 
     def _read(self, bytes=None, until=None, decode=True):
-        if self.lib == "pyvisa":
+
+        if self.lib == 'pyvisa':
             if bytes:
                 response = self.backend.read_bytes(bytes)
             elif until:
-                response = b""
+                response = b''
                 while until.encode() not in response:
                     response = response + self.backend.read_raw(1)
             else:
                 return self.backend.read(decode=False)  # decoded below
 
-        elif self.lib == "pyserial":
+        elif self.lib == 'pyserial':
             if bytes:
                 response = self.backend.read(bytes)
             elif until:
                 response = self.backend.read_until(until)
             else:
-                response = self.backend.read_until(self.read_termination.encode())
+                response = self.backend.read_until(
+                    self.read_termination.encode()
+                )
 
         else:
-            response = b""
+            response = b''
 
         if decode:
             response = response.decode().strip()
@@ -315,15 +328,17 @@ class Serial(Adapter):
         return response
 
     def _query(self, question, bytes=None, until=None, decode=True):
+
         self._write(question)
         time.sleep(self.delay)
         return self._read(bytes=bytes, until=until, decode=decode)
 
     def disconnect(self):
-        if self.lib == "pyvisa":
+
+        if self.lib == 'pyvisa':
             self.backend.clear()
 
-        elif self.lib == "pyserial":
+        elif self.lib == 'pyserial':
             self.backend.reset_input_buffer()
             self.backend.reset_output_buffer()
 
@@ -332,10 +347,10 @@ class Serial(Adapter):
         self.connected = False
 
     def __repr__(self):
-        return "Serial"
+        return 'Serial'
 
     @classmethod
-    def list(cls, verbose=True):
+    def list(cls):
         """
         List all connected serial devices
 
@@ -345,24 +360,20 @@ class Serial(Adapter):
         :return: (list of str) List of connected serial devices
         """
 
-        if cls.lib == "pyvisa":
-            pyvisa = importlib.import_module("serial")
+        if cls.lib == 'pyvisa':
+
+            pyvisa = importlib.import_module('pyvisa')
             resource_manager = pyvisa.ResourceManager()
 
             devices = resource_manager.list_resources()
 
-            if verbose:
-                print("Connected serial devices (via PyVISA)")
-                print("\n".join(devices))
+        elif cls.lib == 'pyserial':
 
-        elif cls.lib == "pyserial":
-            list_ports = importlib.import_module("serial.tools.list_ports").comports
+            list_ports = importlib.import_module(
+                'serial.tools.list_ports'
+            ).comports
 
             devices = [port.device for port in list_ports()]
-
-            if verbose:
-                print("Connected serial devices (via PySerial)")
-                print("\n".join(devices))
 
         else:
             raise AdapterError(cls.no_lib_msg)
@@ -378,25 +389,26 @@ class Serial(Adapter):
         :return: None (address is printed to console)
         """
 
-        input("Press enter when the instrument is disconnected")
+        input('Press enter when the instrument is disconnected')
 
         other_devices = Serial.list(verbose=False)
 
-        input("Press enter when the instrument is connected")
+        input('Press enter when the instrument is connected')
 
         all_devices = Serial.list(verbose=False)
 
         try:
+
             instrument_address = [
                 device for device in all_devices if device not in other_devices
             ][0]
 
-            print(f"Address: {instrument_address}\n")
+            print(f'Address: {instrument_address}\n')
 
         except IndexError:
-            print("Instrument not found!\n")
+            print('Instrument not found!\n')
 
-        again = "y" in input("Try again? [y/n]").lower()
+        again = 'y' in input('Try again? [y/n]').lower()
         if again:
             Serial.locate()
 
@@ -428,10 +440,10 @@ class GPIB(Adapter):
         14: 30,
         15: 100,
         16: 300,
-        17: 1000,
+        17: 1000
     }
 
-    kwargs = ["prologix_address"]
+    kwargs = ['prologix_address']
 
     prologix_address = None
     prologix_controllers = {}
@@ -440,20 +452,18 @@ class GPIB(Adapter):
     _timeout = None
 
     # Get GPIB library
-    if importlib.util.find_spec("pyvisa"):
-        lib = "pyvisa"
-    elif importlib.util.find_spec("gpib_ctypes"):
-        lib = "linux-gpib"
+    if importlib.util.find_spec('pyvisa'):
+        lib = 'pyvisa'
+    elif importlib.util.find_spec('gpib_ctypes'):
+        lib = 'linux-gpib'
     else:
-        if importlib.util.find_spec("serial"):
-            lib = "prologix-gpib"
+        if importlib.util.find_spec('serial'):
+            lib = 'prologix-gpib'
 
-    no_lib_msg = (
-        "No valid library found for GPIB adapters!"
-        "Please install PyVISA (with GPIB drivers), Linux-GPIB, or"
-        "use a Prologix GPIB-USB or GPIB-ETHERNET adapter "
-        "(requires PySerial)"
-    )
+    no_lib_msg = 'No valid library found for GPIB adapters!' \
+                 'Please install PyVISA (with GPIB drivers), Linux-GPIB, or' \
+                 'use a Prologix GPIB-USB or GPIB-ETHERNET adapter ' \
+                 '(requires PySerial)'
 
     def __init__(self, instrument, **kwargs):
         super().__init__(instrument, **kwargs)
@@ -465,38 +475,45 @@ class GPIB(Adapter):
 
     @timeout.setter
     def timeout(self, timeout):
+
         if self.connected:
-            if self.lib == "pyvisa" or self.lib == "prologix-gpib":
+            if self.lib == 'pyvisa' or self.lib == 'prologix-gpib':
                 # pyvisa records timeouts in milliseconds
                 if timeout is None:
                     self.backend.timeout = None
                 else:
                     self.backend.timeout = timeout * 1000
                 self._timeout = timeout
-            elif self.lib == "linux-gpib":
+            elif self.lib == 'linux-gpib':
                 self._timeout = self._linux_gpib_set_timeout(timeout)
-            elif self.lib == "prologix-gpib":
+            elif self.lib == 'prologix-gpib':
                 self.backend.timeout = timeout
                 self._timeout = timeout
         else:
             self._timeout = None
 
     def connect(self):
-        if self.prologix_address is not None:
-            self.lib = "prologix-gpib"
 
-        if self.lib == "pyvisa":
-            visa = importlib.import_module("pyvisa")
+        if self.prologix_address is not None:
+            self.lib = 'prologix-gpib'
+
+        if self.lib == 'pyvisa':
+
+            visa = importlib.import_module('pyvisa')
 
             manager = visa.ResourceManager()
 
             full_address = None
             for address in manager.list_resources():
+
                 instrument_address = str(self.instrument.address)
 
-                address_format = "GPIB[0-9]::" + instrument_address + "::INSTR"
+                address_format = 'GPIB[0-9]::' + instrument_address + '::INSTR'
 
-                address_match = re.match(address_format, address)
+                address_match = re.match(
+                    address_format,
+                    address
+                )
 
                 if address_match:
                     full_address = address
@@ -505,27 +522,31 @@ class GPIB(Adapter):
                 self.backend = manager.open_resource(full_address)
             else:
                 AdapterError(
-                    "GPIB device at address " f"{self.instrument.address} not found!"
+                    'GPIB device at address '
+                    f'{self.instrument.address} not found!'
                 )
 
-        elif self.lib == "linux-gpib":
-            self.backend = importlib.import_module("gpib")
+        elif self.lib == 'linux-gpib':
+            self.backend = importlib.import_module('gpib')
 
-            self._descr = self.backend.dev(0, self.instrument.address, 0, 9, 1, 0)
+            self._descr = self.backend.dev(
+                0, self.instrument.address, 0, 9, 1, 0
+            )
 
-        elif self.lib == "prologix-gpib":
+        elif self.lib == 'prologix-gpib':
+
             if self.prologix_address is None:
                 raise AdapterError(
-                    "trying to connect to Prologix GPIB adapter but no address "
-                    "was provided (prologix_address argument was not set); "
-                    "must be either an IP address (for Prologix GPIB-LAN) or "
-                    "serial port (for Prologix GPIB-USB)"
+                    'trying to connect to Prologix GPIB adapter but no address '
+                    'was provided (prologix_address argument was not set); '
+                    'must be either an IP address (for Prologix GPIB-LAN) or '
+                    'serial port (for Prologix GPIB-USB)'
                 )
 
             if self.prologix_address in GPIB.prologix_controllers:
                 self.backend = GPIB.prologix_controllers[self.prologix_address]
             else:
-                if re.match("\d+\.\d+\.\d+\.\d+", self.prologix_address):
+                if re.match('\d+\.\d+\.\d+\.\d+', self.prologix_address):
                     self.backend = PrologixGPIBLAN(self.prologix_address)
                 else:
                     self.backend = PrologixGPIBUSB(self.prologix_address)
@@ -545,21 +566,23 @@ class GPIB(Adapter):
         self.connected = True
 
     def _write(self, message):
-        if self.lib == "pyvisa":
+
+        if self.lib == 'pyvisa':
             self.backend.write(message)
-        elif self.lib == "linux-gpib":
+        elif self.lib == 'linux-gpib':
             self.backend.write(self._descr, message)
-        elif self.lib == "prologix-gpib":
+        elif self.lib == 'prologix-gpib':
             self.backend.write(message, address=self.instrument.address)
 
         return "Success"
 
     def _read(self, bytes=1024):
-        if self.lib == "pyvisa":
+
+        if self.lib == 'pyvisa':
             return self.backend.read()
-        elif self.lib == "linux-gpib":
+        elif self.lib == 'linux-gpib':
             return self.backend.read(self._descr, bytes).decode()
-        elif self.lib == "prologix-gpib":
+        elif self.lib == 'prologix-gpib':
             return self.backend.read(address=self.instrument.address)
 
     def _query(self, question):
@@ -568,6 +591,7 @@ class GPIB(Adapter):
         return self._read()
 
     def _linux_gpib_set_timeout(self, timeout):
+
         if timeout is None:
             self.backend.timeout(self.descr, 0)
             return None
@@ -580,20 +604,21 @@ class GPIB(Adapter):
             return allowed_timeout
 
     def disconnect(self):
-        if self.lib == "pyvisa":
+
+        if self.lib == 'pyvisa':
             self.backend.clear()
             self.backend.close()
-        elif self.lib == "linux-gpib":
+        elif self.lib == 'linux-gpib':
             self.backend.clear(self._descr)
             self.backend.close(self._descr)
-        elif self.lib == "prologix-gpib":
+        elif self.lib == 'prologix-gpib':
+
             # clear the instrument buffers
-            self.backend.write(
-                "clr", to_controller=True, address=self.instrument.address
-            )
+            self.backend.write('clr', to_controller=True,
+                               address=self.instrument.address)
 
             # return instrument to local control
-            self.backend.write("loc", to_controller=True)
+            self.backend.write('loc', to_controller=True)
 
             # unlink device from controller
             self.backend.devices.remove(self.instrument.address)
@@ -606,7 +631,7 @@ class GPIB(Adapter):
         self.connected = False
 
     def __repr__(self):
-        return "GPIB"
+        return 'GPIB'
 
 
 class PrologixGPIBUSB:
@@ -623,68 +648,71 @@ class PrologixGPIBUSB:
         self.serial_port.timeout = timeout
 
     def __init__(self, port):
+
         try:
-            serial = importlib.import_module("serial")
+            serial = importlib.import_module('serial')
         except ImportError:
             raise AdapterError(
-                "Please install the PySerial library "
-                "to connect a Prologix GPIB-USB adapter."
+                'Please install the PySerial library '
+                'to connect a Prologix GPIB-USB adapter.'
             )
 
         self.serial_port = serial.Serial(port=port, timeout=1)
 
         # set adapter to "controller" mode
-        self.write("mode 1", to_controller=True)
+        self.write('mode 1', to_controller=True)
 
         # instruments talk only when requested to
-        self.write("auto 0", to_controller=True)
+        self.write('auto 0', to_controller=True)
 
         # set timeout to 0.5 seconds
-        self.write("read_tmo_ms 500", to_controller=True)
+        self.write('read_tmo_ms 500', to_controller=True)
 
         # Do not append CR or LF to messages
-        self.write("eos 3", to_controller=True)
+        self.write('eos 3', to_controller=True)
 
         # Assert EOI with last byte to indicate end of data
-        self.write("eoi 1", to_controller=True)
+        self.write('eoi 1', to_controller=True)
 
         # Append CR to responses from instruments to indicate message
         # termination
-        self.write("eot_char 13", to_controller=True)
-        self.write("eot_enable 1", to_controller=True)
+        self.write('eot_char 13', to_controller=True)
+        self.write('eot_enable 1', to_controller=True)
 
         self.address = None
         self.devices = []
 
     def write(self, message, to_controller=False, address=None):
+
         if address and address != self.address:
-            self.write(f"addr {address}", to_controller=True)
+            self.write(f'addr {address}', to_controller=True)
             self.address = address
 
             if address not in self.devices:
                 self.devices.append(address)
 
-        proper_message = message.encode() + b"\r"
+        proper_message = message.encode() + b'\r'
 
         if to_controller:
-            proper_message = b"++" + proper_message
+            proper_message = b'++' + proper_message
 
         self.serial_port.write(proper_message)
 
         return "Success"
 
     def read(self, from_controller=False, address=None):
+
         if address and address != self.address:
-            self.write(f"addr {address}", to_controller=True)
+            self.write(f'addr {address}', to_controller=True)
             self.address = address
 
             if address not in self.devices:
                 self.devices.append(address)
 
         if not from_controller:
-            self.write(f"read eoi", to_controller=True)
+            self.write(f'read eoi', to_controller=True)
 
-        response = self.serial_port.read_until(b"\r").decode().strip()
+        response = self.serial_port.read_until(b'\r').decode().strip()
 
         return response
 
@@ -710,6 +738,7 @@ class PrologixGPIBLAN:
         self.socket.settimeout(timeout)
 
     def __init__(self, ip_address):
+
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         self.socket.connect((ip_address, 1234))
@@ -717,53 +746,55 @@ class PrologixGPIBLAN:
         self.socket.settimeout(1)
 
         # set adapter to "controller" mode
-        self.write("mode 1", to_controller=True)
+        self.write('mode 1', to_controller=True)
 
         # instruments talk only when requested to
-        self.write("auto 0", to_controller=True)
+        self.write('auto 0', to_controller=True)
 
         # set timeout to 0.5 seconds
-        self.write("read_tmo_ms 500", to_controller=True)
+        self.write('read_tmo_ms 500', to_controller=True)
 
         # Do not append CR or LF to messages
-        self.write("eos 3", to_controller=True)
+        self.write('eos 3', to_controller=True)
 
         # Assert EOI with last byte to indicate end of data
-        self.write("eoi 1", to_controller=True)
+        self.write('eoi 1', to_controller=True)
 
         # Append CR to responses from instruments to indicate message
         # termination
-        self.write("eot_char 13", to_controller=True)
-        self.write("eot_enable 1", to_controller=True)
+        self.write('eot_char 13', to_controller=True)
+        self.write('eot_enable 1', to_controller=True)
 
         self.devices = []
         self.address = None
 
     def write(self, message, to_controller=False, address=None):
+
         if address and address != self.address:
-            self.write(f"addr {address}", to_controller=True)
+            self.write(f'addr {address}', to_controller=True)
             self.address = address
 
             if address not in self.devices:
                 self.devices.append(address)
 
         if to_controller:
-            message = "++" + message
+            message = '++' + message
 
         write_to_socket(self.socket, message)
 
         return "Success"
 
     def read(self, from_controller=False, address=None):
+
         if address and address != self.address:
-            self.write(f"addr {address}", to_controller=True)
+            self.write(f'addr {address}', to_controller=True)
             self.address = address
 
             if address not in self.devices:
                 self.devices.append(address)
 
         if not from_controller:
-            self.write(f"read eoi", to_controller=True)
+            self.write(f'read eoi', to_controller=True)
 
         return read_from_socket(self.socket)
 
@@ -780,37 +811,44 @@ class USB(Adapter):
     timeout = 0.5
 
     # Get USB library
-    if importlib.util.find_spec("pyvisa"):
-        lib = "pyvisa"
-    elif importlib.util.find_spec("usbtmc"):
-        lib = "usbtmc"
+    if importlib.util.find_spec('pyvisa'):
+        lib = 'pyvisa'
+    elif importlib.util.find_spec('usbtmc'):
+        lib = 'usbtmc'
     else:
         lib = None
 
-    no_lib_msg = "No USB library was found! " "Please install either PyVISA or USBTMC."
+    no_lib_msg = 'No USB library was found! ' \
+                 'Please install either PyVISA or USBTMC.'
 
     def connect(self):
+
         serial_number = str(self.instrument.address)
 
-        if self.lib == "pyvisa":
-            visa = importlib.import_module("pyvisa")
+        if self.lib == 'pyvisa':
+
+            visa = importlib.import_module('pyvisa')
 
             manager = visa.ResourceManager()
 
             for address in manager.list_resources():
                 if serial_number in address:
                     self.backend = manager.open_resource(
-                        address, open_timeout=self.timeout
+                        address,
+                        open_timeout=self.timeout
                     )
                     self.backend.timeout = self.timeout
 
-        elif self.lib == "usbtmc":
-            usbtmc = importlib.import_module("usbtmc")
+        elif self.lib == 'usbtmc':
 
-            self.backend = usbtmc.Instrument("USB::" + serial_number + "::INSTR")
+            usbtmc = importlib.import_module('usbtmc')
+
+            self.backend = usbtmc.Instrument(
+                'USB::' + serial_number + '::INSTR'
+            )
 
         else:
-            raise AdapterError(f"invalid library specification, {self.lib}")
+            raise AdapterError(f'invalid library specification, {self.lib}')
 
         self.connected = True
 
@@ -827,12 +865,13 @@ class USB(Adapter):
         return self._read()
 
     def disconnect(self):
+
         self.backend.close()
 
         self.connected = False
 
     def __repr__(self):
-        return "USB"
+        return 'USB'
 
 
 class Socket(Adapter):
@@ -843,13 +882,14 @@ class Socket(Adapter):
     ip_address = None
     port = None
 
-    read_termination = "\r"
-    write_termination = "\r"
+    read_termination = '\r'
+    write_termination = '\r'
     timeout = 1
 
-    kwargs = ["read_termination", "write_termination", "timeout"]
+    kwargs = ['read_termination', 'write_termination', 'timeout']
 
     def connect(self):
+
         if self.connected:
             self.disconnect()
 
@@ -858,7 +898,7 @@ class Socket(Adapter):
         self.backend.settimeout(self.timeout)
 
         address = self.instrument.address
-        remote_ip_address, remote_port = address.split("::")
+        remote_ip_address, remote_port = address.split('::')
 
         self.backend.connect((remote_ip_address, int(remote_port)))
 
@@ -866,27 +906,31 @@ class Socket(Adapter):
 
     def _write(self, message):
         write_to_socket(
-            self.backend,
-            message,
-            termination=self.write_termination,
-            timeout=self.timeout,
+            self.backend, message, termination=self.write_termination,
+            timeout=self.timeout
         )
 
-        return "Success"
+        return 'Success'
 
     def _read(self, **kwargs):
-        termination = kwargs.pop("termination", self.read_termination)
-        timeout = kwargs.pop("timeout", self.timeout)
+
+        termination = kwargs.pop('termination', self.read_termination)
+        timeout = kwargs.pop('timeout', self.timeout)
 
         return read_from_socket(
-            self.backend, termination=termination, timeout=timeout, **kwargs
+            self.backend,
+            termination=termination,
+            timeout=timeout,
+            **kwargs
         )
 
     def _query(self, question, **kwargs):
+
         self._write(question)
         return self._read(**kwargs)
 
     def disconnect(self):
+
         # Clear out any unread messages
         unread = self._read(decode=False, nbytes=np.inf)
         while unread:
@@ -898,7 +942,7 @@ class Socket(Adapter):
         self.connected = False
 
     def __repr__(self):
-        return "Socket"
+        return 'Socket'
 
 
 class ModbusSerial(Adapter):
@@ -910,15 +954,17 @@ class ModbusSerial(Adapter):
     """
 
     # Common defaults
-    slave_mode = "rtu"
+    slave_mode = 'rtu'
     baud_rate = 38400
     timeout = 0.05
     byte_size = 8
     stop_bits = 1
-    parity = "N"
+    parity = 'N'
     delay = 0.05
 
-    kwargs = ["close_port_after_each_call", "slave_mode", "byte_order"]
+    kwargs = [
+        'close_port_after_each_call', 'slave_mode', 'byte_order'
+    ]
 
     # For traffic control of modbus adapters using the same serial ports
     adapters = {}
@@ -926,33 +972,34 @@ class ModbusSerial(Adapter):
     _busy = False
 
     # Get Minimal Modbus library
-    if importlib.util.find_spec("minimalmodbus"):
-        lib = "minimalmodbus"
+    if importlib.util.find_spec('minimalmodbus'):
+        lib = 'minimalmodbus'
     else:
         lib = None
 
-    no_lib_msg = (
-        "No ModbusSerial library was found! " "Please install the minimalmodbus library"
-    )
+    no_lib_msg = 'No ModbusSerial library was found! ' \
+                 'Please install the minimalmodbus library'
 
     @property
     def busy(self):
-        return bool(
-            sum([adapter._busy for adapter in ModbusSerial.adapters.get(self.port, [])])
-        )
+        return bool(sum([
+            adapter._busy
+            for adapter in ModbusSerial.adapters.get(self.port, [])
+        ]))
 
     @busy.setter
     def busy(self, busy):
         self._busy = busy
 
     def __repr__(self):
-        return "ModbusSerial"
+        return 'ModbusSerial'
 
     def connect(self):
-        minimal_modbus = importlib.import_module("minimalmodbus")
+
+        minimal_modbus = importlib.import_module('minimalmodbus')
 
         # Get port and channel
-        self.port, self.channel = self.instrument.address.split("::")
+        self.port, self.channel = self.instrument.address.split('::')
 
         if self.port in ModbusSerial.adapters:
             ModbusSerial.adapters[self.port].append(self)
@@ -961,7 +1008,9 @@ class ModbusSerial(Adapter):
 
         # Handshake with instrument
         self.backend = minimal_modbus.Instrument(
-            self.port, int(self.channel), mode=self.slave_mode
+            self.port,
+            int(self.channel),
+            mode=self.slave_mode
         )
 
         self.backend.serial.baudrate = self.baud_rate
@@ -974,21 +1023,21 @@ class ModbusSerial(Adapter):
 
         self.connected = True
 
-    def _write(self, register, message, dtype="uint16", byte_order=0):
-        if dtype == "uint16":
+    def _write(self, register, message, dtype='uint16', byte_order=0):
+        if dtype == 'uint16':
             self.backend.write_register(register, message)
-        elif dtype == "float":
+        elif dtype == 'float':
             self.backend.write_float(register, message, byteorder=byte_order)
         time.sleep(self.delay)
 
         return "Success"
 
-    def _read(self, register, dtype="uint16", byte_order=0):
+    def _read(self, register, dtype='uint16', byte_order=0):
         self.backend.serial.timeout = self.timeout
 
-        if dtype == "uint16":
+        if dtype == 'uint16':
             return self.backend.read_register(register)
-        elif dtype == "float":
+        elif dtype == 'float':
             return self.backend.read_float(register, byteorder=byte_order)
 
     def disconnect(self):
@@ -1008,58 +1057,53 @@ class Modbus(Adapter):
     """
 
     kwargs = (
-        "slave id",
-        "byte order",
-        "word order",
-        "baud rate",
-        "timeout",
-        "byte size",
-        "stop bits",
-        "parity",
-        "delay",
+        'slave id',
+        'byte order',
+        'word order',
+
+        'baud rate',
+        'timeout',
+        'byte size',
+        'stop bits',
+        'parity',
+        'delay'
     )
 
     slave_id = 0
     # Byte and word order is either little-endian (<) or big-endian (>)
-    byte_order = ">"
-    word_order = ">"
+    byte_order = '>'
+    word_order = '>'
 
     types = [
-        "8bit_uint",
-        "16bit_uint",
-        "32bit_uint",
-        "64bit_uint",
-        "8bit_int",
-        "16bit_int",
-        "32bit_int",
-        "64bit_int",
-        "16bit_float",
-        "32bit_float",
-        "64bit_float",
+        '8bit_uint', '16bit_uint', '32bit_uint', '64bit_uint',
+        '8bit_int', '16bit_int', '32bit_int', '64bit_int',
+        '16bit_float', '32bit_float', '64bit_float',
     ]
 
     baud_rate = 19200
     timeout = 0.05
     byte_size = 8
     stop_bits = 1
-    parity = "N"
+    parity = 'N'
     delay = 0.05
 
     _protocol = None
     _serial_adapters = {}  # for Modbus Serial
 
     # Locate PyModbus library
-    if importlib.util.find_spec("pymodbus"):
-        lib = "pymodbus"
+    if importlib.util.find_spec('pymodbus'):
+        lib = 'pymodbus'
     else:
         lib = None
 
     @property
     def busy(self):
-        if self._protocol == "Serial":
-            return bool(
-                sum([adapter._busy for adapter in Modbus.adapters.get(self.port, [])])
-            )
+
+        if self._protocol == 'Serial':
+            return bool(sum([
+                adapter._busy
+                for adapter in Modbus.adapters.get(self.port, [])
+            ]))
         else:
             return self._busy
 
@@ -1068,33 +1112,40 @@ class Modbus(Adapter):
         self._busy = busy
 
     def connect(self):
-        client = importlib.import_module(".client", package="pymodbus")
+
+        client = importlib.import_module('.client', package='pymodbus')
 
         # Get port (Serial) or address & port (TCP)
-        address = self.instrument.address.split("::")
+        address = self.instrument.address.split('::')
 
-        if re.match("\d+\.\d+\.\d+\.\d+", address[0]):
+        if re.match('\d+\.\d+\.\d+\.\d+', address[0]):
+
             # Modbus TCP
-            self._protocol = "TCP"
+            self._protocol = 'TCP'
 
             if len(address) == 1:
                 address.append(502)  # standard Modbus TCP port
 
-            self.backend = client.ModbusTcpClient(host=address[0], port=int(address[1]))
+            self.backend = client.ModbusTcpClient(
+                host=address[0],
+                port=int(address[1])
+            )
 
         else:
+
             # Modbus Serial
-            self._protocol = "Serial"
+            self._protocol = 'Serial'
 
             if len(address) == 1:
                 raise ValueError(
-                    "Modbus over serial requires both the "
-                    "serial port address and slave address"
+                    'Modbus over serial requires both the '
+                    'serial port address and slave address'
                 )
 
             if address[0] in Modbus._serial_adapters:
                 ModbusSerial.adapters[address[0]].append(self)
             else:
+
                 ModbusSerial.adapters[self.port] = [self]
 
                 self.backend = client.ModbusSerialClient(
@@ -1106,7 +1157,7 @@ class Modbus(Adapter):
                 )
 
         # Get data reading/writing utility classes
-        payload_module = importlib.import_module(".payload", package="pymodbus")
+        payload_module = importlib.import_module('.payload', package='pymodbus')
 
         # Utility for encoding data
         self._builder_cls = payload_module.BinaryPayloadBuilder
@@ -1128,14 +1179,16 @@ class Modbus(Adapter):
         values = np.array([values]).flatten()
 
         if func_code not in [5, 15, 6, 16]:
-            raise ValueError(f"invalid Modbus function code {func_code}")
+            raise ValueError(f'invalid Modbus function code {func_code}')
 
         if _type and _type not in self.types:
             raise TypeError(
-                "invalid _type argument; must be one of:\n" + ", ".join(self.types)
+                'invalid _type argument; must be one of:\n' + ', '.join(
+                    self.types
+                )
             )
 
-        if "5" in str(func_code):
+        if '5' in str(func_code):
             # Write coils
 
             bool_values = [bool(value) for value in values]
@@ -1145,24 +1198,24 @@ class Modbus(Adapter):
             )
 
             if response.function_code == 15:
-                return "Success"
+                return 'Success'
             else:
                 raise AdapterError(
-                    f"error writing to coil(s) on {self.instrument.name}"
+                    f'error writing to coil(s) on {self.instrument.name}'
                 )
 
         else:
             # Write registers
 
             if _type is None:
-                _type = "16bit_uint"
+                _type = '16bit_uint'
 
             builder = self._builder_cls(
                 byteorder=self.byte_order, wordorder=self.word_order
             )
 
             for value in values:
-                builder.__getattribute__("add_" + _type)(value)
+                builder.__getattribute__('add_'+_type)(value)
 
             register_values = builder.to_registers()
 
@@ -1171,11 +1224,11 @@ class Modbus(Adapter):
             )
 
             if response.function_code == 16:
-                return "Success"
+                return 'Success'
             else:
                 raise AdapterError(
-                    f"error writing to register(s) on {self.instrument.name} "
-                    "for writing coils/registers"
+                    f'error writing to register(s) on {self.instrument.name} '
+                    'for writing coils/registers'
                 )
 
     def _read(self, func_code, address, count=1, _type=None):
@@ -1191,7 +1244,8 @@ class Modbus(Adapter):
 
         if _type and _type not in self.types:
             raise TypeError(
-                "invalid _type argument; must be one of:\n" ", ".join(self.types)
+                'invalid _type argument; must be one of:\n'
+                ', '.join(self.types)
             )
 
         # Enumerate modbus read functions
@@ -1227,10 +1281,11 @@ class Modbus(Adapter):
                 registers, byteorder=self.byte_order, wordorder=self.word_order
             )
 
-            n_values = int(16 * count / (int(_type.split("bit")[0])))
+            n_values = int(16 * count / (int(_type.split('bit')[0])))
 
             values = [
-                decoder.__getattribute__("decode_" + _type)() for _ in range(n_values)
+                decoder.__getattribute__('decode_' + _type)()
+                for _ in range(n_values)
             ]
 
             if len(values) == 1:
@@ -1241,8 +1296,8 @@ class Modbus(Adapter):
         else:
             # Invalid function code
             raise ValueError(
-                f"invalid Modbus function code {func_code} for "
-                "reading coils/registers"
+                f'invalid Modbus function code {func_code} for '
+                'reading coils/registers'
             )
 
     def _query(self, *args, **kwargs):
@@ -1250,6 +1305,7 @@ class Modbus(Adapter):
         return self._read(*args, **kwargs)
 
     def disconnect(self):
+
         self.backend.close()
 
 
@@ -1261,20 +1317,20 @@ class Phidget(Adapter):
     delay = 0.2
     timeout = 5
 
-    if importlib.util.find_spec("Phidget22"):
-        lib = "phidget"
+    if importlib.util.find_spec('Phidget22'):
+        lib = 'phidget'
     else:
         lib = None
 
-    no_lib_msg = (
-        "Phidget library was not found! " "Please install (pip[3] install Phidget22)."
-    )
+    no_lib_msg = 'Phidget library was not found! ' \
+                 'Please install (pip[3] install Phidget22).'
 
     def __repr__(self):
-        return "Phidget"
+        return 'Phidget'
 
     def connect(self):
-        address_parts = self.instrument.address.split("::")
+
+        address_parts = self.instrument.address.split('::')
         address_parts = [int(part) for part in address_parts]
 
         serial_number = address_parts[0]
@@ -1299,22 +1355,19 @@ class Phidget(Adapter):
         self.busy = False
 
     def _write(self, parameter, value):
-        self.backend.__getattribute__("set" + parameter)(value)
+        self.backend.__getattribute__('set' + parameter)(value)
         return "Success"
 
     def _query(self, parameter):
-        return self.backend.__getattribute__("get" + parameter)()
+        return self.backend.__getattribute__('get' + parameter)()
 
     def disconnect(self):
         self.backend.close()
         self.connected = True
 
 
-supported = {
-    key: value
-    for key, value in vars().items()
-    if type(value) is type and issubclass(value, Adapter)
-}
+supported = {key: value for key, value in vars().items()
+             if type(value) is type and issubclass(value, Adapter)}
 
 kwargs = []
 for cls in supported.values():
