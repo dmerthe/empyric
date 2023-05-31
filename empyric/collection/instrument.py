@@ -20,11 +20,11 @@ def setter(method):
     :return: wrapped method
     """
 
-    knob = '_'.join(method.__name__.split('_')[1:])
+    knob = "_".join(method.__name__.split("_")[1:])
 
     type_hints = typing.get_type_hints(method)
-    type_hints.pop('self', None)
-    type_hints.pop('return', None)
+    type_hints.pop("self", None)
+    type_hints.pop("return", None)
 
     if type_hints:
         dtype = type_hints[list(type_hints)[0]]
@@ -33,7 +33,6 @@ def setter(method):
 
     @wraps(method)
     def wrapped_method(*args, **kwargs):
-
         self = args[0]
         value = args[1]
 
@@ -64,9 +63,9 @@ def getter(method):
     :return: wrapped method
     """
 
-    knob = '_'.join(method.__name__.split('_')[1:])
+    knob = "_".join(method.__name__.split("_")[1:])
 
-    dtype = typing.get_type_hints(method).get('return', Type)
+    dtype = typing.get_type_hints(method).get("return", Type)
 
     @wraps(method)
     def wrapped_method(*args, **kwargs):
@@ -79,7 +78,7 @@ def getter(method):
             value = recast(method(*args, **kwargs), to=dtype)
         except AttributeError as err:
             # catches most errors caused by the adapter returning None
-            if 'NoneType' in str(err):
+            if "NoneType" in str(err):
                 value = None
             else:
                 raise AttributeError(err)
@@ -103,9 +102,9 @@ def measurer(method):
     :return: wrapped method
     """
 
-    meter = '_'.join(method.__name__.split('_')[1:])
+    meter = "_".join(method.__name__.split("_")[1:])
 
-    dtype = typing.get_type_hints(method).get('return', Type)
+    dtype = typing.get_type_hints(method).get("return", Type)
 
     @wraps(method)
     def wrapped_method(*args, **kwargs):
@@ -118,7 +117,7 @@ def measurer(method):
             value = recast(method(*args, **kwargs), to=dtype)
         except AttributeError as err:
             # catches most errors caused by the adapter returning None
-            if 'NoneType' in str(err):
+            if "NoneType" in str(err):
                 value = None
             else:
                 raise AttributeError(err)
@@ -156,11 +155,9 @@ class Instrument:
 
     """
 
-    name = 'Instrument'
+    name = "Instrument"
 
-    supported_adapters = (
-        (Adapter, {}),
-    )
+    supported_adapters = ((Adapter, {}),)
 
     knobs = tuple()
 
@@ -176,8 +173,7 @@ class Instrument:
     _busy = False
 
     def __init__(
-            self, address=None, adapter=None, presets=None, postsets=None,
-            **kwargs
+        self, address=None, adapter=None, presets=None, postsets=None, **kwargs
     ):
         """
 
@@ -208,28 +204,32 @@ class Instrument:
                     adapter_connected = True
                     break
                 except BaseException as error:
-                    msg = f'in trying {_adapter.__name__} adapter, ' \
-                          f'got {type(error).__name__}: {error}'
+                    msg = (
+                        f"in trying {_adapter.__name__} adapter, "
+                        f"got {type(error).__name__}: {error}"
+                    )
                     errors.append(msg)
 
             if not adapter_connected:
-                message = f'unable to connect an adapter to ' \
-                          f'instrument {self.name} at address {address}:\n'
+                message = (
+                    f"unable to connect an adapter to "
+                    f"instrument {self.name} at address {address}:\n"
+                )
                 for error in errors:
                     message = message + f"{error}\n"
                 raise ConnectionError(message)
 
         if self.address:
-            self.name = self.name + '@' + str(self.address)
+            self.name = self.name + "@" + str(self.address)
 
         # Get existing knob settings, if possible
         for knob in self.knobs:
-            if hasattr(self, 'get_' + knob.replace(' ', '_')):
+            if hasattr(self, "get_" + knob.replace(" ", "_")):
                 # retrieves the knob value from the instrument
-                self.__getattribute__('get_' + knob.replace(' ', '_'))()
+                self.__getattribute__("get_" + knob.replace(" ", "_"))()
             else:
                 # knob value is unknown until it is set
-                self.__setattr__(knob.replace(' ', '_'), None)
+                self.__setattr__(knob.replace(" ", "_"), None)
 
         # Apply presets
         if presets:
@@ -289,7 +289,7 @@ class Instrument:
         """
 
         try:
-            set_method = getattr(self, 'set_' + knob.replace(' ', '_'))
+            set_method = getattr(self, "set_" + knob.replace(" ", "_"))
         except AttributeError as err:
             raise AttributeError(f"{knob} cannot be set on {self.name}\n{err}")
 
@@ -305,10 +305,10 @@ class Instrument:
 
         """
 
-        if hasattr(self, 'get_' + knob.replace(' ', '_')):
-            return getattr(self, 'get_' + knob.replace(' ', '_'))()
+        if hasattr(self, "get_" + knob.replace(" ", "_")):
+            return getattr(self, "get_" + knob.replace(" ", "_"))()
         else:
-            return getattr(self, knob.replace(' ', '_'))
+            return getattr(self, knob.replace(" ", "_"))
 
     def measure(self, meter: str):
         """
@@ -319,8 +319,7 @@ class Instrument:
         """
 
         try:
-            measure_method = self.__getattribute__(
-                'measure_' + meter.replace(' ', '_'))
+            measure_method = self.__getattribute__("measure_" + meter.replace(" ", "_"))
         except AttributeError:
             raise AttributeError(f"{meter} cannot be measured on {self.name}")
 

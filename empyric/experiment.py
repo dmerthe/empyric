@@ -33,11 +33,11 @@ class Experiment:
     """
 
     # Possible statuses of an experiment
-    READY = 'Ready'  # Experiment is waiting to start
-    RUNNING = 'Running'  # Experiment is running
-    HOLDING = 'Holding'  # Routines are stopped, but measurements are ongoing
-    STOPPED = 'Stopped'  # Both routines and measurements are stopped
-    TERMINATED = 'Terminated'
+    READY = "Ready"  # Experiment is waiting to start
+    RUNNING = "Running"  # Experiment is running
+    HOLDING = "Holding"  # Routines are stopped, but measurements are ongoing
+    STOPPED = "Stopped"  # Both routines and measurements are stopped
+    TERMINATED = "Terminated"
 
     # Experiment has either finished or has been terminated by the user
 
@@ -47,8 +47,8 @@ class Experiment:
 
     @status.setter
     def status(self, status):
-        prior_base_status = self._status.split(':')[0]
-        new_base_status = status.split(':')[0]
+        prior_base_status = self._status.split(":")[0]
+        new_base_status = status.split(":")[0]
 
         # Only allow change if the status is unlocked,
         # or if the base status is the same
@@ -57,26 +57,25 @@ class Experiment:
 
     @property
     def ready(self):
-        return 'Ready' in self.status
+        return "Ready" in self.status
 
     @property
     def running(self):
-        return 'Running' in self.status
+        return "Running" in self.status
 
     @property
     def holding(self):
-        return 'Holding' in self.status
+        return "Holding" in self.status
 
     @property
     def stopped(self):
-        return 'Stopped' in self.status
+        return "Stopped" in self.status
 
     @property
     def terminated(self):
-        return 'Terminated' in self.status
+        return "Terminated" in self.status
 
     def __init__(self, variables, routines=None, end=None):
-
         self.variables = variables
         # dict of the form {..., name: variable, ...}
 
@@ -91,7 +90,7 @@ class Experiment:
             self.routines = {}
 
         if end:
-            if end.lower() == 'with routines':
+            if end.lower() == "with routines":
                 self.end = max([routine.end for routine in routines.values()])
             else:
                 self.end = end
@@ -101,12 +100,12 @@ class Experiment:
         self.clock = Clock()
         self.clock.start()
 
-        self.timestamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
+        self.timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
-        self.data = pd.DataFrame(columns=['Time'] + list(variables.keys()))
+        self.data = pd.DataFrame(columns=["Time"] + list(variables.keys()))
 
         self.state = pd.Series({column: None for column in self.data.columns})
-        self.state['Time'] = 0
+        self.state["Time"] = 0
 
         self._status = Experiment.READY
         self.status_locked = True
@@ -115,23 +114,20 @@ class Experiment:
         self.saved = []  # list of saved data entries
 
     def __next__(self):
-
         # Start the clock on first call
         if self.state.name is None:  # first step of the experiment
             self.start()
-            self.status = Experiment.RUNNING + ': initializing...'
+            self.status = Experiment.RUNNING + ": initializing..."
 
         # Update time
-        self.state['Time'] = self.clock.time
+        self.state["Time"] = self.clock.time
         self.state.name = datetime.datetime.now()
 
         # If experiment is stopped, just return the knob & parameter values,
         # and nullify meter & expression values
         if self.stopped:
-
             threads = {}
             for name, variable in self.variables.items():
-
                 is_knob = isinstance(variable, _variables.Knob)
                 is_parameter = isinstance(variable, _variables.Parameter)
 
@@ -145,7 +141,7 @@ class Experiment:
 
             # Wait for all variable update threads to finish
             for name, thread in threads.items():
-                self.status = Experiment.RUNNING + f': retrieving {name}'
+                self.status = Experiment.RUNNING + f": retrieving {name}"
                 thread.join()
 
             return self.state
@@ -153,7 +149,6 @@ class Experiment:
         # If the experiment is running, apply new settings to knobs
         # according to the routines (if there are any)
         if self.running:
-
             # Update each routine in its own thread
             threads = {}
             for name, routine in self.routines.items():
@@ -164,14 +159,13 @@ class Experiment:
 
             # Wait for all routine threads to finish
             for name, thread in threads.items():
-                self.status = Experiment.RUNNING + f': executing {name}'
+                self.status = Experiment.RUNNING + f": executing {name}"
                 thread.join()
 
             self.status = Experiment.RUNNING
 
         # Get all variable values if experiment is running or holding
         if self.running or self.holding:
-
             for event in self.eval_events.values():
                 event.clear()
 
@@ -187,7 +181,7 @@ class Experiment:
 
             # Wait for all threads to finish
             for name, thread in threads.items():
-                self.status = base_status + f': retrieving {name}'
+                self.status = base_status + f": retrieving {name}"
                 thread.join()
 
             self.status = base_status
@@ -211,7 +205,6 @@ class Experiment:
         """Retrieve and store a variable value"""
 
         try:
-
             if isinstance(self.variables[name], _variables.Expression):
                 for dependee in self.variables[name].definitions:
                     event = self.eval_events[dependee]
@@ -226,8 +219,8 @@ class Experiment:
                 dataframe = pd.DataFrame(
                     {name: value}, index=[self.state.name] * len(value)
                 )
-                path = name.replace(' ', '_') + '_'
-                path += self.state.name.strftime('%Y%m%d-%H%M%S') + '.csv'
+                path = name.replace(" ", "_") + "_"
+                path += self.state.name.strftime("%Y%m%d-%H%M%S") + ".csv"
                 dataframe.to_csv(path)
                 self.state[name] = path
             else:
@@ -255,7 +248,7 @@ class Experiment:
         """
 
         base_status = self.status
-        self.status = base_status + ': saving data'
+        self.status = base_status + ": saving data"
 
         path = f"data_{self.timestamp}.csv"
 
@@ -264,15 +257,15 @@ class Experiment:
 
         if not os.path.exists(path):
             # if this is a new file, write column headers
-            with open(path, 'a') as data_file:
-                data_file.write(',' + ','.join(self.data.columns) + '\n')
+            with open(path, "a") as data_file:
+                data_file.write("," + ",".join(self.data.columns) + "\n")
 
         unsaved = np.setdiff1d(self.data.index, self.saved)
 
-        with open(path, 'a') as data_file:
+        with open(path, "a") as data_file:
             for line in unsaved:
-                line_data = ','.join(map(str, list(self.data.loc[line])))
-                data_file.write(str(line) + ',' + line_data + '\n')
+                line_data = ",".join(map(str, list(self.data.loc[line])))
+                data_file.write(str(line) + "," + line_data + "\n")
 
         self.saved = self.saved + list(unsaved)
 
@@ -302,7 +295,7 @@ class Experiment:
         self.status_locked = False
         self.status = Experiment.HOLDING
         if reason:
-            self.status = self.status + ': ' + reason
+            self.status = self.status + ": " + reason
         self.status_locked = True
 
     def stop(self, reason=None):
@@ -316,7 +309,7 @@ class Experiment:
         self.status_locked = False
         self.status = Experiment.STOPPED
         if reason:
-            self.status = self.status + ': ' + reason
+            self.status = self.status + ": " + reason
         self.status_locked = True
 
     def terminate(self, reason=None):
@@ -332,7 +325,7 @@ class Experiment:
         self.status_locked = False
         self.status = Experiment.TERMINATED
         if reason:
-            self.status = self.status + ': ' + reason
+            self.status = self.status + ": " + reason
         self.status_locked = True
 
         # End routines
@@ -340,7 +333,7 @@ class Experiment:
             routine.terminate()
 
     def __repr__(self):
-        return 'Experiment'
+        return "Experiment"
 
 
 class Alarm:
@@ -357,14 +350,14 @@ class Alarm:
         if protocol:
             self.protocol = protocol
         else:
-            self.protocol = 'none'
+            self.protocol = "none"
 
     @property
     def triggered(self):
         return self.trigger_variable.value is True
 
     def __repr__(self):
-        return 'Alarm'
+        return "Alarm"
 
 
 class Manager:
@@ -388,57 +381,50 @@ class Manager:
             root = tk.Tk()
             root.withdraw()
             self.runcard = askopenfilename(
-                parent=root, title='Select Runcard',
-                filetypes=[('YAML files', '*.yaml')]
+                parent=root,
+                title="Select Runcard",
+                filetypes=[("YAML files", "*.yaml")],
             )
 
-            if self.runcard == '':
-                raise ValueError('a valid runcard was not selected!')
+            if self.runcard == "":
+                raise ValueError("a valid runcard was not selected!")
 
         if isinstance(self.runcard, str):
             if os.path.exists(self.runcard):
                 dirname = os.path.dirname(self.runcard)
-                if dirname != '':
+                if dirname != "":
                     os.chdir(os.path.dirname(self.runcard))
                     # go to runcard directory to put data in same location
 
                 yaml = YAML()
-                with open(self.runcard, 'rb') as runcard_file:
+                with open(self.runcard, "rb") as runcard_file:
                     self.runcard = yaml.load(runcard_file)  # load the runcard
             else:
-                raise FileNotFoundError(
-                    f'invalid runcard path "{self.runcard}"'
-                )
+                raise FileNotFoundError(f'invalid runcard path "{self.runcard}"')
         elif isinstance(self.runcard, dict):
             pass
         else:
             raise TypeError(
-                f'runcard given to Manager must be a path to a YAML file '
-                f'or a dictionary, not {type(self.runcard)}!'
+                f"runcard given to Manager must be a path to a YAML file "
+                f"or a dictionary, not {type(self.runcard)}!"
             )
 
         converted_runcard = convert_runcard(self.runcard)
 
-        self.description = converted_runcard['Description']
-        self.settings = converted_runcard['Settings']
-        self.instruments = converted_runcard['Instruments']
-        self.alarms = converted_runcard['Alarms']
-        self.plotter = converted_runcard.get('Plotter', None)
+        self.description = converted_runcard["Description"]
+        self.settings = converted_runcard["Settings"]
+        self.instruments = converted_runcard["Instruments"]
+        self.alarms = converted_runcard["Alarms"]
+        self.plotter = converted_runcard.get("Plotter", None)
 
-        self.experiment = converted_runcard['Experiment']
+        self.experiment = converted_runcard["Experiment"]
 
         # Unpack settings
-        self.followup = self.settings.get('follow-up', None)
-        self.step_interval = convert_time(
-            self.settings.get('step interval', 0.1)
-        )
-        self.save_interval = convert_time(
-            self.settings.get('save interval', 60)
-        )
-        self.plot_interval = convert_time(
-            self.settings.get('plot interval', 0.1)
-        )
-        self.end = convert_time(self.settings.get('end', np.inf))
+        self.followup = self.settings.get("follow-up", None)
+        self.step_interval = convert_time(self.settings.get("step interval", 0.1))
+        self.save_interval = convert_time(self.settings.get("save interval", 60))
+        self.plot_interval = convert_time(self.settings.get("plot interval", 0.1))
+        self.end = convert_time(self.settings.get("end", np.inf))
 
         self.experiment.end = self.end
 
@@ -462,8 +448,8 @@ class Manager:
             os.chdir(directory)
 
         # Create a new directory for data storage
-        experiment_name = self.runcard['Description'].get('name', 'Experiment')
-        working_dir = experiment_name + '-' + self.experiment.timestamp
+        experiment_name = self.runcard["Description"].get("name", "Experiment")
+        working_dir = experiment_name + "-" + self.experiment.timestamp
         os.mkdir(working_dir)
         os.chdir(working_dir)
 
@@ -471,7 +457,7 @@ class Manager:
         yaml = YAML()
 
         timestamped_path = f"{experiment_name}_{self.experiment.timestamp}.yaml"
-        with open(timestamped_path, 'w') as runcard_file:
+        with open(timestamped_path, "w") as runcard_file:
             yaml.dump(self.runcard, runcard_file)
 
         # Run experiment loop in separate thread
@@ -479,15 +465,15 @@ class Manager:
         experiment_thread.start()
 
         # Set up the GUI for user interaction
-        self.gui = _graphics.ExperimentGUI(self.experiment,
-                                           alarms=self.alarms,
-                                           instruments=self.instruments,
-                                           title=self.description.get(
-                                               'name', 'Experiment'
-                                           ),
-                                           plotter=self.plotter,
-                                           save_interval=self.save_interval,
-                                           plot_interval=self.plot_interval)
+        self.gui = _graphics.ExperimentGUI(
+            self.experiment,
+            alarms=self.alarms,
+            instruments=self.instruments,
+            title=self.description.get("name", "Experiment"),
+            plotter=self.plotter,
+            save_interval=self.save_interval,
+            plot_interval=self.plot_interval,
+        )
 
         self.gui.run()
 
@@ -500,15 +486,15 @@ class Manager:
         os.chdir(top_dir)  # return to the parent directory
 
         # Cancel follow-up if experiment terminated by user
-        if self.experiment.terminated and 'user' in self.experiment.status:
+        if self.experiment.terminated and "user" in self.experiment.status:
             self.followup = None
 
         # Execute the follow-up experiment if there is one
         if self.followup:
-            if 'yaml' in self.followup:
+            if "yaml" in self.followup:
                 self.__init__(self.followup)
                 self.run(directory=directory)
-            elif 'repeat' in self.followup:
+            elif "repeat" in self.followup:
                 self.__init__(self.runcard)
                 self.run(directory=directory)
 
@@ -516,7 +502,6 @@ class Manager:
         # Run in a separate thread
 
         for state in self.experiment:
-
             step_start = time.time()
 
             # Save experimental data periodically
@@ -529,35 +514,34 @@ class Manager:
             # Check if any alarms are triggered and handle them
             for name, alarm in self.alarms.items():
                 if alarm.triggered:
-
                     # Add to dictionary of triggered alarms, if newly triggered
                     if name not in self.awaiting_alarms:
                         self.awaiting_alarms[name] = {
-                            'time': self.experiment.data['Time'].iloc[-1],
-                            'status': self.experiment.status,
+                            "time": self.experiment.data["Time"].iloc[-1],
+                            "status": self.experiment.status,
                         }
 
-                    if 'none' in alarm.protocol:
+                    if "none" in alarm.protocol:
                         # do nothing (GUI will indicate that alarm is triggered)
                         break
-                    if 'hold' in alarm.protocol:
+                    if "hold" in alarm.protocol:
                         # stop routines but keep measuring until alarm is clear
                         self.experiment.hold(reason=name)
                         break
-                    elif 'stop' in alarm.protocol:
+                    elif "stop" in alarm.protocol:
                         # stop routines and measurements until alarm is clear
                         self.experiment.stop(reason=name)
                         break
-                    elif 'terminate' in alarm.protocol:
+                    elif "terminate" in alarm.protocol:
                         # terminate the experiment
                         self.experiment.terminate(reason=name)
                         break
-                    elif 'yaml' in alarm.protocol:
+                    elif "yaml" in alarm.protocol:
                         # terminate the experiment and run another
                         self.experiment.terminate(reason=name)
                         self.followup = alarm.protocol
                         break
-                    elif 'check' in alarm.protocol:
+                    elif "check" in alarm.protocol:
                         # stop routines and measurements until user resumes
                         self.experiment.stop(reason=name)
                         break
@@ -569,22 +553,22 @@ class Manager:
                 elif name in self.awaiting_alarms:
                     # Alarm was previously triggered but is now clear
 
-                    if 'check' not in alarm.protocol:
+                    if "check" not in alarm.protocol:
                         # alarm is not waiting for user to check
 
                         info = self.awaiting_alarms.pop(name)
                         # remove from dictionary of triggered alarms
-                        prior_status = info['status']
+                        prior_status = info["status"]
 
                         if len(self.awaiting_alarms) == 0:
                             # there are no more triggered alarms
                             # return to state of experiment prior to trigger
-                            if 'Running' in prior_status:
+                            if "Running" in prior_status:
                                 self.experiment.start()
-                            if 'Holding' in prior_status:
-                                self.experiment.hold(reason=name + ' cleared')
-                            if 'Stopped' in prior_status:
-                                self.experiment.stop(reason=name + ' cleared')
+                            if "Holding" in prior_status:
+                                self.experiment.hold(reason=name + " cleared")
+                            if "Stopped" in prior_status:
+                                self.experiment.stop(reason=name + " cleared")
 
             step_end = time.time()
 
@@ -594,7 +578,7 @@ class Manager:
                 time.sleep(remaining_time)
 
     def __repr__(self):
-        return 'Manager'
+        return "Manager"
 
 
 class RuncardError(BaseException):
@@ -606,13 +590,12 @@ def validate_runcard(runcard):
     is_ordereddict = isinstance(runcard, collections.OrderedDict)
 
     if is_dict or is_ordereddict:
-
         # Create temporary runcard YAML file for PyKwalify to validate
         yaml = YAML()
 
-        runcard_path = f'tmp_runcard_{time.time()}.yaml'
+        runcard_path = f"tmp_runcard_{time.time()}.yaml"
 
-        with open(runcard_path, 'w') as runcard_file:
+        with open(runcard_path, "w") as runcard_file:
             yaml.dump(runcard, runcard_file)
 
         validate_runcard(runcard_path)
@@ -626,13 +609,13 @@ def validate_runcard(runcard):
         return True
 
     elif type(runcard) is not str:
-        raise ValueError('runcard must be either dict or str.')
+        raise ValueError("runcard must be either dict or str.")
 
     validator = YamlValidator(
         source_file=runcard,
         schema_files=[
             os.path.join(pathlib.Path(__file__).parent, "runcard_schema.yaml")
-        ]
+        ],
     )
 
     try:
@@ -664,7 +647,7 @@ def convert_runcard(runcard):
     # if runcard argument is a path to a YAML file, load into a dictionary
     if type(runcard) == str:
         yaml = YAML()
-        with open(runcard, 'rb') as runcard_file:
+        with open(runcard, "rb") as runcard_file:
             runcard = yaml.load(runcard_file)
 
     # Validate runcard format and contents
@@ -676,9 +659,9 @@ def convert_runcard(runcard):
     custom_routines = {}
     custom_instruments = {}
 
-    if 'custom.py' in os.listdir():
+    if "custom.py" in os.listdir():
         sys.path.insert(1, os.getcwd())
-        custom = importlib.import_module('custom')
+        custom = importlib.import_module("custom")
 
         for name, thing in custom.__dict__.items():
             if type(thing) == type:
@@ -691,59 +674,56 @@ def convert_runcard(runcard):
     available_instruments = {**_instruments.supported, **custom_instruments}
 
     instruments = {}
-    for name, specs in runcard.get('Instruments', {}).items():
-
+    for name, specs in runcard.get("Instruments", {}).items():
         specs = specs.copy()
-        _type = specs.pop('type')
-        address = specs.get('address', None)
+        _type = specs.pop("type")
+        address = specs.get("address", None)
 
         # Grab any keyword arguments for the adapter
         adapter_kwargs = {}
         for kwarg in _adapters.kwargs:
-            if kwarg.replace('_', ' ') in specs:
-                adapter_kwargs[kwarg] = specs.pop(kwarg.replace('_', ' '))
+            if kwarg.replace("_", " ") in specs:
+                adapter_kwargs[kwarg] = specs.pop(kwarg.replace("_", " "))
 
         # Any remaining keywords are instrument presets
         presets = {
-            key: recast(value) for key, value
-            in specs.get('presets', {}).items()
+            key: recast(value) for key, value in specs.get("presets", {}).items()
         }
         postsets = {
-            key: recast(value) for key, value
-            in specs.get('postsets', {}).items()
+            key: recast(value) for key, value in specs.get("postsets", {}).items()
         }
 
         instrument_class = available_instruments[_type]
         instruments[name] = instrument_class(
-            address=address, presets=presets, postsets=postsets,
-            **adapter_kwargs
+            address=address, presets=presets, postsets=postsets, **adapter_kwargs
         )
         instruments[name].name = name
 
-    converted_runcard['Instruments'] = instruments
+    converted_runcard["Instruments"] = instruments
 
     # Variables section
     variables = {}
-    for name, specs in runcard['Variables'].items():
-        if 'meter' in specs:
-            instrument = converted_runcard['Instruments'][specs['instrument']]
-            gate = specs.get('gate', None)
+    for name, specs in runcard["Variables"].items():
+        if "meter" in specs:
+            instrument = converted_runcard["Instruments"][specs["instrument"]]
+            gate = specs.get("gate", None)
             gate = variables[gate] if gate else None
             variables[name] = _variables.Meter(
-                meter=specs['meter'], instrument=instrument, gate=gate
+                meter=specs["meter"], instrument=instrument, gate=gate
             )
-        elif 'knob' in specs:
-            instrument = converted_runcard['Instruments'][specs['instrument']]
+        elif "knob" in specs:
+            instrument = converted_runcard["Instruments"][specs["instrument"]]
             variables[name] = _variables.Knob(
-                knob=specs['knob'], instrument=instrument,
-                lower_limit=specs.get('lower limit', None),
-                upper_limit=specs.get('upper limit', None)
+                knob=specs["knob"],
+                instrument=instrument,
+                lower_limit=specs.get("lower limit", None),
+                upper_limit=specs.get("upper limit", None),
             )
-        elif 'expression' in specs:
-            expression = specs['expression']
+        elif "expression" in specs:
+            expression = specs["expression"]
             definitions = {}
 
-            for symbol, var_name in specs['definitions'].items():
+            for symbol, var_name in specs["definitions"].items():
                 expression = expression.replace(symbol, var_name)
 
                 try:
@@ -757,79 +737,79 @@ def convert_runcard(runcard):
             variables[name] = _variables.Expression(
                 expression=expression, definitions=definitions
             )
-        elif 'server' in specs:
-            server = specs['server']
-            alias = specs.get('alias', name)
-            protocol = specs.get('protocol', None)
-            settable = specs.get('settable', False)
+        elif "server" in specs:
+            server = specs["server"]
+            alias = specs.get("alias", name)
+            protocol = specs.get("protocol", None)
+            settable = specs.get("settable", False)
 
             variables[name] = _variables.Remote(
                 server=server, alias=alias, protocol=protocol, settable=settable
             )
 
-        elif 'parameter' in specs:
-            variables[name] = _variables.Parameter(parameter=specs['parameter'])
+        elif "parameter" in specs:
+            variables[name] = _variables.Parameter(parameter=specs["parameter"])
 
     # Routines section
     available_routines = {**_routines.supported, **custom_routines}
 
     routines = {}
-    if 'Routines' in runcard:
-        for name, specs in runcard['Routines'].items():
+    if "Routines" in runcard:
+        for name, specs in runcard["Routines"].items():
             specs = specs.copy()  # avoids modifying the runcard
-            _type = specs.pop('type')
+            _type = specs.pop("type")
 
-            specs = {
-                key.replace(' ', '_'): value for key, value in specs.items()
-            }
+            specs = {key.replace(" ", "_"): value for key, value in specs.items()}
 
             # Convert list of knobs into dictionary
-            knobs = np.array([specs.get('knobs', [])]).flatten()
+            knobs = np.array([specs.get("knobs", [])]).flatten()
             if knobs.size > 0:
                 for knob in knobs:
                     if knob not in variables:
                         raise KeyError(
-                            f'knob {knob} specified for routine {name} '
-                            'is not in Variables!'
+                            f"knob {knob} specified for routine {name} "
+                            "is not in Variables!"
                         )
 
-                specs['knobs'] = {name: variables[name] for name in knobs}
+                specs["knobs"] = {name: variables[name] for name in knobs}
 
             routines[name] = available_routines[_type](**specs)
 
-    converted_runcard['Experiment'] = Experiment(variables, routines=routines)
+    converted_runcard["Experiment"] = Experiment(variables, routines=routines)
 
     # Alarms section
     alarms = {}
-    if 'Alarms' in runcard:
-        for name, specs in runcard['Alarms'].items():
+    if "Alarms" in runcard:
+        for name, specs in runcard["Alarms"].items():
+            alarm_variables = specs.copy().get("variables", {})
+            condition = specs.copy()["condition"]
 
-            alarm_variables = specs.copy().get('variables', {})
-            condition = specs.copy()['condition']
-
-            for variable in specs.get('variables', {}):
+            for variable in specs.get("variables", {}):
                 if variable not in variables:
                     raise KeyError(
-                        f'variable {variable} specified for alarm {name} '
-                        f'is not in Variables!'
+                        f"variable {variable} specified for alarm {name} "
+                        f"is not in Variables!"
                     )
 
-            alphabet = 'abcdefghijklmnopqrstuvwxyz'
+            alphabet = "abcdefghijklmnopqrstuvwxyz"
             for var_name, variable in variables.items():
-
                 # Variables can be called by name in the condition
                 if var_name in condition:
-                    temp_name = ''.join(
+                    temp_name = "".join(
                         [
-                            alphabet[np.random.randint(0, len(alphabet))]
+                            alphabet[
+                                np.random.randint(0, len(alphabet))
+                            ]  # pylint: disable=invalid-sequence-index
                             for i in range(3)
                         ]
                     )
                     while temp_name in alarm_variables:
                         # make sure temp_name is not repeated
-                        temp_name = ''.join(
+                        temp_name = "".join(
                             [
-                                alphabet[np.random.randint(0, len(alphabet))]
+                                alphabet[
+                                    np.random.randint(0, len(alphabet))
+                                ]  # pylint: disable=invalid-sequence-index
                                 for i in range(3)
                             ]
                         )
@@ -845,21 +825,19 @@ def convert_runcard(runcard):
             alarms.update(
                 {
                     name: Alarm(
-                        condition,
-                        alarm_variables,
-                        protocol=specs.get('protocol', None)
+                        condition, alarm_variables, protocol=specs.get("protocol", None)
                     )
                 }
             )
 
-    converted_runcard['Alarms'] = alarms
+    converted_runcard["Alarms"] = alarms
 
     # Plots section
-    if 'Plots' in runcard:
-        converted_runcard['Plotter'] = _graphics.Plotter(
-            converted_runcard['Experiment'].data, settings=runcard['Plots']
+    if "Plots" in runcard:
+        converted_runcard["Plotter"] = _graphics.Plotter(
+            converted_runcard["Experiment"].data, settings=runcard["Plots"]
         )
     else:
-        converted_runcard['Plotter'] = None
+        converted_runcard["Plotter"] = None
 
     return converted_runcard
