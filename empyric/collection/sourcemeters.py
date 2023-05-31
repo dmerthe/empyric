@@ -651,9 +651,9 @@ class Keithley2460(Instrument):
 
         if list_length >= 100:
             sub_lists = [
-                self.fast_voltages[
+                self.fast_voltages[ # pylint: disable=unsubscriptable-object
                     i * 100 : (i + 1) * 100
-                ]  # pylint: disable=unsubscriptable-object
+                ]
                 for i in range(list_length // 100)
             ]
         else:
@@ -661,8 +661,8 @@ class Keithley2460(Instrument):
 
         if list_length % 100 > 0:
             sub_lists.append(
-                self.fast_voltages[-(list_length % 100) :]
-            )  # pylint: disable=unsubscriptable-object
+                self.fast_voltages[-(list_length % 100) :] # pylint: disable=unsubscriptable-object
+            )
 
         current_list = []
 
