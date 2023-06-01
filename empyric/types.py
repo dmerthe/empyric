@@ -5,7 +5,7 @@ import re
 from abc import ABC
 import pandas as pd
 import numpy as np
-from typing import Any, Union
+from typing import Any, Union, get_origin, get_args
 
 
 class Type(ABC):
@@ -155,8 +155,13 @@ def recast(value: Any, to: type = Type) -> Union[Type, None]:
             return None
 
         for dtype in np.array([to], dtype=object).flatten():
+            # Recast to desired type
             try:
-                # recast to desired
+
+                if get_origin(dtype) is Union:
+                    # Expand type unions
+                    return recast(value, to=get_args(dtype))
+
                 if issubclass(dtype, Boolean):
                     return np.bool_(value)
                 elif issubclass(dtype, Toggle):
@@ -169,6 +174,7 @@ def recast(value: Any, to: type = Type) -> Union[Type, None]:
                     return np.str_(value)
                 elif issubclass(dtype, Array) and np.ndim(value) > 0:
                     return np.array(value)
+
             except ValueError:
                 pass
 
