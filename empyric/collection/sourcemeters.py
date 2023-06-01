@@ -1,6 +1,7 @@
 import os
 import datetime
 import re
+from typing import Union
 
 import numpy as np
 import pandas as pd
@@ -338,7 +339,7 @@ class Keithley2400(Instrument):
         return self.adapter.delay
 
     @setter
-    def set_fast_voltages(self, voltages: [Array, String]):
+    def set_fast_voltages(self, voltages: Union[Array, String]):
         # import fast voltages, if specified as a path
         if type(voltages) == str:
             is_csv = ".csv" in voltages.lower()
@@ -656,14 +657,18 @@ class Keithley2460(Instrument):
 
         if list_length >= 100:
             sub_lists = [
-                self.fast_voltages[i * 100 : (i + 1) * 100]
+                self.fast_voltages[ # pylint: disable=unsubscriptable-object
+                    i * 100 : (i + 1) * 100
+                ]
                 for i in range(list_length // 100)
             ]
         else:
             sub_lists = []
 
         if list_length % 100 > 0:
-            sub_lists.append(self.fast_voltages[-(list_length % 100) :])
+            sub_lists.append(
+                self.fast_voltages[-(list_length % 100) :] # pylint: disable=unsubscriptable-object
+            )
 
         current_list = []
 

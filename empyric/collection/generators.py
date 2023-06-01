@@ -1,9 +1,9 @@
 # Function/signal generators
+from typing import Union
 
 from empyric.adapters import Socket
 from empyric.instruments import Instrument, setter, getter, measurer
 from empyric.types import ON, OFF, Toggle, Integer, String, Float, recast
-from typing import Union
 
 
 class SiglentSDG1000(Instrument):

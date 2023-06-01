@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "empyric"
-version = "0.2.3"
+version = "0.2.4"
 description = "A package for experiment automation"
 authors = ["Daniel Merthe <dmerthe@gmail.com>"]
 readme = "README.md"
@@ -16,11 +16,11 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.10"
-numpy = "~1.24.3"
-scipy = "~1.9.3"
-matplotlib = "~3.6"
-pandas = "~1.5.3"
-pykwalify = "~1.8"
+numpy = "1.24.3"
+scipy = "1.9.3"
+matplotlib = "3.6.2"
+pandas = "1.5.3"
+pykwalify = "1.8.0"
 "ruamel.yaml" = "0.17.21"
 
 [tool.poetry.group.dev.dependencies]
