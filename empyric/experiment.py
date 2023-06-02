@@ -216,13 +216,17 @@ class Experiment:
             # unblock threads evaluating dependents
 
             if np.size(value) > 1:  # store array data as CSV files
-                dataframe = pd.DataFrame(
-                    {name: value}, index=[self.state.name] * len(value)
-                )
-                path = name.replace(" ", "_") + "_"
-                path += self.state.name.strftime("%Y%m%d-%H%M%S") + ".csv"
-                dataframe.to_csv(path)
-                self.state[name] = path
+                if np.any(value):
+                    # only save non-empty arrays
+                    dataframe = pd.DataFrame(
+                        {name: value}, index=[self.state.name] * len(value)
+                    )
+                    path = name.replace(" ", "_") + "_"
+                    path += self.state.name.strftime("%Y%m%d-%H%M%S") + ".csv"
+                    dataframe.to_csv(path)
+                    self.state[name] = path
+                else:
+                    self.state[name] = None
             else:
                 self.state[name] = value
         except BaseException as err:
