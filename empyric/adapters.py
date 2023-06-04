@@ -126,7 +126,11 @@ class Adapter:
 
         self.instrument.adapter = self
 
-        self.lock = Lock()  # for traffic control
+        # This lock is used by the chaperone wrapper function to prevent
+        # cross-talk from different threads. Each time an adapter's write, read
+        # or query methods is called, the lock is acquired and then released
+        # when the transaction is complete.
+        self.lock = Lock()
 
     def __del__(self):
         # Try to cleanly close communications when adapters are deleted
@@ -1033,7 +1037,12 @@ class Modbus(Adapter):
     delay = 0.05
 
     _protocol = None
-    _serial_adapters = {}  # for traffic control with Modbus Serial adapters
+
+    # This dict contains all active Modbus serial adapters. When a new adapter
+    # is initialized with the same com port as an existing one, it uses the
+    # same Modbus client object as its backend (they are differentiated by
+    # their slave IDs).
+    _serial_adapters = {}
 
     # Locate PyModbus library
     if importlib.util.find_spec("pymodbus"):
