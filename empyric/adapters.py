@@ -2,6 +2,7 @@ import importlib
 import socket
 import time
 import re
+from threading import Lock
 
 import numpy as np
 
@@ -24,15 +25,12 @@ def chaperone(method):
                 f"at address {self.instrument.address}"
             )
 
-        while self.busy:  # wait for turn to talk to the instrument
-            time.sleep(0.05)
-
-        self.busy = True  # block other methods from talking to the instrument
-
         # Catch communication errors and either try to repeat communication
         # or reset the connection
         attempts = 0
         reconnects = 0
+
+        self.lock.acquire()
 
         while reconnects <= self.max_reconnects:
             while attempts < self.max_attempts:
@@ -51,7 +49,7 @@ def chaperone(method):
                     elif attempts > 0 or reconnects > 0:
                         print("Resolved")
 
-                    self.busy = False
+                    self.lock.release()
                     return response
 
                 except BaseException as err:
@@ -73,7 +71,7 @@ def chaperone(method):
 
         # Getting here means that both repeats
         # and reconnects have been maxed out
-        self.busy = False
+        self.lock.release()
         raise AdapterError(f"Unable to communicate with {self.instrument.name}!")
 
     wrapped_method.__doc__ = method.__doc__  # keep method doc string
@@ -128,7 +126,11 @@ class Adapter:
 
         self.instrument.adapter = self
 
-        self.busy = False  # indicator for multithreading
+        # This lock is used by the chaperone wrapper function to prevent
+        # cross-talk from different threads. Each time an adapter's write, read
+        # or query methods is called, the lock is acquired and then released
+        # when the transaction is complete.
+        self.lock = Lock()
 
     def __del__(self):
         # Try to cleanly close communications when adapters are deleted
@@ -372,11 +374,11 @@ class Serial(Adapter):
 
         input("Press enter when the instrument is disconnected")
 
-        other_devices = Serial.list(verbose=False)
+        other_devices = Serial.list()
 
         input("Press enter when the instrument is connected")
 
-        all_devices = Serial.list(verbose=False)
+        all_devices = Serial.list()
 
         try:
             instrument_address = [
@@ -467,9 +469,6 @@ class GPIB(Adapter):
                 self._timeout = timeout
             elif self.lib == "linux-gpib":
                 self._timeout = self._linux_gpib_set_timeout(timeout)
-            elif self.lib == "prologix-gpib":
-                self.backend.timeout = timeout
-                self._timeout = timeout
         else:
             self._timeout = None
 
@@ -1038,7 +1037,12 @@ class Modbus(Adapter):
     delay = 0.05
 
     _protocol = None
-    _serial_adapters = {}  # for Modbus Serial
+
+    # This dict contains all active Modbus serial adapters. When a new adapter
+    # is initialized with the same com port as an existing one, it uses the
+    # same Modbus client object as its backend (they are differentiated by
+    # their slave IDs).
+    _serial_adapters = {}
 
     # Locate PyModbus library
     if importlib.util.find_spec("pymodbus"):
@@ -1050,7 +1054,10 @@ class Modbus(Adapter):
     def busy(self):
         if self._protocol == "Serial":
             return bool(
-                sum([adapter._busy for adapter in Modbus.adapters.get(self.port, [])])
+                sum([
+                    adapter._busy for adapter in
+                    Modbus._serial_adapters.get(self.port, [])
+                ])
             )
         else:
             return self._busy
@@ -1072,30 +1079,43 @@ class Modbus(Adapter):
             if len(address) == 1:
                 address.append(502)  # standard Modbus TCP port
 
-            self.backend = client.ModbusTcpClient(host=address[0], port=int(address[1]))
+            self.backend = client.ModbusTcpClient(
+                host=address[0],
+                port=int(address[1])
+            )
 
         else:
             # Modbus Serial
             self._protocol = "Serial"
 
             if len(address) == 1:
-                raise ValueError(
-                    "Modbus over serial requires both the "
-                    "serial port address and slave address"
-                )
 
-            if address[0] in Modbus._serial_adapters:
-                ModbusSerial.adapters[address[0]].append(self)
+                # assume slave id is zero if not specified
+                port, slave_id = address[0], 0
+
             else:
-                ModbusSerial.adapters[self.port] = [self]
+                port, slave_id = address
+
+            if port in Modbus._serial_adapters:
+
+                Modbus._serial_adapters[port].append(self)
+
+                # use existing backend
+                self.backend = Modbus._serial_adapters[port].backend
+
+            else:
+
+                Modbus._serial_adapters[port] = [self]
 
                 self.backend = client.ModbusSerialClient(
-                    address=address[0],
+                    address=port,
                     baudrate=self.baud_rate,
                     bytesize=self.byte_size,
                     parity=self.parity,
                     stopbits=self.stop_bits,
                 )
+
+            self.slave_id = slave_id
 
         # Get data reading/writing utility classes
         payload_module = importlib.import_module(".payload", package="pymodbus")
@@ -1124,7 +1144,8 @@ class Modbus(Adapter):
 
         if _type and _type not in self.types:
             raise TypeError(
-                "invalid _type argument; must be one of:\n" + ", ".join(self.types)
+                "invalid _type argument; must be one of:\n"
+                + ", ".join(self.types)
             )
 
         if "5" in str(func_code):
@@ -1288,7 +1309,6 @@ class Phidget(Adapter):
         self.backend.openWaitForAttachment(1000 * self.timeout)
 
         self.connected = True
-        self.busy = False
 
     def _write(self, parameter, value):
         self.backend.__getattribute__("set" + parameter)(value)

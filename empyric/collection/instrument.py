@@ -1,4 +1,5 @@
 import typing
+from threading import RLock
 from functools import wraps
 from empyric.adapters import *
 from empyric.types import recast, Type
@@ -36,19 +37,20 @@ def setter(method):
         self = args[0]
         value = args[1]
 
-        while self._busy:
-            time.sleep(0.01)
+        self.lock.acquire()
 
-        returned_value = method(*args, **kwargs)
+        try:
+            returned_value = method(*args, **kwargs)
 
-        # The knob attribute is set to the returned value of the method, or
-        # the value argument if the returned value is None
-        if returned_value is not None:
-            self.__setattr__(knob, recast(returned_value, to=dtype))
-        else:
-            self.__setattr__(knob, recast(value, to=dtype))
+            # The knob attribute is set to the returned value of the method, or
+            # the value argument if the returned value is None
+            if returned_value is not None:
+                self.__setattr__(knob, recast(returned_value, to=dtype))
+            else:
+                self.__setattr__(knob, recast(value, to=dtype))
+        finally:
 
-        self._busy = False
+            self.lock.release()
 
     return wrapped_method
 
@@ -71,8 +73,7 @@ def getter(method):
     def wrapped_method(*args, **kwargs):
         self = args[0]
 
-        while self._busy:
-            time.sleep(0.01)
+        self.lock.acquire()
 
         try:
             value = recast(method(*args, **kwargs), to=dtype)
@@ -82,10 +83,10 @@ def getter(method):
                 value = None
             else:
                 raise AttributeError(err)
+        finally:
+            self.lock.release()
 
         self.__setattr__(knob, value)
-
-        self._busy = False
 
         return value
 
@@ -110,8 +111,7 @@ def measurer(method):
     def wrapped_method(*args, **kwargs):
         self = args[0]
 
-        while self._busy:
-            time.sleep(0.01)
+        self.lock.acquire()
 
         try:
             value = recast(method(*args, **kwargs), to=dtype)
@@ -121,10 +121,10 @@ def measurer(method):
                 value = None
             else:
                 raise AttributeError(err)
+        finally:
+            self.lock.release()
 
         self.__setattr__(meter, value)
-
-        self._busy = False
 
         return value
 
@@ -167,10 +167,13 @@ class Instrument:
 
     meters = tuple()
 
-    # Flag for blocking concurrent operations; useful for set, get or measure
-    # methods that involve multiple adapter operations that might overlap in
-    # time with those of other set, get or measure calls.
-    _busy = False
+    # This lock is used to prevent commands executed in separate threads from
+    # interfering with each other. The lock is acquired in the setter, getter
+    # and measurer wrapper functions and then released when the wrapped
+    # operation is complete. Using an RLock allows set, get and measure
+    # methods to call other such methods without blocking, as long as it
+    # happens in the same thread, which is the norm.
+    lock = RLock()
 
     def __init__(
         self, address=None, adapter=None, presets=None, postsets=None, **kwargs
