@@ -324,18 +324,13 @@ class Timecourse(Routine):
                 # use that variable's value from state
                 last_value = state[last_value]
 
-            last_is_number = isinstance(last_value, numbers.Number)
-            next_is_number = isinstance(next_value, numbers.Number)
+            if next_value in list(state.keys()):
+                next_value = state[next_value]
 
-            if next_is_number and last_is_number:
-                # ramp linearly between numerical values
-                value = last_value + (next_value - last_value) * (
-                    state["Time"] - last_time
-                ) / (next_time - last_time)
-            else:
-                # stay at last value until next time,
-                # when value variable will be evaluated
-                value = last_value
+            # Ramp linearly between numerical values
+            value = last_value + (next_value - last_value) * (
+                state["Time"] - last_time
+            ) / (next_time - last_time)
 
             self.knobs[knob].value = value
 
@@ -359,7 +354,11 @@ class Timecourse(Routine):
         # Upon routine completion, set each knob to its final value
         for knob, value in zip(self.knobs.values(), self.values[:, -1]):
             if knob._controller is None or knob._controller == self:
-                knob.value = value
+
+                if isinstance(value, String) and value in state:
+                    knob.value = state[value]
+                else:
+                    knob.value = value
 
 
 class Sequence(Routine):
@@ -406,7 +405,11 @@ class Sequence(Routine):
         # Upon routine completion, set each knob to its final value
         for knob, value in zip(self.knobs.values(), self.values[:, -1]):
             if knob._controller is None or knob._controller == self:
-                knob.value = value
+
+                if isinstance(value, String) and value in state:
+                    knob.value = state[value]
+                else:
+                    knob.value = value
 
 
 class Minimization(Routine):
