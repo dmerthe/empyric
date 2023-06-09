@@ -9,7 +9,3 @@ build:
 
 sphinx:
    configuration: docs/conf.py
-
-#python:
-#   install:
-#   - requirements: requirements.txt
