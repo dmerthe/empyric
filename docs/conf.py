@@ -19,11 +19,11 @@ sys.path.insert(0, os.path.abspath(".."))
 # -- Project information -----------------------------------------------------
 
 project = "empyric"
-copyright = "2022, Daniel Merthe"
+copyright = "2023, Daniel Merthe"
 author = "Daniel Merthe"
 
 # The full version, including alpha/beta/rc tags
-release = "0.1"
+release = "0.2.5"
 
 
 # -- General configuration ---------------------------------------------------
