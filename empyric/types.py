@@ -15,8 +15,7 @@ class Type(ABC):
 
 
 class Boolean(Type):
-    """Abstract base class for all boolean types; `bool` and `np.bool_` are
-    subclasses"""
+    """Abstract base class for `bool` and `numpy.bool_`"""
 
     pass
 
@@ -69,8 +68,7 @@ OFF = Toggle("OFF")
 
 
 class Integer(Type):
-    """Abstract base class for all integer types; `int` and `np.integer` are
-    subclasses"""
+    """Abstract base class for `int` and `numpy.integer`"""
 
     pass
 
@@ -80,8 +78,7 @@ Integer.register(np.integer)
 
 
 class Float(Type):
-    """Abstract base class for all float types; `float` and `np.floating` are
-    subclasses"""
+    """Abstract base class for `float` and `numpy.floating`"""
 
     pass
 
@@ -91,8 +88,7 @@ Float.register(np.floating)
 
 
 class String(Type):
-    """Abstract base class for all string types; `str` and `np.str_` are
-    subclasses"""
+    """Abstract base class for `str` and `numpy.str_`"""
 
     pass
 
@@ -103,9 +99,8 @@ String.register(np.str_)
 
 class Array(Type):
     """
-    Abstract base class for all array-like types, essentially any commonly
-    used type that can be indexed; `list`, `tuple`, `numpy.ndarray`,
-    `pandas.Series` and `pandas.Dataframe` are subclasses
+    Abstract base class for `list`, `tuple`, `numpy.ndarray`, `pandas.Series`
+    and `pandas.Dataframe`
     """
 
     pass
@@ -128,6 +123,9 @@ supported = {
 def recast(value: Any, to: type = Type) -> Union[Type, None]:
     """
     Convert a value into the appropriate type for the information it contains.
+
+    If a subclass of `Type` is passed to the optional `to` keyword argument,
+    the value is reast to that type. Otherwise, recasting goes as follows.
 
     Booleans are converted into numpy booleans; integers are converted into
     64-bit numpy integers; floats are converted into 64-bit numpy floats.
