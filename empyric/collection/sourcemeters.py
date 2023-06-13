@@ -374,7 +374,6 @@ class Keithley2400(Instrument):
 
     @measurer
     def measure_fast_currents(self) -> Array:
-
         normal_timeout = self.adapter.timeout
         self.adapter.timeout = None  # measurements can take a while
 
@@ -653,7 +652,7 @@ class Keithley2460(Instrument):
 
         if list_length >= 100:
             sub_lists = [
-                self.fast_voltages[ # pylint: disable=unsubscriptable-object
+                self.fast_voltages[  # pylint: disable=unsubscriptable-object
                     i * 100 : (i + 1) * 100
                 ]
                 for i in range(list_length // 100)
@@ -663,7 +662,9 @@ class Keithley2460(Instrument):
 
         if list_length % 100 > 0:
             sub_lists.append(
-                self.fast_voltages[-(list_length % 100) :] # pylint: disable=unsubscriptable-object
+                self.fast_voltages[
+                    -(list_length % 100) :
+                ]  # pylint: disable=unsubscriptable-object
             )
 
         current_list = []

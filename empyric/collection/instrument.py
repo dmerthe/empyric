@@ -49,7 +49,6 @@ def setter(method):
             else:
                 self.__setattr__(knob, recast(value, to=dtype))
         finally:
-
             self.lock.release()
 
     return wrapped_method

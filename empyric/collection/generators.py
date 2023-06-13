@@ -30,9 +30,9 @@ class SiglentSDG1000(Instrument):
         "channel 2 pulse width",
         "channel 1 pulse delay",
         "channel 2 pulse delay",
-        'channel 1 invert',
-        'channel 2 invert',
-        'equal phase'
+        "channel 1 invert",
+        "channel 2 invert",
+        "equal phase",
     )
 
     wave_forms = ("SINE", "SQUARE", "RAMP", "PULSE", "NOISE", "ARB", "DC", "PRBS", "IQ")
@@ -100,19 +100,17 @@ class SiglentSDG1000(Instrument):
         return waveform_dict
 
     def _set_channel_n_invert(self, n, state: Toggle):
-
         if state == ON:
-            self.write('C%d:INVT ON' % n)
+            self.write("C%d:INVT ON" % n)
         elif state == OFF:
-            self.write('C%d:INVT OFF' % n)
+            self.write("C%d:INVT OFF" % n)
 
     def _get_channel_n_invert(self, n):
+        response = self.query("C%d:INVT?" % n)
 
-        response = self.query('C%d:INVT?' % n)
-
-        if 'ON' in response:
+        if "ON" in response:
             return ON
-        if 'OFF' in response:
+        if "OFF" in response:
             return OFF
 
     # Output
@@ -320,6 +318,5 @@ class SiglentSDG1000(Instrument):
     # Equalize phase of both channels
     @setter
     def set_equal_phase(self, state: Toggle):
-
         if state == ON:
-            self.write('EQPHASE')
+            self.write("EQPHASE")

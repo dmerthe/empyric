@@ -110,7 +110,6 @@ class Routine:
                 return
 
             else:
-
                 if not self.prepped:
                     self.prep(state)
 
@@ -306,7 +305,6 @@ class Timecourse(Routine):
     def update(self, state):
         knobs_times_values = zip(self.knobs, self.times, self.values)
         for knob, times, values in knobs_times_values:
-
             if np.min(times) > state["Time"] or np.max(times) < state["Time"]:
                 continue
 
@@ -335,26 +333,23 @@ class Timecourse(Routine):
             self.knobs[knob].value = value
 
     def prep(self, state):
-
         # Validate values
         for knob, value_list in zip(self.knobs.keys(), self.values):
             for value in value_list:
-
                 is_number = isinstance(value, numbers.Number)
                 is_variable = value in list(state.keys())
 
                 if not is_number and not is_variable:
                     raise ValueError(
-                        f'value {value} given for knob {knob} in Timecourse '
-                        f'routine is invalid; value must be a numeric type or '
-                        f'the name of a variable in the updating state'
+                        f"value {value} given for knob {knob} in Timecourse "
+                        f"routine is invalid; value must be a numeric type or "
+                        f"the name of a variable in the updating state"
                     )
 
     def finish(self, state):
         # Upon routine completion, set each knob to its final value
         for knob, value in zip(self.knobs.values(), self.values[:, -1]):
             if knob._controller is None or knob._controller == self:
-
                 if isinstance(value, String) and value in state:
                     knob.value = state[value]
                 else:
@@ -405,7 +400,6 @@ class Sequence(Routine):
         # Upon routine completion, set each knob to its final value
         for knob, value in zip(self.knobs.values(), self.values[:, -1]):
             if knob._controller is None or knob._controller == self:
-
                 if isinstance(value, String) and value in state:
                     knob.value = state[value]
                 else:

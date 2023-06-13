@@ -1054,10 +1054,12 @@ class Modbus(Adapter):
     def busy(self):
         if self._protocol == "Serial":
             return bool(
-                sum([
-                    adapter._busy for adapter in
-                    Modbus._serial_adapters.get(self.port, [])
-                ])
+                sum(
+                    [
+                        adapter._busy
+                        for adapter in Modbus._serial_adapters.get(self.port, [])
+                    ]
+                )
             )
         else:
             return self._busy
@@ -1079,17 +1081,13 @@ class Modbus(Adapter):
             if len(address) == 1:
                 address.append(502)  # standard Modbus TCP port
 
-            self.backend = client.ModbusTcpClient(
-                host=address[0],
-                port=int(address[1])
-            )
+            self.backend = client.ModbusTcpClient(host=address[0], port=int(address[1]))
 
         else:
             # Modbus Serial
             self._protocol = "Serial"
 
             if len(address) == 1:
-
                 # assume slave id is zero if not specified
                 port, slave_id = address[0], 0
 
@@ -1097,14 +1095,12 @@ class Modbus(Adapter):
                 port, slave_id = address
 
             if port in Modbus._serial_adapters:
-
                 Modbus._serial_adapters[port].append(self)
 
                 # use existing backend
                 self.backend = Modbus._serial_adapters[port].backend
 
             else:
-
                 Modbus._serial_adapters[port] = [self]
 
                 self.backend = client.ModbusSerialClient(
@@ -1144,8 +1140,7 @@ class Modbus(Adapter):
 
         if _type and _type not in self.types:
             raise TypeError(
-                "invalid _type argument; must be one of:\n"
-                + ", ".join(self.types)
+                "invalid _type argument; must be one of:\n" + ", ".join(self.types)
             )
 
         if "5" in str(func_code):

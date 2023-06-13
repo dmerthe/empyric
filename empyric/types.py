@@ -155,7 +155,6 @@ def recast(value: Any, to: type = Type) -> Union[Type, None]:
         for dtype in np.array([to], dtype=object).flatten():
             # Recast to desired type
             try:
-
                 if get_origin(dtype) is Union:
                     # Expand type unions
                     return recast(value, to=get_args(dtype))
