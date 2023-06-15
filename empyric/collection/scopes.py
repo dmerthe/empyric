@@ -5,7 +5,7 @@ from empyric.collection.instrument import *
 from empyric.types import Float, Array, Integer, String
 
 
-class TekScope(Instrument):
+class TekTDSScope(Instrument):
     """
     Tektronix oscillscope of the TDS200, TDS1000/2000, TDS1000B/2000B,
     TPS2000 series
@@ -15,7 +15,7 @@ class TekScope(Instrument):
 
     name = "TekScope"
 
-    supported_adapters = ((USB, {"timeout": 10}),)  # acquisitions can take a long time
+    supported_adapters = ((USB, {"timeout": 10}),)
 
     knobs = (
         "horz scale",
@@ -38,49 +38,181 @@ class TekScope(Instrument):
         "channel 4",
     )
 
+    channels = 0
+
+    two_channel_models = [1001, 1002, 1012, 2002, 2012, 2022]
+    four_channel_models = [2004, 2014]
+
+    def __init__(self, *args, **kwargs):
+
+        adapter = USB(Instrument(args[0]))
+
+        self.model = int(re.search('\d\d\d\d', adapter.query("*IDN?"))[0])
+
+        adapter.disconnect()
+
+        if self.model in self.two_channel_models:
+            self.channels = 2
+        elif self.model in self.four_channel_models:
+            self.channels = 4
+
+        super().__init__(*args, **kwargs)
+
+    # Horizontal
+
     @setter
     def set_horz_scale(self, scale: Float):
         self.write("HOR:SCA %.3e" % scale)
+
+    @getter
+    def get_horz_scale(self) -> Float:
+        return float(self.query("HOR:SCA?"))
 
     @setter
     def set_horz_position(self, position: Float):
         self.write("HOR:POS %.3e" % position)
 
+    @getter
+    def get_horz_position(self) -> Float:
+        return float(self.query("HOR:POS?"))
+
+    # Channel 1
+
     @setter
     def set_ch1_scale(self, scale: Float):
         self.write("CH1:SCA %.3e" % scale)
 
-    @setter
-    def set_ch2_scale(self, scale: Float):
-        self.write("CH1:SCA %.3e" % scale)
-
-    @setter
-    def set_ch3_scale(self, scale: Float):
-        self.write("CH1:SCA %.3e" % scale)
-
-    @setter
-    def set_ch4_scale(self, scale: Float):
-        self.write("CH1:SCA %.3e" % scale)
+    @getter
+    def get_ch1_scale(self) -> Float:
+        return float(self.query("CH1:SCA?"))
 
     @setter
     def set_ch1_position(self, position: Float):
         self.write("CH1:POS %.3e" % position)
 
+    @getter
+    def get_ch1_position(self) -> Float:
+        return float(self.query("CH1:POS?"))
+
+    @measurer
+    def measure_channel_1(self) -> Array:
+        return self._measure_channel(1)
+
+    # Channel 2
+
+    @setter
+    def set_ch2_scale(self, scale: Float):
+        self.write("CH2:SCA %.3e" % scale)
+
+    @getter
+    def get_ch2_scale(self) -> Float:
+        return float(self.query("CH2:SCA?"))
+
     @setter
     def set_ch2_position(self, position: Float):
-        self.write("CH1:POS %.3e" % position)
+        self.write("CH2:POS %.3e" % position)
+
+    @getter
+    def get_ch2_position(self) -> Float:
+        return float(self.query("CH2:POS?"))
+
+    @measurer
+    def measure_channel_2(self) -> Array:
+        return self._measure_channel(2)
+
+    # Channel 3
+
+    @setter
+    def set_ch3_scale(self, scale: Float):
+
+        if self.channels > 2:
+            self.write("CH3:SCA %.3e" % scale)
+        else:
+            return np.nan
+
+    @getter
+    def get_ch3_scale(self) -> Float:
+
+        if self.channels > 2:
+            return float(self.query("CH3:SCA?"))
+        else:
+            return np.nan
 
     @setter
     def set_ch3_position(self, position: Float):
-        self.write("CH1:POS %.3e" % position)
+
+        if self.channels > 2:
+            self.write("CH3:POS %.3e" % position)
+        else:
+            return np.nan
+
+    @getter
+    def get_ch3_position(self) -> Float:
+
+        if self.channels > 2:
+            return float(self.query("CH3:POS?"))
+        else:
+            return np.nan
+
+    @measurer
+    def measure_channel_3(self) -> Array:
+
+        if self.channels > 2:
+            return self._measure_channel(3)
+        else:
+            return [np.nan]
+
+    # Channel 4
+
+    @setter
+    def set_ch4_scale(self, scale: Float):
+
+        if self.channels > 2:
+            self.write("CH4:SCA %.3e" % scale)
+        else:
+            return np.nan
+
+    @getter
+    def get_ch4_scale(self) -> Float:
+
+        if self.channels > 2:
+            return float(self.query("CH4:SCA?"))
+        else:
+            return np.nan
 
     @setter
     def set_ch4_position(self, position: Float):
-        self.write("CH1:POS %.3e" % position)
+
+        if self.channels > 2:
+            self.write("CH4:POS %.3e" % position)
+        else:
+            return np.nan
+
+    @getter
+    def get_ch4_position(self) -> Float:
+
+        if self.channels > 2:
+            return float(self.query("CH4:POS?"))
+        else:
+            return np.nan
+
+    @measurer
+    def measure_channel_4(self) -> Array:
+
+        if self.channels > 2:
+            return self._measure_channel(4)
+        else:
+            return [np.nan]
+
+    # Trigger
 
     @setter
     def set_trigger_level(self, level: Float):
         self.write("TRIG:MAI:LEV %.3e" % level)
+
+    @getter
+    def get_trigger_level(self) -> Float:
+        return float(self.query("TRIG:MAI:LEV?"))
 
     def _measure_channel(self, channel):
         self.write("DAT:ENC ASCI")  # ensure ASCII encoding of data
@@ -99,22 +231,6 @@ class TekScope(Instrument):
         return np.array(
             [(float(datum) - offset) * scale_factor + zero for datum in str_data]
         )
-
-    @measurer
-    def measure_channel_1(self) -> Array:
-        return self._measure_channel(1)
-
-    @measurer
-    def measure_channel_2(self) -> Array:
-        return self._measure_channel(2)
-
-    @measurer
-    def measure_channel_3(self) -> Array:
-        return self._measure_channel(3)
-
-    @measurer
-    def measure_channel_4(self) -> Array:
-        return self._measure_channel(4)
 
 
 class MulticompProScope(Instrument):
