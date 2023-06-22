@@ -8,9 +8,14 @@ from empyric.types import Float, Array, Integer, String
 class TekTDSScope(Instrument):
     """
     Tektronix oscillscope of the TDS200, TDS1000/2000, TDS1000B/2000B,
-    TPS2000 series
+    TPS2000 series.
 
-    NOT TESTED
+    Although there are four possible channels, the constructor checks the model
+    number for the number of channels. Any calls to measure_channel_3 or
+    measure_channel_4 for 2-channel models will return an array of NaN values.
+
+    2-Channel models: TXX1001, TXX1002, TXX1012, TXX2002, TXX2012, TXX2022
+    4-channel models: TXX2004, TXX2014
     """
 
     name = "TekScope"
@@ -214,9 +219,9 @@ class TekTDSScope(Instrument):
     def get_trigger_level(self) -> Float:
         return float(self.query("TRIG:MAI:LEV?"))
 
-    def _measure_channel(self, channel):
+    def _measure_channel(self, n):
         self.write("DAT:ENC ASCI")  # ensure ASCII encoding of data
-        self.write("DAT:SOU CH%d" % channel)  # switch to channel 1
+        self.write("DAT:SOU CH%d" % n)  # switch to channel n
 
         scale_factor = float(self.query("WFMPRE:YMULT?"))
         zero = float(self.query("WFMPRE:YZERO?"))
@@ -225,9 +230,17 @@ class TekTDSScope(Instrument):
         self.write("ACQ:STATE RUN")  # acquire the waveform
 
         while int(self.query("BUSY?")):
-            time.sleep(1)  # wait for acquisition to complete
+            time.sleep(0.25)  # wait for acquisition to complete
 
-        str_data = self.query("CURVE?").split(" ")[1].split(",")
+        normal_timeout = self.adapter.timeout
+        self.adapter.timeout = 60
+
+        response = self.query("CURVE?")
+
+        str_data = response.split(",")
+
+        self.adapter.timeout = normal_timeout
+
         return np.array(
             [(float(datum) - offset) * scale_factor + zero for datum in str_data]
         )

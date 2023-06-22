@@ -768,8 +768,6 @@ class USB(Adapter):
     Handles communications with pure USB instruments through PyVISA or USBTMC.
     """
 
-    timeout = 0.5
-
     # Get USB library
     if importlib.util.find_spec("pyvisa"):
         lib = "pyvisa"
@@ -779,6 +777,23 @@ class USB(Adapter):
         lib = None
 
     no_lib_msg = "No USB library was found! " "Please install either PyVISA or USBTMC."
+
+    _timeout = 0.5
+
+    @property
+    def timeout(self):
+        return self._timeout
+
+    @timeout.setter
+    def timeout(self, timeout):
+
+        if self.backend is not None:
+            if self.lib == "usbtmc":
+                self.backend.timeout = timeout
+            elif self.lib == 'pyvisa':
+                self.backend.timeout = 1000*timeout
+
+        self._timeout = timeout
 
     def connect(self):
         serial_number = str(self.instrument.address)
@@ -791,14 +806,18 @@ class USB(Adapter):
             for address in manager.list_resources():
                 if serial_number in address:
                     self.backend = manager.open_resource(
-                        address, open_timeout=self.timeout
+                        address, open_timeout=1000 * self.timeout
                     )
-                    self.backend.timeout = self.timeout
+
+                    # PyVISA timeout is in milliseconds
+                    self.backend.timeout = 1000 * self.timeout
 
         elif self.lib == "usbtmc":
             usbtmc = importlib.import_module("usbtmc")
 
             self.backend = usbtmc.Instrument("USB::" + serial_number + "::INSTR")
+
+            self.backend.timeout = self.timeout
 
         else:
             raise AdapterError(f"invalid library specification, {self.lib}")
