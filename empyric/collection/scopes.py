@@ -15,6 +15,7 @@ class TekTDSScope(Instrument):
     measure_channel_4 for 2-channel models will return an array of NaN values.
 
     2-Channel models: TXX1001, TXX1002, TXX1012, TXX2002, TXX2012, TXX2022
+
     4-channel models: TXX2004, TXX2014
     """
 
