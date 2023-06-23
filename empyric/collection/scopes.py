@@ -10,9 +10,9 @@ class TekTDSScope(Instrument):
     Tektronix oscillscope of the TDS200, TDS1000/2000, TDS1000B/2000B,
     TPS2000 series.
 
-    Although there are four possible channels, the constructor checks the model
-    number for the number of channels. Any calls to measure_channel_3 or
-    measure_channel_4 for 2-channel models will return an array of NaN values.
+    Although there are up to four channels, the constructor checks the model
+    number for the actual number of supported channels. With the 2-channel
+    models, any methods relating to channels 3 or 4 will take no action.
 
     2-Channel models: TXX1001, TXX1002, TXX1012, TXX2002, TXX2012, TXX2022
 
@@ -51,6 +51,7 @@ class TekTDSScope(Instrument):
 
     def __init__(self, *args, **kwargs):
 
+        # Check for number of channels before standard initialization
         adapter = USB(Instrument(args[0]))
 
         self.model = int(re.search('\d\d\d\d', adapter.query("*IDN?"))[0])
