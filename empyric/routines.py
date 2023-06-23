@@ -545,6 +545,31 @@ class Maximization(Minimization):
             return change > 0
 
 
+class Maximization(Routine):
+    """
+    Maximize a `meter`/expression influenced by the set of knobs;
+    otherwise, works the same way as Minimize.
+    """
+
+    def __init__(
+        self, knobs: dict, meter, max_deltas=None, **kwargs
+    ):
+        Routine.__init__(self, knobs, **kwargs)
+
+        self.meter = meter
+
+        if max_deltas:
+            self.max_deltas = np.array([max_deltas]).flatten()
+        else:
+            self.max_deltas = np.ones(len(self.knobs))
+
+        self.meter_values = []
+        self.best_meter = None
+        self.best_knobs = [None for _ in self.knobs]
+
+        self.revert = False  # going back?
+
+
 class SocketServer(Routine):
     """
     Server routine for transmitting data to other experiments, local or remote,
