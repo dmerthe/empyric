@@ -11,6 +11,8 @@ import functools
 import numpy as np
 import pandas as pd
 
+from bayes_opt import BayesianOptimization, UtilityFunction
+
 from empyric.tools import (
     convert_time,
     autobind_socket,
@@ -406,143 +408,143 @@ class Sequence(Routine):
                     knob.value = value
 
 
-class Minimization(Routine):
-    """
-    Minimize a `meter`(/expression) influenced by the set of `knobs`, using
-    simulated annealing.
-
-    The `meter` argument is the expression or meter to be minimized. The
-    `max_deltas` argument is an optional list/array of same length as `knobs`
-    indicating the maximum change per step for each knob; if not specified,
-    defaults to a list of ones. The `T0` and `T1` argumnets are the initial and
-    final temperatures; if not specified, defaults to T0 = 0.0 and T1 = 0.0.
-    The `samples` argument determines the number of meter values to average
-    together for each step.
-    """
-
-    def __init__(
-        self, knobs: dict, meter, max_deltas=None, T0=0.0, T1=0.0, samples=1, **kwargs
-    ):
-        Routine.__init__(self, knobs, **kwargs)
-
-        self.meter = meter
-
-        if max_deltas:
-            self.max_deltas = np.array([max_deltas]).flatten()
-        else:
-            self.max_deltas = np.ones(len(self.knobs))
-
-        self.T = T0
-        self.T0 = T0
-        self.T1 = T1
-        self.samples = samples
-
-        self.meter_values = []
-        self.best_meter = None
-        self.best_knobs = [None for _ in self.knobs]
-
-        self.revert = False  # going back?
-
-    @Routine.enabler
-    def update(self, state):
-        # Take no action if knobs values are undefined
-        if None in [state[knob] for knob in self.knobs] or np.nan in [
-            state[knob] for knob in self.knobs
-        ]:
-            return
-
-        if not self.prepped:
-            self.prep(state)
-            self.prepped = True
-
-        # Update temperature
-        self.T = self.T0 + (self.T1 - self.T0) * (state["Time"] - self.start) / (
-            self.end - self.start
-        )
-
-        # Get meter values
-        meter_value = state[self.meter]
-
-        # Check for valid new meter value
-        if meter_value is not None and meter_value != np.nan:
-            self.meter_values.append(meter_value)
-        else:
-            return
-
-        # Check if enough samples have been measured
-        if len(self.meter_values) <= self.samples:
-            return
-
-        # Check if found (or returned to) minimum
-        if self.better(np.mean(self.meter_values)) or self.revert:
-            # Record this new (or past) optimal state
-            self.best_meter = np.mean(self.meter_values)
-            self.best_knobs = [state[knob] for knob in self.knobs]
-
-            # Generate and apply new knob settings
-            new_knobs = self.best_knobs + self.max_deltas * (
-                2 * np.random.rand(len(self.knobs)) - 1
-            )
-
-            for knob, new_value in zip(self.knobs.values(), new_knobs):
-                knob.value = new_value
-
-            self.meter_values = []
-            self.revert = False
-
-        else:
-            for knob, best_val in zip(self.knobs.values(), self.best_knobs):
-                knob.value = best_val
-
-            self.meter_values = []
-            self.revert = True
-
-    def better(self, meter_value):
-        if meter_value is None or meter_value == np.nan:
-            return False
-
-        if self.best_meter is None or self.best_meter == np.nan:
-            return False
-
-        change = meter_value - self.best_meter
-
-        if self.T > 0:
-            _rand = np.random.rand()
-            return (change < 0) or (np.exp(-change / self.T) > _rand)
-        else:
-            return change < 0
-
-    def prep(self, state):
-        self.best_knobs = [state[knob] for knob in self.knobs]
-        self.best_meter = state[self.meter]
-
-    def finish(self, state):
-        for knob, best_val in zip(self.knobs.values(), self.best_knobs):
-            knob.value = best_val
-
-
-class Maximization(Minimization):
-    """
-    Maximize a `meter`/expression influenced by the set of knobs;
-    otherwise, works the same way as Minimize.
-    """
-
-    best_meter = -np.inf
-
-    def better(self, meter_value):
-        if meter_value is None or meter_value == np.nan:
-            return False
-
-        if self.best_meter is None or self.best_meter == np.nan:
-            return False
-
-        change = meter_value - self.best_meter
-
-        if self.T > 0:
-            _rand = np.random.rand()
-            return (change > 0) or (np.exp(change / self.T) > _rand)
-        else:
-            return change > 0
+# class Minimization(Routine):
+#     """
+#     Minimize a `meter`(/expression) influenced by the set of `knobs`, using
+#     simulated annealing.
+#
+#     The `meter` argument is the expression or meter to be minimized. The
+#     `max_deltas` argument is an optional list/array of same length as `knobs`
+#     indicating the maximum change per step for each knob; if not specified,
+#     defaults to a list of ones. The `T0` and `T1` argumnets are the initial and
+#     final temperatures; if not specified, defaults to T0 = 0.0 and T1 = 0.0.
+#     The `samples` argument determines the number of meter values to average
+#     together for each step.
+#     """
+#
+#     def __init__(
+#         self, knobs: dict, meter, max_deltas=None, T0=0.0, T1=0.0, samples=1, **kwargs
+#     ):
+#         Routine.__init__(self, knobs, **kwargs)
+#
+#         self.meter = meter
+#
+#         if max_deltas:
+#             self.max_deltas = np.array([max_deltas]).flatten()
+#         else:
+#             self.max_deltas = np.ones(len(self.knobs))
+#
+#         self.T = T0
+#         self.T0 = T0
+#         self.T1 = T1
+#         self.samples = samples
+#
+#         self.meter_values = []
+#         self.best_meter = None
+#         self.best_knobs = [None for _ in self.knobs]
+#
+#         self.revert = False  # going back?
+#
+#     @Routine.enabler
+#     def update(self, state):
+#         # Take no action if knobs values are undefined
+#         if None in [state[knob] for knob in self.knobs] or np.nan in [
+#             state[knob] for knob in self.knobs
+#         ]:
+#             return
+#
+#         if not self.prepped:
+#             self.prep(state)
+#             self.prepped = True
+#
+#         # Update temperature
+#         self.T = self.T0 + (self.T1 - self.T0) * (state["Time"] - self.start) / (
+#             self.end - self.start
+#         )
+#
+#         # Get meter values
+#         meter_value = state[self.meter]
+#
+#         # Check for valid new meter value
+#         if meter_value is not None and meter_value != np.nan:
+#             self.meter_values.append(meter_value)
+#         else:
+#             return
+#
+#         # Check if enough samples have been measured
+#         if len(self.meter_values) <= self.samples:
+#             return
+#
+#         # Check if found (or returned to) minimum
+#         if self.better(np.mean(self.meter_values)) or self.revert:
+#             # Record this new (or past) optimal state
+#             self.best_meter = np.mean(self.meter_values)
+#             self.best_knobs = [state[knob] for knob in self.knobs]
+#
+#             # Generate and apply new knob settings
+#             new_knobs = self.best_knobs + self.max_deltas * (
+#                 2 * np.random.rand(len(self.knobs)) - 1
+#             )
+#
+#             for knob, new_value in zip(self.knobs.values(), new_knobs):
+#                 knob.value = new_value
+#
+#             self.meter_values = []
+#             self.revert = False
+#
+#         else:
+#             for knob, best_val in zip(self.knobs.values(), self.best_knobs):
+#                 knob.value = best_val
+#
+#             self.meter_values = []
+#             self.revert = True
+#
+#     def better(self, meter_value):
+#         if meter_value is None or meter_value == np.nan:
+#             return False
+#
+#         if self.best_meter is None or self.best_meter == np.nan:
+#             return False
+#
+#         change = meter_value - self.best_meter
+#
+#         if self.T > 0:
+#             _rand = np.random.rand()
+#             return (change < 0) or (np.exp(-change / self.T) > _rand)
+#         else:
+#             return change < 0
+#
+#     def prep(self, state):
+#         self.best_knobs = [state[knob] for knob in self.knobs]
+#         self.best_meter = state[self.meter]
+#
+#     def finish(self, state):
+#         for knob, best_val in zip(self.knobs.values(), self.best_knobs):
+#             knob.value = best_val
+#
+#
+# class Maximization(Minimization):
+#     """
+#     Maximize a `meter`/expression influenced by the set of knobs;
+#     otherwise, works the same way as Minimize.
+#     """
+#
+#     best_meter = -np.inf
+#
+#     def better(self, meter_value):
+#         if meter_value is None or meter_value == np.nan:
+#             return False
+#
+#         if self.best_meter is None or self.best_meter == np.nan:
+#             return False
+#
+#         change = meter_value - self.best_meter
+#
+#         if self.T > 0:
+#             _rand = np.random.rand()
+#             return (change > 0) or (np.exp(change / self.T) > _rand)
+#         else:
+#             return change > 0
 
 
 class Maximization(Routine):
@@ -552,22 +554,64 @@ class Maximization(Routine):
     """
 
     def __init__(
-        self, knobs: dict, meter, max_deltas=None, **kwargs
+        self, knobs: dict, meter, bounds, max_deltas=None, **kwargs
     ):
         Routine.__init__(self, knobs, **kwargs)
 
-        self.meter = meter
+        self.bounds = {
+            knob: subbounds for knob, subbounds in zip(knobs, bounds)
+        }
 
         if max_deltas:
             self.max_deltas = np.array([max_deltas]).flatten()
         else:
             self.max_deltas = np.ones(len(self.knobs))
 
-        self.meter_values = []
+        self.meter = meter
+
         self.best_meter = None
         self.best_knobs = [None for _ in self.knobs]
 
-        self.revert = False  # going back?
+        self.optimizer = BayesianOptimization(
+            f=None,
+            verbose=0,
+            pbounds=bounds,
+            random_state=6174,
+            allow_duplicate_points=True
+        )
+
+        self.util_func = UtilityFunction()
+
+    def update(self, state):
+
+        if np.any([not isinstance(state[knob], numbers.Number) for knob in self.knobs]):
+            # undefined state
+            return
+
+        if not isinstance(state[self.meter], numbers.Number):
+            # undefined target value
+            return
+
+        self.optimizer.register(
+            params={knob: state[knob] for knob in self.knobs},
+            target=state[self.meter]
+        )
+
+        for i, (knob, value) in enumerate(self.optimizer.suggest(self.util_func)):
+
+            if np.abs(state[knob] - value) <= self.max_deltas[i]:
+                self.knobs[knob].value = value
+            else:
+                sign = np.random.choice([-1, 1])
+                self.knobs[knob].value = state[knob] + sign*self.max_deltas[i]
+
+        self.best_meter = self.optimizer.max['target']
+        self.best_knobs = self.optimizer.max['params']
+
+    def finish(self, state):
+
+        for knob, value in self.best_knobs:
+            self.knobs[knob].value = value
 
 
 class SocketServer(Routine):
