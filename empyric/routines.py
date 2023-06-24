@@ -553,6 +553,8 @@ class Maximization(Routine):
     otherwise, works the same way as Minimize.
     """
 
+    _sign = 1.0
+
     def __init__(
         self, knobs: dict, meter, bounds, max_deltas=None, **kwargs
     ):
@@ -594,7 +596,7 @@ class Maximization(Routine):
 
         self.optimizer.register(
             params={knob: state[knob] for knob in self.knobs},
-            target=state[self.meter]
+            target=self._sign*state[self.meter]
         )
 
         for i, (knob, value) in enumerate(self.optimizer.suggest(self.util_func)):
@@ -612,6 +614,11 @@ class Maximization(Routine):
 
         for knob, value in self.best_knobs:
             self.knobs[knob].value = value
+
+
+class Minimization(Maximization):
+    """Same as Maximization except that the sign of the meter is inverted"""
+    _sign = -1.0
 
 
 class SocketServer(Routine):
