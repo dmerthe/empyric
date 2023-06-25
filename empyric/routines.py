@@ -441,7 +441,16 @@ class Maximization(Routine):
         }
 
         if max_deltas:
-            self.max_deltas = np.array([max_deltas]).flatten()
+            if np.ndim(max_deltas) == 0:
+                self.max_deltas = np.array([max_deltas]*len(knobs))
+            elif np.ndim(max_deltas) == 1 and len(max_deltas) == len(knobs):
+                self.max_deltas = np.array(max_deltas)
+            else:
+                ValueError(
+                    f"Improperly specified max_deltas parameter {max_deltas} for "
+                    "optimization routine; must be either a single value or 1-D array "
+                    "with the same length as the knobs argument"
+                )
         else:
             self.max_deltas = np.array([np.inf] * len(self.knobs))
 
@@ -490,6 +499,9 @@ class Maximization(Routine):
 
         self.best_meter = self.optimizer.max["target"]
         self.best_knobs = self.optimizer.max["params"]
+
+        if np.isfinite(self.end):
+            self.util_func.kappa *= (self.end - state['Time']) / (self.end - self.start)
 
     def finish(self, state):
         for i, (knob, value) in enumerate(self.best_knobs.items()):

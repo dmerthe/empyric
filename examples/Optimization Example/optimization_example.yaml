@@ -24,42 +24,58 @@ Variables:
  Some Parameter:
   parameter: 0.0
 
+ Some Other Parameter:
+  parameter: 0.0
+
  Some Noise:
   instrument: Dummy Noise
   meter: value
 
  Some Metric:
-  expression: '(63*x^5 - 70*x^3 + 15*x)/8 + noise'
+  expression: 'sin(3.14159*x) * sin(3.14159*y) + noise'
   definitions:
    x: Some Parameter
+   y: Some Other Parameter
    noise: Some Noise
 
 Plots:
  Parameter Plot:
-  y: Some Parameter
+  y: [Some Parameter, Some Other Parameter]
  Metric Plot:
   x: Some Parameter
-  y: Some Metric
+  y: Some Other Parameter
+  s: Some Metric
   style: parametric
+  configure:
+   linestyle: 'none'
+   marker: 'o'
 
 Routines:
 
  Minimization Routine:
   type: Minimization
-  knobs: Some Parameter
+  knobs:
+   - Some Parameter
+   - Some Other Parameter
   meter: Some Metric
-  bounds: [-0.5, 0.5]
-  max deltas: 0.25
+  bounds:
+   - [0, 1]
+   - [0, 1]
+  max deltas: 0.1
   kappa: 3.0  # exploration vs. exploitation parameter
   start: 0
   end: 60
 
  Maximization Routine:
   type: Maximization
-  knobs: Some Parameter
+  knobs:
+   - Some Parameter
+   - Some Other Parameter
   meter: Some Metric
-  bounds: [-0.5, 0.5]
-  max deltas: 0.25
-  kappa: 3.0 # exploration vs. exploitation parameter
+  bounds:
+   - [0, 1]
+   - [0, 1]
+  max deltas: 0.1
+  kappa: 3.0  # exploration vs. exploitation parameter
   start: 90
   end: 150
