@@ -412,8 +412,9 @@ class Maximization(Routine):
     """
     Maximize a meter or expression influenced by the set of knobs.
 
-    This routine uses a bayesian optimizer, which models the relation between
-    the knobs and the meter as a gaussian process.
+    This routine uses a `bayesian optimizer
+    <https://github.com/bayesian-optimization/BayesianOptimization>`_, which models
+    the relation between the knobs and the meter as a gaussian process.
 
     The `bounds` parameter
     provides the parameter space over which the knob values can be explored.
