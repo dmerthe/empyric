@@ -13,19 +13,21 @@ Settings:
  end: 3 minutes
 
 Instruments:
- Dummy Instrument:
-  type: Echo
+
  Dummy Noise:
   type: SimpleProcess
   presets:
-   noise level: 0.1
+   noise level: 0.05
 
 Variables:
+
  Some Parameter:
   parameter: 0.0
+
  Some Noise:
   instrument: Dummy Noise
   meter: value
+
  Some Metric:
   expression: '(63*x^5 - 70*x^3 + 15*x)/8 + noise'
   definitions:
@@ -48,6 +50,7 @@ Routines:
   meter: Some Metric
   bounds: [-0.5, 0.5]
   max deltas: 0.25
+  kappa: 3.0  # exploration vs. exploitation parameter
   start: 0
   end: 60
 
@@ -57,5 +60,6 @@ Routines:
   meter: Some Metric
   bounds: [-0.5, 0.5]
   max deltas: 0.25
+  kappa: 3.0 # exploration vs. exploitation parameter
   start: 90
   end: 150
