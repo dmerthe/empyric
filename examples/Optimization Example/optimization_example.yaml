@@ -46,10 +46,8 @@ Routines:
   type: Minimization
   knobs: Some Parameter
   meter: Some Metric
+  bounds: [-0.5, 0.5]
   max deltas: 0.25
-  T0: 0.01
-  T1: 0
-  samples: 10
   start: 0
   end: 60
 
@@ -57,9 +55,7 @@ Routines:
   type: Maximization
   knobs: Some Parameter
   meter: Some Metric
+  bounds: [-0.5, 0.5]
   max deltas: 0.25
-  T0: 0.01
-  T1: 0
-  samples: 10
   start: 90
   end: 150

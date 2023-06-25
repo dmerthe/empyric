@@ -549,8 +549,7 @@ class Sequence(Routine):
 
 class Maximization(Routine):
     """
-    Maximize a `meter`/expression influenced by the set of knobs;
-    otherwise, works the same way as Minimize.
+    Maximize a meter or expression influenced by the set of knobs.
     """
 
     _sign = 1.0
@@ -561,13 +560,14 @@ class Maximization(Routine):
         Routine.__init__(self, knobs, **kwargs)
 
         self.bounds = {
-            knob: subbounds for knob, subbounds in zip(knobs, bounds)
+            knob: subbounds for knob, subbounds
+            in zip(knobs, np.reshape(bounds, (len(knobs), -1)))
         }
 
         if max_deltas:
             self.max_deltas = np.array([max_deltas]).flatten()
         else:
-            self.max_deltas = np.ones(len(self.knobs))
+            self.max_deltas = np.array([np.inf]*len(self.knobs))
 
         self.meter = meter
 
@@ -577,7 +577,7 @@ class Maximization(Routine):
         self.optimizer = BayesianOptimization(
             f=None,
             verbose=0,
-            pbounds=bounds,
+            pbounds=self.bounds,
             random_state=6174,
             allow_duplicate_points=True
         )
@@ -587,11 +587,11 @@ class Maximization(Routine):
     def update(self, state):
 
         if np.any([not isinstance(state[knob], numbers.Number) for knob in self.knobs]):
-            # undefined state
+            # undefined state; take no action
             return
 
         if not isinstance(state[self.meter], numbers.Number):
-            # undefined target value
+            # undefined target value; take no action
             return
 
         self.optimizer.register(
@@ -599,12 +599,14 @@ class Maximization(Routine):
             target=self._sign*state[self.meter]
         )
 
-        for i, (knob, value) in enumerate(self.optimizer.suggest(self.util_func)):
+        suggestion = self.optimizer.suggest(self.util_func)
 
-            if np.abs(state[knob] - value) <= self.max_deltas[i]:
+        for i, (knob, value) in enumerate(suggestion.items()):
+
+            if np.abs(value - state[knob]) <= self.max_deltas[i]:
                 self.knobs[knob].value = value
             else:
-                sign = np.random.choice([-1, 1])
+                sign = (value - state[knob])/np.abs(value - state[knob])
                 self.knobs[knob].value = state[knob] + sign*self.max_deltas[i]
 
         self.best_meter = self.optimizer.max['target']
@@ -612,8 +614,13 @@ class Maximization(Routine):
 
     def finish(self, state):
 
-        for knob, value in self.best_knobs:
-            self.knobs[knob].value = value
+        for i, (knob, value) in enumerate(self.best_knobs):
+
+            if np.abs(value - state[knob]) <= self.max_deltas[i]:
+                self.knobs[knob].value = value
+            else:
+                sign = (value - state[knob])/np.abs(value - state[knob])
+                self.knobs[knob].value = state[knob] + sign*self.max_deltas[i]
 
 
 class Minimization(Maximization):
