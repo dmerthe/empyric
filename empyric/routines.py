@@ -5,6 +5,8 @@ import queue
 import threading
 import asyncio
 import time
+from typing import Union
+
 import select
 import functools
 
@@ -41,19 +43,34 @@ class Routine:
     experiment. The knobs argument should be a dictionary of the form
     {..., name: variable, ...}.
 
-    The optional `start` and `end` arguments indicate when the routine should
-    start and end. The default values are 0 and infinity, respectively. When
-    updating, the routine compares these values to the `Time` value of the
-    given state.
+    The optional `enable` argument should be a string corresponding to a key in whatever
+    object is being passed as the `state` argument to the `update` method. The
+    corresponding value should be boolean. When the enabling value is False, the
+    `update` method takes no action. Otherwise, the `update` method proceeds normally.
 
-    All other arguments are fixed values or string dictionary keys,
-    corresponding to variables values of the controlling experiment.
+    The optional `start`, `end` and `duration` arguments indicate when the routine
+    should start and end. The `start` argument can be a number in seconds or a string
+    with a number and units, e.g. "2 minutes", indicating when the routine starts, or it
+    can be set to 'on enable' such that the start time is set to the time at which it is
+    enabled (possibly repeatedly) and the end time is set to the start time plus
+    `_duration` on each call to the `update` method. One can specify either `end` or
+    `duration`, but not both; `end` is the absolute time at which the routine will end,
+    while `duration` is the length of time the routine will run for (end minus start).
+
+    All other arguments are fixed values or dictionary keys, corresponding to variable
+    values of the controlling experiment.
     """
 
     assert_control = True
 
+    _start_on_enable = False
+
+    _duration = 0.0
+
     def __init__(
-        self, knobs: dict, enable: String = None, start=0.0, end=np.inf, **kwargs
+            self, knobs: dict, enable: String = None,
+            start: Union[Float, String] = None, end: Union[Float, String] = None,
+            duration: Union[Float, String] = None, **kwargs
     ):
         self.knobs = knobs
 
@@ -61,8 +78,26 @@ class Routine:
             knob._controller = None  # to control access to knob
 
         self.enable = enable
-        self.start = convert_time(start)
-        self.end = convert_time(end)
+
+        if start is not None:
+            if start == 'on enable':
+                self.start = np.nan  # will be set when routine is enabled
+                self._start_on_enable = True
+            else:
+                self.start = convert_time(start)
+        else:
+            self.start = 0.0
+
+        if end is not None:
+            self.end = convert_time(end)
+            self._duration = self.end - self.start
+        elif duration is not None:
+            self.end = self.start + convert_time(duration)
+            self._duration = duration
+        else:
+            self.end = np.inf
+            self._duration = np.inf
+
         self.prepped = False
         self.finished = False
 
@@ -90,6 +125,11 @@ class Routine:
                 for name, knob in self.knobs.items():
                     if knob._controller == self:
                         knob._controller = None
+
+                if self._start_on_enable:
+                    self.start = np.nan
+                    self.end = np.nan
+
                 return
 
             elif state["Time"] < self.start:
@@ -114,6 +154,10 @@ class Routine:
             else:
                 if not self.prepped:
                     self.prep(state)
+
+                if self._start_on_enable and np.isnan(self.start):
+                    self.start = state['Time']
+                    self.end = self.start + self._duration
 
                 for name, knob in self.knobs.items():
                     if knob._controller and knob._controller != self:
@@ -502,7 +546,7 @@ class Maximization(Routine):
         self.best_knobs = self.optimizer.max["params"]
 
         if np.isfinite(self.end):
-            kappa = self._kappa0 * (self.end - state["Time"]) / (self.end - self.start)
+            kappa = self._kappa0 * (self.end - state["Time"]) / self._duration
             self.util_func.kappa = kappa
 
     def finish(self, state):
