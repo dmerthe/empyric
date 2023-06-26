@@ -1,7 +1,7 @@
 # Simple optimization example
 
 Description:
- name: Quadratic Maximization
+ name: 2-Parameter Optimization
  operator: Mike
  platform: Test Stand 1
  comments: Who is Mike? There is no Test Stand 1
@@ -32,10 +32,10 @@ Variables:
   meter: value
 
  Some Metric:
-  expression: 'sin(3.14159*x) * sin(3.14159*y) + noise'
+  expression: 'sin(3.14159*X)*exp(-X^2-Y^2) + noise'
   definitions:
-   x: Some Parameter
-   y: Some Other Parameter
+   X: Some Parameter
+   Y: Some Other Parameter
    noise: Some Noise
 
 Plots:
@@ -59,8 +59,8 @@ Routines:
    - Some Other Parameter
   meter: Some Metric
   bounds:
-   - [0, 1]
-   - [0, 1]
+   - [-1, 1]
+   - [-1, 1]
   max deltas: 0.1
   kappa: 3.0  # exploration vs. exploitation parameter
   start: 0
@@ -73,8 +73,8 @@ Routines:
    - Some Other Parameter
   meter: Some Metric
   bounds:
-   - [0, 1]
-   - [0, 1]
+   - [-1, 1]
+   - [-1, 1]
   max deltas: 0.1
   kappa: 3.0  # exploration vs. exploitation parameter
   start: 90

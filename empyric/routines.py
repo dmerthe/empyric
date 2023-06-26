@@ -442,7 +442,7 @@ class Maximization(Routine):
 
         if max_deltas:
             if np.ndim(max_deltas) == 0:
-                self.max_deltas = np.array([max_deltas]*len(knobs))
+                self.max_deltas = np.array([max_deltas] * len(knobs))
             elif np.ndim(max_deltas) == 1 and len(max_deltas) == len(knobs):
                 self.max_deltas = np.array(max_deltas)
             else:
@@ -467,6 +467,7 @@ class Maximization(Routine):
             allow_duplicate_points=True,
         )
 
+        self._kappa0 = kappa
         self.util_func = UtilityFunction(
             kappa=kappa,  # exploration vs. exploitation parameter
         )
@@ -501,7 +502,8 @@ class Maximization(Routine):
         self.best_knobs = self.optimizer.max["params"]
 
         if np.isfinite(self.end):
-            self.util_func.kappa *= (self.end - state['Time']) / (self.end - self.start)
+            kappa = self._kappa0 * (self.end - state["Time"]) / (self.end - self.start)
+            self.util_func.kappa = kappa
 
     def finish(self, state):
         for i, (knob, value) in enumerate(self.best_knobs.items()):
