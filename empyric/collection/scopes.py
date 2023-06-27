@@ -50,11 +50,10 @@ class TekTDSScope(Instrument):
     four_channel_models = [2004, 2014]
 
     def __init__(self, *args, **kwargs):
-
         # Check for number of channels before standard initialization
         adapter = USB(Instrument(args[0]))
 
-        self.model = int(re.search('\d\d\d\d', adapter.query("*IDN?"))[0])
+        self.model = int(re.search("\d\d\d\d", adapter.query("*IDN?"))[0])
 
         adapter.disconnect()
 
@@ -131,7 +130,6 @@ class TekTDSScope(Instrument):
 
     @setter
     def set_ch3_scale(self, scale: Float):
-
         if self.channels > 2:
             self.write("CH3:SCA %.3e" % scale)
         else:
@@ -139,7 +137,6 @@ class TekTDSScope(Instrument):
 
     @getter
     def get_ch3_scale(self) -> Float:
-
         if self.channels > 2:
             return float(self.query("CH3:SCA?"))
         else:
@@ -147,7 +144,6 @@ class TekTDSScope(Instrument):
 
     @setter
     def set_ch3_position(self, position: Float):
-
         if self.channels > 2:
             self.write("CH3:POS %.3e" % position)
         else:
@@ -155,7 +151,6 @@ class TekTDSScope(Instrument):
 
     @getter
     def get_ch3_position(self) -> Float:
-
         if self.channels > 2:
             return float(self.query("CH3:POS?"))
         else:
@@ -163,7 +158,6 @@ class TekTDSScope(Instrument):
 
     @measurer
     def measure_channel_3(self) -> Array:
-
         if self.channels > 2:
             return self._measure_channel(3)
         else:
@@ -173,7 +167,6 @@ class TekTDSScope(Instrument):
 
     @setter
     def set_ch4_scale(self, scale: Float):
-
         if self.channels > 2:
             self.write("CH4:SCA %.3e" % scale)
         else:
@@ -181,7 +174,6 @@ class TekTDSScope(Instrument):
 
     @getter
     def get_ch4_scale(self) -> Float:
-
         if self.channels > 2:
             return float(self.query("CH4:SCA?"))
         else:
@@ -189,7 +181,6 @@ class TekTDSScope(Instrument):
 
     @setter
     def set_ch4_position(self, position: Float):
-
         if self.channels > 2:
             self.write("CH4:POS %.3e" % position)
         else:
@@ -197,7 +188,6 @@ class TekTDSScope(Instrument):
 
     @getter
     def get_ch4_position(self) -> Float:
-
         if self.channels > 2:
             return float(self.query("CH4:POS?"))
         else:
@@ -205,7 +195,6 @@ class TekTDSScope(Instrument):
 
     @measurer
     def measure_channel_4(self) -> Array:
-
         if self.channels > 2:
             return self._measure_channel(4)
         else:
