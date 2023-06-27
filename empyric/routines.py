@@ -175,9 +175,15 @@ class Routine:
 
         return wrapped_update
 
+    @enabler
     def update(self, state):
         """
         Updates the knobs controlled by the routine based on the given state.
+
+        Calls to this method are moderated by the `enabler` wrapper, which
+        checks the start and end times as well as the enabling variable. The
+        contents of this method just encode what happens when the routine is
+        intended to be running.
 
         :param state: (dict/Series) state of the calling experiment or process
         in the form, {..., variable: value, ...}
