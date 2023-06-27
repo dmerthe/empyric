@@ -464,8 +464,9 @@ class Maximization(Routine):
     <https://github.com/bayesian-optimization/BayesianOptimization>`_, which models
     the relation between the knobs and the meter as a gaussian process.
 
-    The `bounds` parameter
-    provides the parameter space over which the knob values can be explored.
+    The `bounds` parameter is an Nx2 array containing the upper and lower limits for
+    each of the N knobs that defines the parameter space over which the knob values can
+    be explored.
 
     The `max_deltas` parameter is a value or 1-D array of values which are the
     maximum change in a single step the knob(s) can take.
@@ -483,10 +484,10 @@ class Maximization(Routine):
     def __init__(
         self,
         knobs: dict,
-        meter,
-        bounds,
-        max_deltas=None,
-        kappa=2.5,
+        meter: String,
+        bounds: Array,
+        max_deltas: Array = None,
+        kappa: Float = 2.5,
         settling_time: Union[Float, String] = 0.0,
         **kwargs,
     ):
