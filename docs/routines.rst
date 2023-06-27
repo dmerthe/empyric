@@ -11,9 +11,9 @@ Routines
 
 .. autoclass:: empyric.routines.Sequence
 
-.. autoclass:: empyric.routines.Minimization
-
 .. autoclass:: empyric.routines.Maximization
+
+.. autoclass:: empyric.routines.Minimization
 
 .. autoclass:: empyric.routines.SocketServer
 
