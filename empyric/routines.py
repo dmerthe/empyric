@@ -68,9 +68,13 @@ class Routine:
     _duration = 0.0
 
     def __init__(
-            self, knobs: dict, enable: String = None,
-            start: Union[Float, String] = None, end: Union[Float, String] = None,
-            duration: Union[Float, String] = None, **kwargs
+        self,
+        knobs: dict,
+        enable: String = None,
+        start: Union[Float, String] = None,
+        end: Union[Float, String] = None,
+        duration: Union[Float, String] = None,
+        **kwargs,
     ):
         self.knobs = knobs
 
@@ -80,7 +84,7 @@ class Routine:
         self.enable = enable
 
         if start is not None:
-            if start == 'on enable':
+            if start == "on enable":
                 self.start = np.nan  # will be set when routine is enabled
                 self._start_on_enable = True
             else:
@@ -156,7 +160,7 @@ class Routine:
                     self.prep(state)
 
                 if self._start_on_enable and np.isnan(self.start):
-                    self.start = state['Time']
+                    self.start = state["Time"]
                     self.end = self.start + self._duration
 
                 for name, knob in self.knobs.items():
@@ -477,9 +481,14 @@ class Maximization(Routine):
     _last_setting = -np.inf
 
     def __init__(
-        self, knobs: dict, meter, bounds, max_deltas=None, kappa=2.5,
-            settling_time: Union[Float, String] = 0.0,
-            **kwargs
+        self,
+        knobs: dict,
+        meter,
+        bounds,
+        max_deltas=None,
+        kappa=2.5,
+        settling_time: Union[Float, String] = 0.0,
+        **kwargs,
     ):
         Routine.__init__(self, knobs, **kwargs)
 
@@ -524,7 +533,6 @@ class Maximization(Routine):
 
     @Routine.enabler
     def update(self, state):
-
         non_numeric_knobs = [
             not isinstance(state[knob], numbers.Number) for knob in self.knobs
         ]
@@ -537,7 +545,7 @@ class Maximization(Routine):
             # undefined target value; take no action
             return
 
-        if state['Time'] < self._last_setting + self.settling_time:
+        if state["Time"] < self._last_setting + self.settling_time:
             return
 
         self.optimizer.register(
@@ -556,7 +564,7 @@ class Maximization(Routine):
                 sign = (value - state[knob]) / np.abs(value - state[knob])
                 self.knobs[knob].value = state[knob] + sign * self.max_deltas[i]
 
-        self._last_setting = state['Time']
+        self._last_setting = state["Time"]
 
         self.best_meter = self.optimizer.max["target"]
         self.best_knobs = self.optimizer.max["params"]
