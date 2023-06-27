@@ -4,3 +4,4 @@ pandas
 pytest
 matplotlib
 pykwalify
+bayesian-optimization
