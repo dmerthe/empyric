@@ -1,7 +1,7 @@
 # Simple optimization example
 
 Description:
- name: Quadratic Maximization
+ name: 2-Parameter Optimization
  operator: Mike
  platform: Test Stand 1
  comments: Who is Mike? There is no Test Stand 1
@@ -13,53 +13,69 @@ Settings:
  end: 3 minutes
 
 Instruments:
- Dummy Instrument:
-  type: Echo
+
  Dummy Noise:
   type: SimpleProcess
   presets:
-   noise level: 0.1
+   noise level: 0.05
 
 Variables:
+
  Some Parameter:
   parameter: 0.0
+
+ Some Other Parameter:
+  parameter: 0.0
+
  Some Noise:
   instrument: Dummy Noise
   meter: value
+
  Some Metric:
-  expression: '(63*x^5 - 70*x^3 + 15*x)/8 + noise'
+  expression: 'sin(3.14159*X)*exp(-X^2-Y^2) + noise'
   definitions:
-   x: Some Parameter
+   X: Some Parameter
+   Y: Some Other Parameter
    noise: Some Noise
 
 Plots:
  Parameter Plot:
-  y: Some Parameter
+  y: [Some Parameter, Some Other Parameter]
  Metric Plot:
   x: Some Parameter
-  y: Some Metric
+  y: Some Other Parameter
+  s: Some Metric
   style: parametric
+  configure:
+   linestyle: 'none'
+   marker: 'o'
 
 Routines:
 
  Minimization Routine:
   type: Minimization
-  knobs: Some Parameter
+  knobs:
+   - Some Parameter
+   - Some Other Parameter
   meter: Some Metric
-  max deltas: 0.25
-  T0: 0.01
-  T1: 0
-  samples: 10
+  bounds:
+   - [-1, 1]
+   - [-1, 1]
+  max deltas: 0.1
+  kappa: 3.0  # exploration vs. exploitation parameter
   start: 0
   end: 60
 
  Maximization Routine:
   type: Maximization
-  knobs: Some Parameter
+  knobs:
+   - Some Parameter
+   - Some Other Parameter
   meter: Some Metric
-  max deltas: 0.25
-  T0: 0.01
-  T1: 0
-  samples: 10
+  bounds:
+   - [-1, 1]
+   - [-1, 1]
+  max deltas: 0.1
+  kappa: 3.0  # exploration vs. exploitation parameter
   start: 90
   end: 150

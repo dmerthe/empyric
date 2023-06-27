@@ -786,12 +786,11 @@ class USB(Adapter):
 
     @timeout.setter
     def timeout(self, timeout):
-
         if self.backend is not None:
             if self.lib == "usbtmc":
                 self.backend.timeout = timeout
-            elif self.lib == 'pyvisa':
-                self.backend.timeout = 1000*timeout
+            elif self.lib == "pyvisa":
+                self.backend.timeout = 1000 * timeout
 
         self._timeout = timeout
 
