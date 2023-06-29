@@ -14,14 +14,14 @@ Settings:
 
 Variables:
  Knob a: # This remote variable is settable (knob on server)
-  server: 192.168.86.206::502  # replace with the ip address and port of your server
+  server: 10.0.2.9::502  # replace with the ip address and port of your server
   protocol: modbus
   settable: True
-  alias: 0  # replace with the register address of the remote variable
+  alias: 5  # replace with the register address of the remote variable
  Distance r: # This remote variable is not settable (expression on server)
-  server: 192.168.86.206::502  # replace with the ip address and port of your server
+  server: 10.0.2.9::502  # replace with the ip address and port of your server
   protocol: modbus
-  alias: 20  # replace with the register address of the remote variable
+  alias: 25  # replace with the register address of the remote variable
 
 Plots:
  R Plot:
