@@ -807,7 +807,7 @@ class ModbusServer(Routine):
     starting from address 0. Each value in both sets of registers is stored as 5
     consecutive registers, 4 registers for the 64-bit value and 1 register for
     any metadata (i.e. data type). Note that the that `state` of an instance of
-    `Experiment` has `Time` as its first entry.
+    `Experiment` has `Time` as its first entry (i.e. register 0 is the time value).
     """
 
     assert_control = False
