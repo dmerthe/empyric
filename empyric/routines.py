@@ -493,8 +493,8 @@ class Maximization(Routine):
         meter: String,
         bounds: Array,
         max_deltas: Array = None,
-        kappa: Float = 2.5,
         settling_time: Union[Float, String] = 0.0,
+        method=None,
         **kwargs,
     ):
         Routine.__init__(self, knobs, **kwargs)
@@ -531,15 +531,19 @@ class Maximization(Routine):
             allow_duplicate_points=True,
         )
 
-        self._kappa0 = kappa
-        self.util_func = UtilityFunction(
-            kappa=kappa,  # exploration vs. exploitation parameter
-        )
+        self.method = method if method is not None else 'bayesian'
 
         self.settling_time = convert_time(settling_time)
 
+        self.options = kwargs
+
     @Routine.enabler
     def update(self, state):
+
+        if self.method == "bayesian":
+            self._update_bayesian(state)
+
+    def _update_bayesian(self, state):
         non_numeric_knobs = [
             not isinstance(state[knob], numbers.Number) for knob in self.knobs
         ]
@@ -579,6 +583,15 @@ class Maximization(Routine):
         if np.isfinite(self.end):
             kappa = self._kappa0 * (self.end - state["Time"]) / self._duration
             self.util_func.kappa = kappa
+
+    def prep(self, state):
+
+        if self.method == 'bayesian':
+
+            self._kappa0 = self.options.get('kappa', 2.5)
+            self.util_func = UtilityFunction(
+                kappa=self._kappa0,  # exploration vs. exploitation parameter
+            )
 
     def finish(self, state):
         for i, (knob, value) in enumerate(self.best_knobs.items()):

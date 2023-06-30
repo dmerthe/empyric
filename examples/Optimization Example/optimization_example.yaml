@@ -62,7 +62,7 @@ Routines:
    - [-1, 1]
    - [-1, 1]
   max deltas: 0.1
-  kappa: 3.0  # exploration vs. exploitation parameter
+  kappa: 2.5  # exploration vs. exploitation parameter
   start: 0
   end: 60
 
