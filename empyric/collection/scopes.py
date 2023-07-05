@@ -624,7 +624,11 @@ class SiglentSDS1000(Instrument):
     name = "SiglentSDS1000"
 
     supported_adapters = (
-        (Socket, {"write_termination": "\n", "read_termination": "\n"}),
+        (Socket, {
+            "write_termination": "\n",
+            "read_termination": "\n",
+            "timeout": 60  # waveform retrieval may take some extra time
+        }),
     )
 
     knobs = (
