@@ -134,7 +134,7 @@ class Adapter:
 
     def __del__(self):
         # Try to cleanly close communications when adapters are deleted
-        if self.connected:
+        if hasattr(self, "connected") and self.connected:
             try:
                 self.disconnect()
             except BaseException as err:
@@ -849,6 +849,9 @@ class Socket(Adapter):
     Handles communications between sockets using Python's built-in socket module
     """
 
+    family = socket.AF_INET
+    type = socket.SOCK_STREAM
+
     ip_address = None
     port = None
 
@@ -862,7 +865,7 @@ class Socket(Adapter):
         if self.connected:
             self.disconnect()
 
-        self.backend = socket.socket()
+        self.backend = socket.socket(self.family, self.type)
 
         self.backend.settimeout(self.timeout)
 

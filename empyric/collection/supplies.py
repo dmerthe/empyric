@@ -10,7 +10,14 @@ class Keithley2260B(Instrument):
 
     name = "Keithley2260B"
 
-    supported_adapters = ((Serial, {"baud_rate": 115200, "write_termination": "\r\n"}),)
+    supported_adapters = (
+        (Serial, {"baud_rate": 115200, "write_termination": "\r\n"}),
+        (Socket, {
+            "read_termination": "\n",
+            "write_termination": "\n"
+        }
+         )
+    )
 
     knobs = ("max voltage", "max current", "output")
 
@@ -46,6 +53,16 @@ class Keithley2260B(Instrument):
             self.write("OUTP:STAT:IMM ON")
         elif output == OFF:
             self.write("OUTP:STAT:IMM OFF")
+
+    @getter
+    def get_output(self) -> Toggle:
+
+        response = self.query("OUTP?")
+
+        if response == "0":
+            return OFF
+        elif response == "1":
+            return ON
 
     @getter
     def get_max_current(self) -> Float:
@@ -251,3 +268,80 @@ class SRSPS300(Instrument):
     @measurer
     def measure_current(self):
         return float(self.query("IOUT?"))
+
+
+class KoradKWR100(Instrument):
+    """
+    Korad KWR100 series power supply
+
+    When using LAN communications (via Socket adapter) use the KWR100 Assistant
+    executable to configure IP address and port number. Also, send the command
+    ":SYST:UPDMODE 0" in order to be able to use an arbitrary local port.
+    """
+
+    name = "KWR100"
+
+    supported_adapters = (
+        (Socket, {
+            "type": socket.SOCK_DGRAM,  # UDP
+            "write_termination": "\n",
+            "read_termination": "\n",
+            "timeout": 1
+        }),
+    )
+
+    knobs = (
+        "output",
+        "max voltage",
+        "max current"
+    )
+
+    meters = (
+        "voltage",
+        "current"
+    )
+
+
+    @setter
+    def set_output(self, state: Toggle):
+
+        if state == ON:
+            self.write('OUT:1')
+        elif state == OFF:
+            self.write('OUT:0')
+
+    @getter
+    def get_output(self) -> Toggle:
+
+        response = self.query('OUT?')
+
+        if response == "0":
+            return OFF
+        elif response == "1":
+            return ON
+
+    @setter
+    def set_max_voltage(self, voltage: Float):
+
+        self.write('VSET:%.1e' % voltage)
+
+    @getter
+    def get_max_voltage(self) -> Float:
+
+        return float(self.query('VSET?'))
+
+    @setter
+    def set_max_current(self, current: Float):
+        self.write('ISET:%.1e' % current)
+
+    @getter
+    def get_max_current(self) -> Float:
+        return float(self.query('ISET?'))
+
+    @measurer
+    def measure_voltage(self) -> Float:
+        return float(self.query('VOUT?'))
+
+    @measurer
+    def measure_current(self) -> Float:
+        return float(self.query('IOUT?'))
