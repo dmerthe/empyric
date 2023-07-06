@@ -34,7 +34,6 @@ from empyric.types import (
     String,
 )
 from empyric.types import supported as supported_types
-from empyric.variables import Variable
 
 
 class Routine:
