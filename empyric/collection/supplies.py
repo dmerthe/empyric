@@ -323,7 +323,7 @@ class KoradKWR100(Instrument):
     @setter
     def set_max_voltage(self, voltage: Float):
 
-        self.write('VSET:%.1e' % voltage)
+        self.write('VSET:%.2f' % voltage)
 
     @getter
     def get_max_voltage(self) -> Float:
@@ -332,7 +332,7 @@ class KoradKWR100(Instrument):
 
     @setter
     def set_max_current(self, current: Float):
-        self.write('ISET:%.1e' % current)
+        self.write('ISET:%.2f' % current)
 
     @getter
     def get_max_current(self) -> Float:

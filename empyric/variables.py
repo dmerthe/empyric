@@ -19,7 +19,7 @@ class Variable:
     experiment.
     """
 
-    type = None  #: the data type of the variable
+    _type = None  #: the data type of the variable
 
     #: time since the epoch of last evaluation in seconds, being equal to the
     #: result of `time.time()` being called upon the most recent evaluation of
@@ -55,8 +55,8 @@ class Variable:
             ):
                 self._value = None
 
-            elif self.type is not None:
-                setter(self, recast(value, to=self.type))
+            elif self._type is not None:
+                setter(self, recast(value, to=self._type))
             else:
                 # if type is not explicitly defined upon construction,
                 # infer from first set value
@@ -65,7 +65,7 @@ class Variable:
 
                 for _type in types.supported.values():
                     if isinstance(recasted_value, _type):
-                        self.type = _type
+                        self._type = _type
                         setter(self, recasted_value)
 
         return wrapped_setter
@@ -83,8 +83,8 @@ class Variable:
             ):
                 self._value = None
 
-            elif self.type is not None:
-                self._value = recast(value, to=self.type)
+            elif self._type is not None:
+                self._value = recast(value, to=self._type)
             else:
                 # if type is not explicitly defined upon construction,
                 # infer from first set value
@@ -93,7 +93,7 @@ class Variable:
 
                 for _type in types.supported.values():
                     if isinstance(recasted_value, _type):
-                        self.type = _type
+                        self._type = _type
                         self._value = recasted_value
 
             return self._value
@@ -390,7 +390,7 @@ class Remote(Variable):
 
             if _type is not None:
                 self._value = self._client.read(
-                    fcode, self.alias, count=4, _type=self.type_map[_type]
+                    fcode, self.alias, count=4, _type=self._type_map[_type]
                 )
 
         else:
@@ -422,7 +422,9 @@ class Remote(Variable):
         """
 
         if self.protocol == "modbus":
-            self._client.write(16, self.alias, value, _type=self.type_map[self.type])
+            self._client.write(
+                16, self.alias, value, _type=self._type_map[self._type]
+            )
 
         else:
             write_to_socket(self._socket, f"{self.alias} {value}")
@@ -483,8 +485,12 @@ class Parameter(Variable):
     _settable = True  #:
 
     def __init__(self, parameter: Type):
-        self.parameter = recast(parameter)
+        self.parameter = parameter
         self._value = parameter
+
+        for name, _type in types.supported.items():
+            if isinstance(parameter, _type):
+                self._type = _type
 
     @property
     @Variable.getter_type_validator

@@ -124,7 +124,9 @@ class Routine:
 
         @functools.wraps(update)
         def wrapped_update(self, state):
+
             if self.enable is not None and not state[self.enable]:
+
                 for name, knob in self.knobs.items():
                     if knob._controller == self:
                         knob._controller = None
@@ -247,6 +249,8 @@ class Ramp(Routine):
     the `state` argument of the `update` method.
     """
 
+    _start_on_enable = True
+
     def __init__(self, knobs: dict, targets, rates, **kwargs):
         """
         :param rates: (1D array) list of ramp rates
@@ -264,13 +268,13 @@ class Ramp(Routine):
         self.targets = targets
 
         self.now = None
-        self.then = None
+        self.then = None  # last time of update call
 
     @Routine.enabler
     def update(self, state):
         self.now = state["Time"]
 
-        if self.then is None:
+        if self.then is None or self.then < self.start:
             self.then = state["Time"]
 
         for knob, rate, target in zip(self.knobs, self.rates, self.targets):
@@ -741,7 +745,7 @@ class SocketServer(Routine):
 
                     elif value == "type?":
                         if alias in self.knobs:
-                            _type = self.knobs[alias].type
+                            _type = self.knobs[alias]._type
                         elif alias in self.state:
                             _type = None
                             for supported_type in supported_types.values():
@@ -772,7 +776,7 @@ class SocketServer(Routine):
                         if knob_exists and is_free:
                             knob = self.knobs[alias]
 
-                            knob.value = recast(value, to=knob.type)
+                            knob.value = recast(value, to=knob._type)
 
                             outgoing_message = f"{alias} {knob.value}"
 
@@ -958,21 +962,21 @@ class ModbusServer(Routine):
             value = variable._value
 
             # encode the value into the 4 registers
-            if value is None or variable.type is None:
+            if value is None or variable._type is None:
                 builder.add_64bit_float(float("nan"))
-            elif issubclass(variable.type, Boolean):
+            elif issubclass(variable._type, Boolean):
                 builder.add_64bit_uint(value)
-            elif issubclass(variable.type, Toggle):
-                builder.add_64bit_uint(int(value in Toggle.on_values))
-            elif issubclass(variable.type, Integer):
+            elif issubclass(variable._type, Toggle):
+                builder.add_64bit_uint(1 if value == ON else 0)
+            elif issubclass(variable._type, Integer):
                 builder.add_64bit_int(value)
-            elif issubclass(variable.type, Float):
+            elif issubclass(variable._type, Float):
                 builder.add_64bit_float(value)
             else:
                 raise ValueError(
                     f"unable to update modbus server registers from value "
                     f"{value} of variable {name} with data type "
-                    f"{variable.type}"
+                    f"{variable._type}"
                 )
 
             # encode the meta data
@@ -983,7 +987,7 @@ class ModbusServer(Routine):
                 Float: 3,
                 Array: 4,
                 String: 5,
-            }.get(variable.type, -1)
+            }.get(variable._type, -1)
 
             builder.add_16bit_int(meta_reg_val)
 

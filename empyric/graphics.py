@@ -464,7 +464,7 @@ class ExperimentGUI:
             # get them from the experiment variables
             self.instruments = {}
             for variable in self.experiment.variables.values():
-                if variable.type in ["meter", "knob"]:
+                if variable._type in ["meter", "knob"]:
                     instrument = variable.instrument
                     if instrument.name not in self.instruments:
                         self.instruments[instrument.name] = instrument
@@ -876,7 +876,8 @@ class ExperimentGUI:
         """Assigns the value to a variable if entered by the user"""
 
         variable.value = recast(
-            entry.get(), to=variable.type if variable.type is not None else Type
+            entry.get(),
+            to=variable._type if variable._type is not None else Type
         )
 
         root.focus()

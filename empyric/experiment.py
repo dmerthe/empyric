@@ -22,7 +22,7 @@ from empyric import graphics as _graphics
 from empyric import instruments as _instruments
 from empyric import routines as _routines
 from empyric.tools import convert_time, Clock
-from empyric.types import recast, Boolean, Toggle, Integer, Float
+from empyric.types import recast, Boolean, Toggle, Integer, Float, ON
 
 
 class Experiment:
@@ -752,7 +752,9 @@ def convert_runcard(runcard):
             )
 
         elif "parameter" in specs:
-            variables[name] = _variables.Parameter(parameter=specs["parameter"])
+            variables[name] = _variables.Parameter(
+                parameter=recast(specs["parameter"])
+            )
 
     # Routines section
     available_routines = {**_routines.supported, **custom_routines}
