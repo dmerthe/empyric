@@ -243,8 +243,9 @@ class Ramp(Routine):
     """
     Ramps the set of `knobs` to given `target` values at `given rates`.
 
-    The `target` or `rate` arguments can be single keys/values for all knobs, or
-    1D arrays of keys/values.
+    The `target` and `rate` arguments can be single values for all knobs or
+    1D arrays of values. They can also be the names of variables, to be looked up from
+    the `state` argument of the `update` method.
     """
 
     def __init__(self, knobs: dict, targets, rates, **kwargs):
@@ -274,13 +275,15 @@ class Ramp(Routine):
             self.then = state["Time"]
 
         for knob, rate, target in zip(self.knobs, self.rates, self.targets):
+
+            # target and rate can be variables
             if isinstance(target, String):
                 target = state[target]
 
             if isinstance(rate, String):
                 rate = state[rate]
 
-            val_now = self.knobs[knob]._value
+            val_now = self.knobs[knob].value
 
             if (
                 not isinstance(target, numbers.Number)
@@ -288,7 +291,8 @@ class Ramp(Routine):
                 or not isinstance(val_now, numbers.Number)
                 or target == val_now
             ):
-                # Do nothing if knob, rate or target are undefined
+                # Do nothing if knob, rate or target are undefined,
+                # or if knob is already at target value
                 continue
 
             sign = (target - val_now) / abs(target - val_now)
@@ -806,26 +810,32 @@ class ModbusServer(Routine):
     using the Modbus over TCP/IP protocol.
 
     Any variables given in the `knobs` argument will be readable and writeable
-    by connected clients. All variable values provided as the `state` argument
-    of the `update` method can be read by clients.
+    by connected clients; their values are stored in the holding registers. Variable
+    values provided in the `state` argument of the `update` method can be read by
+    clients; their values are stored in the input registers. The optional `meters`
+    argument can be used to restrict the values from `state` that are readable by
+    clients. Only the variable names listed in the `meters` argument will be accessible.
+    If no `meters` argument is given, all variable values in the `state` argument will
+    be readable.
 
     Because data is stored in statically assigned registers, only variables
-    of boolean, toggle, integer or float types can be used. Variable values are
-    stored in consecutive 4 registers (64 bits per value).
+    of boolean, toggle, integer or float types can be used. For more generic types, use
+    the SocketServer routine.
 
     Values of writeable variables (the `knobs` argument) will be stored in
     holding registers in the same order as given in the argument, starting from
     address 0. Values provided in the `state` argument of the `update` method
-    will be stored in input registers in the same order as defined therein,
-    starting from address 0. Each value in both sets of registers is stored as 5
-    consecutive registers, 4 registers for the 64-bit value and 1 register for
-    any metadata (i.e. data type). Note that the that `state` of an instance of
-    `Experiment` has `Time` as its first entry (i.e. register 0 is the time value).
+    will be stored in input registers in the same order as defined therein, or in the
+    same order of the `meters` argument if given, starting from address 0. Each value
+    in both sets of registers is stored as 5 consecutive registers, 4 registers for the
+    64-bit value and 1 register for metadata (i.e. data type). Note that the `state` of
+    an instance of `Experiment` has "Time" as its first entry (i.e. input register 0 is
+    the time value).
     """
 
     assert_control = False
 
-    def __init__(self, knobs: dict = None, meters=None, **kwargs):
+    def __init__(self, knobs: dict = None, meters: Array = None, **kwargs):
         if knobs is None:
             knobs = {}
 
@@ -985,7 +995,7 @@ class ModbusServer(Routine):
         builder.reset()
 
         if self.meters:
-            selection = self.state[self.meters]
+            selection = {name: self.state[name] for name in self.meters}
         else:
             selection = self.state
 
