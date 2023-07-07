@@ -601,20 +601,13 @@ class Maximization(Routine):
             )
 
     def finish(self, state):
+
         for i, (knob, value) in enumerate(self.best_knobs.items()):
+
             if value is None or not np.isfinite(value):
                 print(f"Warning: No optimal value was found for {knob}")
-            if np.abs(value - state[knob]) <= self.max_deltas[i]:
-                self.knobs[knob].value = value
             else:
-                print(
-                    f"Warning: optimal value for {knob} suggested by optimizer "
-                    f"is {value}, but applying this value would exceed the "
-                    f"max_delta parameter. Instead, {knob} will be set as "
-                    f"close as possible without exceeding this limit."
-                )
-                sign = (value - state[knob]) / np.abs(value - state[knob])
-                self.knobs[knob].value = state[knob] + sign * self.max_deltas[i]
+                self.knobs[knob].value = value
 
 
 class Minimization(Maximization):
