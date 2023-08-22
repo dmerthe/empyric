@@ -1104,6 +1104,8 @@ class Modbus(Adapter):
 
             self.backend = client.ModbusTcpClient(host=address[0], port=int(address[1]))
 
+            self.backend.connect()
+
         else:
             # Modbus Serial
             self._protocol = "Serial"
@@ -1131,6 +1133,8 @@ class Modbus(Adapter):
                     parity=self.parity,
                     stopbits=self.stop_bits,
                 )
+
+                self.backend.connect()
 
             self.slave_id = slave_id
 
