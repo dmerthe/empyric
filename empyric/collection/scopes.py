@@ -929,9 +929,9 @@ class SiglentSDS1000(Instrument):
 
     # Channel measurements
     def _measure_chn_waveform(self, n):
+
         # Set trigger mode to NORMAL
-        if "NORM" not in self.query("TRMD?"):
-            self.write("TRMD NORM")
+        self.write("TRMD NORM")
 
         # Wait for trigger
         triggered = False
@@ -1001,8 +1001,6 @@ class SiglentSDS1000(Instrument):
         response = self.query("C%d:WF? DAT2" % n, decode=False, validator=validator)
 
         self.adapter.read_termination = "\n"  # restore normal read termination
-
-        self.write("TRMD NORM")  # set to single trigger mode
 
         header, size, waveform = response[:13], response[13:22], response[22:-2]
         size = int(size)
