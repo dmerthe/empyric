@@ -351,6 +351,17 @@ class SynaccessNetbooter(Instrument):
         "port 3 toggle",
         "port 4 toggle",
         "port 5 toggle",
+        "port 6 toggle",
+        "port 7 toggle",
+        "port 8 toggle",
+        "port 9 toggle",
+        "port 10 toggle",
+        "port 11 toggle",
+        "port 12 toggle",
+        "port 13 toggle",
+        "port 14 toggle",
+        "port 15 toggle",
+        "port 16 toggle",
     )
 
     def _set_port_n_toggle(self, n, state):
@@ -372,12 +383,12 @@ class SynaccessNetbooter(Instrument):
         self.read(nbytes=np.inf, timeout=0.1, decode=False)
 
         def termination(message):
-            return re.search(b"A0,\d\d\d\d\d", message)
+            return re.search(b"A0,\d+", message)
 
         status_message = self.query("$A5", termination=termination, decode=False)
 
         # Port statuses are a sequence of 0s and 1s, starting from the right
-        statuses = re.search(b"A0,\d\d\d\d\d", status_message)[0]
+        statuses = re.search(b"A0,\d+", status_message)[0]
 
         port_n_toggle = ON if int(statuses.decode()[-n]) == 1 else OFF
 
@@ -422,3 +433,91 @@ class SynaccessNetbooter(Instrument):
     @getter
     def get_port_5_toggle(self) -> Toggle:
         return self._get_port_n_toggle(5)
+
+    @setter
+    def set_port_6_toggle(self, state: Toggle):
+        return self._set_port_n_toggle(6, state)
+
+    @getter
+    def get_port_6_toggle(self) -> Toggle:
+        return self._get_port_n_toggle(6)
+
+    @setter
+    def set_port_7_toggle(self, state: Toggle):
+        return self._set_port_n_toggle(7, state)
+
+    @getter
+    def get_port_7_toggle(self) -> Toggle:
+        return self._get_port_n_toggle(7)
+
+    @setter
+    def set_port_8_toggle(self, state: Toggle):
+        return self._set_port_n_toggle(8, state)
+
+    @getter
+    def get_port_8_toggle(self) -> Toggle:
+        return self._get_port_n_toggle(8)
+
+    @setter
+    def set_port_9_toggle(self, state: Toggle):
+        return self._set_port_n_toggle(9, state)
+
+    @getter
+    def get_port_9_toggle(self) -> Toggle:
+        return self._get_port_n_toggle(9)
+
+    @setter
+    def set_port_10_toggle(self, state: Toggle):
+        return self._set_port_n_toggle(10, state)
+
+    @getter
+    def get_port_10_toggle(self) -> Toggle:
+        return self._get_port_n_toggle(10)
+
+    @setter
+    def set_port_11_toggle(self, state: Toggle):
+        return self._set_port_n_toggle(11, state)
+
+    @getter
+    def get_port_11_toggle(self) -> Toggle:
+        return self._get_port_n_toggle(11)
+
+    @setter
+    def set_port_12_toggle(self, state: Toggle):
+        return self._set_port_n_toggle(12, state)
+
+    @getter
+    def get_port_12_toggle(self) -> Toggle:
+        return self._get_port_n_toggle(12)
+
+    @setter
+    def set_port_13_toggle(self, state: Toggle):
+        return self._set_port_n_toggle(13, state)
+
+    @getter
+    def get_port_13_toggle(self) -> Toggle:
+        return self._get_port_n_toggle(13)
+
+    @setter
+    def set_port_14_toggle(self, state: Toggle):
+        return self._set_port_n_toggle(14, state)
+
+    @getter
+    def get_port_14_toggle(self) -> Toggle:
+        return self._get_port_n_toggle(14)
+
+    @setter
+    def set_port_15_toggle(self, state: Toggle):
+        return self._set_port_n_toggle(15, state)
+
+    @getter
+    def get_port_15_toggle(self) -> Toggle:
+        return self._get_port_n_toggle(15)
+
+    @setter
+    def set_port_16_toggle(self, state: Toggle):
+        return self._set_port_n_toggle(16, state)
+
+    @getter
+    def get_port_16_toggle(self) -> Toggle:
+        return self._get_port_n_toggle(16)

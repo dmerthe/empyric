@@ -51,6 +51,9 @@ class Toggle(Type):
     def __str__(self):
         return "ON" if self.on else "OFF"
 
+    def __repr__(self):
+        return "ON" if self.on else "OFF"
+
     def __eq__(self, other):
         if hasattr(other, "on"):
             return self.on == other.on
