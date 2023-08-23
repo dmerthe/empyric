@@ -50,7 +50,9 @@ map:
       protocol: {type: any},
       alias: {type: any},
       dtype: {type: str},
-      settable: {type: bool}
+      settable: {type: bool},
+
+      hidden: {type: bool}  # whether to show in GUI
     }}
   }}
 

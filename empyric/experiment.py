@@ -708,6 +708,7 @@ def convert_runcard(runcard):
     # Variables section
     variables = {}
     for name, specs in runcard["Variables"].items():
+
         if "meter" in specs:
             instrument = converted_runcard["Instruments"][specs["instrument"]]
             gate = specs.get("gate", None)
@@ -755,6 +756,11 @@ def convert_runcard(runcard):
             variables[name] = _variables.Parameter(
                 parameter=recast(specs["parameter"])
             )
+
+        if name in variables and 'hidden' in specs:
+            # If hidden, the variable does not appear in the GUI
+            if specs['hidden']:
+                variables[name]._hidden = True
 
     # Routines section
     available_routines = {**_routines.supported, **custom_routines}

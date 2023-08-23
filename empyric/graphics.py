@@ -543,6 +543,10 @@ class ExperimentGUI:
 
         i += 1
         for name in self.variables:
+
+            if self.variables[name]._hidden:
+                continue
+
             tk.Label(self.status_frame, text=name, width=len(name), anchor=tk.E).grid(
                 row=i, column=0, sticky=tk.E
             )

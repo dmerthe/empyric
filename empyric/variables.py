@@ -29,6 +29,8 @@ class Variable:
     _settable = False  #: whether the variable can be set by the user
     _value = None  #: last known value of the variable
 
+    _hidden = False  #: used by GUIs
+
     @property
     def settable(self):
         return self._settable
