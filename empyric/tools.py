@@ -161,15 +161,6 @@ def read_from_socket(
     :param chunk_size: (int) number of bytes to read on each call to recv method.
     """
 
-    # Block until the socket is readable or until timeout
-    if timeout:
-        readable = _socket in select.select([_socket], [], [], timeout)[0]
-    else:
-        readable = _socket in select.select([_socket], [], [])[0]
-
-    if not readable:
-        return None
-
     default_timeout = _socket.gettimeout()  # save default timeout
 
     _socket.settimeout(timeout)
@@ -203,7 +194,28 @@ def read_from_socket(
 
         remaining_bytes = nbytes - len(message)
 
+        # Check for readability and errors
+        if timeout:
+            rlist, _, xlist = select.select([_socket], [], [_socket], timeout)
+        else:
+            rlist, _, xlist = select.select([_socket], [], [_socket])
+
+        readable = _socket in rlist
+        in_error = _socket in xlist
+
+        if not readable:
+            break
+        elif in_error:
+            raise ConnectionError('an exception has been raised for the socket')
+
         try:
+
+            # Check again that socket is readable
+            readable = select.select([_socket], [], [], timeout)[0]
+
+            if not readable:
+                break
+
             if remaining_bytes < chunk_size:
                 part = _socket.recv(remaining_bytes)
             else:
