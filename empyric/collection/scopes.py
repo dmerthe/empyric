@@ -701,7 +701,15 @@ class SiglentSDS1000(Instrument):
 
     @getter
     def get_horz_scale(self) -> Float:
-        return float(self.query("TDIV?").split("TDIV ")[-1][:-1])
+
+        response = self.query("TDIV?").split("TDIV ")[-1][:-1]
+
+        try:
+            response = float(response)
+        except ValueError:
+            return np.nan
+
+        return response
 
     @setter
     def set_horz_position(self, position: Float):
@@ -709,24 +717,44 @@ class SiglentSDS1000(Instrument):
 
     @getter
     def get_horz_position(self) -> Float:
-        return float(self.query("TRDL?").split("TRDL ")[-1][:-1])
+
+        response = self.query("TRDL?").split("TRDL ")[-1][:-1]
+
+        try:
+            response = float(response)
+        except ValueError:
+            return np.nan
+
+        return response
 
     # Channel control base functions
     def _set_chn_scale(self, n, scale):
         self.write("C%d:VDIV %.3eV" % (n, float(scale)))
 
     def _get_chn_scale(self, n):
+
         response = self.query("C%d:VDIV?" % n).split("C%d:VDIV " % n)[-1][:-1]
 
-        return float(response)
+        try:
+            response = float(response)
+        except ValueError:
+            return np.nan
+
+        return response
 
     def _set_chn_position(self, n, position):
         self.write("C%d:OFST %.3eV" % (n, float(position)))
 
     def _get_chn_position(self, n):
+
         response = self.query("C%d:OFST?" % n).split("C%d:OFST " % n)[-1][:-1]
 
-        return float(response)
+        try:
+            response = float(response)
+        except ValueError:
+            return np.nan
+
+        return response
 
     # Channel 1 control
     @setter
@@ -807,7 +835,17 @@ class SiglentSDS1000(Instrument):
     def get_trigger_level(self) -> Float:
         trg_src = self.get_trigger_source()
 
-        return float(self.query(f"C{trg_src}:TRLV?").split("TRLV ")[-1][:-1])
+        if trg_src > 0:
+            response = self.query(f"C{trg_src}:TRLV?").split("TRLV ")[-1][:-1]
+        else:
+            return np.nan
+
+        try:
+            response = float(response)
+        except ValueError:
+            return np.nan
+
+        return response
 
     @setter
     def set_trigger_source(self, source: Integer):
@@ -815,7 +853,15 @@ class SiglentSDS1000(Instrument):
 
     @getter
     def get_trigger_source(self) -> Integer:
-        return int(self.query("TRSE?").split("SR,C")[-1][0])
+
+        response = self.query("TRSE?").split("SR,C")[-1][0]
+
+        try:
+            response = int(response)
+        except ValueError:
+            return -1
+
+        return response
 
     @setter
     def set_acquire_mode(self, mode: String):
@@ -834,7 +880,7 @@ class SiglentSDS1000(Instrument):
     def get_acquire_mode(self) -> String:
         response = self.query("ACQW?").split("ACQW ")[-1]
 
-        if "AVERAGE" in response:
+        if "AVERAGE" in response:  # also includes # of averages
             return "AVERAGE"
         else:
             return response
@@ -854,7 +900,12 @@ class SiglentSDS1000(Instrument):
         elif "M" in response:
             response = float(response.replace("M", "e6"))
 
-        return int(response)
+        try:
+            response = int(response)
+        except ValueError:
+            return -1
+
+        return response
 
     @setter
     def set_averages(self, averages: Integer):
@@ -866,7 +917,15 @@ class SiglentSDS1000(Instrument):
 
     @getter
     def get_averages(self) -> Integer:
-        return int(self.query("AVGA?").split("AVGA ")[-1])
+
+        response = self.query("AVGA?").split("AVGA ")[-1]
+
+        try:
+            response = int(response)
+        except ValueError:
+            return -1
+
+        return response
 
     # Channel measurements
     def _measure_chn_waveform(self, n):
@@ -976,4 +1035,12 @@ class SiglentSDS1000(Instrument):
 
     @measurer
     def measure_sample_rate(self) -> Float:
-        return float(self.query("SARA?")[5:-4])
+
+        response = self.query("SARA?")[5:-4]
+
+        try:
+            response = float(response)
+        except ValueError:
+            return np.nan
+
+        return response
