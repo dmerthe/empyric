@@ -547,16 +547,12 @@ class Maximization(Routine):
     @Routine.enabler
     def update(self, state):
 
-        if self.method == "bayesian":
-            self._update_bayesian(state)
-
-    def _update_bayesian(self, state):
         non_numeric_knobs = [
             not isinstance(state[knob], numbers.Number) for knob in self.knobs
         ]
 
         if np.any(non_numeric_knobs):
-            # undefined state; take no action
+            # undefined knob values; take no action
             return
 
         if not isinstance(state[self.meter], numbers.Number):
@@ -564,7 +560,13 @@ class Maximization(Routine):
             return
 
         if state["Time"] < self._last_setting + self.settling_time:
+            # Wait for settling
             return
+
+        if self.method == "bayesian":
+            self._update_bayesian(state)
+
+    def _update_bayesian(self, state):
 
         self.optimizer.register(
             params={knob: state[knob] for knob in self.knobs},
@@ -590,6 +592,8 @@ class Maximization(Routine):
         if np.isfinite(self.end):
             kappa = self._kappa0 * (self.end - state["Time"]) / self._duration
             self.util_func.kappa = kappa
+
+    def _calc_
 
     def prep(self, state):
 
