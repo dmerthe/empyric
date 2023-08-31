@@ -345,3 +345,4 @@ class KoradKWR100(Instrument):
     @measurer
     def measure_current(self) -> Float:
         return float(self.query('IOUT?'))
+
