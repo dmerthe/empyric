@@ -345,3 +345,45 @@ class KoradKWR100(Instrument):
     @measurer
     def measure_current(self) -> Float:
         return float(self.query('IOUT?'))
+
+
+class MagnaPowerSL1000(Instrument):
+    """Magna-Power SL series 1.5 kW (1 kV / 1.5 A) power supply"""
+
+    supported_adapters = (
+        (Serial, {
+            'baud_rate': 19200,
+            'read_termination': '\r\n',
+            'write_termination': '\r\n',
+            'timeout': 10.0}
+         ),
+    )
+
+    name = 'MagnaPowerSL1000'
+
+    knobs = (
+        'output',
+    )
+
+    @setter
+    def set_output(self, state: Toggle):
+
+        if state == ON:
+            self.write('OUTP:START')
+        elif state == OFF:
+            self.write('OUTP:STOP')
+
+    @getter
+    def get_output(self) -> Toggle:
+
+        response = self.query('OUTP?').strip()
+
+        print(response)
+
+        if response == b'1':
+
+            return ON
+        elif response == b'0':
+            return OFF
+        else:
+            return None
