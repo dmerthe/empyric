@@ -355,7 +355,7 @@ class MagnaPowerSL1000(Instrument):
             'baud_rate': 19200,
             'read_termination': '\r\n',
             'write_termination': '\r\n',
-            'timeout': 10.0}
+            'timeout': 2.0}
          ),
     )
 
@@ -377,8 +377,6 @@ class MagnaPowerSL1000(Instrument):
     def get_output(self) -> Toggle:
 
         response = self.query('OUTP?').strip()
-
-        print(response)
 
         if response == b'1':
 

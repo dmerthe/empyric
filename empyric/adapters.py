@@ -254,6 +254,13 @@ class Serial(Adapter):
         if self.lib == "pyvisa":
             pyvisa = importlib.import_module("pyvisa")
 
+            if 'COM' in self.instrument.address:
+                raise AdapterError(
+                    f"The given address {self.instrument.address} is formatted "
+                    f"for PySerial, but the library installed for serial "
+                    f"communications is PyVISA."
+                )
+
             self.backend = pyvisa.ResourceManager().open_resource(
                 self.instrument.address,
                 baud_rate=self.baud_rate,
@@ -272,6 +279,14 @@ class Serial(Adapter):
 
         # Then try connecting with PySerial
         elif self.lib == "pyserial":
+
+            if 'ASRL' in self.instrument.address:
+                raise AdapterError(
+                    f"The given address {self.instrument.address} is formatted "
+                    f"for PyVISA, but the library installed for serial "
+                    f"communications is PySerial."
+                )
+
             serial = importlib.import_module("serial")
 
             self.backend = serial.Serial(
@@ -325,7 +340,13 @@ class Serial(Adapter):
 
     def disconnect(self):
         if self.lib == "pyvisa":
-            self.backend.clear()
+
+            IOerror = importlib.import_module("pyvisa").errors.VisaIOError
+
+            try:
+                self.backend.clear()
+            except IOerror:
+                pass
 
         elif self.lib == "pyserial":
             self.backend.reset_input_buffer()
