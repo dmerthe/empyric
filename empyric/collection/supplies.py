@@ -355,7 +355,7 @@ class MagnaPowerSL1000(Instrument):
             'baud_rate': 19200,
             'read_termination': '\r\n',
             'write_termination': '\r\n',
-            'timeout': 2.0}
+            'timeout': 10.0}
          ),
     )
 
@@ -363,6 +363,13 @@ class MagnaPowerSL1000(Instrument):
 
     knobs = (
         'output',
+        'max voltage',
+        'max current'
+    )
+
+    meters = (
+        'voltage',
+        'current'
     )
 
     @setter
@@ -385,3 +392,53 @@ class MagnaPowerSL1000(Instrument):
             return OFF
         else:
             return None
+
+    @setter
+    def set_max_voltage(self, voltage: Float):
+
+        self.write(':VOLT %.2f' % voltage)
+
+    @getter
+    def get_max_voltage(self) -> Float:
+
+        response = self.query(':VOLT?')
+
+        try:
+            return float(response)
+        except ValueError:
+            return np.nan
+
+    @setter
+    def set_max_current(self, current: Float):
+
+        self.write(':CURR %.2f' % current)
+
+    @getter
+    def get_max_current(self) -> Float:
+
+        response = self.query(':CURR?')
+
+        try:
+            return float(response)
+        except ValueError:
+            return np.nan
+
+    @measurer
+    def measure_voltage(self) -> Float:
+
+        response = self.query('MEAS:VOLT?').strip()
+
+        try:
+            return float(response)
+        except ValueError:
+            return np.nan
+
+    @measurer
+    def measure_current(self) -> Float:
+
+        response = self.query('MEAS:CURR?').strip()
+
+        try:
+            return float(response)
+        except ValueError:
+            return np.nan
