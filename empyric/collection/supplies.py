@@ -12,11 +12,7 @@ class Keithley2260B(Instrument):
 
     supported_adapters = (
         (Serial, {"baud_rate": 115200, "write_termination": "\r\n"}),
-        (Socket, {
-            "read_termination": "\n",
-            "write_termination": "\n"
-        }
-         )
+        (Socket, {"read_termination": "\n", "write_termination": "\n"}),
     )
 
     knobs = ("max voltage", "max current", "output")
@@ -56,7 +52,6 @@ class Keithley2260B(Instrument):
 
     @getter
     def get_output(self) -> Toggle:
-
         response = self.query("OUTP?")
 
         if response == "0":
@@ -282,38 +277,31 @@ class KoradKWR100(Instrument):
     name = "KWR100"
 
     supported_adapters = (
-        (Socket, {
-            "type": socket.SOCK_DGRAM,  # UDP
-            "write_termination": "\n",
-            "read_termination": "\n",
-            "timeout": 1
-        }),
+        (
+            Socket,
+            {
+                "type": socket.SOCK_DGRAM,  # UDP
+                "write_termination": "\n",
+                "read_termination": "\n",
+                "timeout": 1,
+            },
+        ),
     )
 
-    knobs = (
-        "output",
-        "max voltage",
-        "max current"
-    )
+    knobs = ("output", "max voltage", "max current")
 
-    meters = (
-        "voltage",
-        "current"
-    )
-
+    meters = ("voltage", "current")
 
     @setter
     def set_output(self, state: Toggle):
-
         if state == ON:
-            self.write('OUT:1')
+            self.write("OUT:1")
         elif state == OFF:
-            self.write('OUT:0')
+            self.write("OUT:0")
 
     @getter
     def get_output(self) -> Toggle:
-
-        response = self.query('OUT?')
+        response = self.query("OUT?")
 
         if response == "0":
             return OFF
@@ -322,86 +310,133 @@ class KoradKWR100(Instrument):
 
     @setter
     def set_max_voltage(self, voltage: Float):
-
-        self.write('VSET:%.2f' % voltage)
+        self.write("VSET:%.2f" % voltage)
 
     @getter
     def get_max_voltage(self) -> Float:
-
-        return float(self.query('VSET?'))
+        return float(self.query("VSET?"))
 
     @setter
     def set_max_current(self, current: Float):
-        self.write('ISET:%.2f' % current)
+        self.write("ISET:%.2f" % current)
 
     @getter
     def get_max_current(self) -> Float:
-        return float(self.query('ISET?'))
+        return float(self.query("ISET?"))
 
     @measurer
     def measure_voltage(self) -> Float:
-        return float(self.query('VOUT?'))
+        return float(self.query("VOUT?"))
 
     @measurer
     def measure_current(self) -> Float:
-        return float(self.query('IOUT?'))
+        return float(self.query("IOUT?"))
 
 
 class MagnaPowerSL1000(Instrument):
     """Magna-Power SL series 1.5 kW (1 kV / 1.5 A) power supply"""
 
     supported_adapters = (
-        (Serial, {
-            'baud_rate': 19200,
-            'read_termination': '\r\n',
-            'write_termination': '\r\n',
-            'timeout': 10.0}
-         ),
+        (
+            Serial,
+            {
+                "baud_rate": 19200,
+                "read_termination": "\r\n",
+                "write_termination": "\r\n",
+                "timeout": 10.0,
+            },
+        ),
     )
 
-    name = 'MagnaPowerSL1000'
+    name = "MagnaPowerSL1000"
 
-    knobs = (
-        'output',
-        'max voltage',
-        'max current'
-    )
+    knobs = ("output", "max voltage", "max current")
 
-    meters = (
-        'voltage',
-        'current'
-    )
+    meters = ("voltage", "current")
 
     @setter
     def set_output(self, state: Toggle):
-
         if state == ON:
-            self.write('OUTP:START')
+            self.write("OUTP:START")
         elif state == OFF:
-            self.write('OUTP:STOP')
+            self.write("OUTP:STOP")
 
     @getter
     def get_output(self) -> Toggle:
+        response = self.query("OUTP?").strip()
 
-        response = self.query('OUTP?').strip()
-
-        if response == b'1':
-
+        if response == b"1":
             return ON
-        elif response == b'0':
+        elif response == b"0":
             return OFF
         else:
             return None
 
     @setter
-    def set_max_voltage(self, voltage: Float):
+    def set_output_protection_clear(self, state: Toggle):
+        if state == ON:
+            self.write("OUTP:PROT:CLE")
 
-        self.write(':VOLT %.2f' % voltage)
+        return self.get_over_current_protection()
+
+    @getter
+    def get_output_protection_clear(self) -> Toggle:
+        # Read the "questionable" register
+
+        response = self.query("STAT:QUES:COND?")
+
+        try:
+            register = int(response)
+        except ValueError:
+            return None
+
+        # Questionable Register bits as described in the manual
+        ov_bit, register = register // 1024, register % 1024
+        oc_bit, register = register // 512, register % 512
+        pb_bit, register = register // 256, register % 256
+        pgm_bit, register = register // 128, register % 128
+        ot_bit, register = register // 64, register % 64
+        fuse_bit, register = register // 32, register % 32
+        alm_bit, register = register // 16, register % 16
+
+        if any([ov_bit, oc_bit, pb_bit, pgm_bit, ot_bit, fuse_bit, alm_bit]):
+            return OFF
+        else:
+            return ON
+
+    @setter
+    def set_over_voltage_protection(self, voltage: Float):
+        self.write("VOLT:PROT %.1f" % voltage)
+
+    @getter
+    def get_over_voltage_protection(self) -> Float:
+        response = self.query("VOLT:PROT?")
+
+        try:
+            return float(response)
+        except ValueError:
+            return np.nan
+
+    @setter
+    def set_over_current_protection(self, voltage: Float):
+        self.write("CURR:PROT %.1f" % voltage)
+
+    @getter
+    def get_over_current_protection(self) -> Float:
+        response = self.query("CURR:PROT?")
+
+        try:
+            return float(response)
+        except ValueError:
+            return np.nan
+
+    @setter
+    def set_max_voltage(self, voltage: Float):
+        self.write("VOLT:IMM %.1f" % voltage)
 
     @getter
     def get_max_voltage(self) -> Float:
-
-        response = self.query(':VOLT?')
+        response = self.query("VOLT?")
 
         try:
             return float(response)
@@ -410,13 +445,11 @@ class MagnaPowerSL1000(Instrument):
 
     @setter
     def set_max_current(self, current: Float):
-
-        self.write(':CURR %.2f' % current)
+        self.write("CURR:IMM %.1f" % current)
 
     @getter
     def get_max_current(self) -> Float:
-
-        response = self.query(':CURR?')
+        response = self.query("CURR?")
 
         try:
             return float(response)
@@ -425,8 +458,7 @@ class MagnaPowerSL1000(Instrument):
 
     @measurer
     def measure_voltage(self) -> Float:
-
-        response = self.query('MEAS:VOLT?').strip()
+        response = self.query("MEAS:VOLT?").strip()
 
         try:
             return float(response)
@@ -435,8 +467,7 @@ class MagnaPowerSL1000(Instrument):
 
     @measurer
     def measure_current(self) -> Float:
-
-        response = self.query('MEAS:CURR?').strip()
+        response = self.query("MEAS:CURR?").strip()
 
         try:
             return float(response)
