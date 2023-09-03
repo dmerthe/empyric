@@ -12,11 +12,7 @@ class Keithley2260B(Instrument):
 
     supported_adapters = (
         (Serial, {"baud_rate": 115200, "write_termination": "\r\n"}),
-        (Socket, {
-            "read_termination": "\n",
-            "write_termination": "\n"
-        }
-         )
+        (Socket, {"read_termination": "\n", "write_termination": "\n"}),
     )
 
     knobs = ("max voltage", "max current", "output")
@@ -56,7 +52,6 @@ class Keithley2260B(Instrument):
 
     @getter
     def get_output(self) -> Toggle:
-
         response = self.query("OUTP?")
 
         if response == "0":
@@ -282,38 +277,31 @@ class KoradKWR100(Instrument):
     name = "KWR100"
 
     supported_adapters = (
-        (Socket, {
-            "type": socket.SOCK_DGRAM,  # UDP
-            "write_termination": "\n",
-            "read_termination": "\n",
-            "timeout": 1
-        }),
+        (
+            Socket,
+            {
+                "type": socket.SOCK_DGRAM,  # UDP
+                "write_termination": "\n",
+                "read_termination": "\n",
+                "timeout": 1,
+            },
+        ),
     )
 
-    knobs = (
-        "output",
-        "max voltage",
-        "max current"
-    )
+    knobs = ("output", "max voltage", "max current")
 
-    meters = (
-        "voltage",
-        "current"
-    )
-
+    meters = ("voltage", "current")
 
     @setter
     def set_output(self, state: Toggle):
-
         if state == ON:
-            self.write('OUT:1')
+            self.write("OUT:1")
         elif state == OFF:
-            self.write('OUT:0')
+            self.write("OUT:0")
 
     @getter
     def get_output(self) -> Toggle:
-
-        response = self.query('OUT?')
+        response = self.query("OUT?")
 
         if response == "0":
             return OFF
@@ -322,27 +310,24 @@ class KoradKWR100(Instrument):
 
     @setter
     def set_max_voltage(self, voltage: Float):
-
-        self.write('VSET:%.2f' % voltage)
+        self.write("VSET:%.2f" % voltage)
 
     @getter
     def get_max_voltage(self) -> Float:
-
-        return float(self.query('VSET?'))
+        return float(self.query("VSET?"))
 
     @setter
     def set_max_current(self, current: Float):
-        self.write('ISET:%.2f' % current)
+        self.write("ISET:%.2f" % current)
 
     @getter
     def get_max_current(self) -> Float:
-        return float(self.query('ISET?'))
+        return float(self.query("ISET?"))
 
     @measurer
     def measure_voltage(self) -> Float:
-        return float(self.query('VOUT?'))
+        return float(self.query("VOUT?"))
 
     @measurer
     def measure_current(self) -> Float:
-        return float(self.query('IOUT?'))
-
+        return float(self.query("IOUT?"))

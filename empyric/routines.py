@@ -124,9 +124,7 @@ class Routine:
 
         @functools.wraps(update)
         def wrapped_update(self, state):
-
             if self.enable is not None and not state[self.enable]:
-
                 for name, knob in self.knobs.items():
                     if knob._controller == self:
                         knob._controller = None
@@ -278,7 +276,6 @@ class Ramp(Routine):
             self.then = state["Time"]
 
         for knob, rate, target in zip(self.knobs, self.rates, self.targets):
-
             # target and rate can be variables
             if isinstance(target, String):
                 target = state[target]
@@ -538,7 +535,7 @@ class Maximization(Routine):
             allow_duplicate_points=True,
         )
 
-        self.method = method if method is not None else 'bayesian'
+        self.method = method if method is not None else "bayesian"
 
         self.settling_time = convert_time(settling_time)
 
@@ -546,7 +543,6 @@ class Maximization(Routine):
 
     @Routine.enabler
     def update(self, state):
-
         if self.method == "bayesian":
             self._update_bayesian(state)
 
@@ -592,18 +588,14 @@ class Maximization(Routine):
             self.util_func.kappa = kappa
 
     def prep(self, state):
-
-        if self.method == 'bayesian':
-
-            self._kappa0 = self.options.get('kappa', 2.5)
+        if self.method == "bayesian":
+            self._kappa0 = self.options.get("kappa", 2.5)
             self.util_func = UtilityFunction(
                 kappa=self._kappa0,  # exploration vs. exploitation parameter
             )
 
     def finish(self, state):
-
         for i, (knob, value) in enumerate(self.best_knobs.items()):
-
             if value is None or not np.isfinite(value):
                 print(f"Warning: No optimal value was found for {knob}")
             else:

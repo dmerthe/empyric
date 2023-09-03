@@ -424,9 +424,7 @@ class Remote(Variable):
         """
 
         if self.protocol == "modbus":
-            self._client.write(
-                16, self.alias, value, _type=self._type_map[self._type]
-            )
+            self._client.write(16, self.alias, value, _type=self._type_map[self._type])
 
         else:
             write_to_socket(self._socket, f"{self.alias} {value}")

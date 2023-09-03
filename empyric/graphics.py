@@ -543,7 +543,6 @@ class ExperimentGUI:
 
         i += 1
         for name in self.variables:
-
             if self.variables[name]._hidden:
                 continue
 
@@ -880,8 +879,7 @@ class ExperimentGUI:
         """Assigns the value to a variable if entered by the user"""
 
         variable.value = recast(
-            entry.get(),
-            to=variable._type if variable._type is not None else Type
+            entry.get(), to=variable._type if variable._type is not None else Type
         )
 
         root.focus()

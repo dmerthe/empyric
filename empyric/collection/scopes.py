@@ -624,11 +624,14 @@ class SiglentSDS1000(Instrument):
     name = "SiglentSDS1000"
 
     supported_adapters = (
-        (Socket, {
-            "write_termination": "\n",
-            "read_termination": "\n",
-            "timeout": 60  # waveform retrieval may take some extra time
-        }),
+        (
+            Socket,
+            {
+                "write_termination": "\n",
+                "read_termination": "\n",
+                "timeout": 60,  # waveform retrieval may take some extra time
+            },
+        ),
     )
 
     knobs = (
@@ -701,7 +704,6 @@ class SiglentSDS1000(Instrument):
 
     @getter
     def get_horz_scale(self) -> Float:
-
         response = self.query("TDIV?").split("TDIV ")[-1][:-1]
 
         try:
@@ -717,7 +719,6 @@ class SiglentSDS1000(Instrument):
 
     @getter
     def get_horz_position(self) -> Float:
-
         response = self.query("TRDL?").split("TRDL ")[-1][:-1]
 
         try:
@@ -732,7 +733,6 @@ class SiglentSDS1000(Instrument):
         self.write("C%d:VDIV %.3eV" % (n, float(scale)))
 
     def _get_chn_scale(self, n):
-
         response = self.query("C%d:VDIV?" % n).split("C%d:VDIV " % n)[-1][:-1]
 
         try:
@@ -746,7 +746,6 @@ class SiglentSDS1000(Instrument):
         self.write("C%d:OFST %.3eV" % (n, float(position)))
 
     def _get_chn_position(self, n):
-
         response = self.query("C%d:OFST?" % n).split("C%d:OFST " % n)[-1][:-1]
 
         try:
@@ -853,7 +852,6 @@ class SiglentSDS1000(Instrument):
 
     @getter
     def get_trigger_source(self) -> Integer:
-
         response = self.query("TRSE?").split("SR,C")[-1][0]
 
         try:
@@ -917,7 +915,6 @@ class SiglentSDS1000(Instrument):
 
     @getter
     def get_averages(self) -> Integer:
-
         response = self.query("AVGA?").split("AVGA ")[-1]
 
         try:
@@ -929,7 +926,6 @@ class SiglentSDS1000(Instrument):
 
     # Channel measurements
     def _measure_chn_waveform(self, n):
-
         # Set trigger mode to NORMAL
         self.write("TRMD NORM")
 
@@ -1033,7 +1029,6 @@ class SiglentSDS1000(Instrument):
 
     @measurer
     def measure_sample_rate(self) -> Float:
-
         response = self.query("SARA?")[5:-4]
 
         try:
