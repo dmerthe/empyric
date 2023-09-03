@@ -206,10 +206,9 @@ def read_from_socket(
         if not readable:
             break
         elif in_error:
-            raise ConnectionError('an exception has been raised for the socket')
+            raise ConnectionError("an exception has been raised for the socket")
 
         try:
-
             # Check again that socket is readable
             readable = select.select([_socket], [], [], timeout)[0]
 
