@@ -8,14 +8,6 @@ from empyric.types import ON, OFF, Toggle, Integer, String, Float, recast
 
 class SiglentSDG1000(Instrument):
 
-    # maybe what we can do is create additional attributes of a SDG object to store previous state of both burst and basic waveform outputs
-    # then when people want to switch between the two, the previous state will be loaded from the attribute contents
-    def __init__(self, address=None, adapter=None, presets=None, postsets=None, **kwargs):
-        super().__init__(self, address=address, adapter=adapter, presets=presets, postsets=postsets, **kwargs)
-        self.saved_bswv_state = ''
-        self.saved_btwv_state = ''
-        # todo: initialize these to something tomorrow
-
     supported_adapters = (
         (Socket, {"write_termination": "\n", "read_termination": "\n"}),
     )
@@ -47,7 +39,7 @@ class SiglentSDG1000(Instrument):
         "channel 2 invert",
         "equal phase",
         # BURST MODE PARAMETERS
-        "channel 1 mode", # this will be either "burst" or "basic"
+        "channel 1 mode",
         "channel 2 mode",
         "channel 1 burst period",
         "channel 2 burst period",
@@ -95,20 +87,19 @@ class SiglentSDG1000(Instrument):
 
         return output, load, polarity
 
-    def _set_channel_n_waveform(self, n, **kwargs):
+    def _set_channel_n_waveform(self, n, is_basic_param=False, **kwargs):
         # If the mode is being switched from basic/burst, the desired returned waveform should be opposite
         if "mode" in kwargs:
             waveform_dict = self._get_channel_n_waveform(n, mode_override=True)
         else:    
             waveform_dict = self._get_channel_n_waveform(n)
-
-        # Check the validity of keyword args
-        for key in kwargs:
-            if key.upper() not in waveform_dict and key.upper() != "CWVTP":
-                raise ValueError(
-                    f"parameter {key} is not valid for waveform type "
-                    f'{kwargs["WVTP"]}'
-                )
+            # # Check the validity of keyword args
+            # for key in kwargs:
+            #     if key.upper() not in waveform_dict and key.upper() != "CWVTP":
+            #         raise ValueError(
+            #             f"parameter {key} is not valid for waveform type "
+            #             f'{kwargs["WVTP"]}'
+            #         )
 
         # Get burst mode state
         if waveform_dict.get("STATE") == None:
@@ -116,8 +107,9 @@ class SiglentSDG1000(Instrument):
         else:
             burst_mode = "burst"
 
+        # note: consider making a "is basic wave param" boolean argument. if so, the command is sent with basic wave structure.
         # Create appropriate command based on basic/burst waveform mode
-        if burst_mode == "basic":
+        if burst_mode == "basic" or is_basic_param:
             parameter_string = f"C{n}:BSWV " + ",".join(
                 [f"{key.upper()},{value}" for key, value in kwargs.items()]
             )
@@ -126,7 +118,7 @@ class SiglentSDG1000(Instrument):
             parameter_string = f"C{n}:BTWV "
             for key, value in kwargs.items():
                 if key == "CWVTP":
-                    parameter_string += f"CARR, WVTP,{value}, "
+                    parameter_string += f"CARR,WVTP,{value}, "
                 else:
                     parameter_string += f"{key.upper()},{value}, "
 
@@ -141,26 +133,29 @@ class SiglentSDG1000(Instrument):
         bt_response = self.query(f"C{n}:BTWV?")[3:]
         burst_mode_on = True
         key_correction = False
-        if "BTWV STATE, OFF" in bt_response:
+        if "BTWV STATE,OFF" in bt_response:
             burst_mode_on = False
 
         if burst_mode_on:
             if mode_override == True: 
                 # Mode is changing from burst to basic, return basic dictionary
+                self.write(f"C{n}:BTWV STATE, OFF")  # turn burst mode off
                 response = self.query(f"C{n}:BSWV?")
                 response = response.split(f"C{n}:BSWV ")[1].split(",")
             else:
                 # Burst mode is active and unchanged, return active dictionary
-                burst_response = bt_response.split(f"C{n}:BTWV ")[1].split("CARR, ")[0]
-                carrier_response = bt_response.split(f"C{n}:BTWV ")[1].split("CARR, ")[1]
-                response = burst_response + carrier_response
+                burst_response = bt_response.split(f"BTWV ")[1].split("CARR,")[0]
+                carrier_response = bt_response.split(f"BTWV ")[1].split("CARR,")[1]
+                response = (burst_response + carrier_response).split(",")
                 key_correction = True
         else:
             if mode_override == True: 
                 # Mode is changing from basic to burst, return burst dictionary
-                burst_response = bt_response.split(f"C{n}:BTWV ")[1].split("CARR, ")[0]
-                carrier_response = bt_response.split(f"C{n}:BTWV ")[1].split("CARR, ")[1]
-                response = burst_response + carrier_response
+                self.write(f"C{n}:BTWV STATE, ON")  # turn burst mode on
+                bt_response = self.query(f"C{n}:BTWV?")[3:]
+                burst_response = bt_response.split(f"BTWV ")[1].split("CARR,")[0]
+                carrier_response = bt_response.split(f"BTWV ")[1].split("CARR,")[1]
+                response = (burst_response + carrier_response).split(",")
                 key_correction = True
             else:
                 # Basic mode is active and unchanged, return active dictionary
@@ -171,10 +166,10 @@ class SiglentSDG1000(Instrument):
         values = response[1::2]
 
         waveform_dict = {key: value for key, value in zip(keys, values)}
-        
+
         # If returned dictionary is for burst mode, correct key name for wavetype
         if key_correction:
-            waveform_dict["CARR, WVTP"] = waveform_dict.pop("WVTP")
+            waveform_dict["CARR,WVTP"] = waveform_dict.pop("WVTP")
 
         return waveform_dict
 
@@ -271,7 +266,7 @@ class SiglentSDG1000(Instrument):
     @getter
     def get_channel_1_waveform(self) -> String:
         if self._get_mode(1) == "burst":
-            return self._get_channel_n_waveform(1)["CARR, WVTP"]
+            return self._get_channel_n_waveform(1)["CARR,WVTP"]
         else:
             return self._get_channel_n_waveform(1)["WVTP"]
 
@@ -286,14 +281,14 @@ class SiglentSDG1000(Instrument):
     @getter
     def get_channel_2_waveform(self) -> String:
         if self._get_mode(2) == "burst":
-            return self._get_channel_n_waveform(2)["CARR, WVTP"]
+            return self._get_channel_n_waveform(2)["CARR,WVTP"]
         else:
             return self._get_channel_n_waveform(2)["WVTP"]
 
     # Waveform high level
     @setter
     def set_channel_1_high_level(self, high_level: Union[Float, String]):
-        self._set_channel_n_waveform(1, hlev=f"{high_level}")
+        self._set_channel_n_waveform(1, is_basic_param=True, hlev=f"{high_level}")
 
     @getter
     def get_channel_1_high_level(self) -> Float:
@@ -303,7 +298,7 @@ class SiglentSDG1000(Instrument):
 
     @setter
     def set_channel_2_high_level(self, high_level: Union[Float, String]):
-        self._set_channel_n_waveform(2, hlev=f"{high_level}")
+        self._set_channel_n_waveform(2, is_basic_param=True, hlev=f"{high_level}")
 
     @getter
     def get_channel_2_high_level(self) -> Float:
@@ -314,7 +309,7 @@ class SiglentSDG1000(Instrument):
     # Waveform low level
     @setter
     def set_channel_1_low_level(self, low_level: Union[Float, String]):
-        self._set_channel_n_waveform(1, llev=f"{low_level}")
+        self._set_channel_n_waveform(1, is_basic_param=True, llev=f"{low_level}")
 
     @getter
     def get_channel_1_low_level(self) -> Float:
@@ -324,7 +319,7 @@ class SiglentSDG1000(Instrument):
 
     @setter
     def set_channel_2_low_level(self, low_level: Union[Float, String]):
-        self._set_channel_n_waveform(2, llev=f"{low_level}")
+        self._set_channel_n_waveform(2, is_basic_param=True, llev=f"{low_level}")
 
     @getter
     def get_channel_2_low_level(self) -> Float:
