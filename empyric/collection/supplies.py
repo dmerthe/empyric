@@ -432,7 +432,7 @@ class MagnaPowerSL1000(Instrument):
 
     @setter
     def set_max_voltage(self, voltage: Float):
-        self.write("VOLT:IMM %.1f" % voltage)
+        self.write("VOLT %.1f" % voltage)
 
     @getter
     def get_max_voltage(self) -> Float:
@@ -445,7 +445,7 @@ class MagnaPowerSL1000(Instrument):
 
     @setter
     def set_max_current(self, current: Float):
-        self.write("CURR:IMM %.1f" % current)
+        self.write("CURR %.1f" % current)
 
     @getter
     def get_max_current(self) -> Float:
