@@ -204,14 +204,14 @@ class SRSPS300(Instrument):
     meters = ("voltage", "current")
 
     @setter
-    def set_output(self, output):
-        if Toggle(output):
+    def set_output(self, output: Toggle):
+        if output == ON:
             self.write("HVON")
         else:
             self.write("HVOF")
 
     @getter
-    def get_output(self):
+    def get_output(self) -> Toggle:
         # last bit of status byte is the output state
 
         def validator(response):
@@ -220,48 +220,48 @@ class SRSPS300(Instrument):
         status_bit_7 = int(self.query("*STB? 7", validator=validator))
 
         if status_bit_7 == 1:
-            return "ON"
+            return ON
         else:
-            return "OFF"
+            return OFF
 
     @setter
-    def set_voltage(self, voltage):
+    def set_voltage(self, voltage: Float):
         self.write("VSET%f" % float(voltage))
 
     @getter
-    def get_voltage(self):
+    def get_voltage(self) -> Float:
         return float(self.query("VSET?"))
 
     @setter
-    def set_max_voltage(self, voltage):
+    def set_max_voltage(self, voltage: Float):
         self.write("VLIM%f" % float(voltage))
 
     @getter
-    def get_max_voltage(self):
+    def get_max_voltage(self) -> Float:
         return float(self.query("VLIM?"))
 
     @setter
-    def set_max_current(self, current):
+    def set_max_current(self, current: Float):
         self.write("ILIM%f" % float(current))
 
     @getter
-    def get_max_current(self):
+    def get_max_current(self) -> Float:
         return float(self.query("ILIM?"))
 
     @setter
-    def set_trip_current(self, current):
+    def set_trip_current(self, current: Float):
         self.write("ITRP%f" % float(current))
 
     @getter
-    def get_trip_current(self):
+    def get_trip_current(self) -> Float:
         return float(self.query("ITRP?"))
 
     @measurer
-    def measure_voltage(self):
+    def measure_voltage(self) -> Float:
         return float(self.query("VOUT?"))
 
     @measurer
-    def measure_current(self):
+    def measure_current(self) -> Float:
         return float(self.query("IOUT?"))
 
 
