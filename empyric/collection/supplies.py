@@ -195,7 +195,7 @@ class SRSPS300(Instrument):
 
     supported_adapters = ((GPIB, {}),)
 
-    knobs = ("output", "voltage", "max voltage" "max current", "trip current")
+    knobs = ("output", "voltage", "max voltage", "max current", "trip current")
 
     presets = {"output": "OFF", "voltage": 0, "max current": 5e-3}
 
@@ -255,6 +255,32 @@ class SRSPS300(Instrument):
     @getter
     def get_trip_current(self) -> Float:
         return float(self.query("ITRP?"))
+
+    @setter
+    def set_clear_trip(self, state: Toggle) -> Toggle:
+
+        if state == ON:
+            self.write("TCLR")
+
+        return self.get_clear_trip()
+    @getter
+    def get_clear_trip(self):
+
+        try:
+
+            status_byte_1 = int(self.query('*STB? 1'))
+            status_byte_2 = int(self.query('*STB? 2'))
+
+            ovp_tripped = status_byte_1 == 1
+            ocp_tripped = status_byte_2 == 1
+
+        except ValueError:
+            return None
+
+        if ovp_tripped or ocp_tripped:
+            return OFF
+        else:
+            return ON
 
     @measurer
     def measure_voltage(self) -> Float:
