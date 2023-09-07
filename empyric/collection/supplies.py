@@ -195,7 +195,14 @@ class SRSPS300(Instrument):
 
     supported_adapters = ((GPIB, {}),)
 
-    knobs = ("output", "voltage", "max voltage", "max current", "trip current")
+    knobs = (
+        "output",
+        "voltage",
+        "max voltage",
+        "max current",
+        "trip current",
+        "clear trip",
+    )
 
     presets = {"output": "OFF", "voltage": 0, "max current": 5e-3}
 
