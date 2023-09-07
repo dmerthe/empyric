@@ -258,18 +258,16 @@ class SRSPS300(Instrument):
 
     @setter
     def set_clear_trip(self, state: Toggle) -> Toggle:
-
         if state == ON:
             self.write("TCLR")
 
         return self.get_clear_trip()
+
     @getter
     def get_clear_trip(self):
-
         try:
-
-            status_byte_1 = int(self.query('*STB? 1'))
-            status_byte_2 = int(self.query('*STB? 2'))
+            status_byte_1 = int(self.query("*STB? 1"))
+            status_byte_2 = int(self.query("*STB? 2"))
 
             ovp_tripped = status_byte_1 == 1
             ocp_tripped = status_byte_2 == 1
