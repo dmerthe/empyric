@@ -115,8 +115,7 @@ class SiglentSDG1000(Instrument):
         for key in kwargs:
             if key.upper() not in waveform_dict:
                 raise ValueError(
-                    f"parameter {key} is not valid for burst waveform type "
-                    f'{kwargs["CARR,WVTP"]}'
+                    f"parameter {key} is not valid for burst waveform"
                 )
 
         # For burst waveforms only, the wavetype parameter must be corrected
@@ -133,10 +132,13 @@ class SiglentSDG1000(Instrument):
     def _get_channel_n_waveform(self, n, mode="basic"):
         if mode.lower() == "burst":
             bt_response = self.query(f"C{n}:BTWV?")[3:]
-            # Temporarily remove "carr" prefix to create waveform dictionary
-            carrier_response = bt_response.split(f"BTWV ")[1].split("CARR,")[1]
-            bt_response = bt_response.split(f"BTWV ")[1].split("CARR,")[0]
-            response = (bt_response + carrier_response).split(",")
+            if "STATE,OFF" in bt_response:
+                response = bt_response.split(f"BTWV ")[1].split(",")
+            else:
+                # Temporarily remove "carr" prefix to create waveform dictionary
+                carrier_response = bt_response.split(f"BTWV ")[1].split("CARR,")[1]
+                bt_response = bt_response.split(f"BTWV ")[1].split("CARR,")[0]
+                response = (bt_response + carrier_response).split(",")
         else:
             bs_response = self.query(f"C{n}:BSWV?")
             response = bs_response.split(f"C{n}:BSWV ")[1].split(",")
@@ -147,7 +149,7 @@ class SiglentSDG1000(Instrument):
         waveform_dict = {key: value for key, value in zip(keys, values)}
 
         # Adjust name of wavetype key for non-basic waveforms
-        if mode.lower() != "basic":
+        if mode.lower() != "basic" and waveform_dict["STATE"] != "OFF":
             waveform_dict["CARR,WVTP"] = waveform_dict.pop("WVTP")
 
         return waveform_dict
@@ -232,28 +234,28 @@ class SiglentSDG1000(Instrument):
     # Waveform type
     @setter
     def set_channel_1_waveform(self, waveform: String):
-        if self.get_channel_1_burst_state == ON:
+        if self.get_channel_1_burst_state() == ON:
             self._set_channel_n_burst_waveform(1, wvtp=waveform)
         else:
             self._set_channel_n_basic_waveform(1, wvtp=waveform)
 
     @getter
     def get_channel_1_waveform(self) -> String:
-        if self.get_channel_1_burst_state == ON:
+        if self.get_channel_1_burst_state() == ON:
             return self._get_channel_n_waveform(1, mode="burst")["CARR,WVTP"]
         else:
             return self._get_channel_n_waveform(1)["WVTP"]
 
     @setter
     def set_channel_2_waveform(self, waveform: String):
-        if self.get_channel_2_burst_state == ON:
+        if self.get_channel_2_burst_state() == ON:
             self._set_channel_n_burst_waveform(2, wvtp=waveform)
         else:
             self._set_channel_n_basic_waveform(2, wvtp=waveform)
 
     @getter
     def get_channel_2_waveform(self) -> String:
-        if self.get_channel_2_burst_state == ON:
+        if self.get_channel_2_burst_state() is ON:
             return self._get_channel_n_waveform(2, mode="burst")["CARR,WVTP"]
         else:
             return self._get_channel_n_waveform(2)["WVTP"]
@@ -431,7 +433,7 @@ class SiglentSDG1000(Instrument):
     # Burst activated
     @setter
     def set_channel_1_burst_state(self, state: Toggle):
-        self._set_channel_n_burst_waveform(1, state)
+        self._set_channel_n_burst_waveform(1, state=state)
 
     @getter
     def get_channel_1_burst_state(self) -> Toggle:
@@ -439,7 +441,7 @@ class SiglentSDG1000(Instrument):
 
     @setter
     def set_channel_2_burst_state(self, state: Toggle):
-        self._set_channel_n_burst_waveform(2, state)
+        self._set_channel_n_burst_waveform(2, state=state)
 
     @getter
     def get_channel_2_burst_state(self) -> Toggle:
@@ -469,19 +471,19 @@ class SiglentSDG1000(Instrument):
     # Burst trigger source
     @setter
     def set_channel_1_burst_trigger_source(self, trsr: String):
-        self._set_channel_n_burst_waveform(1, trsr)
+        self._set_channel_n_burst_waveform(1, trsr=trsr)
 
     @getter
     def get_channel_1_burst_trigger_source(self) -> String:
-        return self._get_channel_n_waveform(1, mode="burst").get("TRSR", "?")
+        return self._get_channel_n_waveform(1, mode="burst").get("TRSR", None)
 
     @setter
     def set_channel_2_burst_trigger_source(self, trsr: String):
-        self._set_channel_n_burst_waveform(2, trsr)
+        self._set_channel_n_burst_waveform(2, trsr=trsr)
 
     @getter
     def get_channel_2_burst_trigger_source(self) -> String:
-        return self._get_channel_n_waveform(2, mode="burst").get("TRSR", "?")
+        return self._get_channel_n_waveform(2, mode="burst").get("TRSR", None)
 
     # Burst trigger delay
     @setter
@@ -507,24 +509,24 @@ class SiglentSDG1000(Instrument):
     # Burst trigger edge
     @setter
     def set_channel_1_burst_trigger_edge(self, edge: String):
-        self._set_channel_n_burst_waveform(1, edge)
+        self._set_channel_n_burst_waveform(1, edge=edge)
 
     @getter
     def get_channel_1_burst_trigger_edge(self) -> String:
-        return self._get_channel_n_waveform(1, mode="burst").get("EDGE", "?")
+        return self._get_channel_n_waveform(1, mode="burst").get("EDGE", None)
 
     @setter
     def set_channel_2_burst_trigger_edge(self, edge: String):
-        self._set_channel_n_burst_waveform(2, edge)
+        self._set_channel_n_burst_waveform(2, edge=edge)
 
     @getter
     def get_channel_2_burst_trigger_edge(self) -> String:
-        return self._get_channel_n_waveform(2, mode="burst").get("EDGE", "?")
+        return self._get_channel_n_waveform(2, mode="burst").get("EDGE", None)
 
     # Burst cycles
     @setter
-    def set_channel_1_burst_cycles(self, time: Float):
-        self._set_channel_n_burst_waveform(1, time)
+    def set_channel_1_burst_cycles(self, cycles: Float):
+        self._set_channel_n_burst_waveform(1, time=cycles)
 
     @getter
     def get_channel_1_burst_cycles(self) -> Float:
@@ -532,7 +534,7 @@ class SiglentSDG1000(Instrument):
 
     @setter
     def set_channel_2_burst_cycles(self, cycles: Float):
-        self._set_channel_n_burst_waveform(2, time=f"{cycles}")
+        self._set_channel_n_burst_waveform(2, time=cycles)
 
     @getter
     def get_channel_2_burst_cycles(self) -> Float:
@@ -541,16 +543,16 @@ class SiglentSDG1000(Instrument):
     # Burst polarity
     @setter
     def set_channel_1_burst_polarity(self, plrt: String):
-        self._set_channel_n_burst_waveform(1, plrt)
+        self._set_channel_n_burst_waveform(1, plrt=plrt)
 
     @getter
     def get_channel_1_burst_polarity(self) -> String:
-        return self._get_channel_n_waveform(1, mode="burst").get("PLRT", "?")
+        return self._get_channel_n_waveform(1, mode="burst").get("PLRT", None)
 
     @setter
     def set_channel_2_burst_polarity(self, plrt: String):
-        self._set_channel_n_burst_waveform(2, plrt)
+        self._set_channel_n_burst_waveform(2, plrt=plrt)
 
     @getter
     def get_channel_2_burst_polarity(self) -> String:
-        return self._get_channel_n_waveform(2, mode="burst").get("PLRT", "?")
+        return self._get_channel_n_waveform(2, mode="burst").get("PLRT", None)
