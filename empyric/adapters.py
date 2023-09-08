@@ -254,18 +254,38 @@ class Serial(Adapter):
         if self.lib == "pyvisa":
             pyvisa = importlib.import_module("pyvisa")
 
-            self.backend = pyvisa.open_resource(
+            if "COM" in self.instrument.address:
+                raise AdapterError(
+                    f"The given address {self.instrument.address} is formatted "
+                    f"for PySerial, but the library installed for serial "
+                    f"communications is PyVISA."
+                )
+
+            self.backend = pyvisa.ResourceManager().open_resource(
                 self.instrument.address,
                 baud_rate=self.baud_rate,
-                stop_bits=self.stop_bits,
-                parity=self.parity,
+                stop_bits=pyvisa.constants.StopBits(int(self.stop_bits * 10)),
+                parity={
+                    "N": pyvisa.constants.Parity(0),  # none
+                    "O": pyvisa.constants.Parity(1),  # odd
+                    "E": pyvisa.constants.Parity(2),  # even
+                    "M": pyvisa.constants.Parity(3),  # mark
+                    "S": pyvisa.constants.Parity(4),  # space
+                }[self.parity],
                 timeout=self.timeout,
                 write_termination=self.write_termination,
-                read_terimation=self.read_termination,
+                read_termination=self.read_termination,
             )
 
         # Then try connecting with PySerial
         elif self.lib == "pyserial":
+            if "ASRL" in self.instrument.address:
+                raise AdapterError(
+                    f"The given address {self.instrument.address} is formatted "
+                    f"for PyVISA, but the library installed for serial "
+                    f"communications is PySerial."
+                )
+
             serial = importlib.import_module("serial")
 
             self.backend = serial.Serial(
@@ -293,12 +313,8 @@ class Serial(Adapter):
         if self.lib == "pyvisa":
             if bytes:
                 response = self.backend.read_bytes(bytes)
-            elif until:
-                response = b""
-                while until.encode() not in response:
-                    response = response + self.backend.read_raw(1)
             else:
-                return self.backend.read(decode=False)  # decoded below
+                return self.backend.read_raw()  # decoded below
 
         elif self.lib == "pyserial":
             if bytes:
@@ -323,7 +339,12 @@ class Serial(Adapter):
 
     def disconnect(self):
         if self.lib == "pyvisa":
-            self.backend.clear()
+            IOerror = importlib.import_module("pyvisa").errors.VisaIOError
+
+            try:
+                self.backend.clear()
+            except IOerror:
+                pass
 
         elif self.lib == "pyserial":
             self.backend.reset_input_buffer()
