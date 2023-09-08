@@ -350,7 +350,7 @@ class MagnaPowerSL1000(Instrument):
 
     name = "MagnaPowerSL1000"
 
-    knobs = ("output", "max voltage", "max current")
+    knobs = ("output", "output protection clear", "over voltage protection", "over current protection", "max voltage", "max current")
 
     meters = ("voltage", "current")
 
