@@ -38,8 +38,8 @@ class SiglentSDG1000(Instrument):
         "channel 2 invert",
         "equal phase",
         # BURST MODE PARAMETERS
-        "channel 1 burst mode",
-        "channel 2 burst mode",
+        "channel 1 burst state",
+        "channel 2 burst state",
         "channel 1 burst period",
         "channel 2 burst period",
         "channel 1 burst trigger source",
