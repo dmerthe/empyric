@@ -152,6 +152,29 @@ class Instrument:
     * ``meters``: tuple of the names of all meters that can be measured on
       this instrument.
 
+    Every knob of an instrument has an associated ``set_[knob]`` method, which sends
+    commands to the physical instrument that change the value of the knob to the given
+    value. Each ``set_[knob]`` method should be wrapped by the ``setter`` function
+    defined above.
+
+    Every knob may also have an associated ``get_[knob]`` method, which queries the
+    value of the knob from the physical instrument, and should be wrapped by the
+    ``getter`` function defined above.
+
+    Every meter of an instrument has an associated ``measure_[meter]`` method, which
+    queries the value of a quantity measured by the physical instrument, and should be
+    wrapped by the ``measurer`` function defined above.
+
+    For convenience, the ``setter``, ``getter`` and ```measurer`` functions augment the
+    corresponding methods primarily by enforcing typing on the method arguments and the
+    returned values, and storing the last known values of knobs and meters in the
+    corresponding attribute of the Instrument instance. For example, if a meter called
+    ""temperature" is retrieved via the corresponding ``measure_temperature`` method of
+    the instrument ``thermometer``, the wrapping ``measurer`` function will assign that
+    temperature value to ``thermometer.temperature``. If the expected data type is a
+    floating point number, the ``measurer`` function additionally converts whatever the
+    bare ``measure_temperature`` method returns to a 64-bit floating point value.
+
     """
 
     name = "Instrument"
