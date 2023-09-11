@@ -252,14 +252,20 @@ class Serial(Adapter):
     def connect(self):
         # First try connecting with PyVISA
         if self.lib == "pyvisa":
-            pyvisa = importlib.import_module("pyvisa")
 
             if "COM" in self.instrument.address:
-                raise AdapterError(
-                    f"The given address {self.instrument.address} is formatted "
-                    f"for PySerial, but the library installed for serial "
-                    f"communications is PyVISA."
+
+                com_port = int(re.search("\d+", self.instrument.address)[0])
+
+                print(
+                    "PyVISA is the serial communications backend; reformatting "
+                    f"PySerial style address '{self.instrument.address}' to "
+                    f"'ASRL{com_port}::INSTR'"
                 )
+
+                self.instrument.address = f"ASRL{com_port}::INSTR"
+
+            pyvisa = importlib.import_module("pyvisa")
 
             self.backend = pyvisa.ResourceManager().open_resource(
                 self.instrument.address,
@@ -280,11 +286,16 @@ class Serial(Adapter):
         # Then try connecting with PySerial
         elif self.lib == "pyserial":
             if "ASRL" in self.instrument.address:
-                raise AdapterError(
-                    f"The given address {self.instrument.address} is formatted "
-                    f"for PyVISA, but the library installed for serial "
-                    f"communications is PySerial."
+
+                com_port = int(re.search("\d+", self.instrument.address)[0])
+
+                print(
+                    f"PySerial is the serial communications backend; reformatting "
+                    f"PyVISA style address '{self.instrument.address}' to "
+                    f"'COM{com_port}'"
                 )
+
+                self.instrument.address = f"COM{com_port}"
 
             serial = importlib.import_module("serial")
 
