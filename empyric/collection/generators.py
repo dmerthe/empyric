@@ -114,9 +114,7 @@ class SiglentSDG1000(Instrument):
 
         for key in kwargs:
             if key.upper() not in waveform_dict:
-                raise ValueError(
-                    f"parameter {key} is not valid for burst waveform"
-                )
+                raise ValueError(f"parameter {key} is not valid for burst waveform")
 
         # For burst waveforms only, the wavetype parameter must be corrected
         parameter_string = f"C{n}:BTWV " + ",".join(
