@@ -21,6 +21,7 @@ from empyric import adapters as _adapters
 from empyric import graphics as _graphics
 from empyric import instruments as _instruments
 from empyric import routines as _routines
+from empyric import rest as _rest
 from empyric.tools import convert_time, Clock
 from empyric.types import recast, Boolean, Toggle, Integer, Float, ON
 
@@ -468,6 +469,11 @@ class Manager:
         experiment_thread = threading.Thread(target=self._run)
         experiment_thread.start()
 
+        # Set up REST API
+        self.rest = _rest.RESTapi(instruments=self.instruments)
+
+        self.rest.run()
+
         # Set up the GUI for user interaction
         self.gui = _graphics.ExperimentGUI(
             self.experiment,
@@ -482,6 +488,9 @@ class Manager:
         self.gui.run()
 
         experiment_thread.join()
+
+        # Stop rest api
+        self.rest.stop()
 
         # Disconnect instruments
         for instrument in self.instruments.values():
