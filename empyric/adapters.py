@@ -25,14 +25,23 @@ def chaperone(method):
                 f"at address {self.instrument.address}"
             )
 
-        # Catch communication errors and either try to repeat communication
-        # or reset the connection
-        attempts = 0
-        reconnects = 0
-
         self.lock.acquire()
 
-        while reconnects <= self.max_reconnects:
+        # Catch communication errors and either try to repeat communication
+        # or reset the connection
+
+        reconnects = 0
+
+        while reconnects < self.max_reconnects:
+
+            if not self.connected:
+                print("Reconnecting...")
+                time.sleep(self.delay)
+                self.connect()
+                reconnects += 1
+
+            attempts = 0
+
             while attempts < self.max_attempts:
                 try:
                     response = method(self, *args, **kwargs)
@@ -60,17 +69,11 @@ def chaperone(method):
                     )
                     attempts += 1
 
-            # repeats have maxed out, so try reconnecting with the instrument
-            print("Reconnecting...")
+            # getting here means attempts have maxed out;
+            # disconnect adapter and potentially reconnect on next iteration
             self.disconnect()
-            time.sleep(self.delay)
-            self.connect()
 
-            attempts = 0
-            reconnects += 1
-
-        # Getting here means that both repeats
-        # and reconnects have been maxed out
+        # Getting here means that both attempts and reconnects have been maxed out
         self.lock.release()
         raise AdapterError(f"Unable to communicate with {self.instrument.name}!")
 
@@ -209,7 +212,10 @@ class Adapter:
 
     def disconnect(self):
         """
-        Close communication port/channel
+        Close communication port/channel.
+
+        Every ``disconnect`` method should set the ``connected`` attribute to
+        ``False`` in order for the ``chaperone`` wrapper to work correctly.
         """
         self.connected = False
 
@@ -1038,6 +1044,7 @@ class ModbusSerial(Adapter):
     def disconnect(self):
         if not self.backend.close_port_after_each_call:
             self.backend.serial.close()
+
         self.connected = False
 
     @staticmethod
@@ -1317,6 +1324,8 @@ class Modbus(Adapter):
     def disconnect(self):
         self.backend.close()
 
+        self.connected = False
+
 
 class Phidget(Adapter):
     """
@@ -1371,7 +1380,7 @@ class Phidget(Adapter):
 
     def disconnect(self):
         self.backend.close()
-        self.connected = True
+        self.connected = False
 
 
 supported = {

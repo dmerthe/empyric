@@ -37,6 +37,11 @@ def setter(method):
         self = args[0]
         value = args[1]
 
+        if not self.adapter.connected:
+            print(f'Instrument {self.name} is disconnected; unable to set {knob}')
+            self.__setattr__(knob, None)
+            return
+
         self.lock.acquire()
 
         try:
@@ -71,6 +76,11 @@ def getter(method):
     @wraps(method)
     def wrapped_method(*args, **kwargs):
         self = args[0]
+
+        if not self.adapter.connected:
+            self.__setattr__(knob, None)
+            print(f'Instrument {self.name} is disconnected; unable to get {knob}')
+            return
 
         self.lock.acquire()
 
@@ -109,6 +119,11 @@ def measurer(method):
     @wraps(method)
     def wrapped_method(*args, **kwargs):
         self = args[0]
+
+        if not self.adapter.connected:
+            self.__setattr__(meter, None)
+            print(f'Instrument {self.name} is disconnected; unable to measure {meter}')
+            return
 
         self.lock.acquire()
 
@@ -212,10 +227,7 @@ class Instrument:
         :param kwargs: (dict) any keyword args for the adapter
         """
 
-        if address:
-            self.address = address
-        else:
-            self.address = None
+        self.address = address
 
         adapter_connected = False
         if adapter:
@@ -266,6 +278,8 @@ class Instrument:
         # Get postsets
         if postsets:
             self.postsets = {**self.postsets, **postsets}
+
+        self.kwargs = kwargs
 
     def __repr__(self):
         return self.name
@@ -351,6 +365,25 @@ class Instrument:
         measurement = measure_method()
 
         return measurement
+
+    def connect(self):
+        """
+        (Re)Connect to the instrument. This is useful when communications are lost and
+        a new connection is required.
+
+        :return: None
+        """
+
+        if self.adapter.connected:
+            self.adapter.disconnect()
+
+        self.__init__(
+            address=self.address,
+            adapter=self.adapter if self.address is None else None,
+            presets=self.presets,
+            postsets=self.postsets,
+            **self.kwargs
+        )
 
     def disconnect(self):
         """
