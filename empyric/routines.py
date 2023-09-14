@@ -345,11 +345,30 @@ class Timecourse(Routine):
         for i, (t_elem, v_elem) in enumerate(zip(self.times, self.values)):
             if type(t_elem[0]) == str and ".csv" in t_elem[0]:
                 df = pd.read_csv(t_elem[0])
-                self.times[i] = df["times"].values
+
+                try:
+                    key = [col for col in df.columns if "time" in col.lower][0]
+                except IndexError:
+                    raise KeyError(
+                        f"No 'times' values found in {t_elem[0]}"
+                    )
+
+                self.times[i] = df[key].values
 
             if type(v_elem[0]) == str and ".csv" in v_elem[0]:
                 df = pd.read_csv(v_elem[0])
-                self.values[i] = [recast(val) for val in df["values"].values]
+
+                try:
+                    key = [
+                        col for col in df.columns
+                        if col == "values" or col == list(self.knobs)[i]
+                    ][0]
+                except IndexError:
+                    raise KeyError(
+                        f"No values for {list(self.knobs)[i]} found in {v_elem[0]}"
+                    )
+
+                self.values[i] = [recast(val) for val in df[key].values]
 
         self.times = np.array(convert_time(self.times)).astype(float)
         self.values = np.array(self.values, dtype=object)
@@ -438,7 +457,18 @@ class Sequence(Routine):
         for i, v_elem in enumerate(self.values):
             if type(v_elem[0]) == str and ".csv" in v_elem[0]:
                 df = pd.read_csv(v_elem[0])
-                self.values[i] = [recast(val) for val in df["values"].values]
+
+                try:
+                    key = [
+                        col for col in df.columns
+                        if col == "values" or col == list(self.knobs)[i]
+                    ][0]
+                except IndexError:
+                    raise KeyError(
+                        f"No values for {list(self.knobs)[i]} found in {v_elem[0]}"
+                    )
+
+                self.values[i] = [recast(val) for val in df[key].values]
 
         self.values = np.array(self.values, dtype=object)
 
