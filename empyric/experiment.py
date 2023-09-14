@@ -123,27 +123,7 @@ class Experiment:
         self.state["Time"] = self.clock.time
         self.state.name = datetime.datetime.now()
 
-        # If experiment is stopped, just return the knob & parameter values,
-        # and nullify meter & expression values
         if self.stopped:
-            threads = {}
-            for name, variable in self.variables.items():
-                is_knob = isinstance(variable, _variables.Knob)
-                is_parameter = isinstance(variable, _variables.Parameter)
-
-                if is_knob or is_parameter:
-                    threads[name] = threading.Thread(
-                        target=self._update_variable, args=(name,)
-                    )
-                    threads[name].start()
-                else:
-                    self.state[name] = None
-
-            # Wait for all variable update threads to finish
-            for name, thread in threads.items():
-                self.status = Experiment.RUNNING + f": retrieving {name}"
-                thread.join()
-
             return self.state
 
         # If the experiment is running, apply new settings to knobs
