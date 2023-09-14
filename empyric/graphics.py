@@ -1035,8 +1035,15 @@ class ConfigTestDialog(BasicDialog):
         BasicDialog.__init__(self, parent, title="Config/Test: " + instrument.name)
 
     def set_knob_entry(self, knob):
+
         value = self.knob_entries[knob].get()
         self.instrument.set(knob.replace(" ", "_"), recast(value))
+
+        # Check connection
+        if self.instrument.adapter.connected:
+            self.status_label.config(text="Connected", fg="green")
+        else:
+            self.status_label.config(text="Disconnected", fg="red")
 
     def get_knob_entry(self, knob):
         if hasattr(self.instrument, "get_" + knob.replace(" ", "_")):
@@ -1046,6 +1053,12 @@ class ConfigTestDialog(BasicDialog):
 
         self.knob_entries[knob].delete(0, tk.END)
         self.knob_entries[knob].insert(0, str(value))
+
+        # Check connection
+        if self.instrument.adapter.connected:
+            self.status_label.config(text="Connected", fg="green")
+        else:
+            self.status_label.config(text="Disconnected", fg="red")
 
     def update_meter_entry(self, meter):
         value = self.instrument.measure(meter)
@@ -1064,6 +1077,12 @@ class ConfigTestDialog(BasicDialog):
         self.meter_entries[meter].insert(0, str(value))
         self.meter_entries[meter].config(state="readonly")
 
+        # Check connection
+        if self.instrument.adapter.connected:
+            self.status_label.config(text="Connected", fg="green")
+        else:
+            self.status_label.config(text="Disconnected", fg="red")
+
     def body(self, master):
         knobs = self.instrument.knobs
         knob_values = {
@@ -1074,56 +1093,77 @@ class ConfigTestDialog(BasicDialog):
         meters = self.instrument.meters
         self.meter_entries = {}
 
-        label = tk.Label(master, text="Knobs", font=("Arial", 14, "bold"))
+        label = tk.Label(
+            master,
+            text=f"Status:"
+        )
         label.grid(row=0, column=0, sticky=tk.W)
 
-        label = tk.Label(master, text="Meters", font=("Arial", 14, "bold"))
-        label.grid(row=0, column=3, sticky=tk.W)
+        # Instrument status indicator and reconnect button
+        status = "Connected" if self.instrument.adapter.connected else "Disconnected"
+        color = "green" if self.instrument.adapter.connected else "red"
+
+        self.status_label = tk.Label(master, text=status, fg=color)
+        self.status_label.grid(row=0, column=1, sticky=tk.W)
+
+        self.reconnect_button = tk.Button(
+            master, text="Reconnect", command=lambda: self.instrument.connect()
+        )
+        self.reconnect_button.grid(row=0, column=2, sticky=tk.W)
+
+        frame = tk.Frame(master)
+        frame.grid(row=1, column=0, columnspan=7)
+
+        label = tk.Label(frame, text="Knobs", font=("Arial", 14, "bold"))
+        label.grid(row=1, column=0, sticky=tk.W)
+
+        label = tk.Label(frame, text="Meters", font=("Arial", 14, "bold"))
+        label.grid(row=1, column=3, sticky=tk.W)
 
         self.set_buttons = {}
         self.get_buttons = {}
-        i = 1
+        i = 2
         for knob in knobs:
             formatted_name = " ".join(
                 [word[0].upper() + word[1:] for word in knob.split(" ")]
             )
 
-            label = tk.Label(master, text=formatted_name)
+            label = tk.Label(frame, text=formatted_name)
             label.grid(row=i, column=0, sticky=tk.W)
 
-            self.knob_entries[knob] = tk.Entry(master)
+            self.knob_entries[knob] = tk.Entry(frame)
             self.knob_entries[knob].grid(row=i, column=1)
             self.knob_entries[knob].insert(0, str(knob_values[knob]))
 
             self.set_buttons[knob] = tk.Button(
-                master, text="Set", command=lambda knob=knob: self.set_knob_entry(knob)
+                frame, text="Set", command=lambda knob=knob: self.set_knob_entry(knob)
             )
             self.set_buttons[knob].grid(row=i, column=2)
 
             self.get_buttons[knob] = tk.Button(
-                master, text="Get", command=lambda knob=knob: self.get_knob_entry(knob)
+                frame, text="Get", command=lambda knob=knob: self.get_knob_entry(knob)
             )
             self.get_buttons[knob].grid(row=i, column=3)
 
             i += 1
 
         self.measure_buttons = {}
-        i = 1
+        i = 2
         for meter in meters:
             formatted_name = " ".join(
                 [word[0].upper() + word[1:] for word in meter.split(" ")]
             )
 
-            label = tk.Label(master, text=formatted_name)
+            label = tk.Label(frame, text=formatted_name)
             label.grid(row=i, column=4, sticky=tk.W)
 
-            self.meter_entries[meter] = tk.Entry(master)
+            self.meter_entries[meter] = tk.Entry(frame)
             self.meter_entries[meter].grid(row=i, column=5)
             self.meter_entries[meter].insert(0, "???")
             self.meter_entries[meter].config(state="readonly")
 
             self.measure_buttons[meter] = tk.Button(
-                master,
+                frame,
                 text="Measure",
                 command=lambda meter=meter: self.update_meter_entry(meter),
             )
