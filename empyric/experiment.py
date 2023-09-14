@@ -21,6 +21,7 @@ from empyric import adapters as _adapters
 from empyric import graphics as _graphics
 from empyric import instruments as _instruments
 from empyric import routines as _routines
+from empyric.adapters import AdapterError
 from empyric.tools import convert_time, Clock
 from empyric.types import recast, Boolean, Toggle, Integer, Float, ON
 
@@ -190,7 +191,12 @@ class Experiment:
                     event = self.eval_events[dependee]
                     event.wait()  # wait for dependee to be evaluated
 
-            value = self.variables[name].value
+            try:
+                value = self.variables[name].value
+            except AdapterError:
+                value = None
+            except ValueError:
+                value = None
 
             self.eval_events[name].set()
             # unblock threads evaluating dependents
