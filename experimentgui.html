@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Empyric</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: space-between;
+            align-items: top;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+        }
+        #variables_panel {
+            flex: 1;
+            padding: 20px;
+        }
+        #plots_panel {
+            flex: 2;
+            padding: 20px;
+        }
+        label {
+            float: left
+            width: auto
+        }
+        input {
+            max-width: 50%
+        }
+        /* Style the image */
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <div id="variables_panel">
+        <h2>Variables</h2>
+        <div>
+            <label for="var1">Variable 1:</label>
+            <input type="text" id="var1" name="vars">
+        </div>
+    </div>
+    <div id="plots_panel">
+        <h2>Plots</h2>
+    </div>
+</body>
+</html>
