@@ -120,10 +120,10 @@ class HenonMapper(Instrument):
 
     meters = ("x", "y")
 
-    a = 1.4
-    b = 0.3
+    _a = 1.4
+    _b = 0.3
 
-    x, y = 0.63, 0.19  # near the unstable fixed point
+    _x, _y = 0.63, 0.19  # near the unstable fixed point
 
     @setter
     def set_a(self, value: Float):
@@ -133,7 +133,8 @@ class HenonMapper(Instrument):
         :param value: (float) new value for a
         :return: None
         """
-        pass
+
+        self._a = value
 
     @setter
     def set_b(self, value: Float):
@@ -143,7 +144,8 @@ class HenonMapper(Instrument):
         :param value: (float) new value for b
         :return: None
         """
-        pass
+
+        self._b = value
 
     @measurer
     def measure_x(self) -> Float:
@@ -156,13 +158,13 @@ class HenonMapper(Instrument):
         :return: (float) current value of x
         """
 
-        x_new = 1.0 - self.a * self.x**2 + self.y
-        y_new = self.b * self.x
+        x_new = 1.0 - self._a * self._x**2 + self._y
+        y_new = self._b * self._x
 
-        self.x = x_new
-        self.y = y_new
+        self._x = x_new
+        self._y = y_new
 
-        return self.x
+        return self._x
 
     @measurer
     def measure_y(self) -> Float:
@@ -176,7 +178,7 @@ class HenonMapper(Instrument):
 
         time.sleep(0.25)  # make sure x is evaluated first
 
-        return self.y
+        return self._y
 
 
 class PIDController(Instrument):
@@ -298,33 +300,33 @@ class RandomWalk(Instrument):
 
     meters = ("value",)
 
-    def __init__(self, *args, **kwargs):
-        Instrument.__init__(self, *args, **kwargs)
-
-        self.mean = 0.0
-        self.step = 1.0
-        self.affinity = 0.01
-        self.value = self.mean
+    _mean = 0.0
+    _step = 1.0
+    _affinity = 0.01
+    _value = 0.0
 
     @setter
     def set_mean(self, mean: Float):
-        pass
+
+        self._mean = mean
 
     @setter
     def set_step(self, step: Float):
-        pass
+
+        self._step = step
 
     @setter
-    def set_drift(self, drift: Float):
-        pass
+    def set_affinity(self, affinity: Float):
+
+        self._affinity = affinity
 
     @measurer
     def measure_value(self) -> Float:
-        self.value += np.random.choice([-self.step, self.step]) + self.affinity * (
-            self.mean - self.value
+        self._value += np.random.choice([-self._step, self._step]) + self._affinity * (
+            self._mean - self._value
         )
 
-        return self.value
+        return self._value
 
 
 class SimpleProcess(Instrument):

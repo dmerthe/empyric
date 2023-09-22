@@ -1039,12 +1039,6 @@ class ConfigTestDialog(BasicDialog):
         value = self.knob_entries[knob].get()
         self.instrument.set(knob.replace(" ", "_"), recast(value))
 
-        # Check connection
-        if self.instrument.adapter.connected:
-            self.status_label.config(text="Connected", fg="green")
-        else:
-            self.status_label.config(text="Disconnected", fg="red")
-
     def get_knob_entry(self, knob):
         if hasattr(self.instrument, "get_" + knob.replace(" ", "_")):
             value = self.instrument.get(knob)
@@ -1053,12 +1047,6 @@ class ConfigTestDialog(BasicDialog):
 
         self.knob_entries[knob].delete(0, tk.END)
         self.knob_entries[knob].insert(0, str(value))
-
-        # Check connection
-        if self.instrument.adapter.connected:
-            self.status_label.config(text="Connected", fg="green")
-        else:
-            self.status_label.config(text="Disconnected", fg="red")
 
     def update_meter_entry(self, meter):
         value = self.instrument.measure(meter)
@@ -1077,12 +1065,6 @@ class ConfigTestDialog(BasicDialog):
         self.meter_entries[meter].insert(0, str(value))
         self.meter_entries[meter].config(state="readonly")
 
-        # Check connection
-        if self.instrument.adapter.connected:
-            self.status_label.config(text="Connected", fg="green")
-        else:
-            self.status_label.config(text="Disconnected", fg="red")
-
     def body(self, master):
         knobs = self.instrument.knobs
         knob_values = {
@@ -1092,24 +1074,6 @@ class ConfigTestDialog(BasicDialog):
 
         meters = self.instrument.meters
         self.meter_entries = {}
-
-        label = tk.Label(
-            master,
-            text=f"Status:"
-        )
-        label.grid(row=0, column=0, sticky=tk.W)
-
-        # Instrument status indicator and reconnect button
-        status = "Connected" if self.instrument.adapter.connected else "Disconnected"
-        color = "green" if self.instrument.adapter.connected else "red"
-
-        self.status_label = tk.Label(master, text=status, fg=color)
-        self.status_label.grid(row=0, column=1, sticky=tk.W)
-
-        self.reconnect_button = tk.Button(
-            master, text="Reconnect", command=lambda: self.instrument.connect()
-        )
-        self.reconnect_button.grid(row=0, column=2, sticky=tk.W)
 
         frame = tk.Frame(master)
         frame.grid(row=1, column=0, columnspan=7)

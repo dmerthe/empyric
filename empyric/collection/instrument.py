@@ -2,7 +2,7 @@ import typing
 from threading import RLock
 from functools import wraps
 from empyric.adapters import *
-from empyric.types import recast, Type
+from empyric.types import recast, Type, ON, OFF, Toggle
 
 
 def setter(method):
@@ -37,7 +37,7 @@ def setter(method):
         self = args[0]
         value = args[1]
 
-        if not self.adapter.connected:
+        if not self.adapter.connected and knob != 'connected':
             print(f'Instrument {self.name} is disconnected; unable to set {knob}')
             self.__setattr__(knob, None)
             return
@@ -77,7 +77,7 @@ def getter(method):
     def wrapped_method(*args, **kwargs):
         self = args[0]
 
-        if not self.adapter.connected:
+        if not self.adapter.connected and knob != 'connected':
             self.__setattr__(knob, None)
             print(f'Instrument {self.name} is disconnected; unable to get {knob}')
             return
@@ -158,7 +158,9 @@ class Instrument:
       contains an adapter class that the instrument can be used with and a
       dictionary of adapter settings.
     * ``knobs``: tuple of the names of all knobs that can be set on the
-      instrument.
+      instrument. Every instrument has a ``connected`` (``Toggle``) knob, for
+      convenience, whose set method calls the instruments ``connect`` or ``disconnect``
+      methods, if set to ``ON`` or ``OFF`` respectively.
     * ``presets``: dictionary of knob settings to apply when the instrument is
       instantiated.
       The keys are the names of the knobs and the values are the knob values.
@@ -228,6 +230,8 @@ class Instrument:
         """
 
         self.address = address
+
+        self.knobs = ('connected',) + self.knobs
 
         adapter_connected = False
         if adapter:
@@ -399,3 +403,25 @@ class Instrument:
             self.adapter.disconnect()
         else:
             raise ConnectionError(f"adapter for {self.name} is not connected!")
+
+    @setter
+    def set_connected(self, state: Toggle):
+
+        if state == ON:
+            if self.adapter.connected:
+                print(f'{self.name} is already connected')
+            else:
+                self.connect()
+        elif state == OFF:
+            if self.adapter.connected:
+                self.disconnect()
+            else:
+                print(f'{self.name} is already disconnected')
+
+    @getter
+    def get_connected(self) -> Toggle:
+
+        if self.adapter.connected:
+            return ON
+        else:
+            return OFF
