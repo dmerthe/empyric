@@ -852,7 +852,11 @@ class SiglentSDS1000(Instrument):
 
     @getter
     def get_trigger_source(self) -> Integer:
-        response = self.query("TRSE?").split("SR,C")[-1][0]
+
+        def validator(response):
+            return "SR,C" in response
+
+        response = self.query("TRSE?", validator=validator).split("SR,C")[-1][0]
 
         try:
             response = int(response)

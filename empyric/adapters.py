@@ -938,9 +938,13 @@ class Socket(Adapter):
 
     def disconnect(self):
         # Clear out any unread messages
-        unread = self._read(decode=False, nbytes=np.inf)
-        while unread:
-            unread = self._read(decode=False, nbytes=np.inf)
+
+        try:
+            unread = self._read(decode=False, nbytes=np.inf, timeout=1)
+            while unread:
+                unread = self._read(decode=False, nbytes=np.inf, timeout=1)
+        except ConnectionError:
+            pass
 
         self.backend.shutdown(socket.SHUT_RDWR)
         self.backend.close()

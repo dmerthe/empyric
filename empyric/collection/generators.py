@@ -428,6 +428,13 @@ class SiglentSDG1000(Instrument):
         if state == ON:
             self.write("EQPHASE")
 
+        # Equalizing the phase resets the delays, even if the display show otherwise.
+        self.set_channel_1_pulse_delay(0.0)
+        self.set_channel_2_pulse_delay(0.0)
+
+        # One shot button
+        return OFF
+
     # Burst activated
     @setter
     def set_channel_1_burst_state(self, state: Toggle):
