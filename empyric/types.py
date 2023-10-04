@@ -215,7 +215,7 @@ def recast(value: Any, to: type = Type) -> Union[Type, None]:
                 if booleans:
                     return np.array(booleans) == "True"
 
-                numbers = re.findall("[-+]?[0-9na]+\.?[0-9]*[eE]?[-+]?[0-9]*", value)
+                numbers = re.findall("nan|[-+]?[0-9]+\.?[0-9]*[eE]?[-+]?[0-9]*", value)
                 if numbers:
 
                     floats = np.any(['.' in elem for elem in numbers])
@@ -232,7 +232,7 @@ def recast(value: Any, to: type = Type) -> Union[Type, None]:
             elif re.fullmatch('\[(.|\\n)*\]', value):
                 # higher dimensional list or array
                 print('higher dimension array:', value)
-                elements = re.findall('\[.*\]', value[1:-1])
+                elements = re.findall('\[[^]]*\]', value[1:-1])
                 print('elements:', elements)
                 # Recursively recast on lower dimensions
                 array = [recast(element) for element in elements]
