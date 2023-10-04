@@ -12,15 +12,18 @@ explicitly define elements, and eventually convert it into a Jinja template-->
             align-items: top;
             margin: 0;
             padding: 0;
+            width: 100vw;
             height: 100vh;
         }
         #variables_panel {
             flex: 1;
             padding: 20px;
+            width: 50%
         }
         #plots_panel {
             flex: 2;
             padding: 20px;
+            width: 50%
         }
         label {
             float: left
@@ -42,6 +45,14 @@ explicitly define elements, and eventually convert it into a Jinja template-->
         <div>
             <label for="var1">Variable 1:</label>
             <input type="text" id="var1" name="vars">
+        </div>
+        <div>
+            <label for="var1">Variable 2:</label>
+            <input type="text" id="var2" name="vars">
+        </div>
+        <div>
+            <label for="var1">Variable 3:</label>
+            <input type="text" id="var3" name="vars">
         </div>
     </div>
     <div id="plots_panel">
