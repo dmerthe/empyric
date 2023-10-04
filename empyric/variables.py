@@ -406,7 +406,10 @@ class Remote(Variable):
                 elif "Error" in response:
                     raise RuntimeError(response.split("Error: ")[-1])
                 else:
-                    self._value = recast(response.split(" ")[-1])
+                    self._value = recast(
+                        response.split(f"{self.alias} ")[-1],
+                        to=self._type if self._type is not None else Type
+                    )
 
             except BaseException as error:
                 print(

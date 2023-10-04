@@ -193,21 +193,51 @@ def recast(value: Any, to: type = Type) -> Union[Type, None]:
         elif isinstance(value, Float):
             return np.float64(value)
         elif isinstance(value, String):
-            if value.lower() == "true":
+            if value.lower() == "true":  # boolean True
                 return np.bool_(True)
-            elif value.lower() == "false":
+            elif value.lower() == "false":  # boolean False
                 return np.bool_(False)
-            elif re.fullmatch("[0-9]+", value):  # integer
+            elif re.fullmatch("[-+]?[0-9]+", value):  # integer
                 return np.int64(value)
             elif re.fullmatch("[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?", value):
                 # float
                 return float(value)
-            elif value in (Toggle.on_values + Toggle.off_values):
+            elif value in (Toggle.on_values + Toggle.off_values):  # Toggle
                 return Toggle(value)
             elif os.path.isfile(value):  # path in the current working directory
                 return os.path.abspath(value)
-            elif os.path.isfile(os.path.join("..", value)):  # ... up one level
+            elif os.path.isfile(os.path.join("..", value)):  # ... or up one level
                 return os.path.abspath(os.path.join("..", value))
+            elif re.fullmatch('\[(?!\[)(.|\\n)*\]', value):
+                # 1D list or array
+                print('1D array:', value)
+                booleans = re.findall("True|False", value)
+                if booleans:
+                    return np.array(booleans) == "True"
+
+                numbers = re.findall("[-+]?[0-9na]+\.?[0-9]*[eE]?[-+]?[0-9]*", value)
+                if numbers:
+
+                    floats = np.any(['.' in elem for elem in numbers])
+
+                    if floats:
+                        return np.array(numbers, dtype=np.float64)
+                    else:
+                        return np.array(numbers, dtype=np.int64)
+
+                strings = re.findall("(?<=\')[^']*(?=\'[\]\s,])", value)
+                if strings:
+                    return np.array(strings, dtype=str)
+
+            elif re.fullmatch('\[(.|\\n)*\]', value):
+                # higher dimensional list or array
+                print('higher dimension array:', value)
+                elements = re.findall('\[.*\]', value[1:-1])
+                print('elements:', elements)
+                # Recursively recast on lower dimensions
+                array = [recast(element) for element in elements]
+
+                return np.array(array)
             else:
                 return value  # must be an actual string
         if isinstance(value, Array):  # value is an array
