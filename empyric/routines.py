@@ -701,7 +701,7 @@ class SocketServer(Routine):
             except socket.timeout:
                 pass
 
-            time.sleep(0.1)
+            time.sleep(0.001)
 
         # Close sockets
         try:
@@ -782,14 +782,14 @@ class SocketServer(Routine):
                         else:
                             _value = None
 
-                        if np.ndim(_value) == 0:
-                            outgoing_message = f"{alias} {_value}"
-                        else:
-                            # pickle dimensional quantities and send as bytes
+                        if isinstance(_value, Array):
+                            # pickle arrays and send as bytes
                             outgoing_message = f'{alias} pickle'.encode()
                             outgoing_message += dill.dumps(
                                 _value, protocol=dill.HIGHEST_PROTOCOL
                             )
+                        else:
+                            outgoing_message = f"{alias} {_value}"
 
                     else:  # Setting a value
                         knob_exists = alias in self.knobs

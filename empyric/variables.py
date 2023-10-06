@@ -406,9 +406,10 @@ class Remote(Variable):
                 elif b"Error" in response:
                     raise RuntimeError(response.decode().split("Error: ")[-1])
                 else:
+                    bytes_value = response.split(self.alias.encode() + b' ')[-1].strip()
 
                     self._value = recast(
-                        response.split(f"{self.alias} ")[-1],
+                        bytes_value,
                         to=self._type if self._type is not None else Type
                     )
 
