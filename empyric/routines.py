@@ -1,5 +1,6 @@
 import importlib
 import numbers
+import os.path
 import socket
 import queue
 import threading
@@ -779,6 +780,17 @@ class SocketServer(Routine):
                             _value = self.knobs[alias].value
                         elif alias in self.state:
                             _value = self.state[alias]
+
+                            if isinstance(_value, String) and os.path.isfile(_value):
+                                df = pd.read_csv(_value)
+
+                                if alias in df.columns:
+                                    # 1D array
+                                    _value = df[alias].values
+                                else:
+                                    # 2D array
+                                    _value = df.values
+
                         else:
                             _value = None
 
