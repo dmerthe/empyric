@@ -10,6 +10,7 @@ from typing import Union
 import select
 import functools
 
+import dill
 import numpy as np
 import pandas as pd
 
@@ -781,7 +782,14 @@ class SocketServer(Routine):
                         else:
                             _value = None
 
-                        outgoing_message = f"{alias} {_value}"
+                        if np.ndim(_value) == 0:
+                            outgoing_message = f"{alias} {_value}"
+                        else:
+                            # pickle dimensional quantities and send as bytes
+                            outgoing_message = f'{alias} pickle'.encode()
+                            outgoing_message += dill.dumps(
+                                _value, protocol=dill.HIGHEST_PROTOCOL
+                            )
 
                     else:  # Setting a value
                         knob_exists = alias in self.knobs

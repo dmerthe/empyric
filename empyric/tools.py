@@ -249,7 +249,7 @@ def write_to_socket(_socket, message, termination="\r", timeout=1):
     transmitted.
 
     :param _socket: (socket.Socket) socket to write to.
-    :param message: (str) message to send.
+    :param message: (str/bytes) message to send.
     :param termination: (str/bytes) expected message termination character(s).
     :param timeout: (numbers.Number) timeout for `select.select` call.
     """
@@ -263,7 +263,13 @@ def write_to_socket(_socket, message, termination="\r", timeout=1):
     if not writeable:
         return 0
 
-    bytes_message = (message + termination).encode()
+    if isinstance(message, str):
+        bytes_message = (message + termination).encode()
+    elif isinstance(message, bytes):
+        bytes_message = message + termination.encode()
+    else:
+        raise ValueError('message argument must be either string or bytes')
+
     msg_len = len(bytes_message)
 
     failures = 0
@@ -280,6 +286,6 @@ def write_to_socket(_socket, message, termination="\r", timeout=1):
         total_sent = total_sent + sent
 
     if total_sent < msg_len:
-        raise IOError(f"Socket connection to {_socket.getsockname()} is broken!")
+        raise ConnectionError(f"Socket connection to {_socket.getsockname()} is broken!")
 
     return total_sent

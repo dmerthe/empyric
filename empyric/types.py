@@ -3,6 +3,8 @@ import abc
 import os
 import re
 from abc import ABC
+
+import dill
 import pandas as pd
 import numpy as np
 from typing import Any, Union, get_origin, get_args
@@ -208,38 +210,17 @@ def recast(value: Any, to: type = Type) -> Union[Type, None]:
                 return os.path.abspath(value)
             elif os.path.isfile(os.path.join("..", value)):  # ... or up one level
                 return os.path.abspath(os.path.join("..", value))
-            elif re.fullmatch('\[(?!\[)(.|\\n)*\]', value):
-                # 1D list or array
-                print('1D array:', value)
-                booleans = re.findall("True|False", value)
-                if booleans:
-                    return np.array(booleans) == "True"
-
-                numbers = re.findall("nan|[-+]?[0-9]+\.?[0-9]*[eE]?[-+]?[0-9]*", value)
-                if numbers:
-
-                    floats = np.any(['.' in elem for elem in numbers])
-
-                    if floats:
-                        return np.array(numbers, dtype=np.float64)
-                    else:
-                        return np.array(numbers, dtype=np.int64)
-
-                strings = re.findall("(?<=\')[^']*(?=\'[\]\s,])", value)
-                if strings:
-                    return np.array(strings, dtype=str)
-
-            elif re.fullmatch('\[(.|\\n)*\]', value):
-                # higher dimensional list or array
-                print('higher dimension array:', value)
-                elements = re.findall('\[[^]]*\]', value[1:-1])
-                print('elements:', elements)
-                # Recursively recast on lower dimensions
-                array = [recast(element) for element in elements]
-
-                return np.array(array)
             else:
                 return value  # must be an actual string
+        elif isinstance(value, bytes):
+            if b'pickle' in value:
+                # pickled object
+                return dill.loads(value[6:])
+            else:
+                try:
+                    return recast(value.decode())
+                except UnicodeDecodeError:
+                    return value
         if isinstance(value, Array):  # value is an array
             np_array = np.array(value)  # convert to numpy array
             rep_elem = np_array.flatten()[0]  # representative element

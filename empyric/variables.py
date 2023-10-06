@@ -398,14 +398,15 @@ class Remote(Variable):
         else:
             write_to_socket(self._socket, f"{self.alias} ?")
 
-            response = read_from_socket(self._socket, timeout=60)
+            response = read_from_socket(self._socket, timeout=60, decode=False)
 
             try:
                 if response is None:
                     self._value = None
-                elif "Error" in response:
-                    raise RuntimeError(response.split("Error: ")[-1])
+                elif b"Error" in response:
+                    raise RuntimeError(response.decode().split("Error: ")[-1])
                 else:
+
                     self._value = recast(
                         response.split(f"{self.alias} ")[-1],
                         to=self._type if self._type is not None else Type
