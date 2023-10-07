@@ -175,7 +175,11 @@ def recast(value: Any, to: type = Type) -> Union[Type, None]:
                 elif issubclass(dtype, String):
                     return np.str_(value)
                 elif issubclass(dtype, Array) and np.ndim(value) > 0:
-                    return np.array(value)
+
+                    if isinstance(value, np.ndarray):
+                        return value
+                    else:
+                        return np.array(value)
 
             except ValueError:
                 pass

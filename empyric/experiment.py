@@ -210,7 +210,8 @@ class Experiment:
                     path = name.replace(" ", "_") + "_"
                     path += self.state.name.strftime("%Y%m%d-%H%M%S") + ".csv"
                     dataframe.to_csv(path)
-                    self.state[name] = path
+
+                    self.state[name] = os.path.abspath(path)
                 else:
                     self.state[name] = None
             else:

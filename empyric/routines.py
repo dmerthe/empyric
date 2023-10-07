@@ -718,6 +718,10 @@ class SocketServer(Routine):
                 client.shutdown(socket.SHUT_RDWR)
                 client.close()
             except ConnectionError:
+                # client is already disconnected
+                pass
+            except OSError:
+                # client is already disconnected
                 pass
 
         # Return empty clients dict to queue so process_requests can exit
