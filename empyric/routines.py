@@ -1,5 +1,6 @@
 import importlib
 import numbers
+import os.path
 import socket
 import queue
 import threading
@@ -10,6 +11,7 @@ from typing import Union
 import select
 import functools
 
+import dill
 import numpy as np
 import pandas as pd
 
@@ -700,7 +702,7 @@ class SocketServer(Routine):
             except socket.timeout:
                 pass
 
-            time.sleep(0.1)
+            time.sleep(0.001)
 
         # Close sockets
         try:
@@ -716,6 +718,10 @@ class SocketServer(Routine):
                 client.shutdown(socket.SHUT_RDWR)
                 client.close()
             except ConnectionError:
+                # client is already disconnected
+                pass
+            except OSError:
+                # client is already disconnected
                 pass
 
         # Return empty clients dict to queue so process_requests can exit
@@ -741,7 +747,7 @@ class SocketServer(Routine):
                     clients[address] = None
                     continue
 
-                if client and request:
+                if request:
                     alias = " ".join(request.split(" ")[:-1])
                     value = request.split(" ")[-1]
 
@@ -763,10 +769,15 @@ class SocketServer(Routine):
                             _type = self.knobs[alias]._type
                         elif alias in self.state:
                             _type = None
-                            for supported_type in supported_types.values():
-                                value = self.state[alias]
-                                if isinstance(value, supported_type):
-                                    _type = supported_type
+                            value = self.state[alias]
+
+                            if isinstance(value, String) and '.csv' in value:
+                                # value is an Array stored in a CSV file
+                                _type = Array
+                            else:
+                                for supported_type in supported_types.values():
+                                    if isinstance(value, supported_type):
+                                        _type = supported_type
 
                         else:
                             _type = None
@@ -778,10 +789,29 @@ class SocketServer(Routine):
                             _value = self.knobs[alias].value
                         elif alias in self.state:
                             _value = self.state[alias]
+
+                            if isinstance(_value, String) and '.csv' in _value:
+                                # value is an array, list or tuple stored in CSV file
+                                df = pd.read_csv(_value)
+
+                                if alias in df.columns:
+                                    # 1D array
+                                    _value = df[alias].values
+                                else:
+                                    # 2D array
+                                    _value = df.values
+
                         else:
                             _value = None
 
-                        outgoing_message = f"{alias} {_value}"
+                        if isinstance(_value, Array):
+                            # pickle arrays and send as bytes
+                            outgoing_message = f'{alias} dlpkl'.encode()
+                            outgoing_message += dill.dumps(
+                                _value, protocol=dill.HIGHEST_PROTOCOL
+                            )
+                        else:
+                            outgoing_message = f"{alias} {_value}"
 
                     else:  # Setting a value
                         knob_exists = alias in self.knobs
@@ -811,7 +841,7 @@ class SocketServer(Routine):
 
             self.clients_queue.put(clients)
 
-            time.sleep(0.01)
+            time.sleep(0.001)
 
     @Routine.enabler
     def update(self, state):

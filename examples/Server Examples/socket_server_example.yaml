@@ -37,6 +37,11 @@ Variables:
  Coordinate y:
   instrument: Henon Mapper
   meter: y
+ Coordinate Vector:
+  expression: '[x, y]'
+  definitions:
+   x: Coordinate x
+   y: Coordinate y
  Distance r:
   expression: 'sqrt(x^2 + y^2)'
   definitions:
