@@ -785,7 +785,8 @@ class SocketServer(Routine):
                         elif alias in self.state:
                             _value = self.state[alias]
 
-                            if isinstance(_value, String) and os.path.isfile(_value):
+                            if isinstance(_value, String) and '.csv' in _value:
+                                # value is an array, list or tuple stored in CSV file
                                 df = pd.read_csv(_value)
 
                                 if alias in df.columns:
