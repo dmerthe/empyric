@@ -747,7 +747,7 @@ class SocketServer(Routine):
                     clients[address] = None
                     continue
 
-                if client and request:
+                if request:
                     alias = " ".join(request.split(" ")[:-1])
                     value = request.split(" ")[-1]
 
@@ -801,7 +801,7 @@ class SocketServer(Routine):
 
                         if isinstance(_value, Array):
                             # pickle arrays and send as bytes
-                            outgoing_message = f'{alias} pickle'.encode()
+                            outgoing_message = f'{alias} dlpkl'.encode()
                             outgoing_message += dill.dumps(
                                 _value, protocol=dill.HIGHEST_PROTOCOL
                             )
@@ -836,7 +836,7 @@ class SocketServer(Routine):
 
             self.clients_queue.put(clients)
 
-            time.sleep(0.01)
+            time.sleep(0.001)
 
     @Routine.enabler
     def update(self, state):

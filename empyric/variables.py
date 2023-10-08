@@ -398,7 +398,7 @@ class Remote(Variable):
 
                     bytes_value = response.split(self.alias.encode() + b' ')[-1].strip()
 
-                    if bytes_value[:6] == b'pickle':
+                    if bytes_value[:6] == b'dlpkl':
                         # pickled quantity, usually an array, list or tuple
                         self._value = dill.loads(bytes_value[6:])
                     else:
