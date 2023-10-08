@@ -769,10 +769,15 @@ class SocketServer(Routine):
                             _type = self.knobs[alias]._type
                         elif alias in self.state:
                             _type = None
-                            for supported_type in supported_types.values():
-                                value = self.state[alias]
-                                if isinstance(value, supported_type):
-                                    _type = supported_type
+                            value = self.state[alias]
+
+                            if isinstance(value, String) and '.csv' in value:
+                                # value is an Array stored in a CSV file
+                                _type = Array
+                            else:
+                                for supported_type in supported_types.values():
+                                    if isinstance(value, supported_type):
+                                        _type = supported_type
 
                         else:
                             _type = None
