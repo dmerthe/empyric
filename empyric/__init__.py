@@ -90,7 +90,7 @@ def execute():
                 )
             )
     elif args.debug is not None:
-
+        debug = True
     else:
         manager = Manager(runcard=args.runcard)
         manager.run(directory=args.directory)
