@@ -217,7 +217,7 @@ def recast(value: Any, to: type = Type) -> Union[Type, None]:
             else:
                 return value  # must be an actual string
         elif isinstance(value, bytes):
-            if b'dlpkl' in value:
+            if value[:5] == b'dlpkl':
                 # pickled object
                 return dill.loads(value[5:])
             else:
