@@ -1,4 +1,7 @@
 import argparse
+import logging
+
+debugging = False
 
 try:
     import pytest
@@ -46,6 +49,8 @@ def execute():
         "-t", "--test", nargs="*", help="test empyric installation and components"
     )
 
+    parser.add_argument("-b", "--debug", nargs='?', default='True')
+
     args = parser.parse_args()
 
     if args.test is not None:
@@ -84,6 +89,18 @@ def execute():
                     ]
                 )
             )
+    elif args.debug is not None:
+
     else:
         manager = Manager(runcard=args.runcard)
         manager.run(directory=args.directory)
+
+
+# Set up logging
+logger = logging.getLogger(__name__)
+
+logfile_handler = logging.FileHandler('empyric.log')
+logfile_handler.setLevel(logging.INFO)
+
+logstream_handler = logging.StreamHandler()
+
