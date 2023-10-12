@@ -16,6 +16,7 @@ import pykwalify.errors
 from pykwalify.core import Core as YamlValidator
 from ruamel.yaml import YAML
 
+from empyric import logger
 from empyric import variables as _variables
 from empyric import adapters as _adapters
 from empyric import graphics as _graphics

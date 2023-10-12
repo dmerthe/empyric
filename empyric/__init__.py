@@ -1,14 +1,21 @@
 import argparse
 import logging
 
-debugging = False
-
 try:
     import pytest
 except ImportError:
     pytest = None
 
 from empyric.experiment import Manager
+
+# Set up logging
+logger = logging.getLogger()
+
+log_stream_handler = logging.StreamHandler()
+log_file_handler = logging.FileHandler('empyric.log')
+
+logger.addHandler(log_stream_handler)
+logger.addHandler(log_file_handler)
 
 
 # List of testable features.
@@ -49,9 +56,17 @@ def execute():
         "-t", "--test", nargs="*", help="test empyric installation and components"
     )
 
-    parser.add_argument("-b", "--debug", nargs='?', default='True')
+    parser.add_argument(
+        "-b", "--debug", nargs='*', default='True', help='run empyric in debug mode'
+    )
 
     args = parser.parse_args()
+
+    if args.debug is not None:
+        logger.setLevel(logging.DEBUG)
+        log_stream_handler.setLevel(logging.DEBUG)
+        log_file_handler.setLevel(logging.DEBUG)
+        logger.debug('Running in debug mode...')
 
     if args.test is not None:
         if pytest is None:
@@ -89,18 +104,6 @@ def execute():
                     ]
                 )
             )
-    elif args.debug is not None:
-        debug = True
     else:
         manager = Manager(runcard=args.runcard)
         manager.run(directory=args.directory)
-
-
-# Set up logging
-logger = logging.getLogger(__name__)
-
-logfile_handler = logging.FileHandler('empyric.log')
-logfile_handler.setLevel(logging.INFO)
-
-logstream_handler = logging.StreamHandler()
-

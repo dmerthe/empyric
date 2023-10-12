@@ -1,4 +1,5 @@
 # Required for ReadTheDocs
+dill
 numpy
 pandas
 pytest
