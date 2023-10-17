@@ -13,6 +13,7 @@ from empyric.collection.virtual import *
 from empyric.collection.generators import *
 from empyric.collection.scopes import *
 from empyric.collection.io import *
+from empyric.collection.owon_vds_raw import *
 
 supported = {
     key: value

@@ -859,7 +859,7 @@ class Socket(Adapter):
     write_termination = "\r"
     timeout = 1
 
-    kwargs = ["read_termination", "write_termination", "timeout"]
+    kwargs = ["read_termination", "write_termination", "timeout", "encode", "decode"]
 
     def connect(self):
         if self.connected:
@@ -876,12 +876,13 @@ class Socket(Adapter):
 
         self.connected = True
 
-    def _write(self, message):
+    def _write(self, message, **kwargs):
         write_to_socket(
             self.backend,
             message,
             termination=self.write_termination,
             timeout=self.timeout,
+            **kwargs
         )
 
         return "Success"
@@ -889,13 +890,18 @@ class Socket(Adapter):
     def _read(self, **kwargs):
         termination = kwargs.pop("termination", self.read_termination)
         timeout = kwargs.pop("timeout", self.timeout)
+        decode = kwargs.pop("decode", True)
 
         return read_from_socket(
-            self.backend, termination=termination, timeout=timeout, **kwargs
+            self.backend,
+            termination=termination,
+            timeout=timeout,
+            decode=decode,
+            **kwargs
         )
 
     def _query(self, question, **kwargs):
-        self._write(question)
+        self._write(question, **kwargs)
         return self._read(**kwargs)
 
     def disconnect(self):

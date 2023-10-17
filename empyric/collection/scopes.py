@@ -1,8 +1,12 @@
 import struct
+import numpy as np
 from empyric.tools import find_nearest
 from empyric.adapters import *
 from empyric.collection.instrument import *
 from empyric.types import Float, Array, Integer, String
+from empyric.tools import read_from_socket, write_to_socket
+import os
+import time
 
 
 class TekTDSScope(Instrument):
@@ -244,11 +248,20 @@ class MulticompProScope(Instrument):
     NOT TESTED
     """
 
-    supported_adapters = (
-        (USB, {"delay": 1}),
-        # acquisitions can take a long time
-    )
     """Supported adapters and options."""
+    supported_adapters = (
+        (
+            Socket,
+            {
+                "write_termination": "\n",
+                "read_termination": "\n",
+                "timeout": 60,  # waveform retrieval may take some extra time
+            },
+        ),
+        (
+            USB, {"timeout": 10}
+        ),
+    )
 
     knobs = (
         "horz scale",
@@ -362,10 +375,10 @@ class MulticompProScope(Instrument):
 
         scale_str = self._volt_scales[new_volt_scale]
 
-        self.write((":CH%d:SCAL " % channel) + scale_str)
+        self.write((":CHAN%d:SCAL " % channel) + scale_str)
 
     def _get_scale_ch(self, channel):
-        volt_scale_str = self.query(":CH%d:SCAL?" % channel)[:-2]
+        volt_scale_str = self.query(":CHAN%d:SCAL?" % channel)[:-2]
 
         if "mv" in volt_scale_str.lower():
             return 1e-3 * float(volt_scale_str[:-2])
@@ -375,7 +388,7 @@ class MulticompProScope(Instrument):
             return float("nan")
 
     def _set_position_ch(self, channel, position):
-        self.write((":CH%d:OFFS " % channel) + str(position))
+        self.write((":CHAN%d:OFFS " % channel) + str(position))
 
     @setter
     def set_scale_ch(self, scale, channel=None):
@@ -391,7 +404,7 @@ class MulticompProScope(Instrument):
 
     @getter
     def get_position_ch(self, channel=None):
-        return float(self.query(":CH%d:OFFS?" % channel)[:-2])
+        return float(self.query(":CHAN%d:OFFS?" % channel)[:-2])
 
     @setter
     def set_sweep_mode(self, mode):
@@ -1029,7 +1042,7 @@ class SiglentSDS1000(Instrument):
 
     @measurer
     def measure_sample_rate(self) -> Float:
-        response = self.query("SARA?")[5:-4]
+        response = self.query_read_until_response_helper("SARA?")[5:-4]
 
         try:
             response = float(response)
@@ -1037,3 +1050,484 @@ class SiglentSDS1000(Instrument):
             return np.nan
 
         return response
+
+class OwonVDSScope(Instrument):
+    """
+    Owon VDS PC Oscilloscope.
+
+    NOT TESTED
+    """
+
+    """Supported adapters and options."""
+    supported_adapters = (
+        (
+            Socket,
+            {
+                "write_termination": "\n",
+                "read_termination": "\n",
+                "timeout": 0.5,  # waveform retrieval may take some extra time
+            },
+        ),
+    )
+
+    knobs = (
+        "horz scale",
+        "horz position",
+        "scale ch1",
+        "position ch1",
+        "scale ch2",
+        "position ch2",
+        "sweep mode",
+        "trigger level",
+        "trigger source",
+        "sweep mode",
+        "resolution",
+        "acquire",
+        "state",
+    )
+
+    meters = (
+        "channel 1",
+        "channel 2",
+    )
+
+    presets = {
+        "resolution": 1e6,
+        "sweep mode": "SINGLE",
+        "trigger source": 1,
+    }
+
+    _time_scales = {
+        2e-9: "2ns",
+        5e-9: "5ns",
+        10e-9: "10ns",
+        20e-9: "20ns",
+        50e-9: "50ns",
+        100e-9: "100ns",
+        200e-9: "200ns",
+        500e-9: "500ns",
+        1e-6: "1us",
+        2e-6: "2us",
+        5e-6: "5us",
+        10e-6: "10us",
+        20e-6: "20us",
+        50e-6: "50us",
+        100e-6: "100us",
+        200e-6: "200us",
+        500e-6: "500us",
+        1e-3: "1ms",
+        2e-3: "2ms",
+        5e-3: "5ms",
+        10e-3: "10ms",
+        20e-3: "20ms",
+        50e-3: "50ms",
+        100e-3: "100ms",
+        200e-3: "200ms",
+        500e-3: "500ms",
+        1: "1s",
+        2: "2s",
+        5: "5s",
+        10: "10s",
+        20: "20s",
+        50: "50s",
+        100: "100s",
+    }
+
+    _volt_scales = {
+        2e-3: "2mv",
+        5e-3: "5mv",
+        10e-3: "10mv",
+        20e-3: "20mv",
+        50e-3: "50mv",
+        100e-3: "100mv",
+        200e-3: "200mv",
+        500e-3: "500mv",
+        1.0: "1v",
+        2.0: "2v",
+        5.0: "5v",
+    }
+
+    _volt_div_table = {0: 1e-3, 9: 1.0}
+
+    _resolutions = {
+        1e3: "1K",
+        1e4: "10K",
+        1e5: "100K",
+        1e6: "1M",
+        5e6: "5M",
+        #1e7: "10M" # Doesn't work on current unit
+        }
+
+    _sweep_modes = ["AUTO", "NORMAL", "SINGLE"]
+
+    _acquire_modes = ["SAMPLE", "AVERAGE", "PEAK"]
+
+    _acquiring = False
+
+    _channels = {
+        1: "CH1",
+        2: "CH2",
+        3: "CH3",
+        4: "CH4",
+    }
+
+    def query_read_until_response_helper(self, cmd, timeout=10):
+        self.write(cmd)
+        response = ""
+        timeout_downcounter = int(timeout/self.adapter.timeout)
+        while (len(response) == 0 and timeout_downcounter > 0):
+            response = self.read()
+            timeout_downcounter -= 1
+        print(f'Downcounter remaining: {timeout_downcounter}')
+        return response
+
+
+    @setter
+    def set_horz_scale(self, scale):
+        new_time_scale = find_nearest(list(self._time_scales.keys()), scale)
+
+        self.query_read_until_response_helper(":TIM:SCAL " + self._time_scales[new_time_scale])
+
+    @getter
+    def get_horz_scale(self):
+        time_scales_rev = {val: key for key, val in self._time_scales.items()}
+
+        time_scale_str = self.query_read_until_response_helper(":TIM:SCAL?")
+
+        return time_scales_rev[time_scale_str]
+
+    @setter
+    def set_horz_position(self, offset):
+        self.query_read_until_response_helper(":TIM:HOFF " + str(offset))
+
+    @getter
+    def get_horz_position(self):
+        return float(self.query_read_until_response_helper(":TIM:HOFF?"))
+
+    def _set_scale_ch(self, channel, scale):
+        new_volt_scale = find_nearest(list(self._volt_scales.keys()), scale)
+
+        # don't want to use the string value. Scope prefers numeric value
+
+        self.query_read_until_response_helper((":CHAN%d:SCAL " % channel) + str(new_volt_scale))
+
+    def _get_scale_ch(self, channel):
+        volt_scale_str = self.query_read_until_response_helper(":CHAN%d:SCAL?" % channel)
+
+        if "mv" in volt_scale_str.lower():
+            return 1e-3 * float(volt_scale_str[:-2])
+        elif "v" in volt_scale_str.lower():
+            return float(volt_scale_str[:-1])
+        else:
+            return float(volt_scale_str)
+
+    def _set_position_ch(self, channel, position):
+        self.query_read_until_response_helper((":CHAN%d:OFFS " % channel) + str(position))
+
+    @setter
+    def set_scale_ch(self, scale, channel=None):
+        self._set_scale_ch(channel, scale)
+
+    @getter
+    def get_scale_ch(self, channel=None):
+        return self._get_scale_ch(channel)
+
+    @setter
+    def set_position_ch(self, position, channel=None):
+        self._set_position_ch(channel, position)
+
+    @getter
+    def get_position_ch(self, channel=None):
+        return float(self.query_read_until_response_helper(":CHAN%d:OFFS?" % channel))
+
+    @setter
+    def set_sweep_mode(self, mode):
+        if mode.upper() not in self._sweep_modes:
+            raise ValueError(
+                f"Invalid sweep mode! "
+                f"Sweep mode must be one of: {', '.join(self._sweep_modes)}"
+            )
+
+        self.query_read_until_response_helper(":TRIG:MODE " + mode.upper())
+
+    @getter
+    def get_sweep_mode(self):
+        return self.query_read_until_response_helper(":TRIG:MODE?").upper()
+
+    @setter
+    def set_trigger_source(self, source):
+        self.query_read_until_response_helper(":TRIG:SING:EDGE:SOUR CH%d" % int(source))
+
+    @getter
+    def get_trigger_source(self):
+        channels_rev = {val: key for key, val in self._channels.items()}
+        source = self.query_read_until_response_helper(":TRIG:SING:EDGE:SOUR?")
+
+        return channels_rev[source]
+
+    @setter
+    def set_trigger_level(self, level_volts):
+        trigger_source = self.get_trigger_source()
+
+        scale = self._get_scale_ch(trigger_source)
+
+        level_scaled = str(int(25 * level_volts / scale))
+
+        self.query_read_until_response_helper(":TRIG:SING:EDGE:LEV " + level_scaled)
+
+    @getter
+    def get_trigger_level(self):
+        trigger_source = self.get_trigger_source()
+
+        response = self.query_read_until_response_helper(":TRIG:SING:EDGE:LEV?")
+
+        if "mV" in response:
+            scale = 0.001
+            response = response[:-2]
+        elif "V" in response:
+            scale = 1
+            response = response[:-1]
+
+        return float(response) * scale
+
+    @measurer
+    def measure_trigger_status(self):
+        return self.query_read_until_response_helper(":TRIG:STATUS?")[:-2]
+
+    @setter
+    def set_resolution(self, resolution):
+        if resolution not in self._resolutions:
+            raise ValueError(
+                f"Invalid memory depth! "
+                f"Memory depth must be one of: {', '.join(self._resolutions.keys())}"
+            )
+
+        self.query_read_until_response_helper(":ACQ:MDEPth " + self._resolutions[resolution])
+
+    @getter
+    def get_resolution(self):
+        res_rev = {val: key for key, val in self._resolutions.items()}
+
+        return res_rev[self.query_read_until_response_helper(":ACQ:MDEPth?").upper()]
+
+    @setter
+    def set_state(self, state):
+        if state.upper() in ["RUN", "STOP"]:
+            if state.upper() != self.get_state():
+                self.query_read_until_response_helper("*RUNStop")
+        else:
+            raise ValueError(
+                "Invalid state! "
+                "State must be one of: ['RUN', 'STOP']"
+            )
+
+
+    @getter
+    def get_state(self):
+        return self.query_read_until_response_helper("*RUNStop?").upper()
+
+    @setter
+    def set_acquire_mode(self, mode):
+        if (mode.upper() in self._acquire_modes):
+            self.query_read_until_response_helper(f":ACQUIRE:TYPE {mode.upper()}")
+        else:
+            raise ValueError(
+                f"Mode must be in {self._acquire_modes}"
+            )
+
+    @getter
+    def get_acquire_mode(self):
+        return self.query_read_until_response_helper(":ACQUIRE:TYPE?").upper()
+
+    @setter
+    def set_acquire_averages(self, averages):
+        if (averages in range(0,128)):
+            self.query_read_until_response_helper(f":ACQUIRE:AVERAGE {averages}")
+        else:
+            raise ValueError(
+                f"Mode must be in the range 0-128"
+            )
+
+    @getter
+    def get_acquire_averages(self):
+        return int(self.query_read_until_response_helper(":ACQUIRE:AVERAGE?"))
+
+    @setter
+    def set_acquire(self, _):
+        self._acquiring = True
+
+        self.set_sweep_mode("SINGLE")
+
+        trig_status = self.get_state()
+
+        if trig_status == "STOP":
+            # measurement has been triggered
+            pass
+        else:
+            # sweep needs to be reset
+            time.sleep(1)
+            self.set_acquire(1)
+
+    def _read_data_ADC(self, channel):
+        volts_per_div = self.get_scale_ch(channel)
+        resolution = self.get_resolution()
+        voltages = []
+        while (len(voltages) < resolution):
+            self.write(f"*ADC? {self._channels[channel]}")
+            raw_bytes_to_read = read_from_socket(
+                self.adapter.backend,
+                nbytes=4,
+                termination=None,
+                decode=False,
+                timeout=self.adapter.timeout
+            )
+            num_bytes_to_read = int.from_bytes(raw_bytes_to_read, "big")
+
+            raw_values = read_from_socket(
+                self.adapter.backend,
+                nbytes=num_bytes_to_read,
+                termination=None,
+                decode=False,
+                timeout=self.adapter.timeout
+            )
+
+            voltages.extend([float(value/25.0*volts_per_div) for value in raw_values])
+
+        return voltages
+
+    def _read_data(self, channel):
+        config = self.get_current_config()
+        save_path = self._save_traces('C:\\scratch'.upper())
+        time.sleep(30)
+        # previous_file_size = 0
+        # file_size = 1
+        # counter = 0
+        # # while (previous_file_size != file_size):
+        # while(file_size < config["Horizontal"]["sample depth"]+327):
+        #     time.sleep(2) # sleep for 2 seconds so that the binary file is not opened unitl writing is complete.
+        #     previous_file_size = file_size
+        #     file_size = os.path.getsize(save_path)
+        #     counter += 1
+        # print(f'Slept {counter} times')
+        channel_data = self._read_saved_binary_file(save_path, config)
+        # extract data for 1 channel
+        selected_channel = channel_data[self._channels[channel]]['trace data']
+        return np.array(selected_channel, dtype=np.float64)
+
+    
+    def get_current_config(self):
+        return {
+            "Horizontal": {
+                "scale": self.get_horz_scale(),
+                "offset": self.get_horz_position(),
+                "sample depth": self.get_resolution()
+            },
+            "CH1": {
+                "scale": self.get_scale_ch(1),
+                "offset": self.get_position_ch(1)
+            },
+            "CH2": {
+                "scale": self.get_scale_ch(2),
+                "offset": self.get_position_ch(2)
+            },
+            "CH3": {
+                "scale": self.get_scale_ch(3),
+                "offset": self.get_position_ch(3)
+            },
+            "CH4": {
+                "scale": self.get_scale_ch(4),
+                "offset": self.get_position_ch(4)
+            }
+        }
+
+    def _save_traces(self, path: str):
+        response = self.query_read_until_response_helper(f'*LDM? {path}')
+        end_of_upload_response = ''
+        while end_of_upload_response == '':
+            time.sleep(0.5)
+            end_of_upload_response = self.read()
+        path = end_of_upload_response.split('@')[1].strip()
+        return path
+
+    def _read_saved_binary_file(self, path: str, config=None):
+        file_reader = OwonVDSScopeBinaryFile(path)
+        if config is None:
+            raise ValueError(
+                "Config required to decode file for now."
+            )
+        else:
+            channel_data = {}
+            for name in file_reader.get_channel_names():
+                raw_data = file_reader.get_channel_raw_data(name)
+                trace_data = [config[name]['scale']*value/25.0-config[name]['offset'] for value in raw_data]
+                channel_data.update({name: {
+                                    'raw data': raw_data,
+                                    'trace data': trace_data
+                                    }
+                })
+            
+        return channel_data
+            
+
+    @measurer
+    def measure_channel_1(self):
+        if not self._acquiring:
+            self.set_acquire(True)
+
+        self._acquiring = False
+
+        data = self._read_data(1)
+
+        return data
+
+    @measurer
+    def measure_channel_2(self):
+        if not self._acquiring:
+            self.set_acquire(True)
+
+        self._acquiring = False
+
+        self.write(":WAV:BEG CH2")
+
+        data = self._read_data(2)
+
+        self.write(":WAV:END CH2")
+
+        return data[1]
+
+
+class OwonVDSScopeBinaryFile():
+    def __init__(self, filepath: str = None):
+        if filepath is None:
+            raise ValueError("Cannot create file reader without filepath")
+        else:
+            with open(filepath, "rb") as file:
+                self._file_bytes = file.read()
+        # List of constants that we know
+        self._CHANNEL_DATA_START = 32
+        self._TOTAL_DATAPOINTS_START = 28
+        self._CHANNEL_CONFIG_START = self._CHANNEL_DATA_START + self.get_total_datapoints() + 27  # Not sure why 27
+        self._SINGLE_CHANNEL_CONFIG_LEN = 64 + 3
+
+    def get_total_datapoints(self):
+        return struct.unpack(">I", self._file_bytes[self._TOTAL_DATAPOINTS_START:self._TOTAL_DATAPOINTS_START+4])[0]
+
+    def get_num_channels(self):
+        return int((len(self._file_bytes) - self._CHANNEL_CONFIG_START)/self._SINGLE_CHANNEL_CONFIG_LEN)
+
+    def get_datapoints_per_channel(self):
+        return int(self.get_total_datapoints()/self.get_num_channels())
+
+    def get_channel_raw_data(self, channel_name):
+        datapoint_count = self.get_datapoints_per_channel()
+        file_channel_names = self.get_channel_names()
+        channel_index = file_channel_names.index(channel_name)
+        data_offset = self._CHANNEL_DATA_START + channel_index * datapoint_count
+        bytes_to_decode = self._file_bytes[data_offset:data_offset+datapoint_count]
+        return struct.unpack(f">{'b'*datapoint_count}", bytes_to_decode)
+
+    def get_channel_names(self):
+        return [self._file_bytes[self._CHANNEL_CONFIG_START +count*self._SINGLE_CHANNEL_CONFIG_LEN:self._CHANNEL_CONFIG_START +count*self._SINGLE_CHANNEL_CONFIG_LEN+3].decode() for count in range(0,self.get_num_channels())]
+
+
+

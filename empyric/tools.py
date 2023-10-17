@@ -243,7 +243,7 @@ def read_from_socket(
         return message
 
 
-def write_to_socket(_socket, message, termination="\r", timeout=1):
+def write_to_socket(_socket, message, termination="\r", timeout=1, encode=True):
     """
     Write a message to a socket, with care taken to get the whole message
     transmitted.
@@ -263,7 +263,10 @@ def write_to_socket(_socket, message, termination="\r", timeout=1):
     if not writeable:
         return 0
 
-    bytes_message = (message + termination).encode()
+    bytes_message = message + termination
+    if encode:
+        bytes_message = bytes_message.encode()
+
     msg_len = len(bytes_message)
 
     failures = 0

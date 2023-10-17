@@ -23,6 +23,8 @@ pandas = "1.5.3"
 pykwalify = "1.8.0"
 bayesian-optimization = "1.4.3"
 "ruamel.yaml" = "0.17.21"
+pyvisa = "^1.13.0"
+pytest-cov = "^4.1.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "*"
