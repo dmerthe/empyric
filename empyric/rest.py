@@ -69,7 +69,7 @@ class RESTapi:
         # Need to start thread and have some logic to see if thread is already running
         print('Starting REST API')
         #self._app.run()
-        self._thread = threading.Thread(target=lambda: self._app.run(use_reloader=False))
+        self._thread = threading.Thread(target=lambda: self._app.run(use_reloader=False), daemon=True)
         self._thread.start()
         print('REST API started')
 
