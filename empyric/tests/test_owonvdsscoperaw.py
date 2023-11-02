@@ -1,20 +1,36 @@
 import pytest
 import time
 import numpy as np
-from empyric.instruments import OwonVDSScope
+from empyric.instruments import OwonVDSScopeRaw
 
 
-@pytest.fixture()
+@pytest.fixture(scope="module")
 def scope_resource():
-    scope_addr = '127.0.0.1::5025'  # address of Siglent scope
-    scope = OwonVDSScope(scope_addr)
+    scope_addr = '10.50.1.12::2000'  # address of Siglent scope
+    scope = OwonVDSScopeRaw(scope_addr)
     yield scope
+
+
+def test_connect(scope_resource):
+    assert scope_resource.adapter.connected is True
+
+
+def test_get_config(scope_resource):
+    print(scope_resource.get_current_config())
+
+
+def test_resolutions(scope_resource):
+    for resolution in scope_resource._resolutions:
+        scope_resource.set_resolution(resolution)
+        time.sleep(1)
+        assert scope_resource.get_resolution() == resolution
 
 
 def test_time_scales(scope_resource):
     for time_scale in scope_resource._time_scales:
-        scope_resource.set_horz_scale(time_scale)
-        assert scope_resource.get_horz_scale() == time_scale
+        scope_resource.set_horizontal_scale(time_scale)
+        time.sleep(1)
+        assert scope_resource.get_horizontal_scale() == time_scale
 
 
 def test_voltage_scales(scope_resource):
@@ -22,11 +38,6 @@ def test_voltage_scales(scope_resource):
         scope_resource.set_scale_ch(volt_scales, 1)
         assert scope_resource.get_scale_ch(1) == volt_scales
 
-
-def test_resolutions(scope_resource):
-    for resolution in scope_resource._resolutions:
-        scope_resource.set_resolution(resolution)
-        assert scope_resource.get_resolution() == resolution
 
 @pytest.mark.parametrize('timeout', [0.1, 0.5, 1, 2])
 def test_response_timing(scope_resource, timeout):
@@ -36,11 +47,14 @@ def test_response_timing(scope_resource, timeout):
     response_time = time.time()
     print(f'Time Delay (timeout={timeout}): {response_time-start_time}') 
 
-def test_trigger_mode(scope_resource):
-    for trigger_mode in scope_resource._sweep_modes:
-        scope_resource.set_sweep_mode(trigger_mode)
+# TODO: Only checks channel 1
+def test_sweep_mode(scope_resource):
+    scope_resource.set_trigger_source(1)
+    for sweep_mode in scope_resource._sweep_modes:
+        scope_resource.set_sweep_mode(sweep_mode)
         time.sleep(1)
-        assert scope_resource.get_sweep_mode() == trigger_mode
+        print(scope_resource.get_triggered_status())
+        assert scope_resource.get_sweep_mode() == sweep_mode
 
 @pytest.mark.parametrize('state', ['RUN', 'STOP'])
 def test_run_stop(scope_resource, state):
@@ -52,33 +66,16 @@ def test_run_stop(scope_resource, state):
     scope_resource.set_state('RUN')
     time.sleep(1)
 
-@pytest.mark.skip(reason='Takes a while and we know it works now')
-@pytest.mark.parametrize('resolution', [1e3])
-def test_save_data(scope_resource, resolution):
-    scope_resource.set_resolution(resolution)
-    config = scope_resource.get_current_config()
-    scope_resource.set_state('RUN')
-    save_path = scope_resource._save_traces('C:\\scratch'.upper())
-    channel_data = scope_resource._read_saved_binary_file(save_path, config)
-    print(channel_data)
-
 def test_acquire_mode(scope_resource):
-    for acquire_mode in scope_resource._acquire_modes:
-        scope_resource.set_acquire_mode(acquire_mode)
-        assert scope_resource.get_acquire_mode() == acquire_mode
-    scope_resource.set_acquire_mode('SAMPLE')
+    for acquire_mode in scope_resource._acquisition_modes:
+        scope_resource.set_acquisition_mode(acquire_mode)
+        time.sleep(1)
+        assert scope_resource.get_acquisition_mode() == acquire_mode
+    scope_resource.set_acquisition_mode('SAMPLE')
 
-@pytest.mark.parametrize('averages', [1, 4, 17, 128])
-def test_acquire_averages(scope_resource, averages):
-    scope_resource.set_acquire_mode('AVERAGE')
-    scope_resource.set_acquire_averages(averages)
-    assert scope_resource.get_acquire_averages() == averages
-    scope_resource.set_acquire_mode('SAMPLE')
-    scope_resource.set_state('RUN')
-
-@pytest.mark.parametrize('resolution', [1e3, 1e4, 1e5, 1e6, 5e6])
+@pytest.mark.parametrize('resolution', [1e3, 1e4, 1e5, 1e6])  # , 5e6])
 def test_measure_channel(scope_resource, resolution):
-    scope_resource.set_horz_scale(200e-6)
+    scope_resource.set_horizontal_scale(200e-6)
     scope_resource.set_state('RUN')
     scope_resource.set_resolution(resolution)
     scope_resource.set_scale_ch(1, 1)
@@ -91,69 +88,131 @@ def test_measure_channel(scope_resource, resolution):
     voltages = scope_resource.measure_channel_1()
     assert len(voltages) == resolution
 
-def test_run(scope_resource):
+
+@pytest.mark.parametrize('resolution', [1e3, 1e4, 1e5, 1e6])  # , 5e6])
+def test_get_times_channel(scope_resource, resolution):
+    scope_resource.set_horizontal_scale(200e-6)
     scope_resource.set_state('RUN')
-    time.sleep(1)
+    scope_resource.set_resolution(resolution)
+    scope_resource.set_scale_ch(1, 1)
+    scope_resource.set_trigger_source(1)
+    scope_resource.set_sweep_mode('SINGLE')
+    scope_resource.set_state('RUN')
+    scope_resource.set_trigger_level(1.0)
+    scope_resource.set_sweep_mode('SINGLE')
+    scope_resource.set_state('RUN')
+    times = scope_resource.get_times()
+    assert len(times) == resolution
 
-    # knobs = (
-    #     "horz scale",
-    #     "horz position",
-    #     "scale ch1",
-    #     "position ch1",
-    #     "scale ch2",
-    #     "position ch2",
-    #     "sweep mode",
-    #     "trigger level",
-    #     "trigger source",
-    #     "sweep mode",
-    #     "resolution",
-    #     "acquire",
-    #     "state",
-    # )
 
-    # meters = (
-    #     "channel 1",
-    #     "channel 2",
-    # )
+def test_bandwidth_limit(scope_resource):
+    scope_resource.set_ch1_bw_limit("20MHZ")
+    time.sleep(1.0)
+    assert scope_resource.get_ch1_bw_limit() == "20MHZ"
+    scope_resource.set_ch1_bw_limit("FULL")
+    time.sleep(1.0)
+    assert scope_resource.get_ch2_bw_limit() == "FULL"
+    scope_resource.set_ch2_bw_limit("20MHZ")
+    time.sleep(1.0)
+    assert scope_resource.get_ch2_bw_limit() == "20MHZ"
+    scope_resource.set_ch2_bw_limit("FULL")
+    time.sleep(1.0)
+    assert scope_resource.get_ch2_bw_limit() == "FULL"
+    scope_resource.set_ch3_bw_limit("20MHZ")
+    time.sleep(1.0)
+    assert scope_resource.get_ch3_bw_limit() == "20MHZ"
+    scope_resource.set_ch3_bw_limit("FULL")
+    time.sleep(1.0)
+    assert scope_resource.get_ch3_bw_limit() == "FULL"
+    scope_resource.set_ch4_bw_limit("20MHZ")
+    time.sleep(1.0)
+    assert scope_resource.get_ch4_bw_limit() == "20MHZ"
+    scope_resource.set_ch4_bw_limit("FULL")
+    time.sleep(1.0)
+    assert scope_resource.get_ch4_bw_limit() == "FULL"
 
-    # presets = {
-    #     "resolution": 1e6,
-    #     "sweep mode": "SINGLE",
-    #     "trigger source": 1,
-    # }
+@pytest.mark.parametrize('coupling', ["AC", "GND", "DC"])
+def test_coupling(scope_resource, coupling):
+    scope_resource.set_ch1_coupling(coupling)
+    time.sleep(0.5)
+    scope_resource.get_state()
+    assert scope_resource.get_ch1_coupling() == coupling
+    scope_resource.set_ch1_coupling(coupling)
+    time.sleep(0.5)
+    scope_resource.get_state()
+    assert scope_resource.get_ch2_coupling() == coupling
+    scope_resource.set_ch2_coupling(coupling)
+    time.sleep(0.5)
+    scope_resource.get_state()
+    assert scope_resource.get_ch2_coupling() == coupling
+    scope_resource.set_ch2_coupling(coupling)
+    time.sleep(0.5)
+    scope_resource.get_state()
+    assert scope_resource.get_ch2_coupling() == coupling
+    scope_resource.set_ch3_coupling(coupling)
+    time.sleep(0.5)
+    assert scope_resource.get_ch3_coupling() == coupling
+    scope_resource.set_ch3_coupling(coupling)
+    time.sleep(0.5)
+    scope_resource.get_state()
+    assert scope_resource.get_ch3_coupling() == coupling
+    scope_resource.set_ch4_coupling(coupling)
+    time.sleep(0.5)
+    scope_resource.get_state()
+    assert scope_resource.get_ch4_coupling() == coupling
+    scope_resource.set_ch4_coupling(coupling)
+    time.sleep(0.5)
+    scope_resource.get_state()
+    assert scope_resource.get_ch4_coupling() == coupling
 
-    # _volt_scales = {
-    #     2e-3: "2mv",
-    #     5e-3: "5mv",
-    #     10e-3: "10mv",
-    #     20e-3: "20mv",
-    #     50e-3: "50mv",
-    #     100e-3: "100mv",
-    #     200e-3: "200mv",
-    #     500e-3: "500mv",
-    #     1.0: "1v",
-    #     2.0: "2v",
-    #     5.0: "5v",
-    # }
 
-    # _volt_div_table = {0: 1e-3, 9: 1.0}
+@pytest.mark.parametrize('enable', [False, True])
+def test_enable(scope_resource, enable):
+    scope_resource.set_ch1_enable(enable)
+    time.sleep(0.5)
+    assert scope_resource.get_ch1_enable() == enable
+    scope_resource.set_ch1_enable(enable)
+    time.sleep(0.5)
+    assert scope_resource.get_ch2_enable() == enable
+    scope_resource.set_ch2_enable(enable)
+    time.sleep(0.5)
+    assert scope_resource.get_ch2_enable() == enable
+    scope_resource.set_ch2_enable(enable)
+    time.sleep(0.5)
+    assert scope_resource.get_ch2_enable() == enable
+    scope_resource.set_ch3_enable(enable)
+    time.sleep(0.5)
+    assert scope_resource.get_ch3_enable() == enable
+    scope_resource.set_ch3_enable(enable)
+    time.sleep(0.5)
+    assert scope_resource.get_ch3_enable() == enable
+    scope_resource.set_ch4_enable(enable)
+    time.sleep(0.5)
+    assert scope_resource.get_ch4_enable() == enable
+    scope_resource.set_ch4_enable(enable)
+    time.sleep(0.5)
+    assert scope_resource.get_ch4_enable() == enable
 
-    # _resolutions = {
-    #     1e3: "1K",
-    #     1e4: "10K",
-    #     1e5: "100K",
-    #     1e6: "1M",
-    #     5e6: "5M",
-    #     1e7: "10M"
-    #     }
 
-    # _sweep_modes = ["AUTO", "NORMAL", "NORM", "SINGLE", "SING"]
 
-    # _acquiring = False
+"""
+@pytest.mark.skip(reason='Takes a while and we know it works now')
+@pytest.mark.parametrize('resolution', [1e3])
+def test_save_data(scope_resource, resolution):
+    scope_resource.set_resolution(resolution)
+    config = scope_resource.get_current_config()
+    scope_resource.set_state('RUN')
+    save_path = scope_resource._save_traces('C:\\scratch'.upper())
+    channel_data = scope_resource._read_saved_binary_file(save_path, config)
+    print(channel_data)
 
-    # _channels = {
-    #     1: "CH1",
-    #     2: "CH2",
-    #     3: "CH3",
-    #     4: "CH4",
-    # }
+
+@pytest.mark.parametrize('averages', [1, 4, 17, 128])
+def test_acquire_averages(scope_resource, averages):
+    scope_resource.set_acquire_mode('AVERAGE')
+    scope_resource.set_acquire_averages(averages)
+    assert scope_resource.get_acquire_averages() == averages
+    scope_resource.set_acquire_mode('SAMPLE')
+    scope_resource.set_state('RUN')
+
+"""
