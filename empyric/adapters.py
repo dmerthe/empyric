@@ -876,33 +876,70 @@ class Socket(Adapter):
 
         self.connected = True
 
-    def _write(self, message, **kwargs):
+    def _write(self,
+               message,
+               termination=None,
+               timeout=None, encode=True
+               ):
+
+        if termination is None:
+            termination = self.write_termination
+
+        if timeout is None:
+            timeout = self.timeout
+
         write_to_socket(
-            self.backend,
-            message,
-            termination=self.write_termination,
-            timeout=self.timeout,
-            **kwargs
+            self.backend, message,
+            termination=termination,
+            timeout=timeout, encode=encode
         )
 
         return "Success"
 
-    def _read(self, **kwargs):
-        termination = kwargs.pop("termination", self.read_termination)
-        timeout = kwargs.pop("timeout", self.timeout)
-        decode = kwargs.pop("decode", True)
+    def _read(self, nbytes=None, termination=None,
+              timeout=None, decode=True, chunk_size=4096):
+
+        if termination is None:
+            termination = self.read_termination
+
+        if timeout is None:
+            timeout = self.timeout
 
         return read_from_socket(
             self.backend,
+            nbytes=nbytes,
             termination=termination,
             timeout=timeout,
             decode=decode,
-            **kwargs
+            chunk_size=chunk_size
         )
 
-    def _query(self, question, **kwargs):
-        self._write(question, **kwargs)
-        return self._read(**kwargs)
+    def _query(self, question,
+               # write kwargs
+               write_termination=None,
+               write_timeout=None, encode=True,
+
+               # read kwargs
+               nbytes=None, read_termination=None,
+               read_timeout=None, decode=True, chunk_size=4096):
+
+        if write_termination is None:
+            write_termination = self.write_termination
+
+        if write_timeout is None:
+            write_timeout = self.timeout
+
+        if read_termination is None:
+            read_termination = self.read_termination
+
+        if read_timeout is None:
+            read_timeout = self.timeout
+
+        self._write(question, termination=write_termination,
+                    timeout=write_timeout, encode=encode)
+
+        return self._read(nbytes=nbytes, termination=read_termination,
+                          timeout=read_timeout, decode=decode, chunk_size=chunk_size)
 
     def disconnect(self):
         # Clear out any unread messages

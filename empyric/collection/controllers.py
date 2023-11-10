@@ -382,10 +382,12 @@ class SynaccessNetbooter(Instrument):
         # keep-alive signal)
         self.read(nbytes=np.inf, timeout=0.1, decode=False)
 
-        def termination(message):
+        def read_termination(message):
             return re.search(b"A0,\d+", message)
 
-        status_message = self.query("$A5", termination=termination, decode=False)
+        status_message = self.query(
+            "$A5", read_termination=read_termination, decode=False
+        )
 
         # Port statuses are a sequence of 0s and 1s, starting from the right
         statuses = re.search(b"A0,\d+", status_message)[0]
