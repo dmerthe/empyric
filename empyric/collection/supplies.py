@@ -511,3 +511,63 @@ class MagnaPowerSL1000(Instrument):
             return float(response)
         except ValueError:
             return np.nan
+
+class SorensenXG(Instrument):
+    """
+    High current power supply
+    """
+    #TODO: Update docstring, name, max current and voltage based on model number. It's either the 6-220 or the 8-187.5.
+    name = "SorensenXG"
+
+    supported_adapters = ((Serial, {"baud_rate": 9600}),)
+
+    knobs = ("max voltage", "max current", "output")
+
+    presets = {"output": "OFF", "voltage": 0, "max current": 5e-3}
+
+    postsets = {"output": "OFF", "voltage": 0, "max current": 5e-3}
+
+    meters = ("voltage", "current")
+
+
+    @measurer
+    def measure_current(self):
+        return float(self.query("MEAS:CURR?"))
+
+    @measurer
+    def measure_voltage(self):
+        return float(self.query("MEAS:VOLT?"))
+    
+    #TODO: I'm not sure whether this is right
+    @setter
+    def set_output(self, output: Toggle):
+        if output == ON:
+            self.write("OUTP: ON")
+        elif output == OFF:
+            self.write("OUTP: OFF")
+
+    @setter
+    def set_max_current(self, current):
+        self.write("SOUR:CURR:PROT " + str(current))
+
+    @setter
+    def set_max_voltage(self, voltage):
+        self.write("SOUR:VOLT:PROT " + str(voltage))
+
+    @getter
+    def get_max_current(self):
+        return float(self.query("SOUR:CURR?"))
+
+    @getter
+    def get_max_voltage(self):
+        return float(self.query("SOUR:VOLT?"))
+    
+    #TODO: Check whether we need this getter function or only the setter
+    @getter
+    def get_output(self) -> Toggle:
+        response = self.query("OUTP?")
+        if response == "OFF":
+            return OFF
+        elif response == "ON":
+            return ON
+        
