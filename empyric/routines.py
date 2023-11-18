@@ -24,17 +24,8 @@ from empyric.tools import (
     write_to_socket,
     get_ip_address,
 )
-from empyric.types import (
-    recast,
-    Boolean,
-    Integer,
-    Float,
-    Toggle,
-    OFF,
-    ON,
-    Array,
-    String,
-)
+from empyric.types import (recast, Boolean, Integer, Float, Toggle, OFF, ON, Array,
+                           String, Type, )
 from empyric.types import supported as supported_types
 
 
@@ -496,6 +487,62 @@ class Sequence(Routine):
                     knob.value = state[value]
                 else:
                     knob.value = value
+
+
+class PIDControl(Routine):
+    """
+    Hold a set of process values at given setpoints controlled by a set of knobs,
+    using PID feedback.
+    """
+
+    def __init___(
+            self, knobs: dict, meters: Array, setpoints: Array,
+            lower_limits: Array = None, upper_limits: Array = None,
+            **kwargs):
+
+        Routine.__init__(self, knobs, **kwargs)
+
+        self.meters = meters
+        self.setpoints = setpoints
+
+        # Set lower limits
+        if isinstance(lower_limits, numbers.Number):
+            self.lower_limits = np.array([lower_limits]*len(knobs))
+        elif isinstance(lower_limits, Array):
+
+            if len(lower_limits) != len(knobs):
+                raise ValueError(
+                    'Length of lower_limits is different than length of knobs'
+                )
+
+            self.lower_limits = [
+                recast(value, to=knob._type if knob._type is not None else Type)
+                for value, knob in zip(lower_limits, knobs.values())
+            ]
+
+        elif lower_limits is None:
+            self.lower_limits = None
+
+        # Set upper limits
+        if isinstance(upper_limits, numbers.Number):
+            self.upper_limits = np.array([upper_limits] * len(knobs))
+        elif isinstance(upper_limits, Array):
+
+            if len(upper_limits) != len(knobs):
+                raise ValueError(
+                    'Length of upper_limits is different than length of knobs')
+
+            self.upper_limits = [
+                recast(value, to=knob._type if knob._type is not None else Type)
+                for value, knob in zip(upper_limits, knobs.values())
+            ]
+
+        elif upper_limits is None:
+            self.upper_limits = None
+
+    @Routine.enabler
+    def update(self, state):
+        pass
 
 
 class Maximization(Routine):
