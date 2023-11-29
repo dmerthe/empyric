@@ -81,7 +81,12 @@ class BK9183B(Instrument):
 
     name = "BK9183B"
 
-    supported_adapters = ((Serial, {"baud_rate": 57600}),)
+    # supported_adapters = ((Serial, {"baud_rate": 57600}),)
+    # Example of how to do this:
+    supported_adapters = (
+        (Serial, {"baud_rate": 57600}),
+        (Socket, {"read_termination": "\n", "write_termination": "\n"}),
+    )
 
     knobs = ("max voltage", "max current", "output")
 
@@ -514,12 +519,12 @@ class MagnaPowerSL1000(Instrument):
 
 class SorensenXG(Instrument):
     """
-    High current power supply
+    Sorensen XG 10-250 series high current power supply.
     """
-    #TODO: Update docstring, name, max current and voltage based on model number. It's either the 6-220 or the 8-187.5.
-    name = "SorensenXG"
 
-    supported_adapters = ((Serial, {"baud_rate": 9600}),)
+    name = "SorensenXG10250"
+
+    supported_adapters = ((Serial, {"baud_rate": 9600}))
 
     knobs = ("max voltage", "max current", "output")
 
@@ -538,7 +543,6 @@ class SorensenXG(Instrument):
     def measure_voltage(self):
         return float(self.query("MEAS:VOLT?"))
     
-    #TODO: I'm not sure whether this is right
     @setter
     def set_output(self, output: Toggle):
         if output == ON:
@@ -562,7 +566,6 @@ class SorensenXG(Instrument):
     def get_max_voltage(self):
         return float(self.query("SOUR:VOLT?"))
     
-    #TODO: Check whether we need this getter function or only the setter
     @getter
     def get_output(self) -> Toggle:
         response = self.query("OUTP?")
