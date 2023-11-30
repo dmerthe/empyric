@@ -81,8 +81,6 @@ class BK9183B(Instrument):
 
     name = "BK9183B"
 
-    # supported_adapters = ((Serial, {"baud_rate": 57600}),)
-    # Example of how to do this:
     supported_adapters = (
         (Serial, {"baud_rate": 57600}),
         (Socket, {"read_termination": "\n", "write_termination": "\n"}),
@@ -517,7 +515,7 @@ class MagnaPowerSL1000(Instrument):
         except ValueError:
             return np.nan
 
-class SorensenXG(Instrument):
+class SorensenXG10250(Instrument):
     """
     Sorensen XG 10-250 series high current power supply.
     """
@@ -527,10 +525,6 @@ class SorensenXG(Instrument):
     supported_adapters = ((Serial, {"baud_rate": 9600}))
 
     knobs = ("max voltage", "max current", "output")
-
-    presets = {"output": "OFF", "voltage": 0, "max current": 5e-3}
-
-    postsets = {"output": "OFF", "voltage": 0, "max current": 5e-3}
 
     meters = ("voltage", "current")
 
