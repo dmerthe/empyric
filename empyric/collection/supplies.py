@@ -81,7 +81,10 @@ class BK9183B(Instrument):
 
     name = "BK9183B"
 
-    supported_adapters = ((Serial, {"baud_rate": 57600}),)
+    supported_adapters = (
+        (Serial, {"baud_rate": 57600}),
+        (Socket, {"read_termination": "\n", "write_termination": "\n"}),
+    )
 
     knobs = ("max voltage", "max current", "output")
 
@@ -511,3 +514,57 @@ class MagnaPowerSL1000(Instrument):
             return float(response)
         except ValueError:
             return np.nan
+
+class SorensenXG10250(Instrument):
+    """
+    Sorensen XG 10-250 series high current power supply.
+    """
+
+    name = "SorensenXG10250"
+
+    supported_adapters = ((Serial, {"baud_rate": 9600}))
+
+    knobs = ("max voltage", "max current", "output")
+
+    meters = ("voltage", "current")
+
+
+    @measurer
+    def measure_current(self):
+        return float(self.query("MEAS:CURR?"))
+
+    @measurer
+    def measure_voltage(self):
+        return float(self.query("MEAS:VOLT?"))
+    
+    @setter
+    def set_output(self, output: Toggle):
+        if output == ON:
+            self.write("OUTP: ON")
+        elif output == OFF:
+            self.write("OUTP: OFF")
+
+    @setter
+    def set_max_current(self, current):
+        self.write("SOUR:CURR:PROT " + str(current))
+
+    @setter
+    def set_max_voltage(self, voltage):
+        self.write("SOUR:VOLT:PROT " + str(voltage))
+
+    @getter
+    def get_max_current(self):
+        return float(self.query("SOUR:CURR?"))
+
+    @getter
+    def get_max_voltage(self):
+        return float(self.query("SOUR:VOLT?"))
+    
+    @getter
+    def get_output(self) -> Toggle:
+        response = self.query("OUTP?")
+        if response == "OFF":
+            return OFF
+        elif response == "ON":
+            return ON
+        
