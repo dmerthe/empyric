@@ -568,3 +568,158 @@ class SorensenXG10250(Instrument):
         elif response == "ON":
             return ON
         
+
+class BK9140(Instrument):
+    """
+    B&K Precision Model 9140 (35V & 6A / 70V & 3A) power supply
+    """
+
+    name = "BK9140"
+
+    supported_adapters = (
+        (Serial, {"baud_rate": 57600}),
+        (Socket, {"read_termination": "\n", "write_termination": "\n"}),
+    )
+
+    knobs = (
+        "max voltage 1",
+        "max current 1",
+        "output 1",
+        "max voltage 2",
+        "max current 2",
+        "output 2",
+        "max voltage 3",
+        "max current 3",
+        "output 3",
+             )
+
+    # no presets or postsets for this instrument
+
+    meters = (
+        "voltage 1",
+        "current 1",
+        "voltage 2",
+        "current 2",
+        "voltage 3",
+        "current 3",
+        )
+
+    @setter
+    def set_output_1(self, output: Toggle):
+        self.write(":INST:SEL 1")
+        if output == ON:
+            self.write("OUT ON")
+        elif output == OFF:
+            self.write("OUT OFF")
+
+    @setter
+    def set_output_2(self, output: Toggle):
+        self.write(":INST:SEL 2")
+        if output == ON:
+            self.write("OUT ON")
+        elif output == OFF:
+            self.write("OUT OFF")
+
+    @setter
+    def set_output_3(self, output: Toggle):
+        self.write(":INST:SEL 3")
+        if output == ON:
+            self.write("OUT ON")
+        elif output == OFF:
+            self.write("OUT OFF")
+
+    @measurer
+    def measure_current_1(self):
+        # sometimes the first measurement is lagged
+        self.write(":INST:SEL 1")
+        return [float(self.query("MEAS:CURR?")) for i in range(3)][-1]
+
+    @measurer
+    def measure_voltage_1(self):
+        # sometimes the first measurement is lagged
+        self.write(":INST:SEL 1")
+        return [float(self.query("MEAS:VOLT?")) for i in range(3)][-1]
+
+    @setter
+    def set_max_current_1(self, current):
+        self.write(":INST:SEL 1")
+        self.write("SOUR:CURR " + str(current))
+
+    @setter
+    def set_max_voltage_1(self, voltage):
+        self.write(":INST:SEL 1")
+        self.write("SOUR:VOLT " + str(voltage))
+
+    @getter
+    def get_max_current_1(self):
+        self.write(":INST:SEL 1")
+        return float(self.query("SOUR:CURR?"))
+
+    @getter
+    def get_max_voltage_1(self):
+        self.write(":INST:SEL 1")
+        return float(self.query("SOUR:VOLT?"))
+    
+    @measurer
+    def measure_current_2(self):
+        # sometimes the first measurement is lagged
+        self.write(":INST:SEL 2")
+        return [float(self.query("MEAS:CURR?")) for i in range(3)][-1]
+
+    @measurer
+    def measure_voltage_2(self):
+        # sometimes the first measurement is lagged
+        self.write(":INST:SEL 2")
+        return [float(self.query("MEAS:VOLT?")) for i in range(3)][-1]
+
+    @setter
+    def set_max_current_2(self, current):
+        self.write(":INST:SEL 2")
+        self.write("SOUR:CURR " + str(current))
+
+    @setter
+    def set_max_voltage_2(self, voltage):
+        self.write(":INST:SEL 2")
+        self.write("SOUR:VOLT " + str(voltage))
+
+    @getter
+    def get_max_current_2(self):
+        self.write(":INST:SEL 2")
+        return float(self.query("SOUR:CURR?"))
+
+    @getter
+    def get_max_voltage_2(self):
+        self.write(":INST:SEL 2")
+        return float(self.query("SOUR:VOLT?"))
+    
+    @measurer
+    def measure_current_3(self):
+        # sometimes the first measurement is lagged
+        self.write(":INST:SEL 3")
+        return [float(self.query("MEAS:CURR?")) for i in range(3)][-1]
+
+    @measurer
+    def measure_voltage_3(self):
+        # sometimes the first measurement is lagged
+        self.write(":INST:SEL 3")
+        return [float(self.query("MEAS:VOLT?")) for i in range(3)][-1]
+
+    @setter
+    def set_max_current_3(self, current):
+        self.write(":INST:SEL 3")
+        self.write("SOUR:CURR " + str(current))
+
+    @setter
+    def set_max_voltage_3(self, voltage):
+        self.write(":INST:SEL 3")
+        self.write("SOUR:VOLT " + str(voltage))
+
+    @getter
+    def get_max_current_3(self):
+        self.write(":INST:SEL 3")
+        return float(self.query("SOUR:CURR?"))
+
+    @getter
+    def get_max_voltage_3(self):
+        self.write(":INST:SEL 3")
+        return float(self.query("SOUR:VOLT?"))
