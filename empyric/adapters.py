@@ -1059,7 +1059,7 @@ class ModbusSerial(Adapter):
 class Modbus(Adapter):
     """
     Handles communication with instruments via the Modbus communication
-    protocol, over either TCP or serial ports, using PyModbus.
+    protocol, over either TCP, UDP, or serial ports, using PyModbus.
     """
 
     kwargs = (
@@ -1072,6 +1072,7 @@ class Modbus(Adapter):
         "stop bits",
         "parity",
         "delay",
+        "protocol",
     )
 
     slave_id = 0
@@ -1139,15 +1140,26 @@ class Modbus(Adapter):
         address = self.instrument.address.split("::")
 
         if re.match("\d+\.\d+\.\d+\.\d+", address[0]):
-            # Modbus TCP
-            self._protocol = "TCP"
+            if str(self._protocol).upper() == "UDP":
+                # Modbus UDP
+                self._protocol = "UDP"
 
-            if len(address) == 1:
-                address.append(502)  # standard Modbus TCP port
+                if len(address) == 1:
+                    address.append(502)  # standard Modbus UDP port (fascinating that it's the same as TCP)
 
-            self.backend = client.ModbusTcpClient(host=address[0], port=int(address[1]))
+                self.backend = client.ModbusUdpClient(host=address[0], port=int(address[1]))
 
-            self.backend.connect()
+                self.backend.connect()
+            else:
+                # Modbus TCP
+                self._protocol = "TCP"
+
+                if len(address) == 1:
+                    address.append(502)  # standard Modbus TCP port
+
+                self.backend = client.ModbusTcpClient(host=address[0], port=int(address[1]))
+
+                self.backend.connect()
 
         else:
             # Modbus Serial
