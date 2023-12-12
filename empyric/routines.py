@@ -63,6 +63,7 @@ class Routine:
     """
 
     assert_control = True
+    #: if True, routine has sole control of knobs when active
 
     _start_on_enable = False
 
@@ -127,17 +128,22 @@ class Routine:
         @functools.wraps(update)
         def wrapped_update(self, state):
             if self.enable is not None and not state[self.enable]:
+                # if routine has an enabling variable, and it evaluates to false...
+
                 for name, knob in self.knobs.items():
+                    # release control of knobs
                     if knob._controller == self:
                         knob._controller = None
 
                 if self._start_on_enable:
+                    # if start time is reset on enable, nullify start and end values
                     self.start = np.nan
                     self.end = np.nan
 
                 return
 
             elif state["Time"] < self.start:
+                # prepare routine before starting, if needed
                 if not self.prepped:
                     self.prep(state)
                     self.prepped = True
@@ -145,6 +151,7 @@ class Routine:
                 return
 
             elif state["Time"] >= self.end:
+                # finalize routine after ending, if needed
                 if not self.finished:
                     self.finish(state)
                     self.finished = True
@@ -157,10 +164,13 @@ class Routine:
                 return
 
             else:
+                # getting here means that the routine is running
+
                 if not self.prepped:
                     self.prep(state)
 
                 if self._start_on_enable and np.isnan(self.start):
+                    # set start time to time of most recent state evaluation
                     self.start = state["Time"]
                     self.end = self.start + self._duration
 
