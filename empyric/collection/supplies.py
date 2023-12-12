@@ -546,11 +546,11 @@ class SorensenXG10250(Instrument):
 
     @setter
     def set_max_current(self, current):
-        self.write("SOUR:CURR:PROT " + str(current))
+        self.write("SOUR:CURR " + str(current))
 
     @setter
     def set_max_voltage(self, voltage):
-        self.write("SOUR:VOLT:PROT " + str(voltage))
+        self.write("SOUR:VOLT " + str(voltage))
 
     @getter
     def get_max_current(self):
