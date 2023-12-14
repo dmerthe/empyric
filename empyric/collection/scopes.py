@@ -2161,9 +2161,16 @@ class OwonVDSScope(Instrument):
             num_samples = int(min(settings["resolution"], 4000))
         else:
             raise (ValueError, "waveform_type must be in ['GDM', 'GDT'].")
-        start = -10.0 * settings["horizontal scale"] - settings["horizontal position"]
-        stop = 10.0 * settings["horizontal scale"] - settings["horizontal position"]
-        print(start, stop, num_samples)
+        MAX_SAMPLE_RATE = 250e6
+        if settings["resolution"]/(20*settings["horizontal scale"]) <= MAX_SAMPLE_RATE:
+            start_div = -10.0
+            stop_div = 10.0
+        else:
+            # Not all samples fit on screen
+            start_div = -1.0 * settings["resolution"]/(MAX_SAMPLE_RATE*settings["horizontal scale"]) /2
+            stop_div = settings["resolution"]/(MAX_SAMPLE_RATE*settings["horizontal scale"]) / 2
+        start = start_div * settings["horizontal scale"] - settings["horizontal position"]
+        stop = stop_div * settings["horizontal scale"] - settings["horizontal position"]
         return list(np.linspace(start=start, stop=stop, num=num_samples))
 
     def get_waveforms(self, acquire_first: bool = True) -> dict:
@@ -2197,78 +2204,3 @@ class OwonVDSScope(Instrument):
     @measurer
     def measure_channel_4(self):
         return self.get_waveforms()[4]
-
-    # Digits represent number of bytes in that position in the message
-
-    # Channel settings
-    # M
-    #  CH for channel
-    #    1 byte for channel number
-    #     v for voltage scale
-    #      1 bytes for index in _volt_scales
-    #     z for z offset
-    #      4 bytes for value, 25x factor
-    #     c for coupling
-    #      1 byte for index in _coupling_modes
-    #     o for output enable
-    #      1 byte for enable, 1 enable, 0 disable
-    #     b for bandwidth limit
-    #      1 byte for bandwidth limit index
-
-    # Trigger settings
-    # M
-    #  TR for trigger
-    #    s for single
-    #    a for alternate
-    #     1 for channel number
-    #      e for edge
-    #
-    #      v for video
-    #      s? for slope
-    #      p? for pulse
-
-    # def _read_data_ADC(self, channel):
-    #     volts_per_div = self.get_scale_ch(channel)
-    #     resolution = self.get_resolution()
-    #     voltages = []
-    #     while (len(voltages) < resolution):
-    #         self.write(f"*ADC? {self._channels[channel]}")
-    #         raw_bytes_to_read = read_from_socket(
-    #             self.adapter.backend,
-    #             nbytes=4,
-    #             termination=None,
-    #             decode=False,
-    #             timeout=self.adapter.timeout
-    #         )
-    #         num_bytes_to_read = int.from_bytes(raw_bytes_to_read, "big")
-
-    #         raw_values = read_from_socket(
-    #             self.adapter.backend,
-    #             nbytes=num_bytes_to_read,
-    #             termination=None,
-    #             decode=False,
-    #             timeout=self.adapter.timeout
-    #         )
-
-    #         voltages.extend([float(value/25.0*volts_per_div) for value in raw_values])
-
-    #     return voltages
-
-    # def _read_data(self, channel):
-    #     config = self.get_current_config()
-    #     save_path = self._save_traces('C:\\scratch'.upper())
-    #     time.sleep(30)
-    #     # previous_file_size = 0
-    #     # file_size = 1
-    #     # counter = 0
-    #     # # while (previous_file_size != file_size):
-    #     # while(file_size < config["Horizontal"]["sample depth"]+327):
-    #     #     time.sleep(2) # sleep for 2 seconds so that the binary file is not opened unitl writing is complete.
-    #     #     previous_file_size = file_size
-    #     #     file_size = os.path.getsize(save_path)
-    #     #     counter += 1
-    #     # print(f'Slept {counter} times')
-    #     channel_data = self._read_saved_binary_file(save_path, config)
-    #     # extract data for 1 channel
-    #     selected_channel = channel_data[self._channels[channel]]['trace data']
-    #     return np.array(selected_channel, dtype=np.float64)
