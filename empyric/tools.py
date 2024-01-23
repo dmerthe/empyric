@@ -141,7 +141,7 @@ def autobind_socket(_socket):
 
 
 def read_from_socket(
-    _socket, nbytes=None, termination="\r", timeout=1, decode=True, chunk_size=4096
+    _socket, nbytes=None, termination="\r", timeout=None, decode=True, chunk_size=4096
 ):
     """
     Read from a socket, with some effort taken to get the whole message.
@@ -155,13 +155,16 @@ def read_from_socket(
                         otherwise.
     :param timeout: (numbers.Number) communication timeout in seconds;
                     used for both the `select.select` and `_socket.recv`
-                    functions.
+                    functions; defaults to existing timeout of _socket.
     :param decode: (bool) whether to return decoded string (True) or raw bytes
                    message (False); defaults to True.
     :param chunk_size: (int) number of bytes to read on each call to recv method.
     """
 
     default_timeout = _socket.gettimeout()  # save default timeout
+
+    if timeout is None:
+        timeout = default_timeout
 
     _socket.settimeout(timeout)
 
@@ -243,7 +246,7 @@ def read_from_socket(
         return message
 
 
-def write_to_socket(_socket, message, termination="\r", timeout=1):
+def write_to_socket(_socket, message, termination="\r", timeout=None):
     """
     Write a message to a socket, with care taken to get the whole message
     transmitted.
@@ -251,17 +254,12 @@ def write_to_socket(_socket, message, termination="\r", timeout=1):
     :param _socket: (socket.Socket) socket to write to.
     :param message: (str/bytes) message to send.
     :param termination: (str/bytes) expected message termination character(s).
-    :param timeout: (numbers.Number) timeout for `select.select` call.
+    :param timeout: (numbers.Number) timeout for `select.select` call; defaults to
+    existing timeout of _socket.
     """
 
-    # Block until the socket is writeable or until timeout
-    if timeout:
-        writeable = _socket in select.select([], [_socket], [], timeout)[1]
-    else:
-        writeable = _socket in select.select([], [_socket], [])[1]
-
-    if not writeable:
-        return 0
+    if timeout is None:
+        timeout = _socket.gettimeout()
 
     if isinstance(message, str):
         bytes_message = (message + termination).encode()
@@ -278,6 +276,16 @@ def write_to_socket(_socket, message, termination="\r", timeout=1):
     total_sent = 0
 
     while total_sent < msg_len and failures < max_failures:
+
+        # Block until the socket is writeable or until timeout
+        if timeout:
+            writeable = _socket in select.select([], [_socket], [], timeout)[1]
+        else:
+            writeable = _socket in select.select([], [_socket], [])[1]
+
+        if not writeable:
+            break
+
         sent = _socket.send(bytes_message[total_sent:])
 
         if sent == 0:
