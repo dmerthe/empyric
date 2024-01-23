@@ -224,7 +224,10 @@ def read_from_socket(
                 part = _socket.recv(chunk_size)
 
         except ConnectionResetError as err:
-            print(f"Warning: {err}")
+            print(
+                f"Warning: while reading from socket at {_socket.getsockname()}, "
+                f"got error: {err}"
+            )
             break
         except socket.timeout:
             pass

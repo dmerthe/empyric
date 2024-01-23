@@ -682,24 +682,34 @@ class SocketServer(Routine):
 
         self.state = {}
 
-        self.acc_conn_thread = threading.Thread(target=self.accept_connections)
+        self.server_thread = threading.Thread(
+            target=asyncio.run, args=(self._run_async_server(),)
+        )
 
-        self.acc_conn_thread.start()
-
-        self.proc_requ_thread = threading.Thread(target=self.process_requests)
-
-        self.proc_requ_thread.start()
+        self.server_thread.start()
 
     def terminate(self):
         # Kill client handling threads
         self.running = False
-        self.acc_conn_thread.join()
-        self.proc_requ_thread.join()
+        self.server_thread.join()
 
-    def accept_connections(self):
-        while self.running:
+    async def _run_async_server(self):
+
+        asyncio.create_task(self._accept_connections())
+        asyncio.create_task(self._process_requests())
+
+        async def server_forever():
+            while self.running:
+                await asyncio.sleep(0.1)
+
+        await server_forever()
+
+    async def _accept_connections(self):
+        if self.running:
             try:
                 (client, address) = self.socket.accept()
+
+                client.settimeout(1)
 
                 clients = self.clients_queue.get()
 
@@ -712,33 +722,36 @@ class SocketServer(Routine):
             except socket.timeout:
                 pass
 
-            time.sleep(0.001)
+            await asyncio.sleep(0.001)
 
-        # Close sockets
-        try:
-            self.socket.shutdown(socket.SHUT_RDWR)
-        except OSError:  # socket was not connected
-            pass
-        self.socket.close()
+            asyncio.create_task(self._accept_connections())
 
-        clients = self.clients_queue.get()
-
-        for address, client in clients.items():
+        else:
+            # Close sockets
             try:
-                client.shutdown(socket.SHUT_RDWR)
-                client.close()
-            except ConnectionError:
-                # client is already disconnected
+                self.socket.shutdown(socket.SHUT_RDWR)
+            except OSError:  # socket was not connected
                 pass
-            except OSError:
-                # client is already disconnected
-                pass
+            self.socket.close()
 
-        # Return empty clients dict to queue so process_requests can exit
-        self.clients_queue.put({})
+            clients = self.clients_queue.get()
 
-    def process_requests(self):
-        while self.running:
+            for address, client in clients.items():
+                try:
+                    client.shutdown(socket.SHUT_RDWR)
+                    client.close()
+                except ConnectionError:
+                    # client is already disconnected
+                    pass
+                except OSError:
+                    # client is already disconnected
+                    pass
+
+            # Return empty clients dict to queue so process_requests can exit
+            self.clients_queue.put({})
+
+    async def _process_requests(self):
+        if self.running:
             clients = self.clients_queue.get()
 
             # Purge disconnected clients
@@ -754,6 +767,7 @@ class SocketServer(Routine):
                 try:
                     request = read_from_socket(client, chunk_size=1)
                 except ConnectionError:
+                    print(f'Connection issue with client at {address}')
                     clients[address] = None
                     continue
 
@@ -841,6 +855,7 @@ class SocketServer(Routine):
                 # Send outgoing message
                 if outgoing_message is not None:
                     write_to_socket(client, outgoing_message)
+                    message_sent = True
 
                 # Remove clients with problematic connections
                 exceptional = client in select.select([], [], [client], 0)[2]
@@ -850,8 +865,9 @@ class SocketServer(Routine):
                     clients[address] = None
 
             self.clients_queue.put(clients)
+            await asyncio.sleep(0.001)
 
-            time.sleep(0.001)
+            asyncio.create_task(self._process_requests())
 
     @Routine.enabler
     def update(self, state):
