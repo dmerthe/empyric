@@ -768,6 +768,8 @@ class SocketServer(Routine):
                     request = read_from_socket(client, chunk_size=1)
                 except ConnectionError:
                     print(f'Connection issue with client at {address}')
+                    client.shutdown(socket.SHUT_RDWR)
+                    client.close()
                     clients[address] = None
                     continue
 

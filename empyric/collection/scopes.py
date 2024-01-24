@@ -972,7 +972,6 @@ class SiglentSDS1000(Instrument):
             data_length = len(message[22:-2])
 
             if data_length == size:
-                print('terminated:', data_length, size, message[-2:])
                 return True
             else:
                 return False
