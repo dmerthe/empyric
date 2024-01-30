@@ -1101,7 +1101,7 @@ class Modbus(Adapter):
     parity = "N"
     delay = 0.05
 
-    _protocol = None
+    protocol = None
 
     # This dict contains all active Modbus serial adapters. When a new adapter
     # is initialized with the same com port as an existing one, it uses the
@@ -1117,7 +1117,7 @@ class Modbus(Adapter):
 
     @property
     def busy(self):
-        if self._protocol == "Serial":
+        if self.protocol == "Serial":
             return bool(
                 sum(
                     [
@@ -1140,9 +1140,9 @@ class Modbus(Adapter):
         address = self.instrument.address.split("::")
 
         if re.match("\d+\.\d+\.\d+\.\d+", address[0]):
-            if str(self._protocol).upper() == "UDP":
+            if str(self.protocol).upper() == "UDP":
                 # Modbus UDP
-                self._protocol = "UDP"
+                self.protocol = "UDP"
 
                 if len(address) == 1:
                     address.append(502)  # standard Modbus UDP port (fascinating that it's the same as TCP)
@@ -1152,7 +1152,7 @@ class Modbus(Adapter):
                 self.backend.connect()
             else:
                 # Modbus TCP
-                self._protocol = "TCP"
+                self.protocol = "TCP"
 
                 if len(address) == 1:
                     address.append(502)  # standard Modbus TCP port
@@ -1163,7 +1163,7 @@ class Modbus(Adapter):
 
         else:
             # Modbus Serial
-            self._protocol = "Serial"
+            self.protocol = "Serial"
 
             if len(address) == 1:
                 # assume slave id is zero if not specified
