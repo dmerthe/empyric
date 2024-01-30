@@ -2,6 +2,7 @@
 import collections
 import datetime
 import importlib
+import logging
 import os
 import pathlib
 import sys
@@ -16,7 +17,6 @@ import pykwalify.errors
 from pykwalify.core import Core as YamlValidator
 from ruamel.yaml import YAML
 
-from empyric import logger
 from empyric import variables as _variables
 from empyric import adapters as _adapters
 from empyric import graphics as _graphics
@@ -26,6 +26,7 @@ from empyric.adapters import AdapterError
 from empyric.tools import convert_time, Clock
 from empyric.types import recast, Boolean, Toggle, Integer, Float, ON
 
+logger = logging.getLogger()
 
 class Experiment:
     """
