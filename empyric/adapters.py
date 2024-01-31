@@ -1138,7 +1138,7 @@ class Modbus(Adapter):
 
         # Get port (Serial) or address & port (TCP)
         address = self.instrument.address.split("::")
-
+        print(self.protocol)  # DEBUG
         if re.match("\d+\.\d+\.\d+\.\d+", address[0]):
             if str(self.protocol).upper() == "UDP":
                 # Modbus UDP
@@ -1160,7 +1160,8 @@ class Modbus(Adapter):
                 self.backend = client.ModbusTcpClient(host=address[0], port=int(address[1]))
 
                 self.backend.connect()
-
+            print(self.protocol) # DEBUG
+            print(self.backend) # DEBUG
         else:
             # Modbus Serial
             self.protocol = "Serial"
