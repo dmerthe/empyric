@@ -1115,6 +1115,9 @@ class Modbus(Adapter):
     else:
         lib = None
 
+    # DEBUG:
+    print(lib)
+
     @property
     def busy(self):
         if self.protocol == "Serial":
@@ -1146,7 +1149,6 @@ class Modbus(Adapter):
 
                 if len(address) == 1:
                     address.append(502)  # standard Modbus UDP port (fascinating that it's the same as TCP)
-
                 self.backend = client.ModbusUdpClient(host=address[0], port=int(address[1]))
 
                 self.backend.connect()
