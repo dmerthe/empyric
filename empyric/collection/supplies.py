@@ -518,15 +518,17 @@ class MagnaPowerSL1000(Instrument):
 class SorensenXG10250(Instrument):
     """
     Sorensen XG 10-250 series high current power supply.
+    
+    The analog control mode option allows the power supply to operate in a voltage-controlled current mode via its non-isolated input pin.
     """
 
     name = "SorensenXG10250"
 
     supported_adapters = ((Serial, {"baud_rate": 9600}))
 
-    knobs = ("max voltage", "max current", "output")
+    knobs = ("max voltage", "max current", "output", "analog control mode")
 
-    meters = ("voltage", "current")
+    meters = ("voltage", "current", "analog input voltage", "analog input current")
 
 
     @measurer
@@ -537,12 +539,27 @@ class SorensenXG10250(Instrument):
     def measure_voltage(self):
         return float(self.query("MEAS:VOLT?"))
     
+    @measurer
+    def measure_analog_input_voltage(self):
+        return float(self.query("MEAS:APR?"))
+    
+    @measurer
+    def measure_analog_input_current(self):
+        return float(self.query("MEAS:APR:CURR?"))
+    
     @setter
     def set_output(self, output: Toggle):
         if output == ON:
             self.write("OUTP: ON")
         elif output == OFF:
             self.write("OUTP: OFF")
+
+    @setter
+    def set_analog_control_mode(self, analog_control_mode: Toggle):
+        if analog_control_mode == ON:
+            self.write("SYST:REM:SOUR:LOC")
+        if analog_control_mode == OFF:
+            self.write("SYST:REM:SOUR:IAV")
 
     @setter
     def set_max_current(self, current):
@@ -567,4 +584,12 @@ class SorensenXG10250(Instrument):
             return OFF
         elif response == "ON":
             return ON
+    
+    @getter
+    def get_analog_control_mode(self) -> Toggle:
+        response = self.query("SYST:REM:SOUR?")
+        if response == "IAV":
+            return ON
+        elif response == "LOC":
+            return OFF
         
