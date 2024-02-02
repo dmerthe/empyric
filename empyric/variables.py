@@ -39,7 +39,7 @@ class Variable:
     def value(self):
         """The value of the variable"""
         # overwritten by child classes
-        pass
+        return
 
     @value.setter
     def value(self, value):
@@ -365,7 +365,7 @@ class Remote(Variable):
         """
 
         if self._type is None:
-            self._get_type()
+            self.get_type()
 
         if self.protocol == "modbus":
             fcode = 3 if self.settable else 4
@@ -381,7 +381,7 @@ class Remote(Variable):
 
             if _type is not None:
                 self._value = self._client.read(
-                    fcode, self.alias, count=4, _type=self._type_map[_type]
+                    fcode, self.alias, count=4, _type=self.type_map[_type]
                 )
 
         else:
@@ -423,7 +423,7 @@ class Remote(Variable):
         """
 
         if self.protocol == "modbus":
-            self._client.write(16, self.alias, value, _type=self._type_map[self._type])
+            self._client.write(16, self.alias, value, _type=self.type_map[self._type])
 
         else:
             write_to_socket(self._socket, f"{self.alias} {value}")

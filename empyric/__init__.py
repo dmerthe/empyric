@@ -1,5 +1,6 @@
 import argparse
 import logging
+import datetime
 
 try:
     import pytest
@@ -9,14 +10,13 @@ except ImportError:
 from empyric.experiment import Manager
 
 # Set up logging
-logger = logging.getLogger()
+logger = logging.getLogger('empyric')
 
 log_stream_handler = logging.StreamHandler()
-log_file_handler = logging.FileHandler('empyric.log')
-
+log_stream_handler.setLevel(logging.WARNING)
 logger.addHandler(log_stream_handler)
-logger.addHandler(log_file_handler)
 
+# TODO add logging.FileHandler to drop log into file in working directory
 
 # List of testable features.
 # Tests are invoked at the command line with `empyric --test <feature>`
@@ -57,7 +57,7 @@ def execute():
     )
 
     parser.add_argument(
-        "-b", "--debug", nargs='*', default='True', help='run empyric in debug mode'
+        "-b", "--debug", nargs='*', help='run empyric in debug mode'
     )
 
     args = parser.parse_args()
@@ -65,7 +65,6 @@ def execute():
     if args.debug is not None:
         logger.setLevel(logging.DEBUG)
         log_stream_handler.setLevel(logging.DEBUG)
-        log_file_handler.setLevel(logging.DEBUG)
         logger.debug('Running in debug mode...')
 
     if args.test is not None:
