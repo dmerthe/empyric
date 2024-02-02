@@ -1,0 +1,71 @@
+Description:
+  name: Advantech ADAM-6024 Example
+  operator: Mike
+  platform: test stand 1
+  comments: Who is Mike? There is no test stand 1
+
+Settings:
+  step interval: 1 seconds
+  save interval: 30 seconds
+  plot interval: 1 seconds
+  end: 60 seconds
+
+Instruments:
+
+  ADAM 6024:
+    type: ADAM6024
+    address: '10.50.2.179'  # replace with unit's IP address and port
+    timeout: 1.0
+
+Variables:
+
+  Input Voltage 1:
+    instrument: ADAM 6024
+    meter: analog_in0
+
+  Input Voltage 2:
+    instrument: ADAM 6024
+    meter: analog_in1
+
+  Input Voltage 3:
+    instrument: ADAM 6024
+    meter: analog_in2
+
+  Input Voltage 4:
+    instrument: ADAM 6024
+    meter: analog_in3
+
+  Input Voltage 5:
+    instrument: ADAM 6024
+    meter: analog_in4
+
+  Input Voltage 6:
+    instrument: ADAM 6024
+    meter: analog_in5
+
+  Output Voltage 1:
+    instrument: ADAM 6024
+    knob: analog_out0
+    
+  Output Voltage 2:
+    instrument: ADAM 6024
+    knob: analog_out1
+
+Plots:
+  Input Voltages:
+    y:
+      - Input Voltage 1
+      - Input Voltage 2
+      - Input Voltage 3
+      - Input Voltage 4
+      - Input Voltage 5
+      - Input Voltage 6
+      - Output Voltage 1
+      - Output Voltage 2
+
+Routines:
+ Sweep Voltage:
+  type: Timecourse
+  knobs: Output Voltage 1
+  times: [2, 10, 15, 20]
+  values: [0, 2, 2, 0]
