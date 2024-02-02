@@ -54,11 +54,11 @@ class OmegaCN7500(Instrument):
 
     @setter
     def set_integration_time(self, Ti: Integer):
-        self.write(0x100C, Ti)
+        self.write(0x100A, Ti)
 
     @getter
     def get_integration_time(self) -> Integer:
-        return self.read(0x100C)
+        return self.read(0x100A)
 
     @setter
     def set_derivative_time(self, Td: Integer):
