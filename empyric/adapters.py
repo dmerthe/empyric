@@ -1059,7 +1059,7 @@ class ModbusSerial(Adapter):
 class Modbus(Adapter):
     """
     Handles communication with instruments via the Modbus communication
-    protocol, over either TCP or serial ports, using PyModbus.
+    protocol, over either TCP, UDP, or serial ports, using PyModbus.
     """
 
     kwargs = (
@@ -1072,6 +1072,7 @@ class Modbus(Adapter):
         "stop bits",
         "parity",
         "delay",
+        "protocol",
     )
 
     slave_id = 0
@@ -1100,7 +1101,7 @@ class Modbus(Adapter):
     parity = "N"
     delay = 0.05
 
-    _protocol = None
+    protocol = None
 
     # This dict contains all active Modbus serial adapters. When a new adapter
     # is initialized with the same com port as an existing one, it uses the
@@ -1116,7 +1117,7 @@ class Modbus(Adapter):
 
     @property
     def busy(self):
-        if self._protocol == "Serial":
+        if self.protocol == "Serial":
             return bool(
                 sum(
                     [
@@ -1139,19 +1140,28 @@ class Modbus(Adapter):
         address = self.instrument.address.split("::")
 
         if re.match("\d+\.\d+\.\d+\.\d+", address[0]):
-            # Modbus TCP
-            self._protocol = "TCP"
+            if str(self.protocol).upper() == "UDP":
+                # Modbus UDP
+                self.protocol = "UDP"
 
-            if len(address) == 1:
-                address.append(502)  # standard Modbus TCP port
+                if len(address) == 1:
+                    address.append(502)  # standard Modbus UDP port (fascinating that it's the same as TCP)
+                self.backend = client.ModbusUdpClient(host=address[0], port=int(address[1]))
 
-            self.backend = client.ModbusTcpClient(host=address[0], port=int(address[1]))
+                self.backend.connect()
+            else:
+                # Modbus TCP
+                self.protocol = "TCP"
 
-            self.backend.connect()
+                if len(address) == 1:
+                    address.append(502)  # standard Modbus TCP port
 
+                self.backend = client.ModbusTcpClient(host=address[0], port=int(address[1]))
+
+                self.backend.connect()
         else:
             # Modbus Serial
-            self._protocol = "Serial"
+            self.protocol = "Serial"
 
             if len(address) == 1:
                 # assume slave id is zero if not specified
