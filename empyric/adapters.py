@@ -1115,9 +1115,6 @@ class Modbus(Adapter):
     else:
         lib = None
 
-    # DEBUG:
-    print(lib)
-
     @property
     def busy(self):
         if self.protocol == "Serial":
