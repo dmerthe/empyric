@@ -307,17 +307,14 @@ class RandomWalk(Instrument):
 
     @setter
     def set_mean(self, mean: Float):
-
         self._mean = mean
 
     @setter
     def set_step(self, step: Float):
-
         self._step = step
 
     @setter
     def set_affinity(self, affinity: Float):
-
         self._affinity = affinity
 
     @measurer

@@ -36,7 +36,6 @@ def chaperone(method):
         reconnects = 0
 
         while reconnects < self.max_reconnects:
-
             if not self.connected:
                 time.sleep(self.delay)
                 self.connect()
@@ -64,7 +63,6 @@ def chaperone(method):
                     return response
 
                 except Exception as exception:
-
                     traceback = exception.__traceback__
 
                     warn(
@@ -267,9 +265,7 @@ class Serial(Adapter):
     def connect(self):
         # First try connecting with PyVISA
         if self.lib == "pyvisa":
-
             if "COM" in self.instrument.address:
-
                 com_port = int(re.search("\d+", self.instrument.address)[0])
 
                 print(
@@ -301,7 +297,6 @@ class Serial(Adapter):
         # Then try connecting with PySerial
         elif self.lib == "pyserial":
             if "ASRL" in self.instrument.address:
-
                 com_port = int(re.search("\d+", self.instrument.address)[0])
 
                 print(
@@ -1154,8 +1149,12 @@ class Modbus(Adapter):
                 self.protocol = "UDP"
 
                 if len(address) == 1:
-                    address.append(502)  # standard Modbus UDP port (fascinating that it's the same as TCP)
-                self.backend = client.ModbusUdpClient(host=address[0], port=int(address[1]))
+                    address.append(
+                        502
+                    )  # standard Modbus UDP port (fascinating that it's the same as TCP)
+                self.backend = client.ModbusUdpClient(
+                    host=address[0], port=int(address[1])
+                )
 
                 self.backend.connect()
             else:
@@ -1165,7 +1164,9 @@ class Modbus(Adapter):
                 if len(address) == 1:
                     address.append(502)  # standard Modbus TCP port
 
-                self.backend = client.ModbusTcpClient(host=address[0], port=int(address[1]))
+                self.backend = client.ModbusTcpClient(
+                    host=address[0], port=int(address[1])
+                )
 
                 self.backend.connect()
         else:

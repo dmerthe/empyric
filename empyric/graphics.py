@@ -1035,7 +1035,6 @@ class ConfigTestDialog(BasicDialog):
         BasicDialog.__init__(self, parent, title="Config/Test: " + instrument.name)
 
     def set_knob_entry(self, knob):
-
         value = self.knob_entries[knob].get()
         self.instrument.set(knob.replace(" ", "_"), recast(value))
 

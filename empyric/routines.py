@@ -361,9 +361,7 @@ class Timecourse(Routine):
                 try:
                     key = [col for col in df.columns if "time" in col.lower][0]
                 except IndexError:
-                    raise KeyError(
-                        f"No 'times' values found in {t_elem[0]}"
-                    )
+                    raise KeyError(f"No 'times' values found in {t_elem[0]}")
 
                 self.times[i] = df[key].values
 
@@ -372,7 +370,8 @@ class Timecourse(Routine):
 
                 try:
                     key = [
-                        col for col in df.columns
+                        col
+                        for col in df.columns
                         if col == "values" or col == list(self.knobs)[i]
                     ][0]
                 except IndexError:
@@ -472,7 +471,8 @@ class Sequence(Routine):
 
                 try:
                     key = [
-                        col for col in df.columns
+                        col
+                        for col in df.columns
                         if col == "values" or col == list(self.knobs)[i]
                     ][0]
                 except IndexError:
@@ -694,7 +694,6 @@ class SocketServer(Routine):
         self.server_thread.join()
 
     async def _run_async_server(self):
-
         asyncio.create_task(self._accept_connections())
         asyncio.create_task(self._process_requests())
 
@@ -767,7 +766,7 @@ class SocketServer(Routine):
                 try:
                     request = read_from_socket(client, chunk_size=1)
                 except ConnectionError:
-                    print(f'Connection issue with client at {address}')
+                    print(f"Connection issue with client at {address}")
                     client.shutdown(socket.SHUT_RDWR)
                     client.close()
                     clients[address] = None
@@ -797,7 +796,7 @@ class SocketServer(Routine):
                             _type = None
                             value = self.state[alias]
 
-                            if isinstance(value, String) and '.csv' in value:
+                            if isinstance(value, String) and ".csv" in value:
                                 # value is an Array stored in a CSV file
                                 _type = Array
                             else:
@@ -816,7 +815,7 @@ class SocketServer(Routine):
                         elif alias in self.state:
                             _value = self.state[alias]
 
-                            if isinstance(_value, String) and '.csv' in _value:
+                            if isinstance(_value, String) and ".csv" in _value:
                                 # value is an array, list or tuple stored in CSV file
                                 df = pd.read_csv(_value)
 
@@ -832,7 +831,7 @@ class SocketServer(Routine):
 
                         if isinstance(_value, Array):
                             # pickle arrays and send as bytes
-                            outgoing_message = f'{alias} dlpkl'.encode()
+                            outgoing_message = f"{alias} dlpkl".encode()
                             outgoing_message += dill.dumps(
                                 _value, protocol=dill.HIGHEST_PROTOCOL
                             )

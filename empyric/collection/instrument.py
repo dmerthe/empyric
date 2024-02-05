@@ -37,8 +37,8 @@ def setter(method):
         self = args[0]
         value = args[1]
 
-        if not self.adapter.connected and knob != 'connected':
-            print(f'Instrument {self.name} is disconnected; unable to set {knob}')
+        if not self.adapter.connected and knob != "connected":
+            print(f"Instrument {self.name} is disconnected; unable to set {knob}")
             self.__setattr__(knob, None)
             return
 
@@ -77,9 +77,9 @@ def getter(method):
     def wrapped_method(*args, **kwargs):
         self = args[0]
 
-        if not self.adapter.connected and knob != 'connected':
+        if not self.adapter.connected and knob != "connected":
             self.__setattr__(knob, None)
-            print(f'Instrument {self.name} is disconnected; unable to get {knob}')
+            print(f"Instrument {self.name} is disconnected; unable to get {knob}")
             return
 
         self.lock.acquire()
@@ -122,7 +122,7 @@ def measurer(method):
 
         if not self.adapter.connected:
             self.__setattr__(meter, None)
-            print(f'Instrument {self.name} is disconnected; unable to measure {meter}')
+            print(f"Instrument {self.name} is disconnected; unable to measure {meter}")
             return
 
         self.lock.acquire()
@@ -231,7 +231,7 @@ class Instrument:
 
         self.address = address
 
-        self.knobs = ('connected',) + self.knobs
+        self.knobs = ("connected",) + self.knobs
 
         adapter_connected = False
         if adapter:
@@ -386,7 +386,7 @@ class Instrument:
             adapter=self.adapter if self.address is None else None,
             presets=self.presets,
             postsets=self.postsets,
-            **self.kwargs
+            **self.kwargs,
         )
 
     def disconnect(self):
@@ -406,21 +406,19 @@ class Instrument:
 
     @setter
     def set_connected(self, state: Toggle):
-
         if state == ON:
             if self.adapter.connected:
-                print(f'{self.name} is already connected')
+                print(f"{self.name} is already connected")
             else:
                 self.connect()
         elif state == OFF:
             if self.adapter.connected:
                 self.disconnect()
             else:
-                print(f'{self.name} is already disconnected')
+                print(f"{self.name} is already disconnected")
 
     @getter
     def get_connected(self) -> Toggle:
-
         if self.adapter.connected:
             return ON
         else:

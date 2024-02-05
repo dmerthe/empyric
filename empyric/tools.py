@@ -269,7 +269,7 @@ def write_to_socket(_socket, message, termination="\r", timeout=None):
     elif isinstance(message, bytes):
         bytes_message = message + termination.encode()
     else:
-        raise ValueError('message argument must be either string or bytes')
+        raise ValueError("message argument must be either string or bytes")
 
     msg_len = len(bytes_message)
 
@@ -279,7 +279,6 @@ def write_to_socket(_socket, message, termination="\r", timeout=None):
     total_sent = 0
 
     while total_sent < msg_len and failures < max_failures:
-
         # Block until the socket is writeable or until timeout
         if timeout:
             writeable = _socket in select.select([], [_socket], [], timeout)[1]
@@ -297,6 +296,8 @@ def write_to_socket(_socket, message, termination="\r", timeout=None):
         total_sent = total_sent + sent
 
     if total_sent < msg_len:
-        raise ConnectionError(f"Socket connection to {_socket.getsockname()} is broken!")
+        raise ConnectionError(
+            f"Socket connection to {_socket.getsockname()} is broken!"
+        )
 
     return total_sent

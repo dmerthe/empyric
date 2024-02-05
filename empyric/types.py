@@ -175,7 +175,6 @@ def recast(value: Any, to: type = Type) -> Union[Type, None]:
                 elif issubclass(dtype, String):
                     return np.str_(value)
                 elif issubclass(dtype, Array) and np.ndim(value) > 0:
-
                     if isinstance(value, np.ndarray):
                         return value
                     else:
@@ -217,7 +216,7 @@ def recast(value: Any, to: type = Type) -> Union[Type, None]:
             else:
                 return value  # must be an actual string
         elif isinstance(value, bytes):
-            if value[:5] == b'dlpkl':
+            if value[:5] == b"dlpkl":
                 # pickled object
                 return dill.loads(value[5:])
             else:

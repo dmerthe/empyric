@@ -519,18 +519,17 @@ class MagnaPowerSL1000(Instrument):
 class SorensenXG10250(Instrument):
     """
     Sorensen XG 10-250 series high current power supply.
-    
+
     The analog control mode option allows the power supply to operate in a voltage-controlled current mode via its non-isolated input pin.
     """
 
     name = "SorensenXG10250"
 
-    supported_adapters = ((Serial, {"baud_rate": 9600}))
+    supported_adapters = ((Serial, {"baud_rate": 9600}),)
 
     knobs = ("max voltage", "max current", "output", "analog control mode")
 
     meters = ("voltage", "current", "analog input voltage", "analog input current")
-
 
     @measurer
     def measure_current(self):
@@ -539,15 +538,15 @@ class SorensenXG10250(Instrument):
     @measurer
     def measure_voltage(self):
         return float(self.query("MEAS:VOLT?"))
-    
+
     @measurer
     def measure_analog_input_voltage(self):
         return float(self.query("MEAS:APR?"))
-    
+
     @measurer
     def measure_analog_input_current(self):
         return float(self.query("MEAS:APR:CURR?"))
-    
+
     @setter
     def set_output(self, output: Toggle):
         if output == ON:
@@ -577,7 +576,7 @@ class SorensenXG10250(Instrument):
     @getter
     def get_max_voltage(self):
         return float(self.query("SOUR:VOLT?"))
-    
+
     @getter
     def get_output(self) -> Toggle:
         response = self.query("OUTP?")
@@ -585,7 +584,7 @@ class SorensenXG10250(Instrument):
             return OFF
         elif response == "ON":
             return ON
-    
+
     @getter
     def get_analog_control_mode(self) -> Toggle:
         response = self.query("SYST:REM:SOUR?")
@@ -593,7 +592,7 @@ class SorensenXG10250(Instrument):
             return ON
         elif response == "LOC":
             return OFF
-        
+
 
 class BK9140(Instrument):
     """
@@ -617,7 +616,7 @@ class BK9140(Instrument):
         "max voltage 3",
         "max current 3",
         "output 3",
-             )
+    )
 
     # no presets or postsets for this instrument
 
@@ -628,7 +627,7 @@ class BK9140(Instrument):
         "current 2",
         "voltage 3",
         "current 3",
-        )
+    )
 
     @setter
     def set_output_1(self, output: Toggle):
@@ -685,7 +684,7 @@ class BK9140(Instrument):
     def get_max_voltage_1(self):
         self.write(":INST:SEL 1")
         return float(self.query("SOUR:VOLT?"))
-    
+
     @measurer
     def measure_current_2(self):
         # sometimes the first measurement is lagged
@@ -717,7 +716,7 @@ class BK9140(Instrument):
     def get_max_voltage_2(self):
         self.write(":INST:SEL 2")
         return float(self.query("SOUR:VOLT?"))
-    
+
     @measurer
     def measure_current_3(self):
         # sometimes the first measurement is lagged

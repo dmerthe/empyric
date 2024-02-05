@@ -28,6 +28,7 @@ from empyric.types import recast, Boolean, Toggle, Integer, Float, ON
 
 logger = logging.getLogger()
 
+
 class Experiment:
     """
     An iterable class which represents an experiment; iterates through any

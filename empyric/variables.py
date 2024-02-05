@@ -395,16 +395,15 @@ class Remote(Variable):
                 elif b"Error" in response:
                     raise RuntimeError(response.decode().split("Error: ")[-1])
                 else:
+                    bytes_value = response.split(self.alias.encode() + b" ")[-1].strip()
 
-                    bytes_value = response.split(self.alias.encode() + b' ')[-1].strip()
-
-                    if bytes_value[:5] == b'dlpkl':
+                    if bytes_value[:5] == b"dlpkl":
                         # pickled quantity, usually an array, list or tuple
                         self._value = dill.loads(bytes_value[5:])
                     else:
                         self._value = recast(
                             bytes_value,
-                            to=self._type if self._type is not None else Type
+                            to=self._type if self._type is not None else Type,
                         )
 
             except BaseException as error:

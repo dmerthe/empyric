@@ -854,7 +854,6 @@ class SiglentSDS1000(Instrument):
 
     @getter
     def get_trigger_source(self) -> Integer:
-
         def validator(response):
             return "SR,C" in response
 
@@ -869,17 +868,15 @@ class SiglentSDS1000(Instrument):
 
     @setter
     def set_trigger_mode(self, mode: String):
-
-        if mode.upper() in ['AUTO', 'NORM', 'SINGLE', 'STOP']:
-            self.write(f'TRMD {mode.upper()}')
+        if mode.upper() in ["AUTO", "NORM", "SINGLE", "STOP"]:
+            self.write(f"TRMD {mode.upper()}")
         else:
             return self.get_trigger_mode()
 
     @getter
     def get_trigger_mode(self) -> String:
-
         try:
-            return self.query('TRMD?')[5:]
+            return self.query("TRMD?")[5:]
         except IndexError:
             return None
 
@@ -948,7 +945,6 @@ class SiglentSDS1000(Instrument):
 
     # Channel measurements
     def _measure_chn_waveform(self, n):
-
         ready = False
         while not ready:
             time.sleep(0.25)
@@ -957,13 +953,12 @@ class SiglentSDS1000(Instrument):
         # Enable channel if needed
         ch_enabled_query = self.query("C%d:TRA?" % n)
         if "ON" not in ch_enabled_query:
-            print(f'Warning: CH{n} is not enabled; cannot retrieve waveform')
+            print(f"Warning: CH{n} is not enabled; cannot retrieve waveform")
             return None
 
         self.write("WFSU SP,0,NP,0,FP,0")  # setup to get all data points
 
         def is_terminated(message):
-
             try:
                 size = int(message[13:22])
             except ValueError:
@@ -995,24 +990,24 @@ class SiglentSDS1000(Instrument):
 
             header = response[:13]
             if header != (b"C%d:WF DAT2,#9" % n):
-                print('invalid header', header)
+                print("invalid header", header)
                 return False
 
             size = response[13:22]
             try:
                 size = int(size)
             except ValueError:
-                print('invalid data size', size)
+                print("invalid data size", size)
                 return False
 
             data = response[22:-2]
             if len(data) != size:
-                print('truncated data', len(data))
+                print("truncated data", len(data))
                 return False
 
             termination = response[-2:]
             if termination != b"\n\n":
-                print('no termination', response[-2:])
+                print("no termination", response[-2:])
                 return False
 
             return True
