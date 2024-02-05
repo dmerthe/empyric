@@ -2,6 +2,7 @@ import importlib
 import socket
 import time
 import re
+from warnings import warn
 from threading import Lock
 
 import numpy as np
@@ -30,12 +31,13 @@ def chaperone(method):
         # Catch communication errors and either try to repeat communication
         # or reset the connection
 
+        traceback = None
+
         reconnects = 0
 
         while reconnects < self.max_reconnects:
 
             if not self.connected:
-                print("Reconnecting...")
                 time.sleep(self.delay)
                 self.connect()
                 reconnects += 1
@@ -61,12 +63,15 @@ def chaperone(method):
                     self.lock.release()
                     return response
 
-                except BaseException as err:
-                    print(
-                        f"Encountered {err} while trying "
+                except Exception as exception:
+
+                    traceback = exception.__traceback__
+
+                    warn(
+                        f"Encountered '{exception}' while trying "
                         f"to talk to {self.instrument.name}"
-                        "\nRetrying..."
                     )
+
                     attempts += 1
 
             # getting here means attempts have maxed out;
@@ -75,14 +80,18 @@ def chaperone(method):
 
         # Getting here means that both attempts and reconnects have been maxed out
         self.lock.release()
-        raise AdapterError(f"Unable to communicate with {self.instrument.name}!")
+
+        raise AdapterError(
+            f"Unable to communicate with {self.instrument.name}! "
+            f"(after {attempts} attempts & {reconnects} reconnects)"
+        ).with_traceback(traceback)
 
     wrapped_method.__doc__ = method.__doc__  # keep method doc string
 
     return wrapped_method
 
 
-class AdapterError(BaseException):
+class AdapterError(Exception):
     pass
 
 
