@@ -29,6 +29,8 @@ class Variable:
     _settable = False  #: whether the variable can be set by the user
     _value = None  #: last known value of the variable
 
+    _hidden = False  #: used by GUIs
+
     @property
     def settable(self):
         return self._settable
@@ -37,7 +39,7 @@ class Variable:
     def value(self):
         """The value of the variable"""
         # overwritten by child classes
-        pass
+        return
 
     @value.setter
     def value(self, value):
@@ -352,22 +354,8 @@ class Remote(Variable):
 
             self._socket.connect((server_ip, int(server_port)))
 
-            write_to_socket(self._socket, f"{self.alias} settable?")
-
-            response = read_from_socket(self._socket, timeout=60)
-            self._settable = response == f"{self.alias} settable"
-
-            # Get type
-            write_to_socket(self._socket, f"{self.alias} type?")
-
-            response = read_from_socket(self._socket, timeout=60)
-
-            if response is not None:
-                for _type in types.supported:
-                    if str(_type) in response.split(alias)[-1]:
-                        self._type = types.supported.get(_type, None)
-            else:
-                self._type = None
+            self.get_settable()
+            self.get_type()
 
     @property
     @Variable.getter_type_validator
@@ -375,6 +363,9 @@ class Remote(Variable):
         """
         Value of the remote variable on a server
         """
+
+        if self._type is None:
+            self.get_type()
 
         if self.protocol == "modbus":
             fcode = 3 if self.settable else 4
@@ -390,21 +381,30 @@ class Remote(Variable):
 
             if _type is not None:
                 self._value = self._client.read(
-                    fcode, self.alias, count=4, _type=self._type_map[_type]
+                    fcode, self.alias, count=4, _type=self.type_map[_type]
                 )
 
         else:
             write_to_socket(self._socket, f"{self.alias} ?")
 
-            response = read_from_socket(self._socket, timeout=60)
+            response = read_from_socket(self._socket, timeout=60, decode=False)
 
             try:
                 if response is None:
                     self._value = None
-                elif "Error" in response:
-                    raise RuntimeError(response.split("Error: ")[-1])
+                elif b"Error" in response:
+                    raise RuntimeError(response.decode().split("Error: ")[-1])
                 else:
-                    self._value = recast(response.split(" ")[-1])
+                    bytes_value = response.split(self.alias.encode() + b" ")[-1].strip()
+
+                    if bytes_value[:5] == b"dlpkl":
+                        # pickled quantity, usually an array, list or tuple
+                        self._value = dill.loads(bytes_value[5:])
+                    else:
+                        self._value = recast(
+                            bytes_value,
+                            to=self._type if self._type is not None else Type,
+                        )
 
             except BaseException as error:
                 print(
@@ -422,9 +422,7 @@ class Remote(Variable):
         """
 
         if self.protocol == "modbus":
-            self._client.write(
-                16, self.alias, value, _type=self._type_map[self._type]
-            )
+            self._client.write(16, self.alias, value, _type=self.type_map[self._type])
 
         else:
             write_to_socket(self._socket, f"{self.alias} {value}")
@@ -471,6 +469,26 @@ class Remote(Variable):
         else:
             self._socket.shutdown(socket.SHUT_RDWR)
             self._socket.close()
+
+    def get_type(self):
+        """Get the data type of the remote variable"""
+        write_to_socket(self._socket, f"{self.alias} type?")
+
+        response = read_from_socket(self._socket, timeout=60)
+
+        if response is not None:
+            for _type in types.supported:
+                if str(_type) in response.split(self.alias)[-1]:
+                    self._type = types.supported.get(_type, None)
+        else:
+            self._type = None
+
+    def get_settable(self):
+        """Get settability of remote variable"""
+        write_to_socket(self._socket, f"{self.alias} settable?")
+
+        response = read_from_socket(self._socket, timeout=60)
+        self._settable = response == f"{self.alias} settable"
 
 
 class Parameter(Variable):

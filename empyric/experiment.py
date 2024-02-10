@@ -2,6 +2,7 @@
 import collections
 import datetime
 import importlib
+import logging
 import os
 import pathlib
 import sys
@@ -21,8 +22,11 @@ from empyric import adapters as _adapters
 from empyric import graphics as _graphics
 from empyric import instruments as _instruments
 from empyric import routines as _routines
+from empyric.adapters import AdapterError
 from empyric.tools import convert_time, Clock
 from empyric.types import recast, Boolean, Toggle, Integer, Float, ON
+
+logger = logging.getLogger()
 
 
 class Experiment:
@@ -123,27 +127,7 @@ class Experiment:
         self.state["Time"] = self.clock.time
         self.state.name = datetime.datetime.now()
 
-        # If experiment is stopped, just return the knob & parameter values,
-        # and nullify meter & expression values
         if self.stopped:
-            threads = {}
-            for name, variable in self.variables.items():
-                is_knob = isinstance(variable, _variables.Knob)
-                is_parameter = isinstance(variable, _variables.Parameter)
-
-                if is_knob or is_parameter:
-                    threads[name] = threading.Thread(
-                        target=self._update_variable, args=(name,)
-                    )
-                    threads[name].start()
-                else:
-                    self.state[name] = None
-
-            # Wait for all variable update threads to finish
-            for name, thread in threads.items():
-                self.status = Experiment.RUNNING + f": retrieving {name}"
-                thread.join()
-
             return self.state
 
         # If the experiment is running, apply new settings to knobs
@@ -210,7 +194,12 @@ class Experiment:
                     event = self.eval_events[dependee]
                     event.wait()  # wait for dependee to be evaluated
 
-            value = self.variables[name].value
+            try:
+                value = self.variables[name].value
+            except AdapterError:
+                value = None
+            except ValueError:
+                value = None
 
             self.eval_events[name].set()
             # unblock threads evaluating dependents
@@ -224,7 +213,8 @@ class Experiment:
                     path = name.replace(" ", "_") + "_"
                     path += self.state.name.strftime("%Y%m%d-%H%M%S") + ".csv"
                     dataframe.to_csv(path)
-                    self.state[name] = path
+
+                    self.state[name] = os.path.abspath(path)
                 else:
                     self.state[name] = None
             else:
@@ -752,9 +742,12 @@ def convert_runcard(runcard):
             )
 
         elif "parameter" in specs:
-            variables[name] = _variables.Parameter(
-                parameter=recast(specs["parameter"])
-            )
+            variables[name] = _variables.Parameter(parameter=recast(specs["parameter"]))
+
+        if name in variables and "hidden" in specs:
+            # If hidden, the variable does not appear in the GUI
+            if specs["hidden"]:
+                variables[name]._hidden = True
 
     # Routines section
     available_routines = {**_routines.supported, **custom_routines}

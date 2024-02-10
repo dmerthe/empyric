@@ -543,6 +543,9 @@ class ExperimentGUI:
 
         i += 1
         for name in self.variables:
+            if self.variables[name]._hidden:
+                continue
+
             tk.Label(self.status_frame, text=name, width=len(name), anchor=tk.E).grid(
                 row=i, column=0, sticky=tk.E
             )
@@ -876,8 +879,7 @@ class ExperimentGUI:
         """Assigns the value to a variable if entered by the user"""
 
         variable.value = recast(
-            entry.get(),
-            to=variable._type if variable._type is not None else Type
+            entry.get(), to=variable._type if variable._type is not None else Type
         )
 
         root.focus()
@@ -1072,56 +1074,59 @@ class ConfigTestDialog(BasicDialog):
         meters = self.instrument.meters
         self.meter_entries = {}
 
-        label = tk.Label(master, text="Knobs", font=("Arial", 14, "bold"))
-        label.grid(row=0, column=0, sticky=tk.W)
+        frame = tk.Frame(master)
+        frame.grid(row=1, column=0, columnspan=7)
 
-        label = tk.Label(master, text="Meters", font=("Arial", 14, "bold"))
-        label.grid(row=0, column=3, sticky=tk.W)
+        label = tk.Label(frame, text="Knobs", font=("Arial", 14, "bold"))
+        label.grid(row=1, column=0, sticky=tk.W)
+
+        label = tk.Label(frame, text="Meters", font=("Arial", 14, "bold"))
+        label.grid(row=1, column=3, sticky=tk.W)
 
         self.set_buttons = {}
         self.get_buttons = {}
-        i = 1
+        i = 2
         for knob in knobs:
             formatted_name = " ".join(
                 [word[0].upper() + word[1:] for word in knob.split(" ")]
             )
 
-            label = tk.Label(master, text=formatted_name)
+            label = tk.Label(frame, text=formatted_name)
             label.grid(row=i, column=0, sticky=tk.W)
 
-            self.knob_entries[knob] = tk.Entry(master)
+            self.knob_entries[knob] = tk.Entry(frame)
             self.knob_entries[knob].grid(row=i, column=1)
             self.knob_entries[knob].insert(0, str(knob_values[knob]))
 
             self.set_buttons[knob] = tk.Button(
-                master, text="Set", command=lambda knob=knob: self.set_knob_entry(knob)
+                frame, text="Set", command=lambda knob=knob: self.set_knob_entry(knob)
             )
             self.set_buttons[knob].grid(row=i, column=2)
 
             self.get_buttons[knob] = tk.Button(
-                master, text="Get", command=lambda knob=knob: self.get_knob_entry(knob)
+                frame, text="Get", command=lambda knob=knob: self.get_knob_entry(knob)
             )
             self.get_buttons[knob].grid(row=i, column=3)
 
             i += 1
 
         self.measure_buttons = {}
-        i = 1
+        i = 2
         for meter in meters:
             formatted_name = " ".join(
                 [word[0].upper() + word[1:] for word in meter.split(" ")]
             )
 
-            label = tk.Label(master, text=formatted_name)
+            label = tk.Label(frame, text=formatted_name)
             label.grid(row=i, column=4, sticky=tk.W)
 
-            self.meter_entries[meter] = tk.Entry(master)
+            self.meter_entries[meter] = tk.Entry(frame)
             self.meter_entries[meter].grid(row=i, column=5)
             self.meter_entries[meter].insert(0, "???")
             self.meter_entries[meter].config(state="readonly")
 
             self.measure_buttons[meter] = tk.Button(
-                master,
+                frame,
                 text="Measure",
                 command=lambda meter=meter: self.update_meter_entry(meter),
             )

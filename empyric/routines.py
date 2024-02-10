@@ -1,5 +1,6 @@
 import importlib
 import numbers
+import os.path
 import socket
 import queue
 import threading
@@ -10,6 +11,7 @@ from typing import Union
 import select
 import functools
 
+import dill
 import numpy as np
 import pandas as pd
 
@@ -61,6 +63,7 @@ class Routine:
     """
 
     assert_control = True
+    #: if True, routine has sole control of knobs when active
 
     _start_on_enable = False
 
@@ -124,20 +127,23 @@ class Routine:
 
         @functools.wraps(update)
         def wrapped_update(self, state):
-
             if self.enable is not None and not state[self.enable]:
+                # if routine has an enabling variable, and it evaluates to false...
 
                 for name, knob in self.knobs.items():
+                    # release control of knobs
                     if knob._controller == self:
                         knob._controller = None
 
                 if self._start_on_enable:
+                    # if start time is reset on enable, nullify start and end values
                     self.start = np.nan
                     self.end = np.nan
 
                 return
 
             elif state["Time"] < self.start:
+                # prepare routine before starting, if needed
                 if not self.prepped:
                     self.prep(state)
                     self.prepped = True
@@ -145,6 +151,7 @@ class Routine:
                 return
 
             elif state["Time"] >= self.end:
+                # finalize routine after ending, if needed
                 if not self.finished:
                     self.finish(state)
                     self.finished = True
@@ -157,10 +164,13 @@ class Routine:
                 return
 
             else:
+                # getting here means that the routine is running
+
                 if not self.prepped:
                     self.prep(state)
 
                 if self._start_on_enable and np.isnan(self.start):
+                    # set start time to time of most recent state evaluation
                     self.start = state["Time"]
                     self.end = self.start + self._duration
 
@@ -278,7 +288,6 @@ class Ramp(Routine):
             self.then = state["Time"]
 
         for knob, rate, target in zip(self.knobs, self.rates, self.targets):
-
             # target and rate can be variables
             if isinstance(target, String):
                 target = state[target]
@@ -348,11 +357,29 @@ class Timecourse(Routine):
         for i, (t_elem, v_elem) in enumerate(zip(self.times, self.values)):
             if type(t_elem[0]) == str and ".csv" in t_elem[0]:
                 df = pd.read_csv(t_elem[0])
-                self.times[i] = df["times"].values
+
+                try:
+                    key = [col for col in df.columns if "time" in col.lower][0]
+                except IndexError:
+                    raise KeyError(f"No 'times' values found in {t_elem[0]}")
+
+                self.times[i] = df[key].values
 
             if type(v_elem[0]) == str and ".csv" in v_elem[0]:
                 df = pd.read_csv(v_elem[0])
-                self.values[i] = [recast(val) for val in df["values"].values]
+
+                try:
+                    key = [
+                        col
+                        for col in df.columns
+                        if col == "values" or col == list(self.knobs)[i]
+                    ][0]
+                except IndexError:
+                    raise KeyError(
+                        f"No values for {list(self.knobs)[i]} found in {v_elem[0]}"
+                    )
+
+                self.values[i] = [recast(val) for val in df[key].values]
 
         self.times = np.array(convert_time(self.times)).astype(float)
         self.values = np.array(self.values, dtype=object)
@@ -441,7 +468,19 @@ class Sequence(Routine):
         for i, v_elem in enumerate(self.values):
             if type(v_elem[0]) == str and ".csv" in v_elem[0]:
                 df = pd.read_csv(v_elem[0])
-                self.values[i] = [recast(val) for val in df["values"].values]
+
+                try:
+                    key = [
+                        col
+                        for col in df.columns
+                        if col == "values" or col == list(self.knobs)[i]
+                    ][0]
+                except IndexError:
+                    raise KeyError(
+                        f"No values for {list(self.knobs)[i]} found in {v_elem[0]}"
+                    )
+
+                self.values[i] = [recast(val) for val in df[key].values]
 
         self.values = np.array(self.values, dtype=object)
 
@@ -538,7 +577,7 @@ class Maximization(Routine):
             allow_duplicate_points=True,
         )
 
-        self.method = method if method is not None else 'bayesian'
+        self.method = method if method is not None else "bayesian"
 
         self.settling_time = convert_time(settling_time)
 
@@ -546,13 +585,16 @@ class Maximization(Routine):
 
     @Routine.enabler
     def update(self, state):
+        if self.method == "bayesian":
+            self._update_bayesian(state)
 
+    def _update_bayesian(self, state):
         non_numeric_knobs = [
             not isinstance(state[knob], numbers.Number) for knob in self.knobs
         ]
 
         if np.any(non_numeric_knobs):
-            # undefined knob values; take no action
+            # undefined state; take no action
             return
 
         if not isinstance(state[self.meter], numbers.Number):
@@ -560,13 +602,7 @@ class Maximization(Routine):
             return
 
         if state["Time"] < self._last_setting + self.settling_time:
-            # Wait for settling
             return
-
-        if self.method == "bayesian":
-            self._update_bayesian(state)
-
-    def _update_bayesian(self, state):
 
         self.optimizer.register(
             params={knob: state[knob] for knob in self.knobs},
@@ -593,21 +629,15 @@ class Maximization(Routine):
             kappa = self._kappa0 * (self.end - state["Time"]) / self._duration
             self.util_func.kappa = kappa
 
-    def _calc_
-
     def prep(self, state):
-
-        if self.method == 'bayesian':
-
-            self._kappa0 = self.options.get('kappa', 2.5)
+        if self.method == "bayesian":
+            self._kappa0 = self.options.get("kappa", 2.5)
             self.util_func = UtilityFunction(
                 kappa=self._kappa0,  # exploration vs. exploitation parameter
             )
 
     def finish(self, state):
-
         for i, (knob, value) in enumerate(self.best_knobs.items()):
-
             if value is None or not np.isfinite(value):
                 print(f"Warning: No optimal value was found for {knob}")
             else:
@@ -652,24 +682,33 @@ class SocketServer(Routine):
 
         self.state = {}
 
-        self.acc_conn_thread = threading.Thread(target=self.accept_connections)
+        self.server_thread = threading.Thread(
+            target=asyncio.run, args=(self._run_async_server(),)
+        )
 
-        self.acc_conn_thread.start()
-
-        self.proc_requ_thread = threading.Thread(target=self.process_requests)
-
-        self.proc_requ_thread.start()
+        self.server_thread.start()
 
     def terminate(self):
         # Kill client handling threads
         self.running = False
-        self.acc_conn_thread.join()
-        self.proc_requ_thread.join()
+        self.server_thread.join()
 
-    def accept_connections(self):
-        while self.running:
+    async def _run_async_server(self):
+        asyncio.create_task(self._accept_connections())
+        asyncio.create_task(self._process_requests())
+
+        async def server_forever():
+            while self.running:
+                await asyncio.sleep(0.1)
+
+        await server_forever()
+
+    async def _accept_connections(self):
+        if self.running:
             try:
                 (client, address) = self.socket.accept()
+
+                client.settimeout(1)
 
                 clients = self.clients_queue.get()
 
@@ -682,29 +721,36 @@ class SocketServer(Routine):
             except socket.timeout:
                 pass
 
-            time.sleep(0.1)
+            await asyncio.sleep(0.001)
 
-        # Close sockets
-        try:
-            self.socket.shutdown(socket.SHUT_RDWR)
-        except OSError:  # socket was not connected
-            pass
-        self.socket.close()
+            asyncio.create_task(self._accept_connections())
 
-        clients = self.clients_queue.get()
-
-        for address, client in clients.items():
+        else:
+            # Close sockets
             try:
-                client.shutdown(socket.SHUT_RDWR)
-                client.close()
-            except ConnectionError:
+                self.socket.shutdown(socket.SHUT_RDWR)
+            except OSError:  # socket was not connected
                 pass
+            self.socket.close()
 
-        # Return empty clients dict to queue so process_requests can exit
-        self.clients_queue.put({})
+            clients = self.clients_queue.get()
 
-    def process_requests(self):
-        while self.running:
+            for address, client in clients.items():
+                try:
+                    client.shutdown(socket.SHUT_RDWR)
+                    client.close()
+                except ConnectionError:
+                    # client is already disconnected
+                    pass
+                except OSError:
+                    # client is already disconnected
+                    pass
+
+            # Return empty clients dict to queue so process_requests can exit
+            self.clients_queue.put({})
+
+    async def _process_requests(self):
+        if self.running:
             clients = self.clients_queue.get()
 
             # Purge disconnected clients
@@ -720,10 +766,13 @@ class SocketServer(Routine):
                 try:
                     request = read_from_socket(client, chunk_size=1)
                 except ConnectionError:
+                    print(f"Connection issue with client at {address}")
+                    client.shutdown(socket.SHUT_RDWR)
+                    client.close()
                     clients[address] = None
                     continue
 
-                if client and request:
+                if request:
                     alias = " ".join(request.split(" ")[:-1])
                     value = request.split(" ")[-1]
 
@@ -745,10 +794,15 @@ class SocketServer(Routine):
                             _type = self.knobs[alias]._type
                         elif alias in self.state:
                             _type = None
-                            for supported_type in supported_types.values():
-                                value = self.state[alias]
-                                if isinstance(value, supported_type):
-                                    _type = supported_type
+                            value = self.state[alias]
+
+                            if isinstance(value, String) and ".csv" in value:
+                                # value is an Array stored in a CSV file
+                                _type = Array
+                            else:
+                                for supported_type in supported_types.values():
+                                    if isinstance(value, supported_type):
+                                        _type = supported_type
 
                         else:
                             _type = None
@@ -760,10 +814,29 @@ class SocketServer(Routine):
                             _value = self.knobs[alias].value
                         elif alias in self.state:
                             _value = self.state[alias]
+
+                            if isinstance(_value, String) and ".csv" in _value:
+                                # value is an array, list or tuple stored in CSV file
+                                df = pd.read_csv(_value)
+
+                                if alias in df.columns:
+                                    # 1D array
+                                    _value = df[alias].values
+                                else:
+                                    # 2D array
+                                    _value = df.values
+
                         else:
                             _value = None
 
-                        outgoing_message = f"{alias} {_value}"
+                        if isinstance(_value, Array):
+                            # pickle arrays and send as bytes
+                            outgoing_message = f"{alias} dlpkl".encode()
+                            outgoing_message += dill.dumps(
+                                _value, protocol=dill.HIGHEST_PROTOCOL
+                            )
+                        else:
+                            outgoing_message = f"{alias} {_value}"
 
                     else:  # Setting a value
                         knob_exists = alias in self.knobs
@@ -783,6 +856,7 @@ class SocketServer(Routine):
                 # Send outgoing message
                 if outgoing_message is not None:
                     write_to_socket(client, outgoing_message)
+                    message_sent = True
 
                 # Remove clients with problematic connections
                 exceptional = client in select.select([], [], [client], 0)[2]
@@ -792,8 +866,9 @@ class SocketServer(Routine):
                     clients[address] = None
 
             self.clients_queue.put(clients)
+            await asyncio.sleep(0.001)
 
-            time.sleep(0.01)
+            asyncio.create_task(self._process_requests())
 
     @Routine.enabler
     def update(self, state):

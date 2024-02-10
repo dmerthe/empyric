@@ -2,6 +2,7 @@ import importlib
 import socket
 import time
 import re
+from warnings import warn
 from threading import Lock
 
 import numpy as np
@@ -25,14 +26,23 @@ def chaperone(method):
                 f"at address {self.instrument.address}"
             )
 
-        # Catch communication errors and either try to repeat communication
-        # or reset the connection
-        attempts = 0
-        reconnects = 0
-
         self.lock.acquire()
 
-        while reconnects <= self.max_reconnects:
+        # Catch communication errors and either try to repeat communication
+        # or reset the connection
+
+        traceback = None
+
+        reconnects = 0
+
+        while reconnects < self.max_reconnects:
+            if not self.connected:
+                time.sleep(self.delay)
+                self.connect()
+                reconnects += 1
+
+            attempts = 0
+
             while attempts < self.max_attempts:
                 try:
                     response = method(self, *args, **kwargs)
@@ -52,34 +62,34 @@ def chaperone(method):
                     self.lock.release()
                     return response
 
-                except BaseException as err:
-                    print(
-                        f"Encountered {err} while trying "
+                except Exception as exception:
+                    traceback = exception.__traceback__
+
+                    warn(
+                        f"Encountered '{exception}' while trying "
                         f"to talk to {self.instrument.name}"
-                        "\nRetrying..."
                     )
+
                     attempts += 1
 
-            # repeats have maxed out, so try reconnecting with the instrument
-            print("Reconnecting...")
+            # getting here means attempts have maxed out;
+            # disconnect adapter and potentially reconnect on next iteration
             self.disconnect()
-            time.sleep(self.delay)
-            self.connect()
 
-            attempts = 0
-            reconnects += 1
-
-        # Getting here means that both repeats
-        # and reconnects have been maxed out
+        # Getting here means that both attempts and reconnects have been maxed out
         self.lock.release()
-        raise AdapterError(f"Unable to communicate with {self.instrument.name}!")
+
+        raise AdapterError(
+            f"Unable to communicate with {self.instrument.name}! "
+            f"(after {attempts} attempts & {reconnects} reconnects)"
+        ).with_traceback(traceback)
 
     wrapped_method.__doc__ = method.__doc__  # keep method doc string
 
     return wrapped_method
 
 
-class AdapterError(BaseException):
+class AdapterError(Exception):
     pass
 
 
@@ -209,7 +219,10 @@ class Adapter:
 
     def disconnect(self):
         """
-        Close communication port/channel
+        Close communication port/channel.
+
+        Every ``disconnect`` method should set the ``connected`` attribute to
+        ``False`` in order for the ``chaperone`` wrapper to work correctly.
         """
         self.connected = False
 
@@ -252,20 +265,48 @@ class Serial(Adapter):
     def connect(self):
         # First try connecting with PyVISA
         if self.lib == "pyvisa":
+            if "COM" in self.instrument.address:
+                com_port = int(re.search("\d+", self.instrument.address)[0])
+
+                print(
+                    "PyVISA is the serial communications backend; reformatting "
+                    f"PySerial style address '{self.instrument.address}' to "
+                    f"'ASRL{com_port}::INSTR'"
+                )
+
+                self.instrument.address = f"ASRL{com_port}::INSTR"
+
             pyvisa = importlib.import_module("pyvisa")
 
-            self.backend = pyvisa.open_resource(
+            self.backend = pyvisa.ResourceManager().open_resource(
                 self.instrument.address,
                 baud_rate=self.baud_rate,
-                stop_bits=self.stop_bits,
-                parity=self.parity,
+                stop_bits=pyvisa.constants.StopBits(int(self.stop_bits * 10)),
+                parity={
+                    "N": pyvisa.constants.Parity(0),  # none
+                    "O": pyvisa.constants.Parity(1),  # odd
+                    "E": pyvisa.constants.Parity(2),  # even
+                    "M": pyvisa.constants.Parity(3),  # mark
+                    "S": pyvisa.constants.Parity(4),  # space
+                }[self.parity],
                 timeout=self.timeout,
                 write_termination=self.write_termination,
-                read_terimation=self.read_termination,
+                read_termination=self.read_termination,
             )
 
         # Then try connecting with PySerial
         elif self.lib == "pyserial":
+            if "ASRL" in self.instrument.address:
+                com_port = int(re.search("\d+", self.instrument.address)[0])
+
+                print(
+                    f"PySerial is the serial communications backend; reformatting "
+                    f"PyVISA style address '{self.instrument.address}' to "
+                    f"'COM{com_port}'"
+                )
+
+                self.instrument.address = f"COM{com_port}"
+
             serial = importlib.import_module("serial")
 
             self.backend = serial.Serial(
@@ -293,12 +334,8 @@ class Serial(Adapter):
         if self.lib == "pyvisa":
             if bytes:
                 response = self.backend.read_bytes(bytes)
-            elif until:
-                response = b""
-                while until.encode() not in response:
-                    response = response + self.backend.read_raw(1)
             else:
-                return self.backend.read(decode=False)  # decoded below
+                return self.backend.read_raw()  # decoded below
 
         elif self.lib == "pyserial":
             if bytes:
@@ -323,7 +360,12 @@ class Serial(Adapter):
 
     def disconnect(self):
         if self.lib == "pyvisa":
-            self.backend.clear()
+            IOerror = importlib.import_module("pyvisa").errors.VisaIOError
+
+            try:
+                self.backend.clear()
+            except IOerror:
+                pass
 
         elif self.lib == "pyserial":
             self.backend.reset_input_buffer()
@@ -900,9 +942,13 @@ class Socket(Adapter):
 
     def disconnect(self):
         # Clear out any unread messages
-        unread = self._read(decode=False, nbytes=np.inf)
-        while unread:
-            unread = self._read(decode=False, nbytes=np.inf)
+
+        try:
+            unread = self._read(decode=False, nbytes=np.inf, timeout=1)
+            while unread:
+                unread = self._read(decode=False, nbytes=np.inf, timeout=1)
+        except ConnectionError:
+            pass
 
         self.backend.shutdown(socket.SHUT_RDWR)
         self.backend.close()
@@ -1006,6 +1052,7 @@ class ModbusSerial(Adapter):
     def disconnect(self):
         if not self.backend.close_port_after_each_call:
             self.backend.serial.close()
+
         self.connected = False
 
     @staticmethod
@@ -1016,7 +1063,7 @@ class ModbusSerial(Adapter):
 class Modbus(Adapter):
     """
     Handles communication with instruments via the Modbus communication
-    protocol, over either TCP or serial ports, using PyModbus.
+    protocol, over either TCP, UDP, or serial ports, using PyModbus.
     """
 
     kwargs = (
@@ -1029,6 +1076,7 @@ class Modbus(Adapter):
         "stop bits",
         "parity",
         "delay",
+        "protocol",
     )
 
     slave_id = 0
@@ -1057,7 +1105,7 @@ class Modbus(Adapter):
     parity = "N"
     delay = 0.05
 
-    _protocol = None
+    protocol = None
 
     # This dict contains all active Modbus serial adapters. When a new adapter
     # is initialized with the same com port as an existing one, it uses the
@@ -1073,7 +1121,7 @@ class Modbus(Adapter):
 
     @property
     def busy(self):
-        if self._protocol == "Serial":
+        if self.protocol == "Serial":
             return bool(
                 sum(
                     [
@@ -1096,17 +1144,34 @@ class Modbus(Adapter):
         address = self.instrument.address.split("::")
 
         if re.match("\d+\.\d+\.\d+\.\d+", address[0]):
-            # Modbus TCP
-            self._protocol = "TCP"
+            if str(self.protocol).upper() == "UDP":
+                # Modbus UDP
+                self.protocol = "UDP"
 
-            if len(address) == 1:
-                address.append(502)  # standard Modbus TCP port
+                if len(address) == 1:
+                    address.append(
+                        502
+                    )  # standard Modbus UDP port (fascinating that it's the same as TCP)
+                self.backend = client.ModbusUdpClient(
+                    host=address[0], port=int(address[1])
+                )
 
-            self.backend = client.ModbusTcpClient(host=address[0], port=int(address[1]))
+                self.backend.connect()
+            else:
+                # Modbus TCP
+                self.protocol = "TCP"
 
+                if len(address) == 1:
+                    address.append(502)  # standard Modbus TCP port
+
+                self.backend = client.ModbusTcpClient(
+                    host=address[0], port=int(address[1])
+                )
+
+                self.backend.connect()
         else:
             # Modbus Serial
-            self._protocol = "Serial"
+            self.protocol = "Serial"
 
             if len(address) == 1:
                 # assume slave id is zero if not specified
@@ -1131,6 +1196,8 @@ class Modbus(Adapter):
                     parity=self.parity,
                     stopbits=self.stop_bits,
                 )
+
+                self.backend.connect()
 
             self.slave_id = slave_id
 
@@ -1281,6 +1348,8 @@ class Modbus(Adapter):
     def disconnect(self):
         self.backend.close()
 
+        self.connected = False
+
 
 class Phidget(Adapter):
     """
@@ -1335,7 +1404,7 @@ class Phidget(Adapter):
 
     def disconnect(self):
         self.backend.close()
-        self.connected = True
+        self.connected = False
 
 
 supported = {

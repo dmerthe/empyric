@@ -3,6 +3,8 @@ import abc
 import os
 import re
 from abc import ABC
+
+import dill
 import pandas as pd
 import numpy as np
 from typing import Any, Union, get_origin, get_args
@@ -29,8 +31,8 @@ class Toggle(Type):
     Convenience class for handling toggle variables, which are either off or on.
     """
 
-    on_values = [True, 1, "1", "ON", "On", "on"]
-    off_values = [False, 0, "0", "OFF", "Off", "off"]
+    on_values = [True, 1, "1", "ON", "On", "on", b"ON", b"On", b"on"]
+    off_values = [False, 0, "0", "OFF", "Off", "off", b"OFF", b"Off", b"off"]
 
     def __init__(self, state: Union[str, bool, int, type]):
         if hasattr(state, "on"):
@@ -49,6 +51,9 @@ class Toggle(Type):
         return 1 if self.on else 0
 
     def __str__(self):
+        return "ON" if self.on else "OFF"
+
+    def __repr__(self):
         return "ON" if self.on else "OFF"
 
     def __eq__(self, other):
@@ -170,7 +175,10 @@ def recast(value: Any, to: type = Type) -> Union[Type, None]:
                 elif issubclass(dtype, String):
                     return np.str_(value)
                 elif issubclass(dtype, Array) and np.ndim(value) > 0:
-                    return np.array(value)
+                    if isinstance(value, np.ndarray):
+                        return value
+                    else:
+                        return np.array(value)
 
             except ValueError:
                 pass
@@ -190,23 +198,32 @@ def recast(value: Any, to: type = Type) -> Union[Type, None]:
         elif isinstance(value, Float):
             return np.float64(value)
         elif isinstance(value, String):
-            if value.lower() == "true":
+            if value.lower() == "true":  # boolean True
                 return np.bool_(True)
-            elif value.lower() == "false":
+            elif value.lower() == "false":  # boolean False
                 return np.bool_(False)
-            elif re.fullmatch("[0-9]+", value):  # integer
+            elif re.fullmatch("[-+]?[0-9]+", value):  # integer
                 return np.int64(value)
             elif re.fullmatch("[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?", value):
                 # float
                 return float(value)
-            elif value in (Toggle.on_values + Toggle.off_values):
+            elif value in (Toggle.on_values + Toggle.off_values):  # Toggle
                 return Toggle(value)
             elif os.path.isfile(value):  # path in the current working directory
                 return os.path.abspath(value)
-            elif os.path.isfile(os.path.join("..", value)):  # ... up one level
+            elif os.path.isfile(os.path.join("..", value)):  # ... or up one level
                 return os.path.abspath(os.path.join("..", value))
             else:
                 return value  # must be an actual string
+        elif isinstance(value, bytes):
+            if value[:5] == b"dlpkl":
+                # pickled object
+                return dill.loads(value[5:])
+            else:
+                try:
+                    return recast(value.decode())
+                except UnicodeDecodeError:
+                    return value
         if isinstance(value, Array):  # value is an array
             np_array = np.array(value)  # convert to numpy array
             rep_elem = np_array.flatten()[0]  # representative element

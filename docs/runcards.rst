@@ -45,7 +45,7 @@ The ``Instruments`` section is where you specify which instruments from Empyric'
       (knob name): (setting to apply to knob upon disconnection of the instrument)
      (adapter parameter: value)
     
-The ``Variables`` section defines the experiment variables in relation to the instruments. Each variable must have a unique name. The knob and meter type variables must be assigned an instrument as well as the name of the knob or meter of that instrument. The expression type variables are defined by a mathematical ``expression``, using algebraic operations (``+``, ``-``, ``*``, ``/``, ``^``) and the common functions (sin, exp, log, sum, etc.) that are built into or in the math module of Python. The symbols in the expression are defined by the ``definitions`` entry which maps those symbols to any variables defined above.
+The ``Variables`` section defines the experiment variables in relation to the instruments. Each variable must have a unique name. The knob and meter type variables must be assigned an instrument as well as the name of the knob or meter of that instrument. The expression type variables are defined by a mathematical ``expression``, using algebraic operations (``+``, ``-``, ``*``, ``/``, ``^``) and the common functions (sin, exp, log, sum, etc.) that are built into or in the math module of Python. The symbols in the expression are defined by the ``definitions`` entry which maps those symbols to any variables defined above. All variable types can be hidden from view in the ``ExperimentGUI`` by setting the (optional) ``hidden`` entry to ``True``.
 
 .. code-block:: yaml
    

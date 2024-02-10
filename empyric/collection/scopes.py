@@ -2,7 +2,7 @@ import struct
 from empyric.tools import find_nearest
 from empyric.adapters import *
 from empyric.collection.instrument import *
-from empyric.types import Float, Array, Integer, String
+from empyric.types import Float, Array, Integer, String, Boolean
 
 
 class TekTDSScope(Instrument):
@@ -624,11 +624,14 @@ class SiglentSDS1000(Instrument):
     name = "SiglentSDS1000"
 
     supported_adapters = (
-        (Socket, {
-            "write_termination": "\n",
-            "read_termination": "\n",
-            "timeout": 60  # waveform retrieval may take some extra time
-        }),
+        (
+            Socket,
+            {
+                "write_termination": "\n",
+                "read_termination": "\n",
+                "timeout": 60,  # waveform retrieval may take some extra time
+            },
+        ),
     )
 
     knobs = (
@@ -644,6 +647,8 @@ class SiglentSDS1000(Instrument):
         "ch4 position",
         "trigger source",
         "trigger level",
+        "trigger mode",
+        "arm",
         "acquire mode",
         "memory size",
         "averages",
@@ -701,7 +706,14 @@ class SiglentSDS1000(Instrument):
 
     @getter
     def get_horz_scale(self) -> Float:
-        return float(self.query("TDIV?").split("TDIV ")[-1][:-1])
+        response = self.query("TDIV?").split("TDIV ")[-1][:-1]
+
+        try:
+            response = float(response)
+        except ValueError:
+            return np.nan
+
+        return response
 
     @setter
     def set_horz_position(self, position: Float):
@@ -709,7 +721,14 @@ class SiglentSDS1000(Instrument):
 
     @getter
     def get_horz_position(self) -> Float:
-        return float(self.query("TRDL?").split("TRDL ")[-1][:-1])
+        response = self.query("TRDL?").split("TRDL ")[-1][:-1]
+
+        try:
+            response = float(response)
+        except ValueError:
+            return np.nan
+
+        return response
 
     # Channel control base functions
     def _set_chn_scale(self, n, scale):
@@ -718,7 +737,12 @@ class SiglentSDS1000(Instrument):
     def _get_chn_scale(self, n):
         response = self.query("C%d:VDIV?" % n).split("C%d:VDIV " % n)[-1][:-1]
 
-        return float(response)
+        try:
+            response = float(response)
+        except ValueError:
+            return np.nan
+
+        return response
 
     def _set_chn_position(self, n, position):
         self.write("C%d:OFST %.3eV" % (n, float(position)))
@@ -726,7 +750,12 @@ class SiglentSDS1000(Instrument):
     def _get_chn_position(self, n):
         response = self.query("C%d:OFST?" % n).split("C%d:OFST " % n)[-1][:-1]
 
-        return float(response)
+        try:
+            response = float(response)
+        except ValueError:
+            return np.nan
+
+        return response
 
     # Channel 1 control
     @setter
@@ -807,7 +836,17 @@ class SiglentSDS1000(Instrument):
     def get_trigger_level(self) -> Float:
         trg_src = self.get_trigger_source()
 
-        return float(self.query(f"C{trg_src}:TRLV?").split("TRLV ")[-1][:-1])
+        if trg_src > 0:
+            response = self.query(f"C{trg_src}:TRLV?").split("TRLV ")[-1][:-1]
+        else:
+            return np.nan
+
+        try:
+            response = float(response)
+        except ValueError:
+            return np.nan
+
+        return response
 
     @setter
     def set_trigger_source(self, source: Integer):
@@ -815,7 +854,31 @@ class SiglentSDS1000(Instrument):
 
     @getter
     def get_trigger_source(self) -> Integer:
-        return int(self.query("TRSE?").split("SR,C")[-1][0])
+        def validator(response):
+            return "SR,C" in response
+
+        response = self.query("TRSE?", validator=validator).split("SR,C")[-1][0]
+
+        try:
+            response = int(response)
+        except ValueError:
+            return -1
+
+        return response
+
+    @setter
+    def set_trigger_mode(self, mode: String):
+        if mode.upper() in ["AUTO", "NORM", "SINGLE", "STOP"]:
+            self.write(f"TRMD {mode.upper()}")
+        else:
+            return self.get_trigger_mode()
+
+    @getter
+    def get_trigger_mode(self) -> String:
+        try:
+            return self.query("TRMD?")[5:]
+        except IndexError:
+            return None
 
     @setter
     def set_acquire_mode(self, mode: String):
@@ -834,7 +897,7 @@ class SiglentSDS1000(Instrument):
     def get_acquire_mode(self) -> String:
         response = self.query("ACQW?").split("ACQW ")[-1]
 
-        if "AVERAGE" in response:
+        if "AVERAGE" in response:  # also includes # of averages
             return "AVERAGE"
         else:
             return response
@@ -854,7 +917,12 @@ class SiglentSDS1000(Instrument):
         elif "M" in response:
             response = float(response.replace("M", "e6"))
 
-        return int(response)
+        try:
+            response = int(response)
+        except ValueError:
+            return -1
+
+        return response
 
     @setter
     def set_averages(self, averages: Integer):
@@ -866,31 +934,27 @@ class SiglentSDS1000(Instrument):
 
     @getter
     def get_averages(self) -> Integer:
-        return int(self.query("AVGA?").split("AVGA ")[-1])
+        response = self.query("AVGA?").split("AVGA ")[-1]
+
+        try:
+            response = int(response)
+        except ValueError:
+            return -1
+
+        return response
 
     # Channel measurements
     def _measure_chn_waveform(self, n):
-        # Set trigger mode to NORMAL
-        if "NORM" not in self.query("TRMD?"):
-            self.write("TRMD NORM")
-
-        # Wait for trigger
-        triggered = False
-        wait_time = 0.0
-        while not triggered and wait_time < 30.0:
-            status = self.query("INR?")
-            triggered = status == "INR 8193"
-            wait_time += 0.25
+        ready = False
+        while not ready:
             time.sleep(0.25)
-
-        if not triggered:
-            return None
+            ready = "1" in self.query("*OPC?")
 
         # Enable channel if needed
-        channel_enabled = "ON" in self.query("C%d:TRA?" % n)
-        if not channel_enabled:
-            self.write("C%d:TRA ON" % n)
-            time.sleep(3)
+        ch_enabled_query = self.query("C%d:TRA?" % n)
+        if "ON" not in ch_enabled_query:
+            print(f"Warning: CH{n} is not enabled; cannot retrieve waveform")
+            return None
 
         self.write("WFSU SP,0,NP,0,FP,0")  # setup to get all data points
 
@@ -908,11 +972,16 @@ class SiglentSDS1000(Instrument):
                 return False
 
         self.adapter.read_termination = is_terminated
+        max_attempts = self.adapter.max_attempts
+        self.adapter.max_attempts = 1
 
         def validator(response):
             """
             Checks for correct header, size, message length and termination.
             """
+
+            if response == b"":
+                return True  # no data
 
             if response is None:
                 return False
@@ -921,29 +990,35 @@ class SiglentSDS1000(Instrument):
 
             header = response[:13]
             if header != (b"C%d:WF DAT2,#9" % n):
+                print("invalid header", header)
                 return False
 
             size = response[13:22]
             try:
                 size = int(size)
             except ValueError:
+                print("invalid data size", size)
                 return False
 
             data = response[22:-2]
             if len(data) != size:
+                print("truncated data", len(data))
                 return False
 
             termination = response[-2:]
             if termination != b"\n\n":
+                print("no termination", response[-2:])
                 return False
 
             return True
 
         response = self.query("C%d:WF? DAT2" % n, decode=False, validator=validator)
 
-        self.adapter.read_termination = "\n"  # restore normal read termination
+        if response == b"":
+            return None
 
-        self.write("TRMD NORM")  # set to single trigger mode
+        self.adapter.read_termination = "\n"  # restore normal read termination
+        self.adapter.max_attempts = max_attempts
 
         header, size, waveform = response[:13], response[13:22], response[22:-2]
         size = int(size)
@@ -976,4 +1051,11 @@ class SiglentSDS1000(Instrument):
 
     @measurer
     def measure_sample_rate(self) -> Float:
-        return float(self.query("SARA?")[5:-4])
+        response = self.query("SARA?")[5:-4]
+
+        try:
+            response = float(response)
+        except ValueError:
+            return np.nan
+
+        return response

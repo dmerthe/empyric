@@ -2,7 +2,7 @@ import typing
 from threading import RLock
 from functools import wraps
 from empyric.adapters import *
-from empyric.types import recast, Type
+from empyric.types import recast, Type, ON, OFF, Toggle
 
 
 def setter(method):
@@ -36,6 +36,11 @@ def setter(method):
     def wrapped_method(*args, **kwargs):
         self = args[0]
         value = args[1]
+
+        if not self.adapter.connected and knob != "connected":
+            print(f"Instrument {self.name} is disconnected; unable to set {knob}")
+            self.__setattr__(knob, None)
+            return
 
         self.lock.acquire()
 
@@ -71,6 +76,11 @@ def getter(method):
     @wraps(method)
     def wrapped_method(*args, **kwargs):
         self = args[0]
+
+        if not self.adapter.connected and knob != "connected":
+            self.__setattr__(knob, None)
+            print(f"Instrument {self.name} is disconnected; unable to get {knob}")
+            return
 
         self.lock.acquire()
 
@@ -110,6 +120,11 @@ def measurer(method):
     def wrapped_method(*args, **kwargs):
         self = args[0]
 
+        if not self.adapter.connected:
+            self.__setattr__(meter, None)
+            print(f"Instrument {self.name} is disconnected; unable to measure {meter}")
+            return
+
         self.lock.acquire()
 
         try:
@@ -143,7 +158,9 @@ class Instrument:
       contains an adapter class that the instrument can be used with and a
       dictionary of adapter settings.
     * ``knobs``: tuple of the names of all knobs that can be set on the
-      instrument.
+      instrument. Every instrument has a ``connected`` (``Toggle``) knob, for
+      convenience, whose set method calls the instruments ``connect`` or ``disconnect``
+      methods, if set to ``ON`` or ``OFF`` respectively.
     * ``presets``: dictionary of knob settings to apply when the instrument is
       instantiated.
       The keys are the names of the knobs and the values are the knob values.
@@ -151,6 +168,29 @@ class Instrument:
       to apply when the instrument is deleted.
     * ``meters``: tuple of the names of all meters that can be measured on
       this instrument.
+
+    Every knob of an instrument has an associated ``set_[knob]`` method, which sends
+    commands to the physical instrument that change the value of the knob to the given
+    value. Each ``set_[knob]`` method should be wrapped by the ``setter`` function
+    defined above.
+
+    Every knob may also have an associated ``get_[knob]`` method, which queries the
+    value of the knob from the physical instrument, and should be wrapped by the
+    ``getter`` function defined above.
+
+    Every meter of an instrument has an associated ``measure_[meter]`` method, which
+    queries the value of a quantity measured by the physical instrument, and should be
+    wrapped by the ``measurer`` function defined above.
+
+    For convenience, the ``setter``, ``getter`` and ```measurer`` functions augment the
+    corresponding methods primarily by enforcing typing on the method arguments and the
+    returned values, and storing the last known values of knobs and meters in the
+    corresponding attribute of the Instrument instance. For example, if a meter called
+    ""temperature" is retrieved via the corresponding ``measure_temperature`` method of
+    the instrument ``thermometer``, the wrapping ``measurer`` function will assign that
+    temperature value to ``thermometer.temperature``. If the expected data type is a
+    floating point number, the ``measurer`` function additionally converts whatever the
+    bare ``measure_temperature`` method returns to a 64-bit floating point value.
 
     """
 
@@ -189,10 +229,9 @@ class Instrument:
         :param kwargs: (dict) any keyword args for the adapter
         """
 
-        if address:
-            self.address = address
-        else:
-            self.address = None
+        self.address = address
+
+        self.knobs = ("connected",) + self.knobs
 
         adapter_connected = False
         if adapter:
@@ -243,6 +282,8 @@ class Instrument:
         # Get postsets
         if postsets:
             self.postsets = {**self.postsets, **postsets}
+
+        self.kwargs = kwargs
 
     def __repr__(self):
         return self.name
@@ -329,6 +370,25 @@ class Instrument:
 
         return measurement
 
+    def connect(self):
+        """
+        (Re)Connect to the instrument. This is useful when communications are lost and
+        a new connection is required.
+
+        :return: None
+        """
+
+        if self.adapter.connected:
+            self.adapter.disconnect()
+
+        self.__init__(
+            address=self.address,
+            adapter=self.adapter if self.address is None else None,
+            presets=self.presets,
+            postsets=self.postsets,
+            **self.kwargs,
+        )
+
     def disconnect(self):
         """
         Apply any postsets to the instrument and disconnect the adapter
@@ -343,3 +403,23 @@ class Instrument:
             self.adapter.disconnect()
         else:
             raise ConnectionError(f"adapter for {self.name} is not connected!")
+
+    @setter
+    def set_connected(self, state: Toggle):
+        if state == ON:
+            if self.adapter.connected:
+                print(f"{self.name} is already connected")
+            else:
+                self.connect()
+        elif state == OFF:
+            if self.adapter.connected:
+                self.disconnect()
+            else:
+                print(f"{self.name} is already disconnected")
+
+    @getter
+    def get_connected(self) -> Toggle:
+        if self.adapter.connected:
+            return ON
+        else:
+            return OFF
