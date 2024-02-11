@@ -15,6 +15,7 @@ import dill
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
+from scipy.optimize._minimize import MINIMIZE_METHODS as scipy_minimize_methods
 
 from bayes_opt import BayesianOptimization, UtilityFunction
 
@@ -535,7 +536,7 @@ class Maximization(Routine):
 
     _last_setting = -np.inf
 
-    _optimize_result = None
+    _optimize_result = None  # used with scipy optimization
 
     def __init__(
         self,
@@ -581,12 +582,6 @@ class Maximization(Routine):
 
     @Routine.enabler
     def update(self, state):
-        if self.method == "bayesian":
-            self._update_bayesian(state)
-        elif self.method == "newton":
-            self._update_newton(state)
-
-    def _update_bayesian(self, state):
 
         non_numeric_knobs = [
             not isinstance(state[knob], numbers.Number) for knob in self.knobs
@@ -602,6 +597,13 @@ class Maximization(Routine):
 
         if state["Time"] < self._last_setting + self.settling_time:
             return
+
+        if self.method == "bayesian":
+            self._update_bayesian(state)
+        elif self.method in scipy_minimize_methods:
+            self._update_scipy_optimization(state)
+
+    def _update_bayesian(self, state):
 
         self.optimizer.register(
             params={knob: state[knob] for knob in self.knobs},
@@ -628,27 +630,14 @@ class Maximization(Routine):
             kappa = self._kappa0 * (self.end - state["Time"]) / self._duration
             self.util_func.kappa = kappa
 
-    def _update_newton(self, state):
+    def _update_scipy_optimization(self, state):
 
         # Restart the optimizer thread if it has ended
         if not self._optimizer_thread.is_alive():
-            self._optimizer_thread = threading.Thread(target=self._iterate_newton)
+            self._optimizer_thread = threading.Thread(
+                target=self._iterate_scipy_minimize
+            )
             self._optimizer_thread.start()
-
-        non_numeric_knobs = [
-            not isinstance(state[knob], numbers.Number) for knob in self.knobs
-        ]
-
-        if np.any(non_numeric_knobs):
-            # undefined state; take no action
-            return
-
-        if not isinstance(state[self.meter], numbers.Number):
-            # undefined target value; take no action
-            return
-
-        if state["Time"] < self._last_setting + self.settling_time:
-            return
 
         self._meter_queue.put(state[self.meter])
 
@@ -667,11 +656,13 @@ class Maximization(Routine):
             self.util_func = UtilityFunction(
                 kappa=self._kappa0,  # exploration vs. exploitation parameter
             )
-        elif self.method == "newton":
-            self._optimizer_thread = threading.Thread(target=self._iterate_newton)
+        elif self.method in scipy_minimize_methods:
+            self._optimizer_thread = threading.Thread(
+                target=self._iterate_scipy_minimize
+            )
             self._optimizer_thread.start()
 
-    def _iterate_newton(self):
+    def _iterate_scipy_minimize(self):
 
         self._meter_queue = queue.Queue(1)
 
@@ -683,21 +674,55 @@ class Maximization(Routine):
             # blocks until _update_newton provides a meter value
             value = self._meter_queue.get()
 
+            if value == StopIteration:
+                quit()
+
             if self._sign * value > self._sign * self.best_meter:
                 self.best_meter = value
                 self.best_knobs = {
                     name: knob.value for name, knob in self.knobs.items()
                 }
-
+            print(value, self.best_meter)
             return -self._sign * value
 
+        x0 = np.array([knob.value for knob in self.knobs.values()], dtype=np.float64)
+
+        if self.method.lower() == 'nelder-mead':
+            if 'initial_simplex' not in self.options:
+                # Generate an initial simplex based on either max deltas or bounds
+
+                if np.all(np.isfinite(self.max_deltas)):
+                    d = self.max_deltas
+                else:
+                    d = np.array(
+                        [0.05*(ub -lb) for lb, ub, in self.bounds]
+                    )
+
+                N = len(x0)
+
+                simplex = np.empty((N + 1, N), dtype=x0.dtype)
+                simplex[0] = x0
+                for k in range(N):
+                    y = np.array(x0, copy=True)
+                    if y[k] != 0:
+                        y[k] = y[k] + d[k]
+                    else:
+                        y[k] = d[k]
+                    simplex[k + 1] = y
+
+                self.options['initial_simplex'] = simplex
+
         self._optimize_result = minimize(
-            eval_func, np.array([knob.value for knob in self.knobs.values()]),
+            eval_func, x0,
             bounds=[bounds for bounds in self.bounds.values()],
-            method="L-BFGS-B"
+            method=self.method,
+            options=self.options
         )
 
     def finish(self, state):
+
+        if hasattr(self, '_meter_queue'):
+            self._meter_queue.put(StopIteration)
 
         # only relevant if method = "newton"
         if self._optimize_result and self._optimize_result.success:
@@ -711,6 +736,9 @@ class Maximization(Routine):
                 print(f"Warning: No optimal value was found for {knob}")
             else:
                 self.knobs[knob].value = value
+
+    def terminate(self):
+        self.finish({})
 
 
 class Minimization(Maximization):

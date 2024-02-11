@@ -63,8 +63,8 @@ Routines:
    - [-1, 1]
   max deltas: 0.1
   kappa: 2.5  # exploration vs. exploitation parameter
-  method: newton
-  start: 0
+  method: powell
+  start: 30
   end: 60
 
  Maximization Routine:
@@ -78,6 +78,6 @@ Routines:
    - [-1, 1]
   max deltas: 0.1
   kappa: 3.0  # exploration vs. exploitation parameter
-  method: newton
+  method: powell
   start: 90
-  end: 150
+  end: 120
