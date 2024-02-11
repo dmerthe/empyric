@@ -169,6 +169,7 @@ class Routine:
 
                 if not self.prepped:
                     self.prep(state)
+                    self.prepped = True
 
                 if self._start_on_enable and np.isnan(self.start):
                     # set start time to time of most recent state evaluation
@@ -534,6 +535,8 @@ class Maximization(Routine):
 
     _last_setting = -np.inf
 
+    _optimize_result = None
+
     def __init__(
         self,
         knobs: dict,
@@ -567,7 +570,7 @@ class Maximization(Routine):
 
         self.meter = meter
 
-        self.best_meter = None
+        self.best_meter = -self._sign*np.inf
         self.best_knobs = {name: None for name in self.knobs}
 
         self.method = method if method is not None else "bayesian"
@@ -627,6 +630,11 @@ class Maximization(Routine):
 
     def _update_newton(self, state):
 
+        # Restart the optimizer thread if it has ended
+        if not self._optimizer_thread.is_alive():
+            self._optimizer_thread = threading.Thread(target=self._iterate_newton)
+            self._optimizer_thread.start()
+
         non_numeric_knobs = [
             not isinstance(state[knob], numbers.Number) for knob in self.knobs
         ]
@@ -660,40 +668,44 @@ class Maximization(Routine):
                 kappa=self._kappa0,  # exploration vs. exploitation parameter
             )
         elif self.method == "newton":
+            self._optimizer_thread = threading.Thread(target=self._iterate_newton)
+            self._optimizer_thread.start()
 
-            self._meter_queue = queue.Queue(1)
+    def _iterate_newton(self):
 
-            def eval_func(x):
+        self._meter_queue = queue.Queue(1)
 
-                for i, knob in enumerate(self.knobs.values()):
-                    knob.value = x[i]
+        def eval_func(x):
+            print(x)
+            for i, knob in enumerate(self.knobs.values()):
+                knob.value = x[i]
 
-                # blocks until _update_newton provides a meter value
-                value = self._meter_queue.get()
+            # blocks until _update_newton provides a meter value
+            value = self._meter_queue.get()
 
-                if self._sign*value > self._sign*self.best_meter:
-                    self.best_meter = value
-                    self.best_knobs = {
-                        name: knob.value for name, knob in self.knobs.items()
-                    }
-
-                return -self._sign*value
-
-            self._optimizer_thread = threading.Thread(
-                target=minimize,
-                args=(
-                    eval_func,
-                    [knob.value for knob in self.knobs.values()]
-                ),
-                kwargs={
-                    'bounds': self.bounds,
-                    'method': "L-BFGS-B"
+            if self._sign * value > self._sign * self.best_meter:
+                self.best_meter = value
+                self.best_knobs = {
+                    name: knob.value for name, knob in self.knobs.items()
                 }
-            )
 
-            self._optimizer_thread.run()
+            return -self._sign * value
+
+        self._optimize_result = minimize(
+            eval_func, np.array([knob.value for knob in self.knobs.values()]),
+            bounds=[bounds for bounds in self.bounds.values()],
+            method="L-BFGS-B"
+        )
 
     def finish(self, state):
+
+        # only relevant if method = "newton"
+        if self._optimize_result and self._optimize_result.success:
+            self.best_knobs = {
+                name: val for name, val in zip(self.knobs, self._optimize_result.x)
+            }
+            self.best_meter = self._optimize_result.fun
+
         for i, (knob, value) in enumerate(self.best_knobs.items()):
             if value is None or not np.isfinite(value):
                 print(f"Warning: No optimal value was found for {knob}")

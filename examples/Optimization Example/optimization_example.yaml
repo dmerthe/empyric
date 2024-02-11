@@ -63,6 +63,7 @@ Routines:
    - [-1, 1]
   max deltas: 0.1
   kappa: 2.5  # exploration vs. exploitation parameter
+  method: newton
   start: 0
   end: 60
 
@@ -77,5 +78,6 @@ Routines:
    - [-1, 1]
   max deltas: 0.1
   kappa: 3.0  # exploration vs. exploitation parameter
+  method: newton
   start: 90
   end: 150

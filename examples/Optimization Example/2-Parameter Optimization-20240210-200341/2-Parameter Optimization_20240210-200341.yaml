@@ -1,0 +1,81 @@
+# Simple optimization example
+
+Description:
+  name: 2-Parameter Optimization
+  operator: Mike
+  platform: Test Stand 1
+  comments: Who is Mike? There is no Test Stand 1
+
+Settings:
+  step interval: 0.1
+  plot interval: 1
+  save interval: 10
+  end: 3 minutes
+
+Instruments:
+
+  Dummy Noise:
+    type: SimpleProcess
+    presets:
+      noise level: 0.05
+
+Variables:
+
+  Some Parameter:
+    parameter: 0.0
+
+  Some Other Parameter:
+    parameter: 0.0
+
+  Some Noise:
+    instrument: Dummy Noise
+    meter: value
+
+  Some Metric:
+    expression: sin(3.14159*X)*exp(-X^2-Y^2) + noise
+    definitions:
+      X: Some Parameter
+      Y: Some Other Parameter
+      noise: Some Noise
+
+Plots:
+  Parameter Plot:
+    y: [Some Parameter, Some Other Parameter]
+  Metric Plot:
+    x: Some Parameter
+    y: Some Other Parameter
+    s: Some Metric
+    style: parametric
+    configure:
+      linestyle: none
+      marker: o
+
+Routines:
+
+  Minimization Routine:
+    type: Minimization
+    knobs:
+    - Some Parameter
+    - Some Other Parameter
+    meter: Some Metric
+    bounds:
+    - [-1, 1]
+    - [-1, 1]
+    max deltas: 0.1
+    kappa: 2.5 # exploration vs. exploitation parameter
+    start: 0
+    end: 60
+
+  Maximization Routine:
+    type: Maximization
+    knobs:
+    - Some Parameter
+    - Some Other Parameter
+    meter: Some Metric
+    bounds:
+    - [-1, 1]
+    - [-1, 1]
+    max deltas: 0.1
+    kappa: 3.0 # exploration vs. exploitation parameter
+    start: 90
+    end: 150
