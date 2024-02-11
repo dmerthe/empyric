@@ -14,6 +14,7 @@ import functools
 import dill
 import numpy as np
 import pandas as pd
+from scipy.optimize import minimize
 
 from bayes_opt import BayesianOptimization, UtilityFunction
 
@@ -567,15 +568,7 @@ class Maximization(Routine):
         self.meter = meter
 
         self.best_meter = None
-        self.best_knobs = [None for _ in self.knobs]
-
-        self.optimizer = BayesianOptimization(
-            f=None,
-            verbose=0,
-            pbounds=self.bounds,
-            random_state=6174,
-            allow_duplicate_points=True,
-        )
+        self.best_knobs = {name: None for name in self.knobs}
 
         self.method = method if method is not None else "bayesian"
 
@@ -587,8 +580,11 @@ class Maximization(Routine):
     def update(self, state):
         if self.method == "bayesian":
             self._update_bayesian(state)
+        elif self.method == "newton":
+            self._update_newton(state)
 
     def _update_bayesian(self, state):
+
         non_numeric_knobs = [
             not isinstance(state[knob], numbers.Number) for knob in self.knobs
         ]
@@ -629,12 +625,73 @@ class Maximization(Routine):
             kappa = self._kappa0 * (self.end - state["Time"]) / self._duration
             self.util_func.kappa = kappa
 
+    def _update_newton(self, state):
+
+        non_numeric_knobs = [
+            not isinstance(state[knob], numbers.Number) for knob in self.knobs
+        ]
+
+        if np.any(non_numeric_knobs):
+            # undefined state; take no action
+            return
+
+        if not isinstance(state[self.meter], numbers.Number):
+            # undefined target value; take no action
+            return
+
+        if state["Time"] < self._last_setting + self.settling_time:
+            return
+
+        self._meter_queue.put(state[self.meter])
+
     def prep(self, state):
         if self.method == "bayesian":
+
+            self.optimizer = BayesianOptimization(
+                f=None,
+                verbose=0,
+                pbounds=self.bounds,
+                random_state=6174,
+                allow_duplicate_points=True,
+            )
+
             self._kappa0 = self.options.get("kappa", 2.5)
             self.util_func = UtilityFunction(
                 kappa=self._kappa0,  # exploration vs. exploitation parameter
             )
+        elif self.method == "newton":
+
+            self._meter_queue = queue.Queue(1)
+
+            def eval_func(x):
+
+                for i, knob in enumerate(self.knobs.values()):
+                    knob.value = x[i]
+
+                # blocks until _update_newton provides a meter value
+                value = self._meter_queue.get()
+
+                if self._sign*value > self._sign*self.best_meter:
+                    self.best_meter = value
+                    self.best_knobs = {
+                        name: knob.value for name, knob in self.knobs.items()
+                    }
+
+                return -self._sign*value
+
+            self._optimizer_thread = threading.Thread(
+                target=minimize,
+                args=(
+                    eval_func,
+                    [knob.value for knob in self.knobs.values()]
+                ),
+                kwargs={
+                    'bounds': self.bounds,
+                    'method': "L-BFGS-B"
+                }
+            )
+
+            self._optimizer_thread.run()
 
     def finish(self, state):
         for i, (knob, value) in enumerate(self.best_knobs.items()):
