@@ -632,12 +632,17 @@ class Maximization(Routine):
 
     def _update_scipy_optimization(self, state):
 
-        # Restart the optimizer thread if it has ended
+        # (Re)start the optimizer thread if it is not running
         if not self._optimizer_thread.is_alive():
-            self._optimizer_thread = threading.Thread(
-                target=self._iterate_scipy_minimize
-            )
+
+            # Recreate optimizer thread if it previously completed
+            if self._optimizer_thread.started:
+                self._optimizer_thread = threading.Thread(
+                    target=self._iterate_scipy_minimize
+                )
+
             self._optimizer_thread.start()
+            self._optimizer_thread.started = True
 
         self._meter_queue.put(state[self.meter])
 
@@ -657,21 +662,23 @@ class Maximization(Routine):
                 kappa=self._kappa0,  # exploration vs. exploitation parameter
             )
         elif self.method in scipy_minimize_methods:
+
             self._optimizer_thread = threading.Thread(
                 target=self._iterate_scipy_minimize
             )
-            self._optimizer_thread.start()
+            self._optimizer_thread.started = False
 
     def _iterate_scipy_minimize(self):
 
         self._meter_queue = queue.Queue(1)
 
         def eval_func(x):
-            print(x)
+
             for i, knob in enumerate(self.knobs.values()):
                 knob.value = x[i]
 
-            # blocks until _update_newton provides a meter value
+            # blocks until _update_scipy_optimization or finish methods provide
+            # a meter value
             value = self._meter_queue.get()
 
             if value == StopIteration:
@@ -683,31 +690,40 @@ class Maximization(Routine):
                     name: knob.value for name, knob in self.knobs.items()
                 }
             print(value, self.best_meter)
+
             return -self._sign * value
 
         x0 = np.array([knob.value for knob in self.knobs.values()], dtype=np.float64)
 
         if self.method.lower() == 'nelder-mead':
+
+            self.options['adaptive'] = True
+
             if 'initial_simplex' not in self.options:
                 # Generate an initial simplex based on either max deltas or bounds
+
+                bounds = np.array([(lb, ub) for lb, ub, in self.bounds.values()])
 
                 if np.all(np.isfinite(self.max_deltas)):
                     d = self.max_deltas
                 else:
-                    d = np.array(
-                        [0.05*(ub -lb) for lb, ub, in self.bounds]
-                    )
+                    d = 0.5*np.diff(bounds, axis=1).flatten()
 
                 N = len(x0)
 
                 simplex = np.empty((N + 1, N), dtype=x0.dtype)
                 simplex[0] = x0
                 for k in range(N):
+
                     y = np.array(x0, copy=True)
-                    if y[k] != 0:
-                        y[k] = y[k] + d[k]
-                    else:
-                        y[k] = d[k]
+
+                    y[k] = y[k] + d[k]
+
+                    if y[k] < bounds[k][0]:
+                        y[k] = bounds[k][0]
+                    elif y[k] > bounds[k][1]:
+                        y[k] = bounds[k][1]
+
                     simplex[k + 1] = y
 
                 self.options['initial_simplex'] = simplex
@@ -723,13 +739,6 @@ class Maximization(Routine):
 
         if hasattr(self, '_meter_queue'):
             self._meter_queue.put(StopIteration)
-
-        # only relevant if method = "newton"
-        if self._optimize_result and self._optimize_result.success:
-            self.best_knobs = {
-                name: val for name, val in zip(self.knobs, self._optimize_result.x)
-            }
-            self.best_meter = self._optimize_result.fun
 
         for i, (knob, value) in enumerate(self.best_knobs.items()):
             if value is None or not np.isfinite(value):
