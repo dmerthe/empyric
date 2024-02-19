@@ -520,14 +520,18 @@ class SorensenXG10250(Instrument):
     """
     Sorensen XG 10-250 series high current power supply.
 
-    The analog control mode option allows the power supply to operate in a voltage-controlled current mode via its non-isolated input pin.
+    The analog control mode option allows the power supply to operate in a
+    voltage-controlled current mode via its non-isolated input pin.
     """
 
     name = "SorensenXG10250"
 
     supported_adapters = ((Serial, {"baud_rate": 9600}),)
 
-    knobs = ("max voltage", "max current", "output", "analog control mode")
+    presets = {'comms address': 1}
+
+    knobs = ("max voltage", "max current", "output", "analog control mode",
+             "comms address")
 
     meters = ("voltage", "current", "analog input voltage", "analog input current")
 
@@ -569,6 +573,12 @@ class SorensenXG10250(Instrument):
     def set_max_voltage(self, voltage):
         self.write("SOUR:VOLT " + str(voltage))
 
+    @setter
+    def set_comms_address(self, addr):
+        print("*ADR " + str(addr))
+        self.write("*ADR " + str(addr))
+        print(self.write("*IDN?"))
+
     @getter
     def get_max_current(self):
         return float(self.query("SOUR:CURR?"))
@@ -593,6 +603,9 @@ class SorensenXG10250(Instrument):
         elif response == "LOC":
             return OFF
 
+    @getter
+    def get_comms_address(self, addr):
+        return str(self.read("*ADR?"))
 
 class BK9140(Instrument):
     """
