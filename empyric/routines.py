@@ -673,6 +673,7 @@ class Maximization(Routine):
         self._meter_queue = queue.Queue(1)
 
         def eval_func(x):
+            # emulates the function to optimize for the scipy.minimize function
 
             for i, knob in enumerate(self.knobs.values()):
                 knob.value = x[i]
@@ -689,7 +690,6 @@ class Maximization(Routine):
                 self.best_knobs = {
                     name: knob.value for name, knob in self.knobs.items()
                 }
-            print(value, self.best_meter)
 
             return -self._sign * value
 
