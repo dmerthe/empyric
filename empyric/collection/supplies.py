@@ -532,7 +532,8 @@ class SorensenXG10250(Instrument):
 
     knobs = ("max voltage", "max current", "output", "analog control mode")
 
-    meters = ("voltage", "current", "analog input voltage", "analog input current")
+    meters = ("voltage", "current", "analog input voltage", "analog input current",
+              "iso analog input current")
 
     def __init__(self,  address=None, adapter=None, presets=None,
                  postsets=None, **kwargs):
@@ -612,6 +613,10 @@ class SorensenXG10250(Instrument):
     @measurer
     def measure_analog_input_current(self):
         return float(self.query("MEAS:APR:CURR?").decode("utf-8"))
+
+    @measurer
+    def measure_iso_analog_input_current(self):
+        return float(self.query("MEAS:APR:CURR:ISO?").decode("utf-8"))
 
     @setter
     def set_output(self, output: Toggle):
