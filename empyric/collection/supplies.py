@@ -528,7 +528,7 @@ class SorensenXG10250(Instrument):
 
     name = "SorensenXG10250"
 
-    supported_adapters = ((Serial, {"baud_rate": 9600}),)
+    supported_adapters = ((Serial, {"baud_rate": 9600, "read_termination": "\r"}),)
 
     knobs = ("max voltage", "max current", "output", "analog control mode")
 
@@ -537,6 +537,7 @@ class SorensenXG10250(Instrument):
     def __init__(self,  address=None, adapter=None, presets=None,
                  postsets=None, **kwargs):
         # super().__init__(**kwargs)
+        # self.write("*ADR 1")
         self.address = address
 
         self.knobs = ("connected",) + self.knobs
@@ -571,65 +572,60 @@ class SorensenXG10250(Instrument):
         if self.address:
             self.name = self.name + "@" + str(self.address)
 
-        self.write("*ADR 1")
+        self.write("*ADR 1")  # Set multicast address to 1 by default
 
-        # DEBUG
-        # print(self.query("*IDN?"))
-        # print(self.query("*ADR?"))
-        # print(self.query("MEAS:CURR?"))
+        # Get existing knob settings, if possible
+        for knob in self.knobs:
+            if hasattr(self, "get_" + knob.replace(" ", "_")):
+                # retrieves the knob value from the instrument
+                self.__getattribute__("get_" + knob.replace(" ", "_"))()
+            else:
+                # knob value is unknown until it is set
+                self.__setattr__(knob.replace(" ", "_"), None)
 
-        # # Get existing knob settings, if possible
-        # for knob in self.knobs:
-        #     if hasattr(self, "get_" + knob.replace(" ", "_")):
-        #         # retrieves the knob value from the instrument
-        #         self.__getattribute__("get_" + knob.replace(" ", "_"))()
-        #     else:
-        #         # knob value is unknown until it is set
-        #         self.__setattr__(knob.replace(" ", "_"), None)
-        #
-        # # Apply presets
-        # if presets:
-        #     self.presets = {**self.presets, **presets}
-        #
-        # for knob, value in self.presets.items():
-        #     self.set(knob, value)
-        #
-        # # Get postsets
-        # if postsets:
-        #     self.postsets = {**self.postsets, **postsets}
-        #
-        # self.kwargs = kwargs
+        # Apply presets
+        if presets:
+            self.presets = {**self.presets, **presets}
+
+        for knob, value in self.presets.items():
+            self.set(knob, value)
+
+        # Get postsets
+        if postsets:
+            self.postsets = {**self.postsets, **postsets}
+
+        self.kwargs = kwargs
 
 
     @measurer
     def measure_current(self):
-        return float(self.query("MEAS:CURR?"))
+        return float(self.query("MEAS:CURR?").decode("utf-8"))
 
     @measurer
     def measure_voltage(self):
-        return float(self.query("MEAS:VOLT?"))
+        return float(self.query("MEAS:VOLT?").decode("utf-8"))
 
     @measurer
     def measure_analog_input_voltage(self):
-        return float(self.query("MEAS:APR?"))
+        return float(self.query("MEAS:APR?").decode("utf-8"))
 
     @measurer
     def measure_analog_input_current(self):
-        return float(self.query("MEAS:APR:CURR?"))
+        return float(self.query("MEAS:APR:CURR?").decode("utf-8"))
 
     @setter
     def set_output(self, output: Toggle):
         if output == ON:
-            self.write("OUTP: ON")
+            self.write("OUTP ON")
         elif output == OFF:
-            self.write("OUTP: OFF")
+            self.write("OUTP OFF")
 
     @setter
     def set_analog_control_mode(self, analog_control_mode: Toggle):
         if analog_control_mode == ON:
-            self.write("SYST:REM:SOUR:LOC")
+            self.write("SYST:REM:SOUR IAV")
         if analog_control_mode == OFF:
-            self.write("SYST:REM:SOUR:IAV")
+            self.write("SYST:REM:SOUR LOC")
 
     @setter
     def set_max_current(self, current):
@@ -641,26 +637,26 @@ class SorensenXG10250(Instrument):
 
     @getter
     def get_max_current(self):
-        return float(self.query("SOUR:CURR?"))
+        return float(self.query("SOUR:CURR?").decode("utf-8"))
 
     @getter
     def get_max_voltage(self):
-        return float(self.query("SOUR:VOLT?"))
+        return float(self.query("SOUR:VOLT?").decode("utf-8"))
 
     @getter
     def get_output(self) -> Toggle:
-        response = self.query("OUTP?")
-        if response == "OFF":
+        response = self.query("OUTP?").decode("utf-8")
+        if response.startswith("0"):
             return OFF
-        elif response == "ON":
+        elif response.startswith("1"):
             return ON
 
     @getter
     def get_analog_control_mode(self) -> Toggle:
-        response = self.query("SYST:REM:SOUR?")
-        if response == "IAV":
+        response = self.query("SYST:REM:SOUR?").decode("utf-8")
+        if "Analog Isolated" in response:
             return ON
-        elif response == "LOC":
+        elif "LOCAL" in response:
             return OFF
 
 class BK9140(Instrument):
