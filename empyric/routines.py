@@ -14,7 +14,7 @@ import functools
 import dill
 import numpy as np
 import pandas as pd
-from scipy.optimize import minimize
+from scipy.optimize import minimize as scipy_minimize
 from scipy.optimize._minimize import MINIMIZE_METHODS as scipy_minimize_methods
 
 from bayes_opt import BayesianOptimization, UtilityFunction
@@ -75,6 +75,7 @@ class Routine:
         self,
         knobs: dict,
         enable: String = None,
+        delay_prep: Boolean = False,
         start: Union[Float, String] = None,
         end: Union[Float, String] = None,
         duration: Union[Float, String] = None,
@@ -86,6 +87,8 @@ class Routine:
             knob._controller = None  # to control access to knob
 
         self.enable = enable
+
+        self.delay_prep = delay_prep
 
         if start is not None:
             if start == "on enable":
@@ -146,7 +149,7 @@ class Routine:
 
             elif state["Time"] < self.start:
                 # prepare routine before starting, if needed
-                if not self.prepped:
+                if not self.prepped and not self._delay_prep:
                     self.prep(state)
                     self.prepped = True
 
@@ -511,6 +514,212 @@ class Sequence(Routine):
                     knob.value = value
 
 
+class Optimization(Routine):
+
+    # positive _sign mean maximization; negative _sign means minimization
+    _sign = +1.0
+
+    def __init__(
+        self,
+        knobs: dict,
+        meter: String,
+        bounds: Array,
+        max_deltas: Array = None,
+        settling_time: Union[Float, String] = 0.0,
+        method: String = None,
+        n_iterations: Integer = 100,
+        **kwargs,
+    ):
+        Routine.__init__(self, knobs, **kwargs)
+
+        self.bounds = {
+            knob: subbounds
+            for knob, subbounds in zip(knobs, np.reshape(bounds, (len(knobs), -1)))
+        }
+
+        if max_deltas:
+            if np.ndim(max_deltas) == 0:
+                # a single maximum change for all knobs
+                self.max_deltas = np.array([max_deltas] * len(knobs))
+            elif np.ndim(max_deltas) == 1 and len(max_deltas) == len(knobs):
+                # individual maximum changes for each knob
+                self.max_deltas = np.array(max_deltas)
+            else:
+                ValueError(
+                    f"Improperly specified max_deltas parameter {max_deltas} for "
+                    "optimization routine; must be either a single value or 1-D array "
+                    "with the same length as the knobs argument"
+                )
+        else:
+            self.max_deltas = np.array([np.inf] * len(self.knobs))
+
+        # name of the meter to check from state argument of update
+        self.meter = meter
+
+        # Record best settings when an optimum is found
+        self.best_meter = -self._sign*np.inf
+        self.best_knobs = {name: None for name in self.knobs}
+
+        if "sign" in kwargs:
+            self._sign = float(kwargs.pop('sign'))
+
+        self.method = method if method is not None else "bayesian"
+
+        self.settling_time = convert_time(settling_time)
+
+        self.n_iterations = n_iterations
+
+        self._optimizer_thread = None
+        self._meter_queue = queue.Queue(1)
+
+        self.options = kwargs
+
+        self._bayesian_optimizer = None  # placeholder for bayesian optimization
+
+    @Routine.enabler
+    def update(self, state):
+
+        non_numeric_knobs = [
+            not isinstance(state[knob], numbers.Number) for knob in self.knobs
+        ]
+
+        if np.any(non_numeric_knobs):
+            # undefined state; take no action
+            return
+
+        if not isinstance(state[self.meter], numbers.Number):
+            # undefined target value; take no action
+            return
+
+        if state["Time"] < self._last_setting + self.settling_time:
+            return
+
+        # (Re)start the optimizer thread if it is not running
+        if not self._optimizer_thread.is_alive():
+            self.prep(state, start_optimizer_thread=True)
+
+        self._meter_queue.put(state[self.meter])
+
+    def prep(self, state, start_optimizer_thread=False):
+
+        if self.method == "bayesian":
+
+            self._bayesian_optimizer = BayesianOptimization(
+                f=lambda x: self._sign*self._eval_func(x),
+                verbose=0,
+                pbounds=self.bounds,
+                random_state=6174,
+                allow_duplicate_points=True,
+            )
+
+            optimizer_function = self._bayesian_optimizer.maximize
+            optimizer_args = []
+            optimizer_kwargs = {'init_points': 1, 'n_iter': self.n_iterations}
+
+        elif self.method in scipy_minimize_methods:
+
+            optimizer_functon = scipy_minimize
+            optimizer_args = [
+                lambda x: -self._sign*self._eval_func(x),
+                [knob.value for knob in self.knobs.values()]
+            ]
+            optimizer_kwargs = {
+                'method': self.method,
+                'bounds': [bounds for bounds in self.bounds.values()],
+                'options': {'maxiter': self.n_iterations},
+                **self.options
+            }
+
+        else:
+            # use default optimization algorithm
+            optimizer_function = _default_optimization
+            optimizer_args = [
+                lambda x: self._sign*self._eval_func(x),
+                [knob.value for knob in self.knobs.values()]
+            ]
+            optimizer_kwargs = {
+                'method': self.method,
+                'bounds': [bounds for bounds in self.bounds.values()],
+                'n_iterations': self.n_iterations,
+                'sign': self._sign,
+                **self.options
+            }
+
+        self._optimizer_thread = threading.Thread(
+            target=optimizer_functon,
+            args=optimizer_args,
+            kwargs=optimizer_kwargs
+        )
+
+        if start_optimizer_thread:
+            self._optimizer_thread.start()
+            self._optimizer_thread.started = True
+        else:
+            self._optimizer_thread.started = False
+
+    def finish(self, state):
+
+        if hasattr(self, '_meter_queue') and self._optimizer_thread.is_alive():
+            self._meter_queue.put(StopIteration)
+            self._optimizer_thread.join()
+
+        for i, (knob, value) in enumerate(self.best_knobs.items()):
+            if value is None or not np.isfinite(value):
+                print(f"Warning: No optimal value was found for {knob}")
+            else:
+                self.knobs[knob].value = value
+
+    def _eval_func(self, x):
+        """
+        Emulates a function which takes knobs values as inputs and returns the
+        resulting meter output, but only evaluates at most once per call to the
+        update method.
+        """
+
+        for i, knob in enumerate(self.knobs.values()):
+            knob.value = x[i]
+
+        # wait until invoked update method provides a new meter value
+        value = self._meter_queue.get()
+
+        if value == StopIteration:
+            raise SystemExit  # terminate the enclosing _optimization_thread
+
+        # If this is the best configuration so far, store knob and meter values
+        if self._sign * value > self._sign * self.best_meter:
+            self.best_meter = value
+            self.best_knobs = {
+                name: knob.value for name, knob in self.knobs.items()
+            }
+
+        return -self._sign * value
+
+
+def _default_optimization(
+        func, p0, bounds=None, max_deltas=None, sign=1.0, n_iterations=100, **kwargs
+):
+    """Very basic optimization algorithm"""
+    p = np.array(p0)
+    f = func(p0)
+
+    pbest = p0
+    fbest = f
+
+    for i in range(n_iterations):
+
+        dp = [max_delta*(2*np.random.rand()-1) for max_delta in max_deltas]
+
+        p_new = p + dp
+
+        f = func(p_new)
+
+        if sign*f > sign*fbest:
+            pbest = p = p_new
+            fbest = f
+
+    return pbest, fbest
+
+
 class Maximization(Routine):
     """
     Maximize a meter or expression influenced by the set of knobs.
@@ -728,7 +937,7 @@ class Maximization(Routine):
 
                 self.options['initial_simplex'] = simplex
 
-        self._optimize_result = minimize(
+        self._optimize_result = scipy_minimize(
             eval_func, x0,
             bounds=[bounds for bounds in self.bounds.values()],
             method=self.method,
