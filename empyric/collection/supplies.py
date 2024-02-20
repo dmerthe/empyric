@@ -522,18 +522,84 @@ class SorensenXG10250(Instrument):
 
     The analog control mode option allows the power supply to operate in a
     voltage-controlled current mode via its non-isolated input pin.
+
+    By default, the RS-485 multicast address is assumed to be 1.
     """
 
     name = "SorensenXG10250"
 
     supported_adapters = ((Serial, {"baud_rate": 9600}),)
 
-    presets = {'comms address': 1}
-
-    knobs = ("max voltage", "max current", "output", "analog control mode",
-             "comms address")
+    knobs = ("max voltage", "max current", "output", "analog control mode")
 
     meters = ("voltage", "current", "analog input voltage", "analog input current")
+
+    def __init__(self,  address=None, adapter=None, presets=None,
+                 postsets=None, **kwargs):
+        # super().__init__(**kwargs)
+        self.address = address
+
+        self.knobs = ("connected",) + self.knobs
+
+        adapter_connected = False
+        if adapter:
+            self.adapter = adapter(self, **kwargs)
+        else:
+            errors = []
+            for _adapter, settings in self.supported_adapters:
+                settings.update(kwargs)
+                try:
+                    self.adapter = _adapter(self, **settings)
+                    adapter_connected = True
+                    break
+                except BaseException as error:
+                    msg = (
+                        f"in trying {_adapter.__name__} adapter, "
+                        f"got {type(error).__name__}: {error}"
+                    )
+                    errors.append(msg)
+
+            if not adapter_connected:
+                message = (
+                    f"unable to connect an adapter to "
+                    f"instrument {self.name} at address {address}:\n"
+                )
+                for error in errors:
+                    message = message + f"{error}\n"
+                raise ConnectionError(message)
+
+        if self.address:
+            self.name = self.name + "@" + str(self.address)
+
+        self.write("*ADR 1")
+
+        # DEBUG
+        # print(self.query("*IDN?"))
+        # print(self.query("*ADR?"))
+        # print(self.query("MEAS:CURR?"))
+
+        # # Get existing knob settings, if possible
+        # for knob in self.knobs:
+        #     if hasattr(self, "get_" + knob.replace(" ", "_")):
+        #         # retrieves the knob value from the instrument
+        #         self.__getattribute__("get_" + knob.replace(" ", "_"))()
+        #     else:
+        #         # knob value is unknown until it is set
+        #         self.__setattr__(knob.replace(" ", "_"), None)
+        #
+        # # Apply presets
+        # if presets:
+        #     self.presets = {**self.presets, **presets}
+        #
+        # for knob, value in self.presets.items():
+        #     self.set(knob, value)
+        #
+        # # Get postsets
+        # if postsets:
+        #     self.postsets = {**self.postsets, **postsets}
+        #
+        # self.kwargs = kwargs
+
 
     @measurer
     def measure_current(self):
@@ -573,12 +639,6 @@ class SorensenXG10250(Instrument):
     def set_max_voltage(self, voltage):
         self.write("SOUR:VOLT " + str(voltage))
 
-    @setter
-    def set_comms_address(self, addr):
-        print("*ADR " + str(addr))
-        self.write("*ADR " + str(addr))
-        print(self.write("*IDN?"))
-
     @getter
     def get_max_current(self):
         return float(self.query("SOUR:CURR?"))
@@ -602,10 +662,6 @@ class SorensenXG10250(Instrument):
             return ON
         elif response == "LOC":
             return OFF
-
-    @getter
-    def get_comms_address(self, addr):
-        return str(self.read("*ADR?"))
 
 class BK9140(Instrument):
     """
