@@ -593,7 +593,7 @@ class Optimization(Routine):
         if "sign" in kwargs:
             self._sign = float(kwargs.pop('sign'))
 
-        self.method = method if method is not None else "bayesian"
+        self.method = method
 
         self.settling_time = convert_time(settling_time)
 
@@ -638,7 +638,9 @@ class Optimization(Routine):
         if self.method == "bayesian":
 
             self._bayesian_optimizer = BayesianOptimization(
-                f=lambda x: self._sign*self._eval_func(x),
+                f=lambda x: self._sign*self._eval_func(
+                    [x[name] for name in self.knobs]
+                ),
                 verbose=0,
                 pbounds=self.bounds,
                 random_state=6174,
