@@ -739,6 +739,9 @@ class Optimization(Routine):
         pbest = p = np.array(p0)
         fbest = func(p0)
 
+        # weight to give most recent meter value when reevaluating
+        recency = kwargs.get('recency', 1.0)
+
         for i in range(n_iterations):
 
             # generate new knobs settings
@@ -757,9 +760,9 @@ class Optimization(Routine):
             if sign*f > sign*fbest:  # new best settings found; store values
                 pbest = p
                 fbest = f
-            else: # reevaluate meter at best knob settings
+            else:  # reevaluate meter at best knob settings
                 p = pbest
-                fbest = func(pbest)
+                fbest = recency * func(pbest) + (1 - recency) * fbest
 
         return pbest, fbest
 
