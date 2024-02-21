@@ -6,6 +6,7 @@ import queue
 import threading
 import asyncio
 import time
+import warnings
 from typing import Union
 
 import select
@@ -149,10 +150,9 @@ class Routine:
 
             elif state["Time"] < self.start:
                 # prepare routine before starting, if needed
-                if not self.prepped and not self._delay_prep:
+                if not self.prepped and not self.delay_prep:
                     self.prep(state)
                     self.prepped = True
-
                 return
 
             elif state["Time"] >= self.end:
@@ -515,15 +515,37 @@ class Sequence(Routine):
 
 
 class Optimization(Routine):
+    """
+    Maximize or minimize a meter or expression influenced by the set of knobs.
 
-    # positive _sign mean maximization; negative _sign means minimization
-    _sign = +1.0
+    The `sign` argument determines whether the routine maximizes (sign = +1.0) or
+    minimizes (-1.0) the `meter` value by tuning the `knobs`.
+
+    The `bounds` parameter is an Nx2 array containing the upper and lower limits for
+    each of the N knobs that defines the parameter space over which the knob values can
+    be explored.
+
+    The `max_deltas` parameter is a value or 1-D array of values which are the
+    maximum change in a single step the knob(s) can take.
+
+    The `method` parameter specifies the algorith to use for optimization. The default
+    method is a simple random walk search for the optimal knob settings. If `method` is
+    set to 'bayesian' this routine uses a `bayesian optimizer
+    <https://github.com/bayesian-optimization/BayesianOptimization>`_, which models
+    the relation between the knobs and the meter as a gaussian process. Additionally,
+    any of the methods available to the `scipy.optimize.maximize` function are also
+    available; any keyword arguments accepted by that function can also be accepted by
+    the constructor of the `Optimizer` class.
+    """
+
+    _sign = None
 
     def __init__(
         self,
         knobs: dict,
         meter: String,
         bounds: Array,
+        sign: Float = None,
         max_deltas: Array = None,
         settling_time: Union[Float, String] = 0.0,
         method: String = None,
@@ -531,6 +553,14 @@ class Optimization(Routine):
         **kwargs,
     ):
         Routine.__init__(self, knobs, **kwargs)
+
+        if self._sign is None:
+            if sign == 1.0 or sign == -1.0:
+                self._sign = sign
+            else:
+                raise ValueError(
+                    'sign must be either +1.0 (maximization) or -1.0 (minimization)'
+                )
 
         self.bounds = {
             knob: subbounds
@@ -621,7 +651,7 @@ class Optimization(Routine):
 
         elif self.method in scipy_minimize_methods:
 
-            optimizer_functon = scipy_minimize
+            optimizer_function = scipy_minimize
             optimizer_args = [
                 lambda x: -self._sign*self._eval_func(x),
                 [knob.value for knob in self.knobs.values()]
@@ -649,7 +679,7 @@ class Optimization(Routine):
             }
 
         self._optimizer_thread = threading.Thread(
-            target=optimizer_functon,
+            target=optimizer_function,
             args=optimizer_args,
             kwargs=optimizer_kwargs
         )
@@ -701,12 +731,13 @@ class Optimization(Routine):
     def _default_optimization(
             func, p0, bounds=None, max_deltas=None, sign=1.0, n_iterations=100, **kwargs
     ):
-        """Very basic optimization algorithm"""
-        p = np.array(p0)  # current values of knobs
-        f = func(p0)  # current value of meter
+        """Very basic random step optimization algorithm"""
 
-        pbest = p0  # best knob settings found so far
-        fbest = f  # best meter value found so far
+        for kwarg in kwargs:
+            warnings.warn(f'keyword {kwarg} unused in default optimization algorithm')
+
+        pbest = p = np.array(p0)
+        fbest = func(p0)
 
         for i in range(n_iterations):
 
@@ -714,7 +745,12 @@ class Optimization(Routine):
             dp = np.array(
                 [max_delta*(2*np.random.rand()-1) for max_delta in max_deltas]
             )
+
             p = p + dp
+
+            if bounds:
+                p = np.max([p, np.array(bounds)[:, 0]], axis=0)  # enforce lower bounds
+                p = np.min([p, np.array(bounds)[:, 1]], axis=0)  # enforce upper bounds
 
             f = func(p)  # evaluate the meter
 
@@ -723,253 +759,18 @@ class Optimization(Routine):
                 fbest = f
             else: # reevaluate meter at best knob settings
                 p = pbest
-                f = fbest = func(pbest)
+                fbest = func(pbest)
 
         return pbest, fbest
 
 
-class Maximization(Routine):
-    """
-    Maximize a meter or expression influenced by the set of knobs.
+class Maximization(Optimization):
+    """Alias for `Optimization` with `sign` implicitly set to +1.0 """
+    _sign = +1.0
 
-    This routine uses a `bayesian optimizer
-    <https://github.com/bayesian-optimization/BayesianOptimization>`_, which models
-    the relation between the knobs and the meter as a gaussian process.
 
-    The `bounds` parameter is an Nx2 array containing the upper and lower limits for
-    each of the N knobs that defines the parameter space over which the knob values can
-    be explored.
-
-    The `max_deltas` parameter is a value or 1-D array of values which are the
-    maximum change in a single step the knob(s) can take.
-
-    The `kappa` parameter determines how much time the algorithm spends
-    exploring the parameter space away from the maximum versus the parameter
-    space in the vicinity of the maximum. Higher `kappa` leads to more
-    exploration, lower `kappa` leads to more "exploitation" of the maximum.
-    """
-
-    _sign = 1.0
-
-    _last_setting = -np.inf
-
-    _optimize_result = None  # used with scipy optimization
-
-    def __init__(
-        self,
-        knobs: dict,
-        meter: String,
-        bounds: Array,
-        max_deltas: Array = None,
-        settling_time: Union[Float, String] = 0.0,
-        method=None,
-        **kwargs,
-    ):
-        Routine.__init__(self, knobs, **kwargs)
-
-        self.bounds = {
-            knob: subbounds
-            for knob, subbounds in zip(knobs, np.reshape(bounds, (len(knobs), -1)))
-        }
-
-        if max_deltas:
-            if np.ndim(max_deltas) == 0:
-                self.max_deltas = np.array([max_deltas] * len(knobs))
-            elif np.ndim(max_deltas) == 1 and len(max_deltas) == len(knobs):
-                self.max_deltas = np.array(max_deltas)
-            else:
-                ValueError(
-                    f"Improperly specified max_deltas parameter {max_deltas} for "
-                    "optimization routine; must be either a single value or 1-D array "
-                    "with the same length as the knobs argument"
-                )
-        else:
-            self.max_deltas = np.array([np.inf] * len(self.knobs))
-
-        self.meter = meter
-
-        self.best_meter = -self._sign*np.inf
-        self.best_knobs = {name: None for name in self.knobs}
-
-        self.method = method if method is not None else "bayesian"
-
-        self.settling_time = convert_time(settling_time)
-
-        self.options = kwargs
-
-    @Routine.enabler
-    def update(self, state):
-
-        non_numeric_knobs = [
-            not isinstance(state[knob], numbers.Number) for knob in self.knobs
-        ]
-
-        if np.any(non_numeric_knobs):
-            # undefined state; take no action
-            return
-
-        if not isinstance(state[self.meter], numbers.Number):
-            # undefined target value; take no action
-            return
-
-        if state["Time"] < self._last_setting + self.settling_time:
-            return
-
-        if self.method == "bayesian":
-            self._update_bayesian(state)
-        elif self.method in scipy_minimize_methods:
-            self._update_scipy_optimization(state)
-
-    def _update_bayesian(self, state):
-
-        self.optimizer.register(
-            params={knob: state[knob] for knob in self.knobs},
-            target=self._sign * state[self.meter],
-        )
-
-        suggestion = self.optimizer.suggest(self.util_func)
-
-        for i, (knob, value) in enumerate(suggestion.items()):
-            if value is None or not np.isfinite(value):
-                pass
-            elif np.abs(value - state[knob]) <= self.max_deltas[i]:
-                self.knobs[knob].value = value
-            else:
-                sign = (value - state[knob]) / np.abs(value - state[knob])
-                self.knobs[knob].value = state[knob] + sign * self.max_deltas[i]
-
-        self._last_setting = state["Time"]
-
-        self.best_meter = self.optimizer.max["target"]
-        self.best_knobs = self.optimizer.max["params"]
-
-        if np.isfinite(self.end):
-            kappa = self._kappa0 * (self.end - state["Time"]) / self._duration
-            self.util_func.kappa = kappa
-
-    def _update_scipy_optimization(self, state):
-
-        # (Re)start the optimizer thread if it is not running
-        if not self._optimizer_thread.is_alive():
-
-            # Recreate optimizer thread if it previously completed
-            if self._optimizer_thread.started:
-                self._optimizer_thread = threading.Thread(
-                    target=self._iterate_scipy_minimize
-                )
-
-            self._optimizer_thread.start()
-            self._optimizer_thread.started = True
-
-        self._meter_queue.put(state[self.meter])
-
-    def prep(self, state):
-        if self.method == "bayesian":
-
-            self.optimizer = BayesianOptimization(
-                f=None,
-                verbose=0,
-                pbounds=self.bounds,
-                random_state=6174,
-                allow_duplicate_points=True,
-            )
-
-            self._kappa0 = self.options.get("kappa", 2.5)
-            self.util_func = UtilityFunction(
-                kappa=self._kappa0,  # exploration vs. exploitation parameter
-            )
-        elif self.method in scipy_minimize_methods:
-
-            self._optimizer_thread = threading.Thread(
-                target=self._iterate_scipy_minimize
-            )
-            self._optimizer_thread.started = False
-
-    def _iterate_scipy_minimize(self):
-
-        self._meter_queue = queue.Queue(1)
-
-        def eval_func(x):
-            # emulates the function to optimize for the scipy.minimize function
-
-            for i, knob in enumerate(self.knobs.values()):
-                knob.value = x[i]
-
-            # blocks until _update_scipy_optimization or finish methods provide
-            # a meter value
-            value = self._meter_queue.get()
-
-            if value == StopIteration:
-                quit()
-
-            if self._sign * value > self._sign * self.best_meter:
-                self.best_meter = value
-                self.best_knobs = {
-                    name: knob.value for name, knob in self.knobs.items()
-                }
-
-            return -self._sign * value
-
-        x0 = np.array([knob.value for knob in self.knobs.values()], dtype=np.float64)
-
-        if self.method.lower() == 'nelder-mead':
-
-            self.options['adaptive'] = True
-
-            if 'initial_simplex' not in self.options:
-                # Generate an initial simplex based on either max deltas or bounds
-
-                bounds = np.array([(lb, ub) for lb, ub, in self.bounds.values()])
-
-                if np.all(np.isfinite(self.max_deltas)):
-                    d = self.max_deltas
-                else:
-                    d = 0.5*np.diff(bounds, axis=1).flatten()
-
-                N = len(x0)
-
-                simplex = np.empty((N + 1, N), dtype=x0.dtype)
-                simplex[0] = x0
-                for k in range(N):
-
-                    y = np.array(x0, copy=True)
-
-                    y[k] = y[k] + d[k]
-
-                    if y[k] < bounds[k][0]:
-                        y[k] = bounds[k][0]
-                    elif y[k] > bounds[k][1]:
-                        y[k] = bounds[k][1]
-
-                    simplex[k + 1] = y
-
-                self.options['initial_simplex'] = simplex
-
-        self._optimize_result = scipy_minimize(
-            eval_func, x0,
-            bounds=[bounds for bounds in self.bounds.values()],
-            method=self.method,
-            options=self.options
-        )
-
-    def finish(self, state):
-
-        if hasattr(self, '_meter_queue'):
-            self._meter_queue.put(StopIteration)
-
-        for i, (knob, value) in enumerate(self.best_knobs.items()):
-            if value is None or not np.isfinite(value):
-                print(f"Warning: No optimal value was found for {knob}")
-            else:
-                self.knobs[knob].value = value
-
-    def terminate(self):
-        self.finish({})
-
-
-class Minimization(Maximization):
-    """Same as Maximization except that the sign of the meter is inverted"""
-
+class Minimization(Optimization):
+    """Alias for `Optimization` with `sign` implicitly set to -1.0 """
     _sign = -1.0
 
 

@@ -62,9 +62,9 @@ Routines:
    - [-1, 1]
    - [-1, 1]
   max deltas: 0.1
-  kappa: 2.5  # exploration vs. exploitation parameter
-  method: nelder-mead
-  fatol: 10
+#  kappa: 2.5  # exploration vs. exploitation parameter
+#  method: nelder-mead
+#  fatol: 10
   start: 30
   end: 60
 
@@ -78,8 +78,8 @@ Routines:
    - [-1, 1]
    - [-1, 1]
   max deltas: 0.1
-  kappa: 3.0  # exploration vs. exploitation parameter
-  method: nelder-mead
-  fatol: 10
+#  kappa: 3.0  # exploration vs. exploitation parameter
+#  method: nelder-mead
+#  fatol: 10
   start: 90
   end: 120
