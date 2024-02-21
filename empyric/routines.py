@@ -665,16 +665,53 @@ class Optimization(Routine):
 
         elif self.method in scipy_minimize_methods:
 
+            options = {'maxiter': self.iterations}
+
+            x0 = np.array([knob.value for knob in self.knobs.values()])
+
+            if self.method.lower() == 'nelder-mead':
+
+                options['adaptive'] = True
+
+                # Generate an initial simplex based on either max deltas or bounds
+                bounds = np.array([(lb, ub) for lb, ub, in self.bounds.values()])
+
+                if np.all(np.isfinite(self.max_deltas)):
+                    d = self.max_deltas
+                else:
+                    d = 0.5 * np.diff(bounds, axis=1).flatten()
+
+                N = len(x0)
+
+                simplex = np.empty((N + 1, N), dtype=np.float64)
+                simplex[0] = x0
+                for k in range(N):
+
+                    y = np.array(x0, copy=True)
+                    if y[k] != 0:
+                        y[k] = y[k] + d[k]
+                    else:
+                        y[k] = d[k]
+
+                    y[k] = y[k] + d[k]
+
+                    if y[k] < bounds[k][0]:
+                        y[k] = bounds[k][0]
+                    elif y[k] > bounds[k][1]:
+                        y[k] = bounds[k][1]
+
+                    simplex[k + 1] = y
+
+                options['initial_simplex'] = simplex
+
             optimizer_function = scipy_minimize
             optimizer_args = [
-                lambda x: -self._sign*self._eval_func(x),
-                [knob.value for knob in self.knobs.values()]
+                lambda x: -self._sign*self._eval_func(x), x0
             ]
             optimizer_kwargs = {
                 'method': self.method,
                 'bounds': [bounds for bounds in self.bounds.values()],
-                'options': {'maxiter': self.iterations},
-                **self.options
+                'options': options,
             }
 
         else:
@@ -720,7 +757,7 @@ class Optimization(Routine):
     def terminate(self):
 
         # Shutdown _optimizer_thread
-        if hasattr(self, '_meter_queue') and self._optimizer_thread.is_alive():
+        if self._optimizer_thread is not None and self._optimizer_thread.is_alive():
             self._meter_queue.put(StopIteration)
 
     def _eval_func(self, x):
