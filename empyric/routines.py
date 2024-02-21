@@ -574,8 +574,6 @@ class Optimization(Routine):
 
         self.options = kwargs
 
-        self._bayesian_optimizer = None  # placeholder for bayesian optimization
-
     @Routine.enabler
     def update(self, state):
 
@@ -588,13 +586,14 @@ class Optimization(Routine):
             return
 
         if not isinstance(state[self.meter], numbers.Number):
-            # undefined target value; take no action
+            # undefined meter value; take no action
             return
 
         if state["Time"] < self._last_setting + self.settling_time:
+            # still settling; take no action
             return
 
-        # (Re)start the optimizer thread if it is not running
+        # Reinitialize the optimizer, if iterations have completed
         if not self._optimizer_thread.is_alive():
             self.prep(state, start_optimizer_thread=True)
 
@@ -610,6 +609,10 @@ class Optimization(Routine):
                 pbounds=self.bounds,
                 random_state=6174,
                 allow_duplicate_points=True,
+            )
+
+            self._bayesian_optimizer.probe(
+                {name: knob.value for name, knob in self.knobs.items()}
             )
 
             optimizer_function = self._bayesian_optimizer.maximize
@@ -632,7 +635,7 @@ class Optimization(Routine):
 
         else:
             # use default optimization algorithm
-            optimizer_function = _default_optimization
+            optimizer_function = self._default_optimization
             optimizer_args = [
                 lambda x: self._sign*self._eval_func(x),
                 [knob.value for knob in self.knobs.values()]
@@ -694,30 +697,35 @@ class Optimization(Routine):
 
         return -self._sign * value
 
+    @staticmethod
+    def _default_optimization(
+            func, p0, bounds=None, max_deltas=None, sign=1.0, n_iterations=100, **kwargs
+    ):
+        """Very basic optimization algorithm"""
+        p = np.array(p0)  # current values of knobs
+        f = func(p0)  # current value of meter
 
-def _default_optimization(
-        func, p0, bounds=None, max_deltas=None, sign=1.0, n_iterations=100, **kwargs
-):
-    """Very basic optimization algorithm"""
-    p = np.array(p0)
-    f = func(p0)
+        pbest = p0  # best knob settings found so far
+        fbest = f  # best meter value found so far
 
-    pbest = p0
-    fbest = f
+        for i in range(n_iterations):
 
-    for i in range(n_iterations):
+            # generate new knobs settings
+            dp = np.array(
+                [max_delta*(2*np.random.rand()-1) for max_delta in max_deltas]
+            )
+            p = p + dp
 
-        dp = [max_delta*(2*np.random.rand()-1) for max_delta in max_deltas]
+            f = func(p)  # evaluate the meter
 
-        p_new = p + dp
+            if sign*f > sign*fbest:  # new best settings found; store values
+                pbest = p
+                fbest = f
+            else: # reevaluate meter at best knob settings
+                p = pbest
+                f = fbest = func(pbest)
 
-        f = func(p_new)
-
-        if sign*f > sign*fbest:
-            pbest = p = p_new
-            fbest = f
-
-    return pbest, fbest
+        return pbest, fbest
 
 
 class Maximization(Routine):
