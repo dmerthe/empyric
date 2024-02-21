@@ -1121,12 +1121,13 @@ class Modbus(Adapter):
 
     @property
     def busy(self):
+        address = self.instrument.address.split("::")
         if self.protocol == "Serial":
             return bool(
                 sum(
                     [
                         adapter._busy
-                        for adapter in Modbus._serial_adapters.get(self.port, [])
+                        for adapter in Modbus._serial_adapters.get(address[0], [])
                     ]
                 )
             )
@@ -1184,13 +1185,13 @@ class Modbus(Adapter):
                 Modbus._serial_adapters[port].append(self)
 
                 # use existing backend
-                self.backend = Modbus._serial_adapters[port].backend
+                self.backend = Modbus._serial_adapters[port][0].backend
 
             else:
                 Modbus._serial_adapters[port] = [self]
 
                 self.backend = client.ModbusSerialClient(
-                    address=port,
+                    port=port,
                     baudrate=self.baud_rate,
                     bytesize=self.byte_size,
                     parity=self.parity,

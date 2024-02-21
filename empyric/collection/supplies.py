@@ -628,9 +628,9 @@ class SorensenXG10250(Instrument):
     @setter
     def set_analog_control_mode(self, analog_control_mode: Toggle):
         if analog_control_mode == ON:
-            self.write("SYST:REM:SOUR IAV")
+            self.write("SYST:REM:SOUR:CURR IAV")
         if analog_control_mode == OFF:
-            self.write("SYST:REM:SOUR LOC")
+            self.write("SYST:REM:SOUR:CURR LOC")
 
     @setter
     def set_max_current(self, current):
@@ -658,7 +658,7 @@ class SorensenXG10250(Instrument):
 
     @getter
     def get_analog_control_mode(self) -> Toggle:
-        response = self.query("SYST:REM:SOUR?").decode("utf-8")
+        response = self.query("SYST:REM:SOUR:CURR?").decode("utf-8")
         if "Analog Isolated" in response:
             return ON
         elif "LOCAL" in response:
