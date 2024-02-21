@@ -7,7 +7,7 @@ Description:
  comments: Who is Mike? There is no Test Stand 1
 
 Settings:
- step interval: 0.1
+ step interval: 0.05
  plot interval: 1
  save interval: 10
  end: 3 minutes
@@ -62,10 +62,10 @@ Routines:
    - [-1, 1]
    - [-1, 1]
   max deltas: 0.1
-#  kappa: 2.5  # exploration vs. exploitation parameter
-#  method: nelder-mead
-#  fatol: 10
-  start: 15
+  method: bayesian
+  recency: 0.3
+  samples: 10
+  start: 5
   end: 60
 
  Maximization Routine:
@@ -78,8 +78,7 @@ Routines:
    - [-1, 1]
    - [-1, 1]
   max deltas: 0.1
-#  kappa: 3.0  # exploration vs. exploitation parameter
-#  method: nelder-mead
-#  fatol: 10
-  start: 90
+  recency: 0.3
+  samples: 10
+  start: 65
   end: 120

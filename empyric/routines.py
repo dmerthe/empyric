@@ -536,6 +536,9 @@ class Optimization(Routine):
     any of the methods available to the `scipy.optimize.maximize` function are also
     available; any keyword arguments accepted by that function can also be accepted by
     the constructor of the `Optimizer` class.
+
+    The default optimizer has the following options
+    -
     """
 
     _sign = None
@@ -549,7 +552,8 @@ class Optimization(Routine):
         max_deltas: Array = None,
         settling_time: Union[Float, String] = 0.0,
         method: String = None,
-        n_iterations: Integer = 100,
+        iterations: Integer = 100,
+        samples: Integer = 1,
         **kwargs,
     ):
         Routine.__init__(self, knobs, **kwargs)
@@ -597,7 +601,9 @@ class Optimization(Routine):
 
         self.settling_time = convert_time(settling_time)
 
-        self.n_iterations = n_iterations
+        self.iterations = iterations
+
+        self.samples = int(samples)
 
         self._optimizer_thread = None
         self._meter_queue = queue.Queue(1)
@@ -605,6 +611,8 @@ class Optimization(Routine):
         self.options = kwargs
 
         self._last_setting = -np.inf
+
+        self._state = None
 
     @Routine.enabler
     def update(self, state):
@@ -638,7 +646,7 @@ class Optimization(Routine):
         if self.method == "bayesian":
 
             self._bayesian_optimizer = BayesianOptimization(
-                f=lambda x: self._sign*self._eval_func(
+                f=lambda *args, **x: self._sign*self._eval_func(
                     [x[name] for name in self.knobs]
                 ),
                 verbose=0,
@@ -653,7 +661,7 @@ class Optimization(Routine):
 
             optimizer_function = self._bayesian_optimizer.maximize
             optimizer_args = []
-            optimizer_kwargs = {'init_points': 1, 'n_iter': self.n_iterations}
+            optimizer_kwargs = {'init_points': 1, 'n_iter': self.iterations}
 
         elif self.method in scipy_minimize_methods:
 
@@ -665,7 +673,7 @@ class Optimization(Routine):
             optimizer_kwargs = {
                 'method': self.method,
                 'bounds': [bounds for bounds in self.bounds.values()],
-                'options': {'maxiter': self.n_iterations},
+                'options': {'maxiter': self.iterations},
                 **self.options
             }
 
@@ -673,15 +681,15 @@ class Optimization(Routine):
             # use default optimization algorithm
             optimizer_function = self._default_optimization
             optimizer_args = [
-                lambda x: self._sign*self._eval_func(x),
+                lambda x: self._eval_func(x),
                 [knob.value for knob in self.knobs.values()]
             ]
             optimizer_kwargs = {
-                'method': self.method,
                 'bounds': [bounds for bounds in self.bounds.values()],
-                'n_iterations': self.n_iterations,
+                'max_deltas': self.max_deltas,
+                'iterations': self.iterations,
                 'sign': self._sign,
-                **self.options
+                'recency': self.options.get('recency', 1.0)
             }
 
         self._optimizer_thread = threading.Thread(
@@ -698,15 +706,22 @@ class Optimization(Routine):
 
     def finish(self, state):
 
+        # Shutdown _optimizer_thread
         if hasattr(self, '_meter_queue') and self._optimizer_thread.is_alive():
             self._meter_queue.put(StopIteration)
-            self._optimizer_thread.join()
 
+        # Apply optimal knob settings
         for i, (knob, value) in enumerate(self.best_knobs.items()):
             if value is None or not np.isfinite(value):
                 print(f"Warning: No optimal value was found for {knob}")
             else:
                 self.knobs[knob].value = value
+
+    def terminate(self):
+
+        # Shutdown _optimizer_thread
+        if hasattr(self, '_meter_queue') and self._optimizer_thread.is_alive():
+            self._meter_queue.put(StopIteration)
 
     def _eval_func(self, x):
         """
@@ -718,13 +733,20 @@ class Optimization(Routine):
         for i, knob in enumerate(self.knobs.values()):
             knob.value = x[i]
 
-        self._last_setting = self._state['Time']
+        if self._state is not None:
+            self._last_setting = self._state['Time']
 
-        # wait until invoked update method provides a new meter value
-        value = self._meter_queue.get()
+        values = []
+        while len(values) < self.samples:
+            # wait until invoked update method provides a new meter value
+            new_value = self._meter_queue.get()
 
-        if value == StopIteration:
-            raise SystemExit  # terminate the enclosing _optimization_thread
+            if new_value == StopIteration:
+                raise SystemExit  # terminate the enclosing _optimization_thread
+            else:
+                values.append(new_value)
+
+        value = np.mean(values)
 
         # If this is the best configuration so far, store knob and meter values
         if self._sign * value > self._sign * self.best_meter:
@@ -733,24 +755,18 @@ class Optimization(Routine):
                 name: knob.value for name, knob in self.knobs.items()
             }
 
-        return -self._sign * value
+        return value
 
     @staticmethod
     def _default_optimization(
-            func, p0, bounds=None, max_deltas=None, sign=1.0, n_iterations=100, **kwargs
+            func, p0, bounds=None, max_deltas=None, sign=1.0, iterations=100,
+            recency=1.0
     ):
         """Very basic random step optimization algorithm"""
-
-        for kwarg in kwargs:
-            warnings.warn(f'keyword {kwarg} unused in default optimization algorithm')
-
         pbest = p = np.array(p0)
         fbest = func(p0)
 
-        # weight to give most recent meter value when reevaluating
-        recency = kwargs.get('recency', 1.0)
-
-        for i in range(n_iterations):
+        for i in range(iterations):
 
             # generate new knobs settings
             dp = np.array(
@@ -764,13 +780,12 @@ class Optimization(Routine):
                 p = np.min([p, np.array(bounds)[:, 1]], axis=0)  # enforce upper bounds
 
             f = func(p)  # evaluate the meter
-
             if sign*f > sign*fbest:  # new best settings found; store values
                 pbest = p
                 fbest = f
             else:  # reevaluate meter at best knob settings
                 p = pbest
-                fbest = recency * func(pbest) + (1 - recency) * fbest
+                fbest = recency * func(p) + (1 - recency) * fbest
 
         return pbest, fbest
 
