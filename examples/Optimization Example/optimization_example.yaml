@@ -65,7 +65,7 @@ Routines:
 #  kappa: 2.5  # exploration vs. exploitation parameter
 #  method: nelder-mead
 #  fatol: 10
-  start: 30
+  start: 15
   end: 60
 
  Maximization Routine:

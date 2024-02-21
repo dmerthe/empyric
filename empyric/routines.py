@@ -604,6 +604,8 @@ class Optimization(Routine):
 
         self.options = kwargs
 
+        self._last_setting = -np.inf
+
     @Routine.enabler
     def update(self, state):
 
@@ -626,6 +628,8 @@ class Optimization(Routine):
         # Reinitialize the optimizer, if iterations have completed
         if not self._optimizer_thread.is_alive():
             self.prep(state, start_optimizer_thread=True)
+
+        self._state = state
 
         self._meter_queue.put(state[self.meter])
 
@@ -711,6 +715,8 @@ class Optimization(Routine):
 
         for i, knob in enumerate(self.knobs.values()):
             knob.value = x[i]
+
+        self._last_setting = self._state['Time']
 
         # wait until invoked update method provides a new meter value
         value = self._meter_queue.get()
