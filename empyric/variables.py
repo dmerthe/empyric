@@ -307,6 +307,7 @@ class Expression(Variable):
         """shorthand for numpy FFT function"""
         return np.fft.ifft(s, norm='forward')
 
+
 class Remote(Variable):
     """
     Variable controlled by an experiment (running a server routine) on a
