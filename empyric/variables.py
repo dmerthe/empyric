@@ -242,6 +242,7 @@ class Expression(Variable):
     _functions = {
         "sqrt(": "np.sqrt(",
         "exp(": "np.exp(",
+        "abs(": "np.abs(",
         "sin(": "np.sin(",
         "cos(": "np.cos(",
         "tan(": "np.tan(",
@@ -253,6 +254,8 @@ class Expression(Variable):
         "diff(": "np.diff(",
         "max(": "np.nanmax(",
         "min(": "np.nanmin(",
+        "fft(": "self.fft(",
+        "ifft(": "self.ifft(",
     }
 
     def __init__(self, expression: str, definitions: dict = None):
@@ -294,6 +297,15 @@ class Expression(Variable):
 
         return self._value
 
+    @staticmethod
+    def fft(s):
+        """shorthand for numpy FFT function"""
+        return np.fft.fft(s, norm='forward')
+
+    @staticmethod
+    def ifft(s):
+        """shorthand for numpy FFT function"""
+        return np.fft.ifft(s, norm='forward')
 
 class Remote(Variable):
     """
