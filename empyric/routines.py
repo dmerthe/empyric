@@ -518,15 +518,20 @@ class Optimization(Routine):
     """
     Maximize or minimize a meter or expression influenced by the set of knobs.
 
-    The `sign` argument determines whether the routine maximizes (sign = +1.0) or
-    minimizes (-1.0) the `meter` value by tuning the `knobs`.
-
     The `bounds` parameter is an Nx2 array containing the upper and lower limits for
     each of the N knobs that defines the parameter space over which the knob values can
     be explored.
 
+    The `sign` argument determines whether the routine maximizes (sign = +1.0) or
+    minimizes (-1.0) the `meter` value by tuning the `knobs`. The `Maximization` and
+    `Minimization` subclasses have implied signs, so this argument should not be used
+    with those.
+
     The `max_deltas` parameter is a value or 1-D array of values which are the
     maximum change in a single step the knob(s) can take.
+
+    The `settling_time` is the amount of time to wait before changing knob settings and
+    evaluating the meter.
 
     The `method` parameter specifies the algorith to use for optimization. The default
     method is a simple random walk search for the optimal knob settings. If `method` is
@@ -537,8 +542,17 @@ class Optimization(Routine):
     available; any keyword arguments accepted by that function can also be accepted by
     the constructor of the `Optimizer` class.
 
-    The default optimizer has the following options
-    -
+    The `iterations` parameter determines how many iterations the optimization
+    algorithm is allowed before returning a result. When the iterations are complete,
+    the algorithm is restarted anew.
+
+    The `samples` parameter is how many values of the meter to average together on each
+    iteration to evaluate the optimality of the current knobs settings.
+
+    The default optimizer accepts a `recency` keyword argument, which is the weight
+    given to the most recent best meter value at the best knob settings compared to
+    previously obtained values. This can be useful when the meter is noisy and the
+    relationship between the meter and knobs is changing over time.
     """
 
     _sign = None
@@ -563,7 +577,13 @@ class Optimization(Routine):
                 self._sign = sign
             else:
                 raise ValueError(
-                    'sign must be either +1.0 (maximization) or -1.0 (minimization)'
+                    "sign must be either +1.0 (maximization) or -1.0 (minimization)"
+                )
+        else:
+            if sign is not None:
+                warnings.warn(
+                    "The signs of Maximization and Minimization routines cannot be "
+                    "changed"
                 )
 
         self.bounds = {
@@ -591,11 +611,11 @@ class Optimization(Routine):
         self.meter = meter
 
         # Record best settings when an optimum is found
-        self.best_meter = -self._sign*np.inf
+        self.best_meter = -self._sign * np.inf
         self.best_knobs = {name: None for name in self.knobs}
 
         if "sign" in kwargs:
-            self._sign = float(kwargs.pop('sign'))
+            self._sign = float(kwargs.pop("sign"))
 
         self.method = method
 
@@ -616,7 +636,6 @@ class Optimization(Routine):
 
     @Routine.enabler
     def update(self, state):
-
         non_numeric_knobs = [
             not isinstance(state[knob], numbers.Number) for knob in self.knobs
         ]
@@ -642,13 +661,10 @@ class Optimization(Routine):
         self._meter_queue.put(state[self.meter])
 
     def prep(self, state, start_optimizer_thread=False):
-
         if self.method == "bayesian":
-
             self._bayesian_optimizer = BayesianOptimization(
-                f=lambda *args, **x: self._sign*self._eval_func(
-                    [x[name] for name in self.knobs]
-                ),
+                f=lambda *args, **x: self._sign
+                * self._eval_func([x[name] for name in self.knobs]),
                 verbose=0,
                 pbounds=self.bounds,
                 random_state=6174,
@@ -661,17 +677,15 @@ class Optimization(Routine):
 
             optimizer_function = self._bayesian_optimizer.maximize
             optimizer_args = []
-            optimizer_kwargs = {'init_points': 1, 'n_iter': self.iterations}
+            optimizer_kwargs = {"init_points": 1, "n_iter": self.iterations}
 
         elif self.method in scipy_minimize_methods:
-
-            options = {'maxiter': self.iterations}
+            options = {"maxiter": self.iterations}
 
             x0 = np.array([knob.value for knob in self.knobs.values()])
 
-            if self.method.lower() == 'nelder-mead':
-
-                options['adaptive'] = True
+            if self.method.lower() == "nelder-mead":
+                options["adaptive"] = True
 
                 # Generate an initial simplex based on either max deltas or bounds
                 bounds = np.array([(lb, ub) for lb, ub, in self.bounds.values()])
@@ -686,7 +700,6 @@ class Optimization(Routine):
                 simplex = np.empty((N + 1, N), dtype=np.float64)
                 simplex[0] = x0
                 for k in range(N):
-
                     y = np.array(x0, copy=True)
                     if y[k] != 0:
                         y[k] = y[k] + d[k]
@@ -702,16 +715,14 @@ class Optimization(Routine):
 
                     simplex[k + 1] = y
 
-                options['initial_simplex'] = simplex
+                options["initial_simplex"] = simplex
 
             optimizer_function = scipy_minimize
-            optimizer_args = [
-                lambda x: -self._sign*self._eval_func(x), x0
-            ]
+            optimizer_args = [lambda x: -self._sign * self._eval_func(x), x0]
             optimizer_kwargs = {
-                'method': self.method,
-                'bounds': [bounds for bounds in self.bounds.values()],
-                'options': options,
+                "method": self.method,
+                "bounds": [bounds for bounds in self.bounds.values()],
+                "options": options,
             }
 
         else:
@@ -719,20 +730,18 @@ class Optimization(Routine):
             optimizer_function = self._default_optimization
             optimizer_args = [
                 lambda x: self._eval_func(x),
-                [knob.value for knob in self.knobs.values()]
+                [knob.value for knob in self.knobs.values()],
             ]
             optimizer_kwargs = {
-                'bounds': [bounds for bounds in self.bounds.values()],
-                'max_deltas': self.max_deltas,
-                'iterations': self.iterations,
-                'sign': self._sign,
-                'recency': self.options.get('recency', 1.0)
+                "bounds": [bounds for bounds in self.bounds.values()],
+                "max_deltas": self.max_deltas,
+                "iterations": self.iterations,
+                "sign": self._sign,
+                "recency": self.options.get("recency", 1.0),
             }
 
         self._optimizer_thread = threading.Thread(
-            target=optimizer_function,
-            args=optimizer_args,
-            kwargs=optimizer_kwargs
+            target=optimizer_function, args=optimizer_args, kwargs=optimizer_kwargs
         )
 
         if start_optimizer_thread:
@@ -742,9 +751,8 @@ class Optimization(Routine):
             self._optimizer_thread.started = False
 
     def finish(self, state):
-
         # Shutdown _optimizer_thread
-        if hasattr(self, '_meter_queue') and self._optimizer_thread.is_alive():
+        if hasattr(self, "_meter_queue") and self._optimizer_thread.is_alive():
             self._meter_queue.put(StopIteration)
 
         # Apply optimal knob settings
@@ -755,7 +763,6 @@ class Optimization(Routine):
                 self.knobs[knob].value = value
 
     def terminate(self):
-
         # Shutdown _optimizer_thread
         if self._optimizer_thread is not None and self._optimizer_thread.is_alive():
             self._meter_queue.put(StopIteration)
@@ -771,7 +778,7 @@ class Optimization(Routine):
             knob.value = x[i]
 
         if self._state is not None:
-            self._last_setting = self._state['Time']
+            self._last_setting = self._state["Time"]
 
         values = []
         while len(values) < self.samples:
@@ -788,26 +795,22 @@ class Optimization(Routine):
         # If this is the best configuration so far, store knob and meter values
         if self._sign * value > self._sign * self.best_meter:
             self.best_meter = value
-            self.best_knobs = {
-                name: knob.value for name, knob in self.knobs.items()
-            }
+            self.best_knobs = {name: knob.value for name, knob in self.knobs.items()}
 
         return value
 
     @staticmethod
     def _default_optimization(
-            func, p0, bounds=None, max_deltas=None, sign=1.0, iterations=100,
-            recency=1.0
+        func, p0, bounds=None, max_deltas=None, sign=1.0, iterations=100, recency=1.0
     ):
         """Very basic random step optimization algorithm"""
         pbest = p = np.array(p0)
         fbest = func(p0)
 
         for i in range(iterations):
-
             # generate new knobs settings
             dp = np.array(
-                [max_delta*(2*np.random.rand()-1) for max_delta in max_deltas]
+                [max_delta * (2 * np.random.rand() - 1) for max_delta in max_deltas]
             )
 
             p = p + dp
@@ -817,7 +820,7 @@ class Optimization(Routine):
                 p = np.min([p, np.array(bounds)[:, 1]], axis=0)  # enforce upper bounds
 
             f = func(p)  # evaluate the meter
-            if sign*f > sign*fbest:  # new best settings found; store values
+            if sign * f > sign * fbest:  # new best settings found; store values
                 pbest = p
                 fbest = f
             else:  # reevaluate meter at best knob settings
@@ -828,12 +831,14 @@ class Optimization(Routine):
 
 
 class Maximization(Optimization):
-    """Alias for `Optimization` with `sign` implicitly set to +1.0 """
+    """Alias for `Optimization` with `sign` implicitly set to +1.0"""
+
     _sign = +1.0
 
 
 class Minimization(Optimization):
-    """Alias for `Optimization` with `sign` implicitly set to -1.0 """
+    """Alias for `Optimization` with `sign` implicitly set to -1.0"""
+
     _sign = -1.0
 
 
