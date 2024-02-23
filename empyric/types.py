@@ -92,6 +92,16 @@ Float.register(float)
 Float.register(np.floating)
 
 
+class Complex(Type):
+    """Abstract base class for `float` and `numpy.floating`"""
+
+    pass
+
+
+Complex.register(complex)
+Complex.register(np.complex128)
+
+
 class String(Type):
     """Abstract base class for `str` and `numpy.str_`"""
 
@@ -172,6 +182,8 @@ def recast(value: Any, to: type = Type) -> Union[Type, None]:
                     return np.int64(value)
                 elif issubclass(dtype, Float):
                     return np.float64(value)
+                elif issubclass(dtype, Complex):
+                    return np.complex128(value)
                 elif issubclass(dtype, String):
                     return np.str_(value)
                 elif issubclass(dtype, Array) and np.ndim(value) > 0:
@@ -197,6 +209,8 @@ def recast(value: Any, to: type = Type) -> Union[Type, None]:
             return np.int64(value)
         elif isinstance(value, Float):
             return np.float64(value)
+        elif isinstance(value, Complex):
+            return np.complex128(value)
         elif isinstance(value, String):
             if value.lower() == "true":  # boolean True
                 return np.bool_(True)
