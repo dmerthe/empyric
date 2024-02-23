@@ -53,10 +53,19 @@ class OmegaCN7500(Instrument):
     def set_output(self, state: Toggle):
         if state == ON:
             # turn on output & start PID control
-            self.backend.write_bit(5, 0x814, 1)
+            self.write(5, 0x0814, 1)
         elif state == OFF:
             # turn off output & stop PID control
-            self.backend.write_bit(5, 0x814, 0)
+            self.write(5, 0x0814, 0)
+
+    @getter
+    def get_output(self) -> Toggle:
+        result = self.read(1, 0x0814)
+        if result:
+            return ON
+        else:
+            return OFF
+
 
     @setter
     def set_setpoint(self, setpoint: Float):
