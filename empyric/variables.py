@@ -345,6 +345,9 @@ class Expression(Variable):
             return f"Expression({self.expression} = {self.value})"
         elif isinstance(self.value, Array):
             return f"Expression({self.expression} = Array{np.shape(self.value)}"
+        else:
+            return f"Expression({self.expression} = " \
+                   f"{str(self.value)[:50]} ... {str(self.value)[-50:]}"
 
     # Utility functions for Fourier analysis
     @staticmethod
