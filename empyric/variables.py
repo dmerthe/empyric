@@ -6,8 +6,7 @@ import time
 import typing
 import warnings
 from functools import wraps
-import numpy as np  # functions used in Expression's eval call
-from scipy.optimize import curve_fit
+import numpy as np  # used in Expression's eval call
 
 from empyric.collection.instrument import Instrument
 
