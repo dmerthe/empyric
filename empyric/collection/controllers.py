@@ -13,9 +13,30 @@ class OmegaCN7500(Instrument):
     supported_adapters = (
         (
             Modbus,
-            {"baud_rate": 38400, "parity": "N", "delay": 0.2},
+            {"baud_rate": 38400, "parity": "N", "delay": 0.2, "slave_id": 1},
         ),
     )
+
+    scale_factors = {
+        0: 0.1,  # K-Type Thermocouple
+        1: 0.1,  # J-Type Thermocouple
+        2: 0.1,  # T-Type Thermocouple
+        3: 0.1,  # E-Type Thermocouple
+        4: 0.1,  # N-Type Thermocouple
+        5: 0.1,  # R-Type Thermocouple
+        6: 0.1,  # S-Type Thermocouple
+        7: 0.1,  # B-Type Thermocouple
+        8: 0.1,  # L-Type Thermocouple
+        9: 0.1,  # U-Type Thermocouple
+        10: 0.1,  # TXK-Type Thermocouple
+        11: 0.1,  # JPt100-Type RTD
+        12: 0.1,  # Pt100-Type RTD
+        13: 0.001,  # 0-5V Analog Input
+        14: 0.001,  # 0-10V Analog Input
+        15: 0.001,  # 0-20mA Analog Input
+        16: 0.001,  # 4-20mA Analog Input
+        17: 0.001,  # 0-50mV Analog Input
+    }
 
     knobs = (
         "output",
@@ -23,6 +44,7 @@ class OmegaCN7500(Instrument):
         "proportional band",
         "integration time",
         "derivative time",
+        "sensor type"
     )
 
     meters = ("temperature", "power")
@@ -31,50 +53,76 @@ class OmegaCN7500(Instrument):
     def set_output(self, state: Toggle):
         if state == ON:
             # turn on output & start PID control
-            self.backend.write_bit(0x814, 1)
+            self.backend.write_bit(5, 0x814, 1)
         elif state == OFF:
             # turn off output & stop PID control
-            self.backend.write_bit(0x814, 0)
+            self.backend.write_bit(5, 0x814, 0)
 
     @setter
     def set_setpoint(self, setpoint: Float):
-        self.write(0x1001, int(10 * setpoint))
+        if self.get_sensor_type() in self.scale_factors.keys():
+            scaler = self.scale_factors[self.get_sensor_type()]
+        else:
+            scaler = 0.1
+
+        self.write(6, 0x1001, int(setpoint / scaler))
 
     @getter
     def get_setpoint(self) -> Float:
-        return self.read(3, 1001) / 10
+        if self.get_sensor_type() in self.scale_factors.keys():
+            scaler = self.scale_factors[self.get_sensor_type()]
+        else:
+            scaler = 0.1
+
+        return self.read(3, 0x1001) * scaler
 
     @setter
     def set_proportional_band(self, P: Integer):
-        self.write(0x1009, P)
+        self.write(6, 0x1009, P)
 
     @getter
     def get_proportional_band(self) -> Integer:
-        return self.read(0x1009)
+        return self.read(3, 0x1009)
 
     @setter
     def set_integration_time(self, Ti: Integer):
-        self.write(0x100A, Ti)
+        self.write(6, 0x100A, Ti)
 
     @getter
     def get_integration_time(self) -> Integer:
-        return self.read(0x100A)
+        return self.read(3, 0x100A)
 
     @setter
     def set_derivative_time(self, Td: Integer):
-        self.write(0x100B, Td)
+        self.write(6, 0x100B, Td)
 
     @getter
     def get_derivative_time(self) -> Integer:
-        return self.read(0x100B)
+        return self.read(3, 0x100B)
+
+    @setter
+    def set_sensor_type(self, sensor_type: Integer):
+        self.write(6, 0x1004, sensor_type)
+
+    @getter
+    def get_sensor_type(self) -> Integer:
+        return self.read(3, 0x1004)
 
     @measurer
     def measure_temperature(self) -> Float:
-        return self.read(0x1000) / 10
+        if self.get_sensor_type() in self.scale_factors.keys():
+            scaler = self.scale_factors[self.get_sensor_type()]
+        else:
+            scaler = 0.1
+        return self.read(3, 0x1000) * scaler
 
     @measurer
     def measure_power(self) -> Float:
-        return self.read(0x1000) / 10
+        if self.get_sensor_type() in self.scale_factors.keys():
+            scaler = self.scale_factors[self.get_sensor_type()]
+        else:
+            scaler = 0.1
+        return self.read(3, 0x1000) * scaler
 
 
 class OmegaPlatinum(Instrument):

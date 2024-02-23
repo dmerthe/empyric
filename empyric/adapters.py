@@ -1176,10 +1176,11 @@ class Modbus(Adapter):
 
             if len(address) == 1:
                 # assume slave id is zero if not specified
-                port, slave_id = address[0], 0
-
+                if not hasattr(self, "slave_id"):
+                    self.slave_id = 0
+                port = address[0]
             else:
-                port, slave_id = address
+                port, self.slave_id = address
 
             if port in Modbus._serial_adapters:
                 Modbus._serial_adapters[port].append(self)
@@ -1200,8 +1201,6 @@ class Modbus(Adapter):
 
                 self.backend.connect()
 
-            self.slave_id = slave_id
-
         # Get data reading/writing utility classes
         payload_module = importlib.import_module(".payload", package="pymodbus")
 
@@ -1213,7 +1212,7 @@ class Modbus(Adapter):
 
         self.connected = True
 
-    def _write(self, func_code, address, values, _type=None):
+    def _write(self, func_code, address, values, _type="16bit_uint"):
         """
         Write values to coils (func_code = 5 [single] or 15 [multiple]) or
         holding registers (func_code = 6 [single] or 16 [multiple]).
@@ -1275,7 +1274,7 @@ class Modbus(Adapter):
                     "for writing coils/registers"
                 )
 
-    def _read(self, func_code, address, count=1, _type=None):
+    def _read(self, func_code, address, count=1, _type="16bit_uint"):
         """
         Read from coils (func_code = 1), discrete inputs (func_code = 2),
         holding registers (func_code = 3), or input registers (func_code = 4).
@@ -1315,7 +1314,6 @@ class Modbus(Adapter):
 
         elif func_code in [3, 4]:
             # Read holding registers or input registers
-
             registers = read_functions[func_code](
                 address, count=count, slave=self.slave_id
             ).registers
