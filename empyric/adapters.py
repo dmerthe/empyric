@@ -1220,21 +1220,52 @@ class Modbus(Adapter):
         The Modbus data type for decoding registers is specified by the `_type`
         argument. Valid values for `_type` are listed in the `_types` attribute.
         """
+        if _type and _type not in self.types:
+            raise TypeError(
+                "invalid _type argument; must be one of:\n" ", ".join(self.types)
+            )
+
+        # Enumerate modbus write functions
+        write_functions = {
+            5: self.backend.write_coil,
+            15: self.backend.write_coils,
+            6: self.backend.write_register,
+            16: self.backend.write_registers
+        }
 
         values = np.array([values]).flatten()
 
-        if func_code not in [5, 15, 6, 16]:
-            raise ValueError(f"invalid Modbus function code {func_code}")
+        if func_code == 5:
+            # Write single coil
+            if len(values) == 1:
+                bool_value = bool(values[0])
+            else:
+                raise TypeError(
+                    "Invalid [values] argument for function code 5"
+                    "(write single coil); "
+                    "[values] must have a length of 1"
+                )
 
-        if _type and _type not in self.types:
-            raise TypeError(
-                "invalid _type argument; must be one of:\n" + ", ".join(self.types)
+            response = self.backend.write_coil(
+                address, bool_value, slave=self.slave_id
             )
 
-        if "5" in str(func_code):
-            # Write coils
-
-            bool_values = [bool(value) for value in values]
+            if response.function_code == 5:
+                return "Success"
+            else:
+                raise AdapterError(
+                    f"Error writing to coil on {self.instrument.name}"
+                )
+        elif func_code == 15:
+            # Write multiple coils
+            if len(values) > 1:
+                bool_values = [bool(value) for value in values]
+            else:
+                raise TypeError(
+                    "Invalid [values] argument for function code 15"
+                    "(write multiple coils); "
+                    "[values] must have a length greater than 1"
+                )
 
             response = self.backend.write_coils(
                 address, bool_values, slave=self.slave_id
@@ -1244,15 +1275,10 @@ class Modbus(Adapter):
                 return "Success"
             else:
                 raise AdapterError(
-                    f"error writing to coil(s) on {self.instrument.name}"
+                    f"Error writing to coil(s) on {self.instrument.name}"
                 )
-
-        else:
-            # Write registers
-
-            if _type is None:
-                _type = "16bit_uint"
-
+        elif func_code == 16 or func_code == 6:
+            # Write multiple registers
             builder = self._builder_cls(
                 byteorder=self.byte_order, wordorder=self.word_order
             )
@@ -1270,9 +1296,13 @@ class Modbus(Adapter):
                 return "Success"
             else:
                 raise AdapterError(
-                    f"error writing to register(s) on {self.instrument.name} "
-                    "for writing coils/registers"
+                    f"Error writing to register(s) on {self.instrument.name}"
                 )
+        else:
+            raise TypeError(
+                f"Invalid function code [{func_code}]. Function code options are "
+                f"5, 15, 6, or 16. See docs for details."
+            )
 
     def _read(self, func_code, address, count=1, _type="16bit_uint"):
         """
