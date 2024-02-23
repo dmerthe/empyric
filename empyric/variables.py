@@ -269,6 +269,8 @@ class Expression(Variable):
 
     _settable = False  #:
 
+    # shorthand terms for common functions
+    # TODO consolidate these functions in a separate module
     _functions = {
         "sqrt(": "np.sqrt(",
         "exp(": "np.exp(",
@@ -387,6 +389,8 @@ class Expression(Variable):
 
     @staticmethod
     def demod(s, dt, f0, bw=np.inf, cycles=np.inf, filt=None):
+        """Demodulate an oscillatory signal"""
+
         if np.isfinite(cycles):
             # Partition signal into segments containing integer number of carrier cycles
             fc = Expression.carrier(s, dt, f0, bw=bw)
@@ -407,7 +411,7 @@ class Expression(Variable):
             freq = np.fft.fftfreq(len(partition), d=dt)  # frequency values for the FFT
             fft = np.fft.fft(partition)
 
-            # Find principal frequency in FFT within the given band about the given frequency
+            # Find principal frequency within the given band about the given frequency
             fft_in_positive_band = np.abs(
                 fft * ((freq > f0 - 0.5 * bw) & (freq < f0 + 0.5 * bw))
             )
