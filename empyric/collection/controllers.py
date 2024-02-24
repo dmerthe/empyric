@@ -47,7 +47,7 @@ class OmegaCN7500(Instrument):
         "sensor type"
     )
 
-    meters = ("temperature", "power")
+    meters = ("temperature", "power", "output level")
 
     @setter
     def set_output(self, state: Toggle):
@@ -87,7 +87,12 @@ class OmegaCN7500(Instrument):
 
     @setter
     def set_proportional_band(self, P: Integer):
-        self.write(6, 0x1009, P)
+        round_P = round(P)
+        if P != round_P:
+            warn(
+                f"Proportional band value {P} will be rounded to {round_P}"
+            )
+        self.write(6, 0x1009, round_P)
 
     @getter
     def get_proportional_band(self) -> Integer:
@@ -95,7 +100,12 @@ class OmegaCN7500(Instrument):
 
     @setter
     def set_integration_time(self, Ti: Integer):
-        self.write(6, 0x100A, Ti)
+        round_Ti = round(Ti)
+        if Ti != round_Ti:
+            warn(
+                f"Integration time value {Ti} will be rounded to {round_Ti}"
+            )
+        self.write(6, 0x100A, round_Ti)
 
     @getter
     def get_integration_time(self) -> Integer:
@@ -103,7 +113,12 @@ class OmegaCN7500(Instrument):
 
     @setter
     def set_derivative_time(self, Td: Integer):
-        self.write(6, 0x100B, Td)
+        round_Td = round(Td)
+        if Td != round_Td:
+            warn(
+                f"Derivative time value {Td} will be rounded to {round_Td}"
+            )
+        self.write(6, 0x100B, round_Td)
 
     @getter
     def get_derivative_time(self) -> Integer:
@@ -132,6 +147,14 @@ class OmegaCN7500(Instrument):
         else:
             scaler = 0.1
         return self.read(3, 0x1000) * scaler
+
+    @getter
+    def measure_output_level(self) -> Float:
+        if self.get_sensor_type() in self.scale_factors.keys():
+            scaler = self.scale_factors[self.get_sensor_type()]
+        else:
+            scaler = 0.1
+        return self.read(3, 0x1012) * scaler
 
 
 class OmegaPlatinum(Instrument):
