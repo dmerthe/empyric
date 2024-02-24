@@ -228,6 +228,8 @@ class Routine:
         Makes any final actions after the routine ends
         """
 
+        pass
+
 
 class Set(Routine):
     """
@@ -397,6 +399,8 @@ class Timecourse(Routine):
         if "end" not in kwargs:
             self.end = np.max(self.times)
 
+        self.ramp = kwargs.get('ramp', True)
+
     @Routine.enabler
     def update(self, state):
         knobs_times_values = zip(self.knobs, self.times, self.values)
@@ -421,10 +425,14 @@ class Timecourse(Routine):
             if next_value in list(state.keys()):
                 next_value = state[next_value]
 
-            # Ramp linearly between numerical values
-            value = last_value + (next_value - last_value) * (
-                state["Time"] - last_time
-            ) / (next_time - last_time)
+            if self.ramp:
+                # Ramp linearly between numerical values
+                value = last_value + (next_value - last_value) * (
+                        state["Time"] - last_time
+                ) / (next_time - last_time)
+            else:
+                # or just set to last value
+                value = last_value
 
             self.knobs[knob].value = value
 
@@ -470,7 +478,7 @@ class Sequence(Routine):
         else:
             self.values = values
 
-        # Times and/or values can be stored in CSV files
+        # Values can be stored in CSV files
         for i, v_elem in enumerate(self.values):
             if type(v_elem[0]) == str and ".csv" in v_elem[0]:
                 df = pd.read_csv(v_elem[0])
@@ -490,6 +498,8 @@ class Sequence(Routine):
 
         self.values = np.array(self.values, dtype=object)
 
+        self.repeat = kwargs.get('repeat', True)
+
         self.iteration = 0
 
     @Routine.enabler
@@ -503,6 +513,9 @@ class Sequence(Routine):
             knob.value = value
 
         self.iteration = (self.iteration + 1) % len(self.values[0])
+
+        if self.repeat and self.iteration == 0:
+            self.end = state['Time']  # set to end immediately
 
     def finish(self, state):
         # Upon routine completion, set each knob to its final value
