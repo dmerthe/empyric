@@ -528,20 +528,23 @@ class SorensenXG10250(Instrument):
 
     name = "SorensenXG10250"
 
-    supported_adapters = ((Serial, {"baud_rate": 9600, "read_termination": "\r"}),)
+    supported_adapters = ((Serial, {"baud_rate": 9600,
+                                    "read_termination": "\r",
+                                    "lib": "pyserial"}),)
 
     knobs = ("max voltage", "max current", "output", "analog control mode")
 
     meters = ("voltage", "current", "analog input voltage", "analog input current",
-              "iso analog input current")
+              "isolated analog input current")
 
     def __init__(self,  address=None, adapter=None, presets=None,
                  postsets=None, **kwargs):
-        # super().__init__(**kwargs)
-        # self.write("*ADR 1")
+
         self.address = address
 
         self.knobs = ("connected",) + self.knobs
+
+        self.analog_mode_state = None
 
         adapter_connected = False
         if adapter:
@@ -597,26 +600,33 @@ class SorensenXG10250(Instrument):
 
         self.kwargs = kwargs
 
+    def float_validator(self, response):
+        return bool(re.match("\d+\.\d+", response)) #.decode("utf-8")))
 
     @measurer
     def measure_current(self):
-        return float(self.query("MEAS:CURR?").decode("utf-8"))
+        # return float(self.query("MEAS:CURR?", validator=self.float_validator))
+        return self.query("MEAS:CURR?", validator=self.float_validator)
 
     @measurer
     def measure_voltage(self):
-        return float(self.query("MEAS:VOLT?").decode("utf-8"))
+        # return float(self.query("MEAS:VOLT?", validator=self.float_validator))
+        return self.query("MEAS:VOLT?", validator=self.float_validator)
 
     @measurer
     def measure_analog_input_voltage(self):
-        return float(self.query("MEAS:APR?").decode("utf-8"))
+        # return float(self.query("MEAS:APR?", validator=self.float_validator))
+        return self.query("MEAS:APR?", validator=self.float_validator)
 
     @measurer
     def measure_analog_input_current(self):
-        return float(self.query("MEAS:APR:CURR?").decode("utf-8"))
+        # return float(self.query("MEAS:APR:CURR?", validator=self.float_validator))
+        return self.query("MEAS:APR:CURR?", validator=self.float_validator)
 
     @measurer
-    def measure_iso_analog_input_current(self):
-        return float(self.query("MEAS:APR:CURR:ISO?").decode("utf-8"))
+    def measure_isolated_analog_input_current(self):
+        # return float(self.query("MEAS:APR:CURR:ISOL?", validator=self.float_validator))
+        return self.query("MEAS:APR:CURR:ISOL?", validator=self.float_validator)
 
     @setter
     def set_output(self, output: Toggle):
@@ -632,6 +642,18 @@ class SorensenXG10250(Instrument):
         if analog_control_mode == OFF:
             self.write("SYST:REM:SOUR:CURR LOC")
 
+        # Verify mode was sent
+        def str_validator(response):
+            return bool(re.match("Current mode: .*", response))
+
+        response = self.query("SYST:REM:SOUR:CURR?",
+                              validator=str_validator,
+                              until='\r')
+        if "Analog Isolated" in response:
+            self.analog_mode_state = ON
+        elif "LOCAL" in response:
+            self.analog_mode_state = OFF
+
     @setter
     def set_max_current(self, current):
         self.write("SOUR:CURR " + str(current))
@@ -642,15 +664,17 @@ class SorensenXG10250(Instrument):
 
     @getter
     def get_max_current(self):
-        return float(self.query("SOUR:CURR?").decode("utf-8"))
+        # return float(self.query("SOUR:CURR?")) # .decode("utf-8"))
+        return self.query("SOUR:CURR?")
 
     @getter
     def get_max_voltage(self):
-        return float(self.query("SOUR:VOLT?").decode("utf-8"))
+        # return float(self.query("SOUR:VOLT?")) # .decode("utf-8"))
+        return self.query("SOUR:VOLT?")
 
     @getter
     def get_output(self) -> Toggle:
-        response = self.query("OUTP?").decode("utf-8")
+        response = self.query("OUTP?") # .decode("utf-8")
         if response.startswith("0"):
             return OFF
         elif response.startswith("1"):
@@ -658,11 +682,19 @@ class SorensenXG10250(Instrument):
 
     @getter
     def get_analog_control_mode(self) -> Toggle:
-        response = self.query("SYST:REM:SOUR:CURR?").decode("utf-8")
-        if "Analog Isolated" in response:
-            return ON
-        elif "LOCAL" in response:
-            return OFF
+        if self.analog_mode_state is None:
+            def str_validator(response):
+                return bool(re.match("Current mode: .*", response))
+
+            response = self.query("SYST:REM:SOUR:CURR?",
+                                  validator=str_validator,
+                                  until='\r')
+            if "Analog Isolated" in response:
+                self.analog_mode_state = ON
+            elif "LOCAL" in response:
+                self.analog_mode_state = OFF
+
+        return self.analog_mode_state
 
 class BK9140(Instrument):
     """
