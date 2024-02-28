@@ -116,6 +116,12 @@ class Variable:
         else:
             return self._value + other
 
+    def __sub__(self, other):
+        if isinstance(other, Variable):
+            return self._value - other._value
+        else:
+            return self._value - other
+
     def __bool__(self):
         return np.bool(self._value)
 
@@ -660,7 +666,10 @@ class Parameter(Variable):
 
     _settable = True  #:
 
-    def __init__(self, parameter: Type):
+    def __init__(
+            self,
+            parameter: Union[float, bool, str, Toggle, np.ndarray]
+    ):
         self.parameter = parameter
         self._value = parameter
 
