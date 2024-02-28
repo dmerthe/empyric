@@ -1115,7 +1115,10 @@ class ModbusServer(Routine):
 
     assert_control = False
 
-    def __init__(self, knobs: dict = None, meters: Array = None, **kwargs):
+    def __init__(self,
+                 knobs: dict = None,
+                 meters: Union[list, tuple, np.ndarray] = None,
+                 **kwargs):
         if knobs is None:
             knobs = {}
 
