@@ -668,7 +668,7 @@ class Parameter(Variable):
 
     def __init__(
             self,
-            parameter: Union[float, bool, str, Toggle, np.ndarray]
+            parameter: Union[float, int, bool, str, Toggle, np.ndarray]
     ):
         self.parameter = parameter
         self._value = parameter
