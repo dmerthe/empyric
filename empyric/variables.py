@@ -331,7 +331,7 @@ class Expression(Variable):
             no_infs = (np.inf not in all_values) and (-np.inf not in all_values)
 
             valid_values = no_nones and no_nans and no_infs
-            ""
+
             if valid_values:
                 self._value = eval(expression, {**globals(), **variables}, locals())
             else:
@@ -353,8 +353,10 @@ class Expression(Variable):
         elif isinstance(self.value, Array):
             return f"Expression({self.expression} = Array{np.shape(self.value)}"
         else:
-            return f"Expression({self.expression} = " \
-                   f"{str(self.value)[:50]} ... {str(self.value)[-50:]}"
+            return (
+                f"Expression({self.expression} = "
+                f"{str(self.value)[:50]} ... {str(self.value)[-50:]}"
+            )
 
     # Utility functions for Fourier analysis
     @staticmethod
@@ -666,10 +668,7 @@ class Parameter(Variable):
 
     _settable = True  #:
 
-    def __init__(
-            self,
-            parameter: Union[float, int, bool, str, Toggle, np.ndarray]
-    ):
+    def __init__(self, parameter: Union[float, int, bool, str, Toggle, np.ndarray]):
         self.parameter = parameter
         self._value = parameter
 

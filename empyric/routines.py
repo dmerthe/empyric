@@ -399,7 +399,7 @@ class Timecourse(Routine):
         if "end" not in kwargs:
             self.end = np.max(self.times)
 
-        self.ramp = kwargs.get('ramp', True)
+        self.ramp = kwargs.get("ramp", True)
 
     @Routine.enabler
     def update(self, state):
@@ -428,7 +428,7 @@ class Timecourse(Routine):
             if self.ramp:
                 # Ramp linearly between numerical values
                 value = last_value + (next_value - last_value) * (
-                        state["Time"] - last_time
+                    state["Time"] - last_time
                 ) / (next_time - last_time)
             else:
                 # or just set to last value
@@ -498,7 +498,7 @@ class Sequence(Routine):
 
         self.values = np.array(self.values, dtype=object)
 
-        self.repeat = kwargs.get('repeat', True)
+        self.repeat = kwargs.get("repeat", True)
 
         self.iteration = 0
 
@@ -515,7 +515,7 @@ class Sequence(Routine):
         self.iteration = (self.iteration + 1) % len(self.values[0])
 
         if self.repeat and self.iteration == 0:
-            self.end = state['Time']  # set to end immediately
+            self.end = state["Time"]  # set to end immediately
 
     def finish(self, state):
         # Upon routine completion, set each knob to its final value
@@ -1115,10 +1115,12 @@ class ModbusServer(Routine):
 
     assert_control = False
 
-    def __init__(self,
-                 knobs: dict = None,
-                 meters: Union[list, tuple, np.ndarray] = None,
-                 **kwargs):
+    def __init__(
+        self,
+        knobs: dict = None,
+        meters: Union[list, tuple, np.ndarray] = None,
+        **kwargs,
+    ):
         if knobs is None:
             knobs = {}
 

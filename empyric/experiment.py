@@ -84,7 +84,8 @@ class Experiment:
 
         # Used to block evaluation of expressions
         # until their dependee variables are evaluated
-        self.eval_events = {name: threading.Event() for name in variables}
+        for variable in self.variables.values():
+            variable._eval_event = threading.Event()
 
         if routines:
             self.routines = routines
@@ -149,8 +150,8 @@ class Experiment:
 
         # Get all variable values if experiment is running or holding
         if self.running or self.holding:
-            for event in self.eval_events.values():
-                event.clear()
+            for variable in self.variables.values():
+                variable._eval_event.clear()
 
             # Run each measure / get operation in its own thread
             threads = {}
@@ -189,9 +190,10 @@ class Experiment:
 
         try:
             if isinstance(self.variables[name], _variables.Expression):
-                for dependee in self.variables[name].definitions:
-                    event = self.eval_events[dependee]
-                    event.wait()  # wait for dependee to be evaluated
+                for symbol, dependee in self.variables[name].definitions.items():
+                    if hasattr(dependee, "_eval_event"):
+                        # wait for dependee to be evaluated
+                        dependee._eval_event.wait()
 
             try:
                 value = self.variables[name].value
@@ -200,7 +202,7 @@ class Experiment:
             except ValueError:
                 value = None
 
-            self.eval_events[name].set()
+            self.variables[name]._eval_event.set()
             # unblock threads evaluating dependents
 
             if np.size(value) > 1:  # store array data as CSV files
@@ -347,7 +349,7 @@ class Alarm:
 
     @property
     def triggered(self):
-        return self.trigger_variable.value is True
+        return bool(self.trigger_variable.value)
 
     def __repr__(self):
         return "Alarm"
@@ -714,18 +716,18 @@ def convert_runcard(runcard):
             )
         elif "expression" in specs:
             expression = specs["expression"]
-            definitions = {}
+            definitions = specs.get("definitions", {}).copy()
 
-            for symbol, var_name in specs["definitions"].items():
-                expression = expression.replace(symbol, var_name)
-
-                try:
-                    definitions[var_name] = variables[var_name]
-                except KeyError as undefined:
+            for variable in definitions.values():
+                if variable not in variables:
                     raise KeyError(
-                        f"variable {undefined} is not defined for expression "
-                        f"'{name}'"
+                        f"variable {variable} specified for alarm {name} "
+                        f"is not in Variables!"
                     )
+
+            definitions = {
+                symbol: variables[name] for symbol, name in definitions.items()
+            }
 
             variables[name] = _variables.Expression(
                 expression=expression, definitions=definitions
@@ -779,51 +781,24 @@ def convert_runcard(runcard):
     alarms = {}
     if "Alarms" in runcard:
         for name, specs in runcard["Alarms"].items():
-            alarm_variables = specs.copy().get("variables", {})
             condition = specs.copy()["condition"]
+            definitions = specs.copy().get("definitions", {})
 
-            for variable in specs.get("variables", {}):
+            for variable in definitions.values():
                 if variable not in variables:
                     raise KeyError(
                         f"variable {variable} specified for alarm {name} "
                         f"is not in Variables!"
                     )
 
-            alphabet = "abcdefghijklmnopqrstuvwxyz"
-            for var_name, variable in variables.items():
-                # Variables can be called by name in the condition
-                if var_name in condition:
-                    temp_name = "".join(
-                        [
-                            alphabet[  # pylint: disable=invalid-sequence-index
-                                np.random.randint(0, len(alphabet))
-                            ]
-                            for i in range(3)
-                        ]
-                    )
-                    while temp_name in alarm_variables:
-                        # make sure temp_name is not repeated
-                        temp_name = "".join(
-                            [
-                                alphabet[  # pylint: disable=invalid-sequence-index
-                                    np.random.randint(0, len(alphabet))
-                                ]
-                                for i in range(3)
-                            ]
-                        )
-
-                    alarm_variables.update({temp_name: variable})
-                    condition = condition.replace(var_name, temp_name)
-
-                # Otherwise, they are defined in the alarm_variables
-                for symbol, alarm_variable_name in alarm_variables.items():
-                    if alarm_variable_name == var_name:
-                        alarm_variables[symbol] = variable
+            definitions = {
+                symbol: variables[name] for symbol, name in definitions.items()
+            }
 
             alarms.update(
                 {
                     name: Alarm(
-                        condition, alarm_variables, protocol=specs.get("protocol", None)
+                        condition, definitions, protocol=specs.get("protocol", None)
                     )
                 }
             )

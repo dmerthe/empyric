@@ -1230,7 +1230,7 @@ class Modbus(Adapter):
             5: self.backend.write_coil,
             15: self.backend.write_coils,
             6: self.backend.write_register,
-            16: self.backend.write_registers
+            16: self.backend.write_registers,
         }
 
         values = np.array([values]).flatten()
@@ -1246,16 +1246,12 @@ class Modbus(Adapter):
                     "[values] must have a length of 1"
                 )
 
-            response = self.backend.write_coil(
-                address, bool_value, slave=self.slave_id
-            )
+            response = self.backend.write_coil(address, bool_value, slave=self.slave_id)
 
             if response.function_code == 5:
                 return "Success"
             else:
-                raise AdapterError(
-                    f"Error writing to coil on {self.instrument.name}"
-                )
+                raise AdapterError(f"Error writing to coil on {self.instrument.name}")
         elif func_code == 15:
             # Write multiple coils
             if len(values) > 1:
