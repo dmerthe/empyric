@@ -42,7 +42,6 @@ class Experiment:
     HOLDING = "Holding"  # Routines are stopped, but measurements are ongoing
     STOPPED = "Stopped"  # Both routines and measurements are stopped
     TERMINATED = "Terminated"
-
     # Experiment has either finished or has been terminated by the user
 
     @property
