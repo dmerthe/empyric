@@ -497,6 +497,20 @@ class LabJackT7(Instrument):
         "AIN13",
         "AIN all",
         "device temperature",
+        "AIN0TC",
+        "AIN1TC",
+        "AIN2TC",
+        "AIN3TC",
+        "AIN4TC",
+        "AIN5TC",
+        "AIN6TC",
+        "AIN7TC",
+        "AIN8TC",
+        "AIN9TC",
+        "AIN10TC",
+        "AIN11TC",
+        "AIN12TC",
+        "AIN13TC",
     )
 
     def _set_DION(self, n, value: Integer):
@@ -507,6 +521,9 @@ class LabJackT7(Instrument):
 
     def _measure_AIN(self, n) -> Float:
         return self.read(3, 2 * n, count=2, _type="32bit_float")
+    
+    def _measure_AIN_EF_READ_A(self, n) -> Float:
+        return self.read(3, 2 * n + 7000, count=2, _type="32bit_float")
 
     @setter
     def set_DIO0(self, value: Integer):
@@ -637,3 +654,59 @@ class LabJackT7(Instrument):
     def measure_device_temperature(self) -> Float:
         """Device temperature in C"""
         return self.read(4, 60052, count=2, _type="32bit_float") - 273.15
+
+    @measurer
+    def measure_AIN0TC(self) -> Float:
+        return self._measure_AIN_EF_READ_A(0)
+
+    @measurer
+    def measure_AIN1TC(self) -> Float:
+        return self._measure_AIN_EF_READ_A(1)
+
+    @measurer
+    def measure_AIN2TC(self) -> Float:
+        return self._measure_AIN_EF_READ_A(2)
+
+    @measurer
+    def measure_AIN3TC(self) -> Float:
+        return self._measure_AIN_EF_READ_A(3)
+
+    @measurer
+    def measure_AIN4TC(self) -> Float:
+        return self._measure_AIN_EF_READ_A(4)
+
+    @measurer
+    def measure_AIN5TC(self) -> Float:
+        return self._measure_AIN_EF_READ_A(5)
+
+    @measurer
+    def measure_AIN6TC(self) -> Float:
+        return self._measure_AIN_EF_READ_A(6)
+
+    @measurer
+    def measure_AIN7TC(self) -> Float:
+        return self._measure_AIN_EF_READ_A(7)
+
+    @measurer
+    def measure_AIN8TC(self) -> Float:
+        return self._measure_AIN_EF_READ_A(8)
+
+    @measurer
+    def measure_AIN9TC(self) -> Float:
+        return self._measure_AIN_EF_READ_A(9)
+
+    @measurer
+    def measure_AIN10TC(self) -> Float:
+        return self._measure_AIN_EF_READ_A(10)
+
+    @measurer
+    def measure_AIN11TC(self) -> Float:
+        return self._measure_AIN_EF_READ_A(11)
+
+    @measurer
+    def measure_AIN12TC(self) -> Float:
+        return self._measure_AIN_EF_READ_A(12)
+
+    @measurer
+    def measure_AIN13TC(self) -> Float:
+        return self._measure_AIN_EF_READ_A(13)

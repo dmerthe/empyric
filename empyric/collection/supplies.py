@@ -520,46 +520,129 @@ class SorensenXG10250(Instrument):
     """
     Sorensen XG 10-250 series high current power supply.
 
-    The analog control mode option allows the power supply to operate in a voltage-controlled current mode via its non-isolated input pin.
+    The analog control mode option allows the power supply to operate in a
+    voltage-controlled current mode via its non-isolated input pin.
+
+    By default, the RS-485 multicast address is assumed to be 1.
     """
 
     name = "SorensenXG10250"
 
-    supported_adapters = ((Serial, {"baud_rate": 9600}),)
+    supported_adapters = ((Serial, {"baud_rate": 9600,
+                                    "read_termination": "\r",
+                                    "lib": "pyserial"}),)
 
     knobs = ("max voltage", "max current", "output", "analog control mode")
 
     meters = ("voltage", "current", "analog input voltage", "analog input current")
 
+    def __init__(self,  address=None, adapter=None, presets=None,
+                 postsets=None, **kwargs):
+
+        self.address = address
+
+        self.knobs = ("connected",) + self.knobs
+
+        self.analog_mode_state = None
+
+        adapter_connected = False
+        if adapter:
+            self.adapter = adapter(self, **kwargs)
+        else:
+            errors = []
+            for _adapter, settings in self.supported_adapters:
+                settings.update(kwargs)
+                try:
+                    self.adapter = _adapter(self, **settings)
+                    adapter_connected = True
+                    break
+                except BaseException as error:
+                    msg = (
+                        f"in trying {_adapter.__name__} adapter, "
+                        f"got {type(error).__name__}: {error}"
+                    )
+                    errors.append(msg)
+
+            if not adapter_connected:
+                message = (
+                    f"unable to connect an adapter to "
+                    f"instrument {self.name} at address {address}:\n"
+                )
+                for error in errors:
+                    message = message + f"{error}\n"
+                raise ConnectionError(message)
+
+        if self.address:
+            self.name = self.name + "@" + str(self.address)
+
+        self.write("*ADR 1")  # Set multicast address to 1 by default
+
+        # Get existing knob settings, if possible
+        for knob in self.knobs:
+            if hasattr(self, "get_" + knob.replace(" ", "_")):
+                # retrieves the knob value from the instrument
+                self.__getattribute__("get_" + knob.replace(" ", "_"))()
+            else:
+                # knob value is unknown until it is set
+                self.__setattr__(knob.replace(" ", "_"), None)
+
+        # Apply presets
+        if presets:
+            self.presets = {**self.presets, **presets}
+
+        for knob, value in self.presets.items():
+            self.set(knob, value)
+
+        # Get postsets
+        if postsets:
+            self.postsets = {**self.postsets, **postsets}
+
+        self.kwargs = kwargs
+
+    def float_validator(self, response):
+        return bool(re.match("\d+\.\d+", response))
+
     @measurer
     def measure_current(self):
-        return float(self.query("MEAS:CURR?"))
+        return self.query("MEAS:CURR?", validator=self.float_validator)
 
     @measurer
     def measure_voltage(self):
-        return float(self.query("MEAS:VOLT?"))
+        return self.query("MEAS:VOLT?", validator=self.float_validator)
 
     @measurer
     def measure_analog_input_voltage(self):
-        return float(self.query("MEAS:APR?"))
+        return self.query("MEAS:APR?", validator=self.float_validator)
 
     @measurer
     def measure_analog_input_current(self):
-        return float(self.query("MEAS:APR:CURR?"))
+        return self.query("MEAS:APR:CURR?", validator=self.float_validator)
 
     @setter
     def set_output(self, output: Toggle):
         if output == ON:
-            self.write("OUTP: ON")
+            self.write("OUTP ON")
         elif output == OFF:
-            self.write("OUTP: OFF")
+            self.write("OUTP OFF")
 
     @setter
     def set_analog_control_mode(self, analog_control_mode: Toggle):
         if analog_control_mode == ON:
-            self.write("SYST:REM:SOUR:LOC")
+            self.write("SYST:REM:SOUR:CURR AVOL")
         if analog_control_mode == OFF:
-            self.write("SYST:REM:SOUR:IAV")
+            self.write("SYST:REM:SOUR:CURR LOC")
+
+        # Verify mode was sent
+        def str_validator(response):
+            return bool(re.match("Current mode: .*", response))
+
+        response = self.query("SYST:REM:SOUR:CURR?",
+                              validator=str_validator,
+                              until='\r')
+        if "Analog " in response:
+            self.analog_mode_state = ON
+        elif "LOCAL" in response:
+            self.analog_mode_state = OFF
 
     @setter
     def set_max_current(self, current):
@@ -571,28 +654,35 @@ class SorensenXG10250(Instrument):
 
     @getter
     def get_max_current(self):
-        return float(self.query("SOUR:CURR?"))
+        return self.query("SOUR:CURR?")
 
     @getter
     def get_max_voltage(self):
-        return float(self.query("SOUR:VOLT?"))
+        return self.query("SOUR:VOLT?")
 
     @getter
     def get_output(self) -> Toggle:
         response = self.query("OUTP?")
-        if response == "OFF":
+        if response.startswith("0"):
             return OFF
-        elif response == "ON":
+        elif response.startswith("1"):
             return ON
 
     @getter
     def get_analog_control_mode(self) -> Toggle:
-        response = self.query("SYST:REM:SOUR?")
-        if response == "IAV":
-            return ON
-        elif response == "LOC":
-            return OFF
+        if self.analog_mode_state is None:
+            def str_validator(response):
+                return bool(re.match("Current mode: .*", response))
 
+            response = self.query("SYST:REM:SOUR:CURR?",  # :CURR?",
+                                  validator=str_validator,
+                                  until='\r')
+            if "Analog " in response:
+                self.analog_mode_state = ON
+            elif "LOCAL" in response:
+                self.analog_mode_state = OFF
+
+        return self.analog_mode_state
 
 class BK9140(Instrument):
     """

@@ -1121,12 +1121,13 @@ class Modbus(Adapter):
 
     @property
     def busy(self):
+        address = self.instrument.address.split("::")
         if self.protocol == "Serial":
             return bool(
                 sum(
                     [
                         adapter._busy
-                        for adapter in Modbus._serial_adapters.get(self.port, [])
+                        for adapter in Modbus._serial_adapters.get(address[0], [])
                     ]
                 )
             )
@@ -1175,22 +1176,23 @@ class Modbus(Adapter):
 
             if len(address) == 1:
                 # assume slave id is zero if not specified
-                port, slave_id = address[0], 0
-
+                if not hasattr(self, "slave_id"):
+                    self.slave_id = 0
+                port = address[0]
             else:
-                port, slave_id = address
+                port, self.slave_id = address
 
             if port in Modbus._serial_adapters:
                 Modbus._serial_adapters[port].append(self)
 
                 # use existing backend
-                self.backend = Modbus._serial_adapters[port].backend
+                self.backend = Modbus._serial_adapters[port][0].backend
 
             else:
                 Modbus._serial_adapters[port] = [self]
 
                 self.backend = client.ModbusSerialClient(
-                    address=port,
+                    port=port,
                     baudrate=self.baud_rate,
                     bytesize=self.byte_size,
                     parity=self.parity,
@@ -1198,8 +1200,6 @@ class Modbus(Adapter):
                 )
 
                 self.backend.connect()
-
-            self.slave_id = slave_id
 
         # Get data reading/writing utility classes
         payload_module = importlib.import_module(".payload", package="pymodbus")
@@ -1212,7 +1212,7 @@ class Modbus(Adapter):
 
         self.connected = True
 
-    def _write(self, func_code, address, values, _type=None):
+    def _write(self, func_code, address, values, _type="16bit_uint"):
         """
         Write values to coils (func_code = 5 [single] or 15 [multiple]) or
         holding registers (func_code = 6 [single] or 16 [multiple]).
@@ -1220,21 +1220,52 @@ class Modbus(Adapter):
         The Modbus data type for decoding registers is specified by the `_type`
         argument. Valid values for `_type` are listed in the `_types` attribute.
         """
+        if _type and _type not in self.types:
+            raise TypeError(
+                "invalid _type argument; must be one of:\n" ", ".join(self.types)
+            )
+
+        # Enumerate modbus write functions
+        write_functions = {
+            5: self.backend.write_coil,
+            15: self.backend.write_coils,
+            6: self.backend.write_register,
+            16: self.backend.write_registers
+        }
 
         values = np.array([values]).flatten()
 
-        if func_code not in [5, 15, 6, 16]:
-            raise ValueError(f"invalid Modbus function code {func_code}")
+        if func_code == 5:
+            # Write single coil
+            if len(values) == 1:
+                bool_value = bool(values[0])
+            else:
+                raise TypeError(
+                    "Invalid [values] argument for function code 5"
+                    "(write single coil); "
+                    "[values] must have a length of 1"
+                )
 
-        if _type and _type not in self.types:
-            raise TypeError(
-                "invalid _type argument; must be one of:\n" + ", ".join(self.types)
+            response = self.backend.write_coil(
+                address, bool_value, slave=self.slave_id
             )
 
-        if "5" in str(func_code):
-            # Write coils
-
-            bool_values = [bool(value) for value in values]
+            if response.function_code == 5:
+                return "Success"
+            else:
+                raise AdapterError(
+                    f"Error writing to coil on {self.instrument.name}"
+                )
+        elif func_code == 15:
+            # Write multiple coils
+            if len(values) > 1:
+                bool_values = [bool(value) for value in values]
+            else:
+                raise TypeError(
+                    "Invalid [values] argument for function code 15"
+                    "(write multiple coils); "
+                    "[values] must have a length greater than 1"
+                )
 
             response = self.backend.write_coils(
                 address, bool_values, slave=self.slave_id
@@ -1244,15 +1275,10 @@ class Modbus(Adapter):
                 return "Success"
             else:
                 raise AdapterError(
-                    f"error writing to coil(s) on {self.instrument.name}"
+                    f"Error writing to coil(s) on {self.instrument.name}"
                 )
-
-        else:
-            # Write registers
-
-            if _type is None:
-                _type = "16bit_uint"
-
+        elif func_code == 16 or func_code == 6:
+            # Write multiple registers
             builder = self._builder_cls(
                 byteorder=self.byte_order, wordorder=self.word_order
             )
@@ -1270,11 +1296,15 @@ class Modbus(Adapter):
                 return "Success"
             else:
                 raise AdapterError(
-                    f"error writing to register(s) on {self.instrument.name} "
-                    "for writing coils/registers"
+                    f"Error writing to register(s) on {self.instrument.name}"
                 )
+        else:
+            raise TypeError(
+                f"Invalid function code [{func_code}]. Function code options are "
+                f"5, 15, 6, or 16. See docs for details."
+            )
 
-    def _read(self, func_code, address, count=1, _type=None):
+    def _read(self, func_code, address, count=1, _type="16bit_uint"):
         """
         Read from coils (func_code = 1), discrete inputs (func_code = 2),
         holding registers (func_code = 3), or input registers (func_code = 4).
@@ -1314,7 +1344,6 @@ class Modbus(Adapter):
 
         elif func_code in [3, 4]:
             # Read holding registers or input registers
-
             registers = read_functions[func_code](
                 address, count=count, slave=self.slave_id
             ).registers
