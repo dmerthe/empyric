@@ -574,13 +574,13 @@ class Optimization(Routine):
         self,
         knobs: dict,
         meter: String,
-        bounds: Array,
+        bounds: Union[list, tuple, np.ndarray],
         sign: Float = None,
-        max_deltas: Array = None,
+        max_deltas: Union[float, int, list, tuple, np.ndarray] = None,
         settling_time: Union[Float, String] = 0.0,
         method: String = None,
-        iterations: Integer = 100,
-        samples: Integer = 1,
+        iterations: int = 100,
+        samples: int = 1,
         **kwargs,
     ):
         Routine.__init__(self, knobs, **kwargs)
