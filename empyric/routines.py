@@ -1188,13 +1188,12 @@ class ModbusServer(Routine):
         """
 
         @functools.wraps(setValues_method)
-        def wrapped_method(self2, *args, from_vars=False):
+        def wrapped_method(*args, from_vars=False):
             if from_vars:
                 # update context from variables
-                return setValues_method(self2, *args)
+                return setValues_method(*args)
             else:
                 # update variables according to the request
-
                 fc_as_hex, address, values = args
 
                 if fc_as_hex != 16:
