@@ -477,8 +477,8 @@ class Remote(Variable):
     the server. For Modbus servers, this is the starting address of the
     holding or input register for a read/write or readonly variable,
     respectively. For either set of registers, the starting address is 5*(n-1)
-    for the nth variable in the `readwrite` or `readonly` list/dictionary of
-    variables in the server routine definition.
+    for the nth variable in the `knobs` or `meters` of variables in the server routine
+    definition.
 
     The (optional) `protocol` argument indicates which kind of server to connect
     to. Setting `protocol='modbus'` indicates a Modbus server (controlled by a
@@ -488,9 +488,8 @@ class Remote(Variable):
 
     The `settable` argument is required for remote variables on a Modbus server,
     and is not used for a socket server. If `settable` is set to True, then
-    the variable value is read from the holding registers (`readwrite`
-    variables), otherwise the variable value is read from the input registers
-    (`readonly` variables).
+    the variable value is read from the holding registers (`knobs`), otherwise the
+    variable value is read from the input registers (`meters`).
 
     """
 
