@@ -21,20 +21,26 @@ class Variable:
     experiment.
     """
 
-    _type = None  #: the data type of the variable
+    _type = None  # the data type of the variable
 
     #: time since the epoch of last evaluation in seconds, being equal to the
     #: result of `time.time()` being called upon the most recent evaluation of
     #: the `value` property
     last_evaluation = None
 
-    _settable = False  #: whether the variable can be set by the user
-    _value = None  #: last known value of the variable
+    _settable = False  # whether the variable can be set by the user
+    _value = None  # last known value of the variable
 
-    _hidden = False  #: used by GUIs
+    _hidden = False  # used by GUIs
+
+    @property
+    def type(self):
+        """Data type of the variable"""
+        return self._type
 
     @property
     def settable(self):
+        """Whether values can be assigned to the variable by the user"""
         return self._settable
 
     @property
