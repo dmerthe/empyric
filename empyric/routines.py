@@ -1149,12 +1149,13 @@ class ModbusServer(Routine):
         DataBlock = datastore.ModbusSequentialDataBlock
 
         # Set up a PyModbus TCP Server
-        datastore.ModbusSlaveContext.setValues = self.setValues_decorator(
-            datastore.ModbusSlaveContext.setValues
-        )
 
         self.slave = datastore.ModbusSlaveContext(
             ir=DataBlock.create(), hr=DataBlock.create()
+        )
+
+        self.slave.setValues = self.setValues_decorator(
+            self.slave.setValues
         )
 
         self.context = datastore.ModbusServerContext(slaves=self.slave, single=True)
