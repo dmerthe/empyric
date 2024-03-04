@@ -419,9 +419,6 @@ class Manager:
         self.step_interval = convert_time(self.settings.get("step interval", 0.1))
         self.save_interval = convert_time(self.settings.get("save interval", 60))
         self.plot_interval = convert_time(self.settings.get("plot interval", 0.1))
-        self.end = convert_time(self.settings.get("end", np.inf))
-
-        self.experiment.end = self.end
 
         self.last_save = 0
 
@@ -775,7 +772,16 @@ def convert_runcard(runcard):
 
             routines[name] = available_routines[_type](**specs)
 
-    converted_runcard["Experiment"] = Experiment(variables, routines=routines)
+    end = runcard['Settings'].get('end', np.inf)
+
+    if end.strip().lower() == 'with routines':
+        pass  # pass to Experiment
+    else:
+        end = convert_time(end)
+
+    converted_runcard["Experiment"] = Experiment(
+        variables, routines=routines, end=end
+    )
 
     # Alarms section
     alarms = {}

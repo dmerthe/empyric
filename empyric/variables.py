@@ -538,18 +538,9 @@ class Remote(Variable):
         if self.protocol == "modbus":
             fcode = 3 if self.settable else 4
 
-            type_int = self._client.read(fcode, self.alias + 4, _type="16bit_int")
-
-            _type = {
-                0: Boolean,
-                1: Toggle,
-                2: Integer,
-                3: Float,
-            }.get(type_int, None)
-
-            if _type is not None:
+            if self._type is not None:
                 self._value = self._client.read(
-                    fcode, self.alias, count=4, _type=self.type_map[_type]
+                    fcode, self.alias, count=4, _type=self.type_map[self._type]
                 )
 
         else:
@@ -640,16 +631,30 @@ class Remote(Variable):
 
     def get_type(self):
         """Get the data type of the remote variable"""
-        write_to_socket(self._socket, f"{self.alias} type?")
 
-        response = read_from_socket(self._socket, timeout=60)
+        if self.protocol == 'modbus':
+            fcode = 3 if self.settable else 4
 
-        if response is not None:
-            for _type in types.supported:
-                if str(_type) in response.split(self.alias)[-1]:
-                    self._type = types.supported.get(_type, None)
+            type_int = self._client.read(fcode, self.alias + 4, _type="16bit_int")
+
+            self._type = {
+                0: Boolean,
+                1: Toggle,
+                2: Integer,
+                3: Float,
+            }.get(type_int, None)
+
         else:
-            self._type = None
+            write_to_socket(self._socket, f"{self.alias} type?")
+
+            response = read_from_socket(self._socket, timeout=60)
+
+            if response is not None:
+                for _type in types.supported:
+                    if str(_type) in response.split(self.alias)[-1]:
+                        self._type = types.supported.get(_type, None)
+            else:
+                self._type = None
 
     def get_settable(self):
         """Get settability of remote variable"""
