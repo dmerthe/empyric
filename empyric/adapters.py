@@ -324,6 +324,7 @@ class Serial(Adapter):
 
     def _write(self, message):
         if self.lib == "pyvisa":
+            print(message)  # DEBUG
             self.backend.write(message)
         elif self.lib == "pyserial":
             self.backend.write((message + self.write_termination).encode())

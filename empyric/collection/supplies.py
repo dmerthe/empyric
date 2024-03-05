@@ -850,7 +850,8 @@ class GlassmanOQ500(Instrument):
 
     name = "GlassmanOQ"
 
-    supported_adapters = ((Serial, {"baud_rate": 9600}),)
+    supported_adapters = ((Serial, {"baud_rate": 9600,
+                                    "write_termination": b'\r'}),)
 
     knobs = ("max voltage", "max current", "output enable", 'reset')
 
@@ -933,13 +934,13 @@ class GlassmanOQ500(Instrument):
             return False
 
     @setter
-    def set_max_voltage(self, voltage:Float):
+    def set_max_voltage(self, voltage: Float):
         normalized_voltage_cmd = voltage/self.max_output_voltage
         message: bytes = self._construct_set_message(normalized_voltage_cmd)
         self.query(message, validator=self._acknowledge_validator)
 
     @setter
-    def set_max_current(self, current:Float):
+    def set_max_current(self, current: Float):
         normalized_current_cmd = current/self.max_output_current
         message: bytes = self._construct_set_message(normalized_current_cmd)
         self.query(message, validator=self._acknowledge_validator)
@@ -954,7 +955,7 @@ class GlassmanOQ500(Instrument):
             return OFF
 
     @setter
-    def set_output_enable(self, output:Toggle):
+    def set_output_enable(self, output: Toggle):
         if output == ON:
             message: bytes = self._construct_set_message(hv_on_cmd=True, hv_off_cmd=False)
             self.query(message, validator=self._acknowledge_validator)
@@ -963,7 +964,7 @@ class GlassmanOQ500(Instrument):
             self.query(message, validator=self._acknowledge_validator)
 
     @setter
-    def set_reset(self, reset:Toggle):
+    def set_reset(self, reset: Toggle):
         if reset == ON:
             message: bytes = self._construct_set_message(reset_cmd=True)
             self.write(message)
