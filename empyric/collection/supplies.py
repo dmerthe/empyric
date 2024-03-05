@@ -1,6 +1,8 @@
 from empyric.adapters import *
 from empyric.collection.instrument import *
 from empyric.types import Toggle, Float, ON, OFF
+import struct
+import warnings
 
 
 class Keithley2260B(Instrument):
@@ -838,3 +840,158 @@ class BK9140(Instrument):
     def get_max_voltage_3(self):
         self.write(":INST:SEL 3")
         return float(self.query("SOUR:VOLT?"))
+
+class GlassmanOQ500(Instrument):
+    """
+    Glassman OQ series high voltage power supply (500 kV / 10 mA).
+
+    
+    """
+
+    name = "GlassmanOQ"
+
+    supported_adapters = ((Serial, {"baud_rate": 9600}),)
+
+    knobs = ("max voltage", "max current", "output enable", 'reset')
+
+    meters = ("voltage", "current", "fault state")
+
+    SOH: bytes = b'\x01'
+    EOM: bytes = b'\x0D'
+
+    max_output_voltage = 500,000.0  # 500kV
+    max_output_current = 0.020  # 20 mA
+
+    def _compute_checksum(self, message_segment: bytes) -> bytes:
+        crc = sum(struct.unpack('>'+'B'*len(message_segment), message_segment)) % 256
+        return bytes(format(crc, 'X'), 'utf-8')
+    
+    def _test_checksum(self, message: bytes) -> bool:
+        calculated_crc = self._compute_checksum(message[1:-3])
+        return message[-3:-1] == calculated_crc
+
+    def _wrap_message(self, message_content: bytes) -> bytes:
+        message: bytes = self.SOH
+        message += message_content
+        message += self._compute_checksum(message_content)
+        message += self.EOM
+        return message
+    
+    def _construct_set_message(self,
+                    normalized_voltage_cmd: (float | None) = None,
+                    normalized_current_cmd: (float | None) = None,
+                    hv_on_cmd: (bool | None) = None,
+                    hv_off_cmd: (bool | None) = None,
+                    reset_cmd: (bool | None) = None) -> bytes:
+        # process inputs
+        if normalized_voltage_cmd is not None:
+            self.normalized_voltage_cmd = normalized_voltage_cmd
+        if normalized_current_cmd is not None:
+            self.normalized_current_cmd = normalized_current_cmd
+        if hv_on_cmd is None:
+            self.hv_on_cmd = False
+        else:
+            self.hv_on_cmd = hv_on_cmd
+        if hv_off_cmd is None:
+            self.hv_off_cmd = False
+        else:
+            self.hv_off_cmd = hv_off_cmd
+        if reset_cmd is None:
+            self.reset_cmd = False
+        else:
+            self.reset_cmd = self.reset_cmd
+
+        # construct message
+        message: bytes = b'S'  # command identifier
+        message += bytes(format(int(0xFFF*self.normalized_voltage_cmd), 'X'), 'utf-8')
+        message += bytes(format(int(0xFFF*self.normalized_current_cmd), 'X'), 'utf-8')
+        message += b'000000'  # bytes 9-14
+        message += bytes(format(int((self.reset_cmd << 2) ^ (self.hv_on_cmd << 1) ^ self.hv_off_cmd), 'X'), 'utf-8')
+        return self._wrap_message(message)
+    
+    def _check_response_message(self, message: bytes) -> (bool | None):
+        if message == b'':
+            return None
+        if self._test_checksum(message):
+            if chr(message[0]) == 'R':
+                # Check for fault state  
+                ps_fault = message[10:13][0][1]  # byte 11, bit 1: PS fault (no fault = 0, fault = 1)
+                if ps_fault == '\x01':
+                    warnings.warn("Power supply is in a fault state. A PS reset command must be sent (via 'reset' knob) to clear fault before setting new values!")
+                return message
+            else:
+                raise KeyError(f'Incorrect Message Type [{message[0]}] in decode_response_message()')
+        else:
+            raise ValueError('Checksum error in decode_response_message()')
+
+    def _acknowledge_validator(self, message: bytes) -> (bool | None):
+        if message == b'':
+            return None
+        if message == b'A\r':
+            return True
+        else:
+            return False
+
+    @setter
+    def set_max_voltage(self, voltage:Float):
+        normalized_voltage_cmd = voltage/self.max_output_voltage
+        message: bytes = self._construct_set_message(normalized_voltage_cmd)
+        self.query(message, validator=self._acknowledge_validator)
+
+    @setter
+    def set_max_current(self, current:Float):
+        normalized_current_cmd = current/self.max_output_current
+        message: bytes = self._construct_set_message(normalized_current_cmd)
+        self.query(message, validator=self._acknowledge_validator)
+
+    @getter
+    def get_output_enable(self) -> Toggle:
+        response: bytes = self.query(self._wrap_message(b'Q'))
+        output = self._check_response_message(response)[0][2]
+        if output == b'\x01':
+            return ON
+        else:
+            return OFF
+
+    @setter
+    def set_output_enable(self, output:Toggle):
+        if output == ON:
+            message: bytes = self._construct_set_message(hv_on_cmd=True, hv_off_cmd=False)
+            self.query(message, validator=self._acknowledge_validator)
+        else:
+            message: bytes = self._construct_set_message(hv_off_cmd=True, hv_on_cmd=False)
+            self.query(message, validator=self._acknowledge_validator)
+
+    @setter
+    def set_reset(self, reset:Toggle):
+        if reset == ON:
+            message: bytes = self._construct_set_message(reset_cmd=True)
+            self.write(message)
+        else:
+            message: bytes = self._construct_set_message(reset_cmd=False)
+            self.write(message)
+
+    @measurer
+    def get_voltage(self) -> Float:
+        response: bytes = self.query(self._wrap_message(b'Q'))
+        voltage = self._check_response_message(response)[4:7]
+        voltage_f: Float = Float(struct.unpack('f', voltage)[0])
+        return voltage_f
+    
+    @measurer
+    def get_current(self) -> Float:
+        response: bytes = self.query(self._wrap_message(b'Q'))
+        current = self._check_response_message(response)[1:4]
+        current_f: Float = Float(struct.unpack('f', current)[0])
+        return current_f
+    
+    @measurer
+    def get_fault_state(self) -> Toggle:
+        response: bytes = self.query(self._wrap_message(b'Q'))
+        if response[10:13][0][1] == b'\x01':
+            warnings.warn("Power supply is in a fault state. A PS reset command must be sent (via 'reset' knob) to clear fault before setting new values!")
+            return ON  # fault detected
+        elif response[10:13][0][1] == b'\x00':
+            return OFF  # no fault
+        else:
+            return ON
