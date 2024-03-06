@@ -884,6 +884,17 @@ class GlassmanOQ500(Instrument):
         # print(message.hex())  DEBUG
         return message
     
+    def _wrap_message(self, message_content) -> str:
+        if type(message_content) != bytes:
+            message_content = message_content.encode('utf-8')
+        message = self.SOH
+        message += message_content
+        message += self._compute_checksum(message_content)
+        # message += self.EOM
+        # print(message)
+        # print(message.hex())  DEBUG
+        return message.decode()
+
     def _construct_set_message(self,
                     normalized_voltage_cmd: (float | None) = None,
                     normalized_current_cmd: (float | None) = None,
@@ -916,8 +927,8 @@ class GlassmanOQ500(Instrument):
         message += bytes(format(int((self.reset_cmd << 2) ^ (self.hv_on_cmd << 1) ^ self.hv_off_cmd), 'X'), 'utf-8')
         return self._wrap_message(message)
     
-    def _check_response_message(self, message: bytes) -> (bool | None):
-        if message == b'':
+    def _check_response_message(self, message) -> (bool | None):
+        if message == '':
             return None
         print(message)  # DEBUG
         print(type(message))
@@ -926,7 +937,7 @@ class GlassmanOQ500(Instrument):
         if self._test_checksum(message):
             if chr(message[0]) == 'R':
                 # Check for fault state
-                ps_fault = message[10:13][1:2].decode('utf-8')  # byte 11, bit 1: PS fault (no fault = 0, fault = 1)
+                ps_fault = message[10:13][1:2]  # byte 11, bit 1: PS fault (no fault = 0, fault = 1)
                 if ps_fault == "1":
                     warnings.warn("Power supply is in a fault state. A PS reset command must be sent (via 'reset' knob) to clear fault before setting new values!")
                 return message
@@ -936,6 +947,7 @@ class GlassmanOQ500(Instrument):
             raise ValueError('Checksum error in decode_response_message()')
 
     def _acknowledge_validator(self, message: bytes) -> (bool | None):
+        # TODO: Check if this can/should be converted to string
         if message == b'':
             return None
         if message == b'A\r':
@@ -957,9 +969,10 @@ class GlassmanOQ500(Instrument):
 
     @getter
     def get_output_enable(self) -> Toggle:
-        response: bytes = self.query(self._wrap_message("Q".encode('utf-8')).decode())
-        output = self._check_response_message(response.encode('utf-8'))
-        output = output[10:13][0:1].decode('utf-8')
+        response: str = self.query(self._wrap_message("Q"))
+        output = self._check_response_message(response)
+        # TODO: check type conversions here
+        output = output[10:13][0:1] # .decode('utf-8')
         if output == "1":
             return ON
         else:
@@ -989,27 +1002,25 @@ class GlassmanOQ500(Instrument):
 
     @measurer
     def get_voltage(self) -> Float:
-        response: bytes = self.query(self._wrap_message("Q".encode('utf-8')).decode())
-        voltage = self._check_response_message(response.encode('utf-8'))[4:7]
-        voltage_f: Float = Float(struct.unpack('f', voltage)[0])
-        return voltage_f
+        response = self.query(self._wrap_message("Q"))
+        voltage = self._check_response_message(response)[4:7]
+        return float(voltage)  # TODO: check whether whole numbers are returned 
     
     @measurer
     def get_current(self) -> Float:
-        response: bytes = self.query(self._wrap_message("Q".encode('utf-8')).decode())
-        current = self._check_response_message(response.encode('utf-8'))[1:4]
-        current_f: Float = Float(struct.unpack('f', current)[0])
-        return current_f
+        response = self.query(self._wrap_message("Q"))
+        current = self._check_response_message(response)[1:4]
+        return float(current)
     
     @measurer
     def get_fault_state(self) -> Toggle:
         response: bytes = self.query(self._wrap_message("Q".encode('utf-8')).decode())
-        if response[10:13][0][1] == b'\x01':
+        if response[10:13][1:2] == "1":
             warnings.warn("Power supply is in a fault state. A PS reset "
                           "command must be sent (via 'reset' knob) to clear "
                           "fault before setting new values!")
             return ON  # fault detected
-        elif response[10:13][0][1] == b'\x00':
+        elif response[10:13][1:2] == "0":
             return OFF  # no fault
         else:
             return ON
