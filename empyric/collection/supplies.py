@@ -851,7 +851,9 @@ class GlassmanOQ500(Instrument):
     name = "GlassmanOQ"
 
     supported_adapters = ((Serial, {"baud_rate": 9600,
-                                    "write_termination": b'\r'}),)
+                                    "write_termination": '\r',
+                                    "read_termination": '\r',
+                                    "lib": "pyserial"}),)
 
     knobs = ("max voltage", "max current", "output enable", 'reset')
 
@@ -860,22 +862,26 @@ class GlassmanOQ500(Instrument):
     SOH: bytes = b'\x01'
     EOM: bytes = b'\x0D'
 
-    max_output_voltage = 500,000.0  # 500kV
-    max_output_current = 0.020  # 20 mA
+    max_output_voltage = 500000.0  # 500kV
+    max_output_current = 20  # 20 mA
 
     def _compute_checksum(self, message_segment: bytes) -> bytes:
         crc = sum(struct.unpack('>'+'B'*len(message_segment), message_segment)) % 256
         return bytes(format(crc, 'X'), 'utf-8')
     
     def _test_checksum(self, message: bytes) -> bool:
-        calculated_crc = self._compute_checksum(message[1:-3])
-        return message[-3:-1] == calculated_crc
+        # calculated_crc = self._compute_checksum(message[1:-3])
+        # return message[-3:-1] == calculated_crc
+        calculated_crc = self._compute_checksum(message[1:-2])
+        return message[-3:-1][::-1] == calculated_crc
 
     def _wrap_message(self, message_content: bytes) -> bytes:
         message: bytes = self.SOH
         message += message_content
         message += self._compute_checksum(message_content)
-        message += self.EOM
+        # message += self.EOM
+        # print(message)
+        # print(message.hex())  DEBUG
         return message
     
     def _construct_set_message(self,
@@ -913,11 +919,15 @@ class GlassmanOQ500(Instrument):
     def _check_response_message(self, message: bytes) -> (bool | None):
         if message == b'':
             return None
+        print(message)  # DEBUG
+        print(type(message))
+
+        print("boutta test checksum")
         if self._test_checksum(message):
             if chr(message[0]) == 'R':
-                # Check for fault state  
-                ps_fault = message[10:13][0][1]  # byte 11, bit 1: PS fault (no fault = 0, fault = 1)
-                if ps_fault == '\x01':
+                # Check for fault state
+                ps_fault = message[10:13][1:2].decode('utf-8')  # byte 11, bit 1: PS fault (no fault = 0, fault = 1)
+                if ps_fault == "1":
                     warnings.warn("Power supply is in a fault state. A PS reset command must be sent (via 'reset' knob) to clear fault before setting new values!")
                 return message
             else:
@@ -947,9 +957,10 @@ class GlassmanOQ500(Instrument):
 
     @getter
     def get_output_enable(self) -> Toggle:
-        response: bytes = self.query(self._wrap_message(b'Q'))
-        output = self._check_response_message(response)[0][2]
-        if output == b'\x01':
+        response: bytes = self.query(self._wrap_message("Q".encode('utf-8')).decode())
+        output = self._check_response_message(response.encode('utf-8'))
+        output = output[10:13][0:1].decode('utf-8')
+        if output == "1":
             return ON
         else:
             return OFF
@@ -957,10 +968,14 @@ class GlassmanOQ500(Instrument):
     @setter
     def set_output_enable(self, output: Toggle):
         if output == ON:
-            message: bytes = self._construct_set_message(hv_on_cmd=True, hv_off_cmd=False)
+            message: bytes = \
+                self._construct_set_message(hv_on_cmd=True, hv_off_cmd=False)
+
             self.query(message, validator=self._acknowledge_validator)
         else:
-            message: bytes = self._construct_set_message(hv_off_cmd=True, hv_on_cmd=False)
+            message: bytes = \
+                self._construct_set_message(hv_off_cmd=True, hv_on_cmd=False)
+
             self.query(message, validator=self._acknowledge_validator)
 
     @setter
@@ -974,23 +989,25 @@ class GlassmanOQ500(Instrument):
 
     @measurer
     def get_voltage(self) -> Float:
-        response: bytes = self.query(self._wrap_message(b'Q'))
-        voltage = self._check_response_message(response)[4:7]
+        response: bytes = self.query(self._wrap_message("Q".encode('utf-8')).decode())
+        voltage = self._check_response_message(response.encode('utf-8'))[4:7]
         voltage_f: Float = Float(struct.unpack('f', voltage)[0])
         return voltage_f
     
     @measurer
     def get_current(self) -> Float:
-        response: bytes = self.query(self._wrap_message(b'Q'))
-        current = self._check_response_message(response)[1:4]
+        response: bytes = self.query(self._wrap_message("Q".encode('utf-8')).decode())
+        current = self._check_response_message(response.encode('utf-8'))[1:4]
         current_f: Float = Float(struct.unpack('f', current)[0])
         return current_f
     
     @measurer
     def get_fault_state(self) -> Toggle:
-        response: bytes = self.query(self._wrap_message(b'Q'))
+        response: bytes = self.query(self._wrap_message("Q".encode('utf-8')).decode())
         if response[10:13][0][1] == b'\x01':
-            warnings.warn("Power supply is in a fault state. A PS reset command must be sent (via 'reset' knob) to clear fault before setting new values!")
+            warnings.warn("Power supply is in a fault state. A PS reset "
+                          "command must be sent (via 'reset' knob) to clear "
+                          "fault before setting new values!")
             return ON  # fault detected
         elif response[10:13][0][1] == b'\x00':
             return OFF  # no fault
