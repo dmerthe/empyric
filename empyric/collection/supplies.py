@@ -530,17 +530,17 @@ class SorensenXG10250(Instrument):
 
     name = "SorensenXG10250"
 
-    supported_adapters = ((Serial, {"baud_rate": 9600,
-                                    "read_termination": "\r",
-                                    "lib": "pyserial"}),)
+    supported_adapters = (
+        (Serial, {"baud_rate": 9600, "read_termination": "\r", "lib": "pyserial"}),
+    )
 
     knobs = ("max voltage", "max current", "output", "analog control mode")
 
     meters = ("voltage", "current", "analog input voltage", "analog input current")
 
-    def __init__(self,  address=None, adapter=None, presets=None,
-                 postsets=None, **kwargs):
-
+    def __init__(
+        self, address=None, adapter=None, presets=None, postsets=None, **kwargs
+    ):
         self.address = address
 
         self.knobs = ("connected",) + self.knobs
@@ -638,9 +638,9 @@ class SorensenXG10250(Instrument):
         def str_validator(response):
             return bool(re.match("Current mode: .*", response))
 
-        response = self.query("SYST:REM:SOUR:CURR?",
-                              validator=str_validator,
-                              until='\r')
+        response = self.query(
+            "SYST:REM:SOUR:CURR?", validator=str_validator, until="\r"
+        )
         if "Analog " in response:
             self.analog_mode_state = ON
         elif "LOCAL" in response:
@@ -673,12 +673,13 @@ class SorensenXG10250(Instrument):
     @getter
     def get_analog_control_mode(self) -> Toggle:
         if self.analog_mode_state is None:
+
             def str_validator(response):
                 return bool(re.match("Current mode: .*", response))
 
-            response = self.query("SYST:REM:SOUR:CURR?",  # :CURR?",
-                                  validator=str_validator,
-                                  until='\r')
+            response = self.query(
+                "SYST:REM:SOUR:CURR?", validator=str_validator, until="\r"  # :CURR?",
+            )
             if "Analog " in response:
                 self.analog_mode_state = ON
             elif "LOCAL" in response:
