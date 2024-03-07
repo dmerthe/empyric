@@ -869,30 +869,18 @@ class GlassmanOQ500(Instrument):
         crc = sum(struct.unpack('>'+'B'*len(message_segment), message_segment)) % 256
         return bytes(format(crc, 'X'), 'utf-8')
     
-    def _test_checksum(self, message: bytes, is_set: bool = False) -> bool:
-        if is_set:
-            calculated_crc = self._compute_checksum(message[1:-2])
-        else:
-            print(f"is_set false from test: {message[1:-2]}")
-            calculated_crc = self._compute_checksum(message[1:-2])
-        print(f"calculated_crc from test: {calculated_crc}")  # debug
+    def _test_checksum(self, message: bytes) -> bool:
+        calculated_crc = self._compute_checksum(message[1:-2])
         return message[-3:-1][::-1] == calculated_crc
     
-    def _wrap_message(self, message_content, is_set: bool = False) -> str:
+    def _wrap_message(self, message_content) -> str:
         if type(message_content) != bytes:
             message_content = message_content.encode('utf-8')
         message = self.SOH
         message += message_content
-        # if is_set:
-        #     print(f"is_set: {message_content[1:-2]}")
-        #     calculated_crc = self._compute_checksum(message_content[1:-2])
-        # else:
-        #     print(f"wrap-message: {message_content}")
-        #     print(f"is_set false: {message_content[0:-3]}")
         calculated_crc = self._compute_checksum(message_content)
         message += calculated_crc
         # message += self.EOM
-        print(f"calculated_crc from wrap: {calculated_crc}")  # debug
         return message.decode()
 
     def _construct_set_message(self,
@@ -900,7 +888,7 @@ class GlassmanOQ500(Instrument):
                                normalized_current_cmd: (float | None) = None,
                                hv_on_cmd: (bool | None) = None,
                                hv_off_cmd: (bool | None) = None,
-                               reset_cmd: (bool | None) = None) -> bytes:
+                               reset_cmd: (bool | None) = None) -> str:
         # process inputs
         if normalized_voltage_cmd is not None:
             self.normalized_voltage_cmd = normalized_voltage_cmd
@@ -921,16 +909,19 @@ class GlassmanOQ500(Instrument):
 
         # construct message
         message: bytes = b'S'  # command identifier
-        message += bytes(format(int(0xFFF*self.normalized_voltage_cmd), 'X'), 'utf-8')
-        message += bytes(format(int(0xFFF*self.normalized_current_cmd), 'X'), 'utf-8')
+        message += bytes(format(int(0xFFF*self.normalized_voltage_cmd),
+                                'X').zfill(3), 'utf-8')
+        message += bytes(format(int(0xFFF*self.normalized_current_cmd),
+                                'X').zfill(3), 'utf-8')
         message += b'000000'  # bytes 9-14
-        message += bytes(format(int((self.reset_cmd << 2) ^ (self.hv_on_cmd << 1) ^ self.hv_off_cmd), 'X'), 'utf-8')
-        return self._wrap_message(message, is_set=True)
+        message += bytes(format(int((self.reset_cmd << 2) ^
+                                    (self.hv_on_cmd << 1) ^
+                                    self.hv_off_cmd), 'X'), 'utf-8')
+        return self._wrap_message(message)
     
     def _check_response_message(self, message) -> (bool | None):
         if message == '':
             return None
-        print(f"Message: {message}")
         if self._test_checksum(message.encode('utf-8')):
             if message[0] == 'R':
                 # Check for fault state on byte 11, bit 1
@@ -950,7 +941,7 @@ class GlassmanOQ500(Instrument):
     def _acknowledge_validator(self, message) -> (bool | None):
         if message == '':
             return None
-        if message == 'A\r':
+        if message == 'A':
             return True
         elif message[0] == 'E':
             warnings.warn(f"Error message received during set command: {message}."
@@ -961,13 +952,13 @@ class GlassmanOQ500(Instrument):
     @setter
     def set_max_voltage(self, voltage: Float):
         normalized_voltage_cmd = voltage/self.max_output_voltage
-        message: bytes = self._construct_set_message(normalized_voltage_cmd)
+        message: str = self._construct_set_message(normalized_voltage_cmd)
         self.query(message, validator=self._acknowledge_validator)
 
     @setter
     def set_max_current(self, current: Float):
         normalized_current_cmd = current/self.max_output_current
-        message: bytes = self._construct_set_message(normalized_current_cmd)
+        message: str = self._construct_set_message(normalized_current_cmd)
         self.query(message, validator=self._acknowledge_validator)
 
     @getter
@@ -999,15 +990,17 @@ class GlassmanOQ500(Instrument):
     def set_reset(self, reset: Toggle):
         if reset == ON:
             message: str = self._construct_set_message(reset_cmd=True,
-                                                         normalized_current_cmd=0.0,
-                                                         normalized_voltage_cmd=0.0)
+                                                       normalized_current_cmd=0.0,
+                                                       normalized_voltage_cmd=0.0)
             print("Set reset commands:")
             print(message.encode('utf-8').hex())  # DEBUG
             print(message)
-            self.write(message)
+            # self.write(message)  DEBUG
+            self.query(message, validator=self._acknowledge_validator)
         else:
             message: str = self._construct_set_message(reset_cmd=False)
-            self.write(message)
+            # self.write(message)
+            self.query(message, validator=self._acknowledge_validator)
 
     @measurer
     def get_voltage(self) -> Float:
@@ -1023,7 +1016,7 @@ class GlassmanOQ500(Instrument):
     
     @measurer
     def get_fault_state(self) -> Toggle:
-        response: bytes = self.query(self._wrap_message("Q"))
+        response = self.query(self._wrap_message("Q"))
         if response[10:13][1:2] == "1":
             warnings.warn("Power supply is in a fault state. A PS reset "
                           "command must be sent (via 'reset' knob) to clear "
