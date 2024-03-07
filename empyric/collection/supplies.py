@@ -862,8 +862,8 @@ class GlassmanOQ500(Instrument):
     SOH: bytes = b'\x01'
     EOM: bytes = b'\x0D'
 
-    max_output_voltage = 500000.0  # 500kV
-    max_output_current = 20  # 20 mA
+    max_output_voltage_volts = 500000.0  # 500kV
+    max_output_current_mA = 20  # 20 mA
 
     def _compute_checksum(self, message_segment: bytes) -> bytes:
         crc = sum(struct.unpack('>'+'B'*len(message_segment), message_segment)) % 256
@@ -950,23 +950,21 @@ class GlassmanOQ500(Instrument):
             return False
 
     @setter
-    def set_max_voltage(self, voltage: Float):
-        normalized_voltage_cmd = voltage/self.max_output_voltage
+    def set_max_voltage(self, voltage_Volts: Float):
+        normalized_voltage_cmd = voltage_Volts/self.max_output_voltage_volts
         message: str = self._construct_set_message(normalized_voltage_cmd)
         self.query(message, validator=self._acknowledge_validator)
 
     @setter
-    def set_max_current(self, current: Float):
-        normalized_current_cmd = current/self.max_output_current
+    def set_max_current(self, current_mA: Float):
+        normalized_current_cmd = current_mA/self.max_output_current_mA
         message: str = self._construct_set_message(normalized_current_cmd)
         self.query(message, validator=self._acknowledge_validator)
 
     @getter
     def get_output_enable(self) -> Toggle:
         query = self._wrap_message("Q")
-        print(f"Query: {query.encode('utf-8').hex()}")  # DEBUG
         response: str = self.query(query)
-        print(f"Response: {response.encode('utf-8').hex()}")  # DEBUG
         output = self._check_response_message(response)[10:13][0:1]
         if output == "1":
             return ON
@@ -992,30 +990,33 @@ class GlassmanOQ500(Instrument):
             message: str = self._construct_set_message(reset_cmd=True,
                                                        normalized_current_cmd=0.0,
                                                        normalized_voltage_cmd=0.0)
-            print("Set reset commands:")
-            print(message.encode('utf-8').hex())  # DEBUG
-            print(message)
-            # self.write(message)  DEBUG
             self.query(message, validator=self._acknowledge_validator)
         else:
             message: str = self._construct_set_message(reset_cmd=False)
-            # self.write(message)
             self.query(message, validator=self._acknowledge_validator)
 
     @measurer
-    def get_voltage(self) -> Float:
+    def measure_voltage(self) -> Float:
         response = self.query(self._wrap_message("Q"))
         voltage = self._check_response_message(response)[4:7]
-        return float(voltage)
+        voltage_int = [int(v) for v in voltage]
+        voltage_combined = int.from_bytes(voltage_int, byteorder='big')
+        voltage_normalized = voltage_combined / 0x3FF
+        voltage_outp = voltage_normalized * self.max_output_voltage_volts
+        return voltage_outp
     
     @measurer
-    def get_current(self) -> Float:
+    def measure_current(self) -> Float:
         response = self.query(self._wrap_message("Q"))
         current = self._check_response_message(response)[1:4]
-        return float(current)
+        current_int = [int(i) for i in current]
+        current_combined = int.from_bytes(current_int, byteorder='big')
+        current_normalized = current_combined / 0x3FF
+        current_outp = current_normalized * self.max_output_current_mA
+        return current_outp
     
     @measurer
-    def get_fault_state(self) -> Toggle:
+    def measure_fault_state(self) -> Toggle:
         response = self.query(self._wrap_message("Q"))
         if response[10:13][1:2] == "1":
             warnings.warn("Power supply is in a fault state. A PS reset "
