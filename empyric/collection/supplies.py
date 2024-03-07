@@ -522,8 +522,16 @@ class SorensenXG10250(Instrument):
 
     The analog control mode option allows the power supply to operate in a
     voltage-controlled current mode via its non-isolated input pin.
+<<<<<<< HEAD
+<<<<<<< HEAD
 
     By default, the RS-485 multicast address is assumed to be 1.
+=======
+>>>>>>> 2cc4295 (added comms address preset in sorensen ps)
+=======
+
+    By default, the RS-485 multicast address is assumed to be 1.
+>>>>>>> 8cf2ab3 (tried creating a class init method for sorensen)
     """
 
     name = "SorensenXG10250"
@@ -536,15 +544,24 @@ class SorensenXG10250(Instrument):
 
     meters = ("voltage", "current", "analog input voltage", "analog input current")
 
+<<<<<<< HEAD
     def __init__(
         self, address=None, adapter=None, presets=None, postsets=None, **kwargs
     ):
+=======
+    def __init__(self,  address=None, adapter=None, presets=None,
+                 postsets=None, **kwargs):
+        # super().__init__(**kwargs)
+>>>>>>> 8cf2ab3 (tried creating a class init method for sorensen)
         self.address = address
 
         self.knobs = ("connected",) + self.knobs
 
+<<<<<<< HEAD
         self.analog_mode_state = None
 
+=======
+>>>>>>> 8cf2ab3 (tried creating a class init method for sorensen)
         adapter_connected = False
         if adapter:
             self.adapter = adapter(self, **kwargs)
@@ -575,6 +592,7 @@ class SorensenXG10250(Instrument):
         if self.address:
             self.name = self.name + "@" + str(self.address)
 
+<<<<<<< HEAD
         self.write("*ADR 1")  # Set multicast address to 1 by default
 
         # Get existing knob settings, if possible
@@ -601,6 +619,37 @@ class SorensenXG10250(Instrument):
 
     def float_validator(self, response):
         return bool(re.match("\d+\.\d+", response))
+=======
+        self.write("*ADR 1")
+
+        # DEBUG
+        # print(self.query("*IDN?"))
+        # print(self.query("*ADR?"))
+        # print(self.query("MEAS:CURR?"))
+
+        # # Get existing knob settings, if possible
+        # for knob in self.knobs:
+        #     if hasattr(self, "get_" + knob.replace(" ", "_")):
+        #         # retrieves the knob value from the instrument
+        #         self.__getattribute__("get_" + knob.replace(" ", "_"))()
+        #     else:
+        #         # knob value is unknown until it is set
+        #         self.__setattr__(knob.replace(" ", "_"), None)
+        #
+        # # Apply presets
+        # if presets:
+        #     self.presets = {**self.presets, **presets}
+        #
+        # for knob, value in self.presets.items():
+        #     self.set(knob, value)
+        #
+        # # Get postsets
+        # if postsets:
+        #     self.postsets = {**self.postsets, **postsets}
+        #
+        # self.kwargs = kwargs
+
+>>>>>>> 8cf2ab3 (tried creating a class init method for sorensen)
 
     @measurer
     def measure_current(self):
@@ -684,7 +733,6 @@ class SorensenXG10250(Instrument):
                 self.analog_mode_state = OFF
 
         return self.analog_mode_state
-
 
 class BK9140(Instrument):
     """

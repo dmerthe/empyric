@@ -3,6 +3,7 @@ import collections
 import datetime
 import importlib
 import logging
+import numbers
 import os
 import pathlib
 import sys
@@ -10,6 +11,7 @@ import threading
 import time
 import tkinter as tk
 from tkinter.filedialog import askopenfilename
+from typing import Union
 
 import numpy as np
 import pandas as pd
@@ -34,6 +36,16 @@ class Experiment:
     An iterable class which represents an experiment; iterates through any
     assigned routines,and retrieves and stores the values of all experiment
     variables.
+
+    The constructor take a `variables` argument in the form of a dictionary with the
+    format {..., name: variable, ...}, which contains all of the variables controlled
+    and monitored by the experiment. The optional `routines` argument is a dictionary
+    of the form {..., name: routine, ...} containing any routines to run within
+    the loop of the experiment. The optional `end` argument indicates when the
+    experiment should end (i.e. raise `StopIteration` on subsequent call to `__next__`)
+    , and can either be a number, a string of the form "[number] [time unit, e.g.
+    seconds, minutes or hours]" or "with routines" to end the experiment after the
+    last routine has ended.
     """
 
     # Possible statuses of an experiment
@@ -78,7 +90,11 @@ class Experiment:
     def terminated(self):
         return "Terminated" in self.status
 
-    def __init__(self, variables, routines=None, end=None):
+    def __init__(
+            self, variables: dict, routines: dict = None,
+            end: Union[numbers.Number, str, None] = None
+    ):
+
         self.variables = variables
         # dict of the form {..., name: variable, ...}
 
@@ -94,10 +110,17 @@ class Experiment:
             self.routines = {}
 
         if end:
-            if end.lower() == "with routines":
-                self.end = max([routine.end for routine in routines.values()])
-            else:
+            if type(end) is str:
+                if end.lower() == "with routines":
+                    self.end = max([routine.end for routine in routines.values()])
+                else:
+                    self.end = convert_time(end)
+            elif isinstance(end, numbers.Number):
                 self.end = end
+            else:
+                raise ValueError(
+                    'invalid value for end keyword argument'
+                )
         else:
             self.end = np.inf
 
@@ -772,15 +795,8 @@ def convert_runcard(runcard):
 
             routines[name] = available_routines[_type](**specs)
 
-    end = runcard['Settings'].get('end', np.inf)
-
-    if end.strip().lower() == 'with routines':
-        pass  # pass to Experiment
-    else:
-        end = convert_time(end)
-
     converted_runcard["Experiment"] = Experiment(
-        variables, routines=routines, end=end
+        variables, routines=routines, end=runcard['Settings'].get('end', None)
     )
 
     # Alarms section
