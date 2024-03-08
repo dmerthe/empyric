@@ -11,6 +11,8 @@ Routines
 
 .. autoclass:: empyric.routines.Sequence
 
+.. autoclass:: empyric.routines.Optimization
+
 .. autoclass:: empyric.routines.Maximization
 
 .. autoclass:: empyric.routines.Minimization

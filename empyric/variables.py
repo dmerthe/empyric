@@ -4,8 +4,10 @@ import numbers
 import socket
 import time
 import typing
+import warnings
 from functools import wraps
-import numpy as np  # functions used in Expression's eval call
+import numpy as np  # used in Expression's eval call
+
 from empyric.collection.instrument import Instrument
 
 from empyric import instruments, types
@@ -19,20 +21,26 @@ class Variable:
     experiment.
     """
 
-    _type = None  #: the data type of the variable
+    _type = None  # the data type of the variable
 
     #: time since the epoch of last evaluation in seconds, being equal to the
     #: result of `time.time()` being called upon the most recent evaluation of
     #: the `value` property
     last_evaluation = None
 
-    _settable = False  #: whether the variable can be set by the user
-    _value = None  #: last known value of the variable
+    _settable = False  # whether the variable can be set by the user
+    _value = None  # last known value of the variable
 
-    _hidden = False  #: used by GUIs
+    _hidden = False  # used by GUIs
+
+    @property
+    def type(self):
+        """Data type of the variable"""
+        return self._type
 
     @property
     def settable(self):
+        """Whether values can be assigned to the variable by the user"""
         return self._settable
 
     @property
@@ -102,6 +110,33 @@ class Variable:
 
         return wrapped_getter
 
+    def __mul__(self, other):
+        if isinstance(other, Variable):
+            return self._value * other._value
+        else:
+            return self._value * other
+
+    def __add__(self, other):
+        if isinstance(other, Variable):
+            return self._value + other._value
+        else:
+            return self._value + other
+
+    def __sub__(self, other):
+        if isinstance(other, Variable):
+            return self._value - other._value
+        else:
+            return self._value - other
+
+    def __bool__(self):
+        return np.bool(self._value)
+
+    def __eq__(self, other):
+        if isinstance(other, Variable):
+            return self._value == other._value
+        else:
+            return self._value == other
+
 
 class Knob(Variable):
     """
@@ -167,6 +202,9 @@ class Knob(Variable):
 
         self._value = self.instrument.__getattribute__(self.knob.replace(" ", "_"))
 
+    def __str__(self):
+        return f"Knob({self._value})"
+
 
 class Meter(Variable):
     """
@@ -220,6 +258,9 @@ class Meter(Variable):
 
         return self._value
 
+    def __str__(self):
+        return f"Meter({self._value})"
+
 
 class Expression(Variable):
     """
@@ -239,6 +280,8 @@ class Expression(Variable):
 
     _settable = False  #:
 
+    # shorthand terms for common functions
+    # TODO consolidate these functions in a separate module
     _functions = {
         "sqrt(": "np.sqrt(",
         "exp(": "np.exp(",
@@ -253,6 +296,11 @@ class Expression(Variable):
         "diff(": "np.diff(",
         "max(": "np.nanmax(",
         "min(": "np.nanmin(",
+        "fft(": "self.fft(",
+        "ifft(": "self.ifft(",
+        "carrier(": "self.carrier(",
+        "ampl(": "self.ampl(",
+        "demod(": "self.demod(",
     }
 
     def __init__(self, expression: str, definitions: dict = None):
@@ -271,28 +319,149 @@ class Expression(Variable):
         # carets represent exponents
         expression = expression.replace("^", "**")
 
-        for symbol, variable in self.definitions.items():
-            expression = expression.replace(symbol, f"({variable._value})")
+        variables = {
+            symbol: variable._value for symbol, variable in self.definitions.items()
+        }
 
         for shorthand, longhand in self._functions.items():
             if shorthand in expression:
                 expression = expression.replace(shorthand, longhand)
 
         try:
-            if "None" not in expression and "nan" not in expression:
-                self._value = eval(expression)
+            all_values = np.concatenate(
+                [np.atleast_1d(val).flatten() for val in variables.values()]
+            )
+
+            no_nones = None not in all_values
+            no_nans = np.nan not in all_values
+            no_infs = (np.inf not in all_values) and (-np.inf not in all_values)
+
+            valid_values = no_nones and no_nans and no_infs
+
+            if valid_values:
+                self._value = eval(expression, {**globals(), **variables}, locals())
             else:
                 self._value = None
-        except BaseException as err:
-            print(
-                f"Unable to evaluate expression {self.expression} due to " f"error: ",
-                err,
+
+        except Exception as err:
+            warnings.warn(
+                f"Unable to evaluate expression {self.expression} due to error: {err}"
             )
             self._value = None
 
         self.last_evaluation = time.time()
 
         return self._value
+
+    def __str__(self):
+        if len(str(self.value)) < 100:
+            return f"Expression({self.expression} = {self.value})"
+        elif isinstance(self.value, Array):
+            return f"Expression({self.expression} = Array{np.shape(self.value)}"
+        else:
+            return (
+                f"Expression({self.expression} = "
+                f"{str(self.value)[:50]} ... {str(self.value)[-50:]}"
+            )
+
+    # Utility functions for Fourier analysis
+    @staticmethod
+    def fft(s):
+        """Calculate the fast Fourier transform of a signal"""
+        return np.fft.fft(s, norm="forward")
+
+    @staticmethod
+    def ifft(s):
+        """Calculate the inverse fast Fourier transform of a signal"""
+        return np.fft.ifft(s, norm="forward")
+
+    @staticmethod
+    def _find_carrier(s, dt, f0=0.0, bw=np.inf):
+        """Characterize the carrier wave of a signal"""
+        fft_s = np.fft.fft(s, norm="forward")
+        f = np.fft.fftfreq(len(s), d=dt)
+
+        in_band = (f > f0 - 0.5 * bw) & (f < f0 + 0.5 * bw)
+
+        filt_fft_s = np.abs(in_band * fft_s)
+
+        fc = np.abs(f[filt_fft_s == np.max(filt_fft_s)][0])
+        Ac = np.abs(filt_fft_s[filt_fft_s == np.max(filt_fft_s)][0])
+
+        return fc, Ac
+
+    @staticmethod
+    def carrier(s, dt, f0=0.0, bw=np.inf):
+        """Find the carrier frequency of a signal"""
+        return Expression._find_carrier(s, dt, f0=f0, bw=bw)[0]
+
+    @staticmethod
+    def ampl(s, dt, f0=0.0, bw=np.inf):
+        """Calculate the amplitude of the carrier wave in a signal"""
+        return 2 * Expression._find_carrier(s, dt, f0=f0, bw=bw)[1]
+
+    @staticmethod
+    def demod(s, dt, f0, bw=np.inf, cycles=np.inf, filt=None):
+        """Demodulate an oscillatory signal"""
+
+        if np.isfinite(cycles):
+            # Partition signal into segments containing integer number of carrier cycles
+            fc = Expression.carrier(s, dt, f0, bw=bw)
+
+            k_cycle = int(1 / (dt * fc))  # number of samples per carrier period
+
+            partitions = np.reshape(s, (-1, cycles * k_cycle))
+        else:
+            # Demodulate the whole signal
+            partitions = np.array([s])
+
+        partitions_demod = np.empty_like(partitions, dtype=np.complex128)
+
+        frequencies = []
+
+        for i, partition in enumerate(partitions):
+            # Calculate FFT
+            freq = np.fft.fftfreq(len(partition), d=dt)  # frequency values for the FFT
+            fft = np.fft.fft(partition)
+
+            # Find principal frequency within the given band about the given frequency
+            fft_in_positive_band = np.abs(
+                fft * ((freq > f0 - 0.5 * bw) & (freq < f0 + 0.5 * bw))
+            )
+
+            where_f0_closest = np.argwhere(
+                fft_in_positive_band == np.max(fft_in_positive_band)
+            ).flatten()[0]
+
+            frequencies.append(freq[where_f0_closest])
+
+            if np.abs(fft[where_f0_closest]) > 0.0:
+                phase = np.log(fft[where_f0_closest]).imag  # Get phase of sinusoid
+            else:
+                phase = 0.0
+
+            # Construct the demodulated FFT
+            fft_demod = np.zeros_like(fft)
+
+            # roll the positive component towards zero and remove phase
+            fft_demod += np.roll(fft, -where_f0_closest) * np.exp(-1j * phase)
+
+            # roll the negative component towards zero and remove phase
+            fft_demod += np.roll(fft, where_f0_closest) * np.exp(1j * phase)
+
+            # Apply low pass filter
+            if filt == "gaussian":
+                fft_demod *= np.exp(-(freq**2) / (2 * bw**2))
+            if filt == "sinc":
+                fft_demod *= np.sinc(freq / bw)
+            else:
+                fft_demod *= np.abs(freq) < 0.5 * bw
+
+            partitions_demod[i] = np.fft.ifft(fft_demod)
+
+        signal_demod = partitions_demod.flatten()
+
+        return np.abs(signal_demod)
 
 
 class Remote(Variable):
@@ -308,8 +477,8 @@ class Remote(Variable):
     the server. For Modbus servers, this is the starting address of the
     holding or input register for a read/write or readonly variable,
     respectively. For either set of registers, the starting address is 5*(n-1)
-    for the nth variable in the `readwrite` or `readonly` list/dictionary of
-    variables in the server routine definition.
+    for the nth variable in the `knobs` or `meters` of variables in the server routine
+    definition.
 
     The (optional) `protocol` argument indicates which kind of server to connect
     to. Setting `protocol='modbus'` indicates a Modbus server (controlled by a
@@ -319,9 +488,8 @@ class Remote(Variable):
 
     The `settable` argument is required for remote variables on a Modbus server,
     and is not used for a socket server. If `settable` is set to True, then
-    the variable value is read from the holding registers (`readwrite`
-    variables), otherwise the variable value is read from the input registers
-    (`readonly` variables).
+    the variable value is read from the holding registers (`knobs`), otherwise the
+    variable value is read from the input registers (`meters`).
 
     """
 
@@ -370,18 +538,9 @@ class Remote(Variable):
         if self.protocol == "modbus":
             fcode = 3 if self.settable else 4
 
-            type_int = self._client.read(fcode, self.alias + 4, _type="16bit_int")
-
-            _type = {
-                0: Boolean,
-                1: Toggle,
-                2: Integer,
-                3: Float,
-            }.get(type_int, None)
-
-            if _type is not None:
+            if self._type is not None:
                 self._value = self._client.read(
-                    fcode, self.alias, count=4, _type=self.type_map[_type]
+                    fcode, self.alias, count=4, _type=self.type_map[self._type]
                 )
 
         else:
@@ -472,16 +631,30 @@ class Remote(Variable):
 
     def get_type(self):
         """Get the data type of the remote variable"""
-        write_to_socket(self._socket, f"{self.alias} type?")
 
-        response = read_from_socket(self._socket, timeout=60)
+        if self.protocol == 'modbus':
+            fcode = 3 if self.settable else 4
 
-        if response is not None:
-            for _type in types.supported:
-                if str(_type) in response.split(self.alias)[-1]:
-                    self._type = types.supported.get(_type, None)
+            type_int = self._client.read(fcode, self.alias + 4, _type="16bit_int")
+
+            self._type = {
+                0: Boolean,
+                1: Toggle,
+                2: Integer,
+                3: Float,
+            }.get(type_int, None)
+
         else:
-            self._type = None
+            write_to_socket(self._socket, f"{self.alias} type?")
+
+            response = read_from_socket(self._socket, timeout=60)
+
+            if response is not None:
+                for _type in types.supported:
+                    if str(_type) in response.split(self.alias)[-1]:
+                        self._type = types.supported.get(_type, None)
+            else:
+                self._type = None
 
     def get_settable(self):
         """Get settability of remote variable"""
@@ -489,6 +662,9 @@ class Remote(Variable):
 
         response = read_from_socket(self._socket, timeout=60)
         self._settable = response == f"{self.alias} settable"
+
+    def __str__(self):
+        return f"Remote({self.alias}@{self.server} = {self._value})"
 
 
 class Parameter(Variable):
@@ -502,7 +678,7 @@ class Parameter(Variable):
 
     _settable = True  #:
 
-    def __init__(self, parameter: Type):
+    def __init__(self, parameter: Union[float, int, bool, str, Toggle, np.ndarray]):
         self.parameter = parameter
         self._value = parameter
 
@@ -522,6 +698,9 @@ class Parameter(Variable):
         """Set the parameter value"""
         self.parameter = value
         self._value = value
+
+    def __str__(self):
+        return f"Parameter({self._value})"
 
 
 supported = {

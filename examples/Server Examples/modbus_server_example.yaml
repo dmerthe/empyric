@@ -45,7 +45,9 @@ Variables:
 
 Alarms:
  r > 1:
-  condition: 'Distance r > 1'
+  condition: 'r > 1'
+  definitions:
+   r: Distance r
   protocol: hold
 
 Plots:

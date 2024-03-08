@@ -687,6 +687,7 @@ class SorensenXG10250(Instrument):
 
         return self.analog_mode_state
 
+
 class BK9140(Instrument):
     """
     B&K Precision Model 9140 (35V & 6A / 70V & 3A) power supply
