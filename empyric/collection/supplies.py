@@ -706,6 +706,7 @@ class SorensenXG10250(Instrument):
     def set_analog_control_mode(self, analog_control_mode: Toggle):
         if analog_control_mode == ON:
 <<<<<<< HEAD
+<<<<<<< HEAD
             self.write("SYST:REM:SOUR:CURR AVOL")
         if analog_control_mode == OFF:
             self.write("SYST:REM:SOUR:CURR LOC")
@@ -726,6 +727,11 @@ class SorensenXG10250(Instrument):
         if analog_control_mode == OFF:
             self.write("SYST:REM:SOUR LOC")
 >>>>>>> b362f03 (Sorensen functions working)
+=======
+            self.write("SYST:REM:SOUR:CURR IAV")
+        if analog_control_mode == OFF:
+            self.write("SYST:REM:SOUR:CURR LOC")
+>>>>>>> de5d775 (Sorensen changes in progress)
 
     @setter
     def set_max_current(self, current):
@@ -766,6 +772,7 @@ class SorensenXG10250(Instrument):
     @getter
     def get_analog_control_mode(self) -> Toggle:
 <<<<<<< HEAD
+<<<<<<< HEAD
         if self.analog_mode_state is None:
 
             def str_validator(response):
@@ -782,6 +789,9 @@ class SorensenXG10250(Instrument):
         return self.analog_mode_state
 =======
         response = self.query("SYST:REM:SOUR?").decode("utf-8")
+=======
+        response = self.query("SYST:REM:SOUR:CURR?").decode("utf-8")
+>>>>>>> de5d775 (Sorensen changes in progress)
         if "Analog Isolated" in response:
             return ON
         elif "LOCAL" in response:

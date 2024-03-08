@@ -77,12 +77,16 @@ class OmegaCN7500(Instrument):
 
     @getter
     def get_setpoint(self) -> Float:
+<<<<<<< HEAD
         if self.get_sensor_type() in self.scale_factors.keys():
             scaler = self.scale_factors[self.get_sensor_type()]
         else:
             scaler = 0.1
 
         return self.read(3, 0x1001) * scaler
+=======
+        return self.read(3, 1001) / 10
+>>>>>>> de5d775 (Sorensen changes in progress)
 
     @setter
     def set_proportional_band(self, P: Integer):
