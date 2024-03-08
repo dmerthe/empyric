@@ -1,6 +1,8 @@
 from empyric.adapters import *
 from empyric.collection.instrument import *
 from empyric.types import Toggle, Float, ON, OFF
+import struct
+import warnings
 
 
 class Keithley2260B(Instrument):
@@ -522,55 +524,29 @@ class SorensenXG10250(Instrument):
 
     The analog control mode option allows the power supply to operate in a
     voltage-controlled current mode via its non-isolated input pin.
-<<<<<<< HEAD
-<<<<<<< HEAD
 
     By default, the RS-485 multicast address is assumed to be 1.
-=======
->>>>>>> 2cc4295 (added comms address preset in sorensen ps)
-=======
-
-    By default, the RS-485 multicast address is assumed to be 1.
->>>>>>> 8cf2ab3 (tried creating a class init method for sorensen)
     """
 
     name = "SorensenXG10250"
 
-<<<<<<< HEAD
     supported_adapters = (
         (Serial, {"baud_rate": 9600, "read_termination": "\r", "lib": "pyserial"}),
     )
-=======
-    supported_adapters = ((Serial, {"baud_rate": 9600, "read_termination": "\r"}),)
->>>>>>> b362f03 (Sorensen functions working)
 
     knobs = ("max voltage", "max current", "output", "analog control mode")
 
-    meters = ("voltage", "current", "analog input voltage", "analog input current",
-              "iso analog input current")
+    meters = ("voltage", "current", "analog input voltage", "analog input current")
 
-<<<<<<< HEAD
     def __init__(
         self, address=None, adapter=None, presets=None, postsets=None, **kwargs
     ):
-=======
-    def __init__(self,  address=None, adapter=None, presets=None,
-                 postsets=None, **kwargs):
-        # super().__init__(**kwargs)
-<<<<<<< HEAD
->>>>>>> 8cf2ab3 (tried creating a class init method for sorensen)
-=======
-        # self.write("*ADR 1")
->>>>>>> b362f03 (Sorensen functions working)
         self.address = address
 
         self.knobs = ("connected",) + self.knobs
 
-<<<<<<< HEAD
         self.analog_mode_state = None
 
-=======
->>>>>>> 8cf2ab3 (tried creating a class init method for sorensen)
         adapter_connected = False
         if adapter:
             self.adapter = adapter(self, **kwargs)
@@ -601,8 +577,6 @@ class SorensenXG10250(Instrument):
         if self.address:
             self.name = self.name + "@" + str(self.address)
 
-<<<<<<< HEAD
-<<<<<<< HEAD
         self.write("*ADR 1")  # Set multicast address to 1 by default
 
         # Get existing knob settings, if possible
@@ -629,39 +603,9 @@ class SorensenXG10250(Instrument):
 
     def float_validator(self, response):
         return bool(re.match("\d+\.\d+", response))
-=======
-        self.write("*ADR 1")
-=======
-        self.write("*ADR 1")  # Set multicast address to 1 by default
->>>>>>> b362f03 (Sorensen functions working)
-
-        # Get existing knob settings, if possible
-        for knob in self.knobs:
-            if hasattr(self, "get_" + knob.replace(" ", "_")):
-                # retrieves the knob value from the instrument
-                self.__getattribute__("get_" + knob.replace(" ", "_"))()
-            else:
-                # knob value is unknown until it is set
-                self.__setattr__(knob.replace(" ", "_"), None)
-
-        # Apply presets
-        if presets:
-            self.presets = {**self.presets, **presets}
-
-        for knob, value in self.presets.items():
-            self.set(knob, value)
-
-        # Get postsets
-        if postsets:
-            self.postsets = {**self.postsets, **postsets}
-
-        self.kwargs = kwargs
-
->>>>>>> 8cf2ab3 (tried creating a class init method for sorensen)
 
     @measurer
     def measure_current(self):
-<<<<<<< HEAD
         return self.query("MEAS:CURR?", validator=self.float_validator)
 
     @measurer
@@ -675,25 +619,6 @@ class SorensenXG10250(Instrument):
     @measurer
     def measure_analog_input_current(self):
         return self.query("MEAS:APR:CURR?", validator=self.float_validator)
-=======
-        return float(self.query("MEAS:CURR?").decode("utf-8"))
-
-    @measurer
-    def measure_voltage(self):
-        return float(self.query("MEAS:VOLT?").decode("utf-8"))
-
-    @measurer
-    def measure_analog_input_voltage(self):
-        return float(self.query("MEAS:APR?").decode("utf-8"))
-
-    @measurer
-    def measure_analog_input_current(self):
-        return float(self.query("MEAS:APR:CURR?").decode("utf-8"))
->>>>>>> b362f03 (Sorensen functions working)
-
-    @measurer
-    def measure_iso_analog_input_current(self):
-        return float(self.query("MEAS:APR:CURR:ISO?").decode("utf-8"))
 
     @setter
     def set_output(self, output: Toggle):
@@ -705,8 +630,6 @@ class SorensenXG10250(Instrument):
     @setter
     def set_analog_control_mode(self, analog_control_mode: Toggle):
         if analog_control_mode == ON:
-<<<<<<< HEAD
-<<<<<<< HEAD
             self.write("SYST:REM:SOUR:CURR AVOL")
         if analog_control_mode == OFF:
             self.write("SYST:REM:SOUR:CURR LOC")
@@ -722,16 +645,6 @@ class SorensenXG10250(Instrument):
             self.analog_mode_state = ON
         elif "LOCAL" in response:
             self.analog_mode_state = OFF
-=======
-            self.write("SYST:REM:SOUR IAV")
-        if analog_control_mode == OFF:
-            self.write("SYST:REM:SOUR LOC")
->>>>>>> b362f03 (Sorensen functions working)
-=======
-            self.write("SYST:REM:SOUR:CURR IAV")
-        if analog_control_mode == OFF:
-            self.write("SYST:REM:SOUR:CURR LOC")
->>>>>>> de5d775 (Sorensen changes in progress)
 
     @setter
     def set_max_current(self, current):
@@ -743,7 +656,6 @@ class SorensenXG10250(Instrument):
 
     @getter
     def get_max_current(self):
-<<<<<<< HEAD
         return self.query("SOUR:CURR?")
 
     @getter
@@ -753,17 +665,6 @@ class SorensenXG10250(Instrument):
     @getter
     def get_output(self) -> Toggle:
         response = self.query("OUTP?")
-=======
-        return float(self.query("SOUR:CURR?").decode("utf-8"))
-
-    @getter
-    def get_max_voltage(self):
-        return float(self.query("SOUR:VOLT?").decode("utf-8"))
-
-    @getter
-    def get_output(self) -> Toggle:
-        response = self.query("OUTP?").decode("utf-8")
->>>>>>> b362f03 (Sorensen functions working)
         if response.startswith("0"):
             return OFF
         elif response.startswith("1"):
@@ -771,8 +672,6 @@ class SorensenXG10250(Instrument):
 
     @getter
     def get_analog_control_mode(self) -> Toggle:
-<<<<<<< HEAD
-<<<<<<< HEAD
         if self.analog_mode_state is None:
 
             def str_validator(response):
@@ -787,16 +686,7 @@ class SorensenXG10250(Instrument):
                 self.analog_mode_state = OFF
 
         return self.analog_mode_state
-=======
-        response = self.query("SYST:REM:SOUR?").decode("utf-8")
-=======
-        response = self.query("SYST:REM:SOUR:CURR?").decode("utf-8")
->>>>>>> de5d775 (Sorensen changes in progress)
-        if "Analog Isolated" in response:
-            return ON
-        elif "LOCAL" in response:
-            return OFF
->>>>>>> b362f03 (Sorensen functions working)
+
 
 class BK9140(Instrument):
     """
@@ -952,3 +842,190 @@ class BK9140(Instrument):
     def get_max_voltage_3(self):
         self.write(":INST:SEL 3")
         return float(self.query("SOUR:VOLT?"))
+
+class GlassmanOQ500(Instrument):
+    """
+    Glassman OQ series high voltage power supply (500 kV / 10 mA).
+
+    
+    """
+
+    name = "GlassmanOQ"
+
+    supported_adapters = ((Serial, {"baud_rate": 9600,
+                                    "write_termination": '\r',
+                                    "read_termination": '\r',
+                                    "lib": "pyserial"}),)
+
+    knobs = ("max voltage", "max current", "output enable", 'reset')
+
+    meters = ("voltage", "current", "fault state")
+
+    SOH: bytes = b'\x01'
+    EOM: bytes = b'\x0D'
+
+    max_output_voltage_volts = 500000.0  # 500kV
+    max_output_current_mA = 20  # 20 mA
+
+    def _compute_checksum(self, message_segment: bytes) -> bytes:
+        crc = sum(struct.unpack('>'+'B'*len(message_segment), message_segment)) % 256
+        return bytes(format(crc, 'X'), 'utf-8')
+    
+    def _test_checksum(self, message: bytes) -> bool:
+        calculated_crc = self._compute_checksum(message[1:-2])
+        return message[-3:-1][::-1] == calculated_crc
+    
+    def _wrap_message(self, message_content) -> str:
+        if type(message_content) != bytes:
+            message_content = message_content.encode('utf-8')
+        message = self.SOH
+        message += message_content
+        calculated_crc = self._compute_checksum(message_content)
+        message += calculated_crc
+        # message += self.EOM
+        return message.decode()
+
+    def _construct_set_message(self,
+                               normalized_voltage_cmd: (float | None) = None,
+                               normalized_current_cmd: (float | None) = None,
+                               hv_on_cmd: (bool | None) = None,
+                               hv_off_cmd: (bool | None) = None,
+                               reset_cmd: (bool | None) = None) -> str:
+        # process inputs
+        if normalized_voltage_cmd is not None:
+            self.normalized_voltage_cmd = normalized_voltage_cmd
+        if normalized_current_cmd is not None:
+            self.normalized_current_cmd = normalized_current_cmd
+        if hv_on_cmd is None:
+            self.hv_on_cmd = False
+        else:
+            self.hv_on_cmd = hv_on_cmd
+        if hv_off_cmd is None:
+            self.hv_off_cmd = False
+        else:
+            self.hv_off_cmd = hv_off_cmd
+        if reset_cmd is None:
+            self.reset_cmd = False
+        else:
+            self.reset_cmd = reset_cmd
+
+        # construct message
+        message: bytes = b'S'  # command identifier
+        message += bytes(format(int(0xFFF*self.normalized_voltage_cmd),
+                                'X').zfill(3), 'utf-8')
+        message += bytes(format(int(0xFFF*self.normalized_current_cmd),
+                                'X').zfill(3), 'utf-8')
+        message += b'000000'  # bytes 9-14
+        message += bytes(format(int((self.reset_cmd << 2) ^
+                                    (self.hv_on_cmd << 1) ^
+                                    self.hv_off_cmd), 'X'), 'utf-8')
+        return self._wrap_message(message)
+    
+    def _check_response_message(self, message) -> (bool | None):
+        if message == '':
+            return None
+        if self._test_checksum(message.encode('utf-8')):
+            if message[0] == 'R':
+                # Check for fault state on byte 11, bit 1
+                ps_fault = message[10:13][1:2]
+                if ps_fault == "1":
+                    warnings.warn("Power supply is in a fault state. "
+                                  "A PS reset command must be sent "
+                                  "(via 'reset' knob) to clear fault "
+                                  "before setting new values!")
+                return message
+            else:
+                raise KeyError(f'Incorrect Message Type [{message[0]}]'
+                               f' in decode_response_message()')
+        else:
+            raise ValueError('Checksum error in decode_response_message()')
+
+    def _acknowledge_validator(self, message) -> (bool | None):
+        if message == '':
+            return None
+        if message == 'A':
+            return True
+        elif message[0] == 'E':
+            warnings.warn(f"Error message received during set command: {message}."
+                          f" See manual for further details.")
+        else:
+            return False
+
+    @setter
+    def set_max_voltage(self, voltage_Volts: Float):
+        normalized_voltage_cmd = voltage_Volts/self.max_output_voltage_volts
+        message: str = self._construct_set_message(normalized_voltage_cmd)
+        self.query(message, validator=self._acknowledge_validator)
+
+    @setter
+    def set_max_current(self, current_mA: Float):
+        normalized_current_cmd = current_mA/self.max_output_current_mA
+        message: str = self._construct_set_message(normalized_current_cmd)
+        self.query(message, validator=self._acknowledge_validator)
+
+    @getter
+    def get_output_enable(self) -> Toggle:
+        query = self._wrap_message("Q")
+        response: str = self.query(query)
+        output = self._check_response_message(response)[10:13][0:1]
+        if output == "1":
+            return ON
+        else:
+            return OFF
+
+    @setter
+    def set_output_enable(self, output: Toggle):
+        if output == ON:
+            message: str = \
+                self._construct_set_message(hv_on_cmd=True, hv_off_cmd=False)
+
+            self.query(message, validator=self._acknowledge_validator)
+        else:
+            message: str = \
+                self._construct_set_message(hv_off_cmd=True, hv_on_cmd=False)
+
+            self.query(message, validator=self._acknowledge_validator)
+
+    @setter
+    def set_reset(self, reset: Toggle):
+        if reset == ON:
+            message: str = self._construct_set_message(reset_cmd=True,
+                                                       normalized_current_cmd=0.0,
+                                                       normalized_voltage_cmd=0.0)
+            self.query(message, validator=self._acknowledge_validator)
+        else:
+            message: str = self._construct_set_message(reset_cmd=False)
+            self.query(message, validator=self._acknowledge_validator)
+
+    @measurer
+    def measure_voltage(self) -> Float:
+        response = self.query(self._wrap_message("Q"))
+        voltage = self._check_response_message(response)[4:7]
+        voltage_int = [int(v) for v in voltage]
+        voltage_combined = int.from_bytes(voltage_int, byteorder='big')
+        voltage_normalized = voltage_combined / 0x3FF
+        voltage_outp = voltage_normalized * self.max_output_voltage_volts
+        return voltage_outp
+    
+    @measurer
+    def measure_current(self) -> Float:
+        response = self.query(self._wrap_message("Q"))
+        current = self._check_response_message(response)[1:4]
+        current_int = [int(i) for i in current]
+        current_combined = int.from_bytes(current_int, byteorder='big')
+        current_normalized = current_combined / 0x3FF
+        current_outp = current_normalized * self.max_output_current_mA
+        return current_outp
+    
+    @measurer
+    def measure_fault_state(self) -> Toggle:
+        response = self.query(self._wrap_message("Q"))
+        if response[10:13][1:2] == "1":
+            warnings.warn("Power supply is in a fault state. A PS reset "
+                          "command must be sent (via 'reset' knob) to clear "
+                          "fault before setting new values!")
+            return ON  # fault detected
+        elif response[10:13][1:2] == "0":
+            return OFF  # no fault
+        else:
+            return ON
