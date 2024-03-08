@@ -536,13 +536,18 @@ class SorensenXG10250(Instrument):
 
     name = "SorensenXG10250"
 
+<<<<<<< HEAD
     supported_adapters = (
         (Serial, {"baud_rate": 9600, "read_termination": "\r", "lib": "pyserial"}),
     )
+=======
+    supported_adapters = ((Serial, {"baud_rate": 9600, "read_termination": "\r"}),)
+>>>>>>> b362f03 (Sorensen functions working)
 
     knobs = ("max voltage", "max current", "output", "analog control mode")
 
-    meters = ("voltage", "current", "analog input voltage", "analog input current")
+    meters = ("voltage", "current", "analog input voltage", "analog input current",
+              "iso analog input current")
 
 <<<<<<< HEAD
     def __init__(
@@ -552,7 +557,11 @@ class SorensenXG10250(Instrument):
     def __init__(self,  address=None, adapter=None, presets=None,
                  postsets=None, **kwargs):
         # super().__init__(**kwargs)
+<<<<<<< HEAD
 >>>>>>> 8cf2ab3 (tried creating a class init method for sorensen)
+=======
+        # self.write("*ADR 1")
+>>>>>>> b362f03 (Sorensen functions working)
         self.address = address
 
         self.knobs = ("connected",) + self.knobs
@@ -593,6 +602,7 @@ class SorensenXG10250(Instrument):
             self.name = self.name + "@" + str(self.address)
 
 <<<<<<< HEAD
+<<<<<<< HEAD
         self.write("*ADR 1")  # Set multicast address to 1 by default
 
         # Get existing knob settings, if possible
@@ -621,38 +631,37 @@ class SorensenXG10250(Instrument):
         return bool(re.match("\d+\.\d+", response))
 =======
         self.write("*ADR 1")
+=======
+        self.write("*ADR 1")  # Set multicast address to 1 by default
+>>>>>>> b362f03 (Sorensen functions working)
 
-        # DEBUG
-        # print(self.query("*IDN?"))
-        # print(self.query("*ADR?"))
-        # print(self.query("MEAS:CURR?"))
+        # Get existing knob settings, if possible
+        for knob in self.knobs:
+            if hasattr(self, "get_" + knob.replace(" ", "_")):
+                # retrieves the knob value from the instrument
+                self.__getattribute__("get_" + knob.replace(" ", "_"))()
+            else:
+                # knob value is unknown until it is set
+                self.__setattr__(knob.replace(" ", "_"), None)
 
-        # # Get existing knob settings, if possible
-        # for knob in self.knobs:
-        #     if hasattr(self, "get_" + knob.replace(" ", "_")):
-        #         # retrieves the knob value from the instrument
-        #         self.__getattribute__("get_" + knob.replace(" ", "_"))()
-        #     else:
-        #         # knob value is unknown until it is set
-        #         self.__setattr__(knob.replace(" ", "_"), None)
-        #
-        # # Apply presets
-        # if presets:
-        #     self.presets = {**self.presets, **presets}
-        #
-        # for knob, value in self.presets.items():
-        #     self.set(knob, value)
-        #
-        # # Get postsets
-        # if postsets:
-        #     self.postsets = {**self.postsets, **postsets}
-        #
-        # self.kwargs = kwargs
+        # Apply presets
+        if presets:
+            self.presets = {**self.presets, **presets}
+
+        for knob, value in self.presets.items():
+            self.set(knob, value)
+
+        # Get postsets
+        if postsets:
+            self.postsets = {**self.postsets, **postsets}
+
+        self.kwargs = kwargs
 
 >>>>>>> 8cf2ab3 (tried creating a class init method for sorensen)
 
     @measurer
     def measure_current(self):
+<<<<<<< HEAD
         return self.query("MEAS:CURR?", validator=self.float_validator)
 
     @measurer
@@ -666,6 +675,25 @@ class SorensenXG10250(Instrument):
     @measurer
     def measure_analog_input_current(self):
         return self.query("MEAS:APR:CURR?", validator=self.float_validator)
+=======
+        return float(self.query("MEAS:CURR?").decode("utf-8"))
+
+    @measurer
+    def measure_voltage(self):
+        return float(self.query("MEAS:VOLT?").decode("utf-8"))
+
+    @measurer
+    def measure_analog_input_voltage(self):
+        return float(self.query("MEAS:APR?").decode("utf-8"))
+
+    @measurer
+    def measure_analog_input_current(self):
+        return float(self.query("MEAS:APR:CURR?").decode("utf-8"))
+>>>>>>> b362f03 (Sorensen functions working)
+
+    @measurer
+    def measure_iso_analog_input_current(self):
+        return float(self.query("MEAS:APR:CURR:ISO?").decode("utf-8"))
 
     @setter
     def set_output(self, output: Toggle):
@@ -677,6 +705,7 @@ class SorensenXG10250(Instrument):
     @setter
     def set_analog_control_mode(self, analog_control_mode: Toggle):
         if analog_control_mode == ON:
+<<<<<<< HEAD
             self.write("SYST:REM:SOUR:CURR AVOL")
         if analog_control_mode == OFF:
             self.write("SYST:REM:SOUR:CURR LOC")
@@ -692,6 +721,11 @@ class SorensenXG10250(Instrument):
             self.analog_mode_state = ON
         elif "LOCAL" in response:
             self.analog_mode_state = OFF
+=======
+            self.write("SYST:REM:SOUR IAV")
+        if analog_control_mode == OFF:
+            self.write("SYST:REM:SOUR LOC")
+>>>>>>> b362f03 (Sorensen functions working)
 
     @setter
     def set_max_current(self, current):
@@ -703,6 +737,7 @@ class SorensenXG10250(Instrument):
 
     @getter
     def get_max_current(self):
+<<<<<<< HEAD
         return self.query("SOUR:CURR?")
 
     @getter
@@ -712,6 +747,17 @@ class SorensenXG10250(Instrument):
     @getter
     def get_output(self) -> Toggle:
         response = self.query("OUTP?")
+=======
+        return float(self.query("SOUR:CURR?").decode("utf-8"))
+
+    @getter
+    def get_max_voltage(self):
+        return float(self.query("SOUR:VOLT?").decode("utf-8"))
+
+    @getter
+    def get_output(self) -> Toggle:
+        response = self.query("OUTP?").decode("utf-8")
+>>>>>>> b362f03 (Sorensen functions working)
         if response.startswith("0"):
             return OFF
         elif response.startswith("1"):
@@ -719,6 +765,7 @@ class SorensenXG10250(Instrument):
 
     @getter
     def get_analog_control_mode(self) -> Toggle:
+<<<<<<< HEAD
         if self.analog_mode_state is None:
 
             def str_validator(response):
@@ -733,6 +780,13 @@ class SorensenXG10250(Instrument):
                 self.analog_mode_state = OFF
 
         return self.analog_mode_state
+=======
+        response = self.query("SYST:REM:SOUR?").decode("utf-8")
+        if "Analog Isolated" in response:
+            return ON
+        elif "LOCAL" in response:
+            return OFF
+>>>>>>> b362f03 (Sorensen functions working)
 
 class BK9140(Instrument):
     """

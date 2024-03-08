@@ -521,6 +521,9 @@ class LabJackT7(Instrument):
 
     def _measure_AIN(self, n) -> Float:
         return self.read(3, 2 * n, count=2, _type="32bit_float")
+    
+    def _measure_AIN_EF_READ_A(self, n) -> Float:
+        return self.read(3, 2 * n + 7000, count=2, _type="32bit_float")
 
     def _measure_AIN_EF_READ_A(self, n) -> Float:
         return self.read(3, 2 * n + 7000, count=2, _type="32bit_float")
