@@ -613,13 +613,14 @@ def validate_runcard(runcard):
         with open(runcard_path, "w") as runcard_file:
             yaml.dump(runcard, runcard_file)
 
-        validate_runcard(runcard_path)
+        try:
+            validate_runcard(runcard_path)
+        finally:
+            # Wait until temporary file has write access, then delete
+            while not os.access(runcard_path, os.W_OK):
+                time.sleep(0.1)
 
-        # Wait until temporary file has write access, then delete
-        while not os.access(runcard_path, os.W_OK):
-            time.sleep(0.1)
-
-        os.remove(runcard_path)
+            os.remove(runcard_path)
 
         return True
 
