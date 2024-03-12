@@ -195,7 +195,11 @@ class Knob(Variable):
         Value of the knob of an instrument
         """
 
-        self._value = self.multiplier * self.instrument.get(self.knob) + self.offset
+        self._value = self.instrument.get(self.knob)
+
+        if isinstance(self._value, numbers.Number):
+            self._value = self.multiplier * self._value + self.offset
+
         self.last_evaluation = time.time()
 
         return self._value
@@ -216,10 +220,16 @@ class Knob(Variable):
                 self.knob, (self.lower_limit - self.offset) / self.multiplier
             )
         else:
-            self.instrument.set(self.knob, (value - self.offset) / self.multiplier)
+            print(self.knob, value, type(value), isinstance(value, numbers.Number))
+            if isinstance(value, numbers.Number):
+                self.instrument.set(self.knob, (value - self.offset) / self.multiplier)
+            else:
+                self.instrument.set(self.knob, value)
 
         self._value = self.instrument.__getattribute__(self.knob.replace(" ", "_"))
-        self._value = self.multiplier * self._value + self.offset
+
+        if isinstance(value, numbers.Number):
+            self._value = self.multiplier * self._value + self.offset
 
     def __str__(self):
         return f"Knob({self._value})"
@@ -285,8 +295,10 @@ class Meter(Variable):
         if not self.gate.value:
             return None
 
-        self._value = (self.multiplier * self.instrument.measure(self.meter)
-                       + self.offset)
+        self._value = self.instrument.measure(self.meter)
+
+        if isinstance(self._value, numbers.Number):
+            self._value = self.multiplier * self._value + self.offset
 
         self.last_evaluation = time.time()
 
