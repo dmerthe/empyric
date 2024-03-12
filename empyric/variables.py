@@ -147,6 +147,16 @@ class Knob(Variable):
     associated with.
 
     The `knob` argument is the label of the knob on the instrument.
+
+    The optional `lower_limit` and `upper_limit` keyword arguments set the lower and
+    upper limits for the knob. If an attempt it made to set a value above/below the
+    upper/lower limit, it is set to the upper/lower limit value.
+
+    The optional `multiplier` and offset keyword arguments provide a means to affect
+    a linear transformation of the raw knob value. Readings from the instrument will
+    be multiplied by the `multiplier` and then increased by the `offset`. Set commands
+    to the instrument will take the knob value, subtract the `offset` and divide by the
+    `multiplier`.
     """
 
     _settable = True  #:
@@ -155,13 +165,17 @@ class Knob(Variable):
         self,
         instrument: Instrument,
         knob: str,
-        lower_limit: numbers.Number = None,
-        upper_limit: numbers.Number = None,
+        lower_limit: Union[float, int] = None,
+        upper_limit: Union[float, int] = None,
+        multiplier: Union[float, int] = 1,
+        offset: Union[float, int] = 0
     ):
         self.instrument = instrument
         self.knob = knob  # name of the knob on instrument
         self.lower_limit = lower_limit
         self.upper_limit = upper_limit
+        self.multiplier = multiplier
+        self.offset = offset
 
         # infer type from type hint of first argument of set method
         set_method = getattr(instrument, "set_" + knob.replace(" ", "_"))
@@ -182,6 +196,10 @@ class Knob(Variable):
         """
 
         self._value = self.instrument.get(self.knob)
+
+        if isinstance(self._value, numbers.Number):
+            self._value = self.multiplier * self._value + self.offset
+
         self.last_evaluation = time.time()
 
         return self._value
@@ -194,13 +212,24 @@ class Knob(Variable):
         """
 
         if self.upper_limit and value > self.upper_limit:
-            self.instrument.set(self.knob, self.upper_limit)
+            self.instrument.set(
+                self.knob, (self.upper_limit - self.offset) / self.multiplier
+            )
         elif self.lower_limit and value < self.lower_limit:
-            self.instrument.set(self.knob, self.lower_limit)
+            self.instrument.set(
+                self.knob, (self.lower_limit - self.offset) / self.multiplier
+            )
         else:
-            self.instrument.set(self.knob, value)
+            print(self.knob, value, type(value), isinstance(value, numbers.Number))
+            if isinstance(value, numbers.Number):
+                self.instrument.set(self.knob, (value - self.offset) / self.multiplier)
+            else:
+                self.instrument.set(self.knob, value)
 
         self._value = self.instrument.__getattribute__(self.knob.replace(" ", "_"))
+
+        if isinstance(value, numbers.Number):
+            self._value = self.multiplier * self._value + self.offset
 
     def __str__(self):
         return f"Knob({self._value})"
@@ -224,13 +253,26 @@ class Meter(Variable):
     it should be a variable of integer, boolean or toggle type. When the gate
     variable evaluates to 1/True/On, the meter can be measured. Otherwise,
     attempts to measure the meter will have no effect (`None` is returned).
+
+    The optional `multiplier` and offset keyword arguments provide a means to affect
+    a linear transformation of the raw meter value. Readings from the instrument will
+    be multiplied by the `multiplier` and then increased by the `offset`.
     """
 
     _settable = False  #:
 
-    def __init__(self, instrument: Instrument, meter: str, gate=None):
+    def __init__(
+            self,
+            instrument: Instrument,
+            meter: str,
+            gate=None,
+            multiplier: Union[float, int] = 1,
+            offset: Union[float, int] = 0
+    ):
         self.instrument = instrument
         self.meter = meter
+        self.multiplier = multiplier
+        self.offset = offset
 
         if gate and isinstance(gate, Variable):
             self.gate = gate
@@ -254,6 +296,10 @@ class Meter(Variable):
             return None
 
         self._value = self.instrument.measure(self.meter)
+
+        if isinstance(self._value, numbers.Number):
+            self._value = self.multiplier * self._value + self.offset
+
         self.last_evaluation = time.time()
 
         return self._value
@@ -406,22 +452,28 @@ class Expression(Variable):
 
         if np.isfinite(cycles):
             # Partition signal into segments containing integer number of carrier cycles
-            fc = Expression.carrier(s, dt, f0, bw=bw)
+            fc = Expression.carrier(s, dt, f0, bw=bw)  # get carrier frequency
 
-            k_cycle = int(1 / (dt * fc))  # number of samples per carrier period
+            k_partition = int(cycles / (dt * fc))  # number of samples per partition
 
-            partitions = np.reshape(s, (-1, cycles * k_cycle))
+            n_parts = int(len(s) / k_partition) + 1
+
+            s_padded = np.concatenate([s, np.zeros(n_parts * k_partition - len(s))])
+
+            partitions = np.reshape(s_padded, (n_parts, k_partition))
         else:
             # Demodulate the whole signal
+
+            n_parts = 1
+            k_partition = len(s)
+
             partitions = np.array([s])
 
         partitions_demod = np.empty_like(partitions, dtype=np.complex128)
 
-        frequencies = []
-
         for i, partition in enumerate(partitions):
             # Calculate FFT
-            freq = np.fft.fftfreq(len(partition), d=dt)  # frequency values for the FFT
+            freq = np.fft.fftfreq(k_partition, d=dt)  # frequency values for the FFT
             fft = np.fft.fft(partition)
 
             # Find principal frequency within the given band about the given frequency
@@ -432,8 +484,6 @@ class Expression(Variable):
             where_f0_closest = np.argwhere(
                 fft_in_positive_band == np.max(fft_in_positive_band)
             ).flatten()[0]
-
-            frequencies.append(freq[where_f0_closest])
 
             if np.abs(fft[where_f0_closest]) > 0.0:
                 phase = np.log(fft[where_f0_closest]).imag  # Get phase of sinusoid
@@ -506,10 +556,18 @@ class Remote(Variable):
         alias: Union[int, str],
         protocol: str = None,
         settable: bool = False,  # needed for modbus protocol
+        lower_limit: Union[float, int] = None,
+        upper_limit: Union[float, int] = None,
+        multiplier: Union[float, int] = 1,
+        offset: Union[float, int] = 0
     ):
         self.server = server
         self.alias = alias
         self.protocol = protocol
+        self.lower_limit = lower_limit
+        self.upper_limit = upper_limit
+        self.multiplier = multiplier
+        self.offset = offset
 
         if protocol == "modbus":
             self._client = instruments.ModbusClient(server)
@@ -571,6 +629,9 @@ class Remote(Variable):
                     f'from server at {self.server}; got error "{error}"'
                 )
 
+        if isinstance(self._value, numbers.Number):
+            self._value = self.multiplier * self._value + self.offset
+
         return self._value
 
     @value.setter
@@ -579,6 +640,11 @@ class Remote(Variable):
         """
         Set the value of a remote variable
         """
+
+        if isinstance(value, np.integer):
+            value = (value - int(self.offset)) // int(self.multiplier)
+        elif isinstance(value, np.floating):
+            value = (value - self.offset) / self.multiplier
 
         if self.protocol == "modbus":
             self._client.write(16, self.alias, value, _type=self.type_map[self._type])

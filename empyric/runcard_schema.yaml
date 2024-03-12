@@ -52,7 +52,10 @@ map:
       dtype: {type: str},
       settable: {type: bool},
 
-      hidden: {type: bool}  # whether to show in GUI
+      hidden: {type: bool},  # whether to show in GUI
+
+      multiplier: { type: number },  # for knob, meter and remote type variables
+      offset: { type: number }  # for knob, meter and remote type variables
     }}
   }}
 

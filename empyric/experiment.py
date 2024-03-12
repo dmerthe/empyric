@@ -725,7 +725,9 @@ def convert_runcard(runcard):
             gate = specs.get("gate", None)
             gate = variables[gate] if gate else None
             variables[name] = _variables.Meter(
-                meter=specs["meter"], instrument=instrument, gate=gate
+                meter=specs["meter"], instrument=instrument, gate=gate,
+                multiplier=specs.get("multiplier", 1),
+                offset=specs.get("offset", 0)
             )
         elif "knob" in specs:
             instrument = converted_runcard["Instruments"][specs["instrument"]]
@@ -734,6 +736,8 @@ def convert_runcard(runcard):
                 instrument=instrument,
                 lower_limit=specs.get("lower limit", None),
                 upper_limit=specs.get("upper limit", None),
+                multiplier=specs.get("multiplier", 1),
+                offset=specs.get("offset", 0)
             )
         elif "expression" in specs:
             expression = specs["expression"]
@@ -760,7 +764,9 @@ def convert_runcard(runcard):
             settable = specs.get("settable", False)
 
             variables[name] = _variables.Remote(
-                server=server, alias=alias, protocol=protocol, settable=settable
+                server=server, alias=alias, protocol=protocol, settable=settable,
+                multiplier=specs.get("multiplier", 1),
+                offset=specs.get("offset", 0)
             )
 
         elif "parameter" in specs:
