@@ -514,7 +514,7 @@ class LabJackT7(Instrument):
     )
 
     def _set_DION(self, n, value: Integer):
-        self.write(16, 2000 + n, value, _type="16bit_uint")
+        self.write(16, 2000 + n, int(value), _type="16bit_uint")
 
     def _get_DION(self, n) -> Integer:
         return self.read(3, 2000 + n, count=1, _type="16bit_uint")

@@ -220,7 +220,6 @@ class Knob(Variable):
                 self.knob, (self.lower_limit - self.offset) / self.multiplier
             )
         else:
-            print(self.knob, value, type(value), isinstance(value, numbers.Number))
             if isinstance(value, numbers.Number):
                 self.instrument.set(self.knob, (value - self.offset) / self.multiplier)
             else:
