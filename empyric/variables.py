@@ -544,10 +544,18 @@ class Remote(Variable):
         alias: Union[int, str],
         protocol: str = None,
         settable: bool = False,  # needed for modbus protocol
+        lower_limit: Union[float, int] = None,
+        upper_limit: Union[float, int] = None,
+        multiplier: Union[float, int] = 1,
+        offset: Union[float, int] = 0
     ):
         self.server = server
         self.alias = alias
         self.protocol = protocol
+        self.lower_limit = lower_limit
+        self.upper_limit = upper_limit
+        self.multiplier = multiplier
+        self.offset = offset
 
         if protocol == "modbus":
             self._client = instruments.ModbusClient(server)
@@ -609,6 +617,9 @@ class Remote(Variable):
                     f'from server at {self.server}; got error "{error}"'
                 )
 
+        if isinstance(self._value, numbers.Number):
+            self._value = self.multiplier * self._value + self.offset
+
         return self._value
 
     @value.setter
@@ -617,6 +628,11 @@ class Remote(Variable):
         """
         Set the value of a remote variable
         """
+
+        if isinstance(value, np.integer):
+            value = (value - int(self.offset)) // int(self.multiplier)
+        elif isinstance(value, np.floating):
+            value = (value - self.offset) / self.multiplier
 
         if self.protocol == "modbus":
             self._client.write(16, self.alias, value, _type=self.type_map[self._type])
