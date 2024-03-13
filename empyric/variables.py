@@ -152,7 +152,7 @@ class Knob(Variable):
     upper limits for the knob. If an attempt it made to set a value above/below the
     upper/lower limit, it is set to the upper/lower limit value.
 
-    The optional `multiplier` and offset keyword arguments provide a means to affect
+    The optional `multiplier` and `offset` keyword arguments provide a means to affect
     a linear transformation of the raw knob value. Readings from the instrument will
     be multiplied by the `multiplier` and then increased by the `offset`. Set commands
     to the instrument will take the knob value, subtract the `offset` and divide by the
@@ -253,7 +253,7 @@ class Meter(Variable):
     variable evaluates to 1/True/On, the meter can be measured. Otherwise,
     attempts to measure the meter will have no effect (`None` is returned).
 
-    The optional `multiplier` and offset keyword arguments provide a means to affect
+    The optional `multiplier` and `offset` keyword arguments provide a means to affect
     a linear transformation of the raw meter value. Readings from the instrument will
     be multiplied by the `multiplier` and then increased by the `offset`.
     """
@@ -540,7 +540,7 @@ class Remote(Variable):
     the variable value is read from the holding registers (`knobs`), otherwise the
     variable value is read from the input registers (`meters`).
 
-    The optional `multiplier` and offset keyword arguments provide a means to affect
+    The optional `multiplier` and `offset` keyword arguments provide a means to affect
     a linear transformation of the raw variable value. Readings from the instrument will
     be multiplied by the `multiplier` and then increased by the `offset`. Set commands
     to the server will take the variable value, subtract the `offset` and divide by the
