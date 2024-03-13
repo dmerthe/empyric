@@ -168,7 +168,7 @@ class Knob(Variable):
         lower_limit: Union[float, int] = None,
         upper_limit: Union[float, int] = None,
         multiplier: Union[float, int] = 1,
-        offset: Union[float, int] = 0
+        offset: Union[float, int] = 0,
     ):
         self.instrument = instrument
         self.knob = knob  # name of the knob on instrument
@@ -261,12 +261,12 @@ class Meter(Variable):
     _settable = False  #:
 
     def __init__(
-            self,
-            instrument: Instrument,
-            meter: str,
-            gate=None,
-            multiplier: Union[float, int] = 1,
-            offset: Union[float, int] = 0
+        self,
+        instrument: Instrument,
+        meter: str,
+        gate=None,
+        multiplier: Union[float, int] = 1,
+        offset: Union[float, int] = 0,
     ):
         self.instrument = instrument
         self.meter = meter
@@ -563,7 +563,7 @@ class Remote(Variable):
         lower_limit: Union[float, int] = None,
         upper_limit: Union[float, int] = None,
         multiplier: Union[float, int] = 1,
-        offset: Union[float, int] = 0
+        offset: Union[float, int] = 0,
     ):
         self.server = server
         self.alias = alias
@@ -702,7 +702,7 @@ class Remote(Variable):
     def get_type(self):
         """Get the data type of the remote variable"""
 
-        if self.protocol == 'modbus':
+        if self.protocol == "modbus":
             fcode = 3 if self.settable else 4
 
             type_int = self._client.read(fcode, self.alias + 4, _type="16bit_int")

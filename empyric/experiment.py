@@ -91,10 +91,11 @@ class Experiment:
         return "Terminated" in self.status
 
     def __init__(
-            self, variables: dict, routines: dict = None,
-            end: Union[numbers.Number, str, None] = None
+        self,
+        variables: dict,
+        routines: dict = None,
+        end: Union[numbers.Number, str, None] = None,
     ):
-
         self.variables = variables
         # dict of the form {..., name: variable, ...}
 
@@ -118,9 +119,7 @@ class Experiment:
             elif isinstance(end, numbers.Number):
                 self.end = end
             else:
-                raise ValueError(
-                    'invalid value for end keyword argument'
-                )
+                raise ValueError("invalid value for end keyword argument")
         else:
             self.end = np.inf
 
@@ -725,9 +724,11 @@ def convert_runcard(runcard):
             gate = specs.get("gate", None)
             gate = variables[gate] if gate else None
             variables[name] = _variables.Meter(
-                meter=specs["meter"], instrument=instrument, gate=gate,
+                meter=specs["meter"],
+                instrument=instrument,
+                gate=gate,
                 multiplier=specs.get("multiplier", 1),
-                offset=specs.get("offset", 0)
+                offset=specs.get("offset", 0),
             )
         elif "knob" in specs:
             instrument = converted_runcard["Instruments"][specs["instrument"]]
@@ -737,7 +738,7 @@ def convert_runcard(runcard):
                 lower_limit=specs.get("lower limit", None),
                 upper_limit=specs.get("upper limit", None),
                 multiplier=specs.get("multiplier", 1),
-                offset=specs.get("offset", 0)
+                offset=specs.get("offset", 0),
             )
         elif "expression" in specs:
             expression = specs["expression"]
@@ -764,9 +765,12 @@ def convert_runcard(runcard):
             settable = specs.get("settable", False)
 
             variables[name] = _variables.Remote(
-                server=server, alias=alias, protocol=protocol, settable=settable,
+                server=server,
+                alias=alias,
+                protocol=protocol,
+                settable=settable,
                 multiplier=specs.get("multiplier", 1),
-                offset=specs.get("offset", 0)
+                offset=specs.get("offset", 0),
             )
 
         elif "parameter" in specs:
@@ -803,7 +807,7 @@ def convert_runcard(runcard):
             routines[name] = available_routines[_type](**specs)
 
     converted_runcard["Experiment"] = Experiment(
-        variables, routines=routines, end=runcard['Settings'].get('end', None)
+        variables, routines=routines, end=runcard["Settings"].get("end", None)
     )
 
     # Alarms section

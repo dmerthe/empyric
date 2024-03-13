@@ -1154,9 +1154,7 @@ class ModbusServer(Routine):
             ir=DataBlock.create(), hr=DataBlock.create()
         )
 
-        self.slave.setValues = self.setValues_decorator(
-            self.slave.setValues
-        )
+        self.slave.setValues = self.setValues_decorator(self.slave.setValues)
 
         self.context = datastore.ModbusServerContext(slaves=self.slave, single=True)
 
