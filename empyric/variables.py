@@ -540,6 +540,11 @@ class Remote(Variable):
     the variable value is read from the holding registers (`knobs`), otherwise the
     variable value is read from the input registers (`meters`).
 
+    The optional `multiplier` and offset keyword arguments provide a means to affect
+    a linear transformation of the raw variable value. Readings from the instrument will
+    be multiplied by the `multiplier` and then increased by the `offset`. Set commands
+    to the server will take the variable value, subtract the `offset` and divide by the
+    `multiplier`.
     """
 
     type_map = {
