@@ -966,7 +966,9 @@ class GlassmanOQ500(Instrument):
             normalized_current_cmd = self.vi_setpoints[1]/self.max_output_current_mA
             message: str = self._construct_set_message(
                 normalized_voltage_cmd=normalized_voltage_cmd,
-                normalized_current_cmd=normalized_current_cmd)
+                normalized_current_cmd=normalized_current_cmd) # ,
+                # hv_on_cmd=True,
+                # hv_off_cmd=False)
             self.query(message, validator=self._acknowledge_validator)
 
     @setter
@@ -980,15 +982,20 @@ class GlassmanOQ500(Instrument):
             normalized_current_cmd = current_mA/self.max_output_current_mA
             message: str = self._construct_set_message(
                 normalized_voltage_cmd=normalized_voltage_cmd,
-                normalized_current_cmd=normalized_current_cmd)
+                normalized_current_cmd=normalized_current_cmd ) # ,
+                # hv_on_cmd=True,
+                # hv_off_cmd=False)  # DEBUG
             self.query(message, validator=self._acknowledge_validator)
+
 
     @getter
     def get_output_enable(self) -> Toggle:
         query = self._wrap_message("Q")
         response: str = self.query(query)
-        output = self._check_response_message(response)[10:13][0:1]
-        if output == "1":
+        response = self._check_response_message(response)[10:13][0:1]
+        bytestr = bin(int(response))[2:].zfill(4)
+        bit = bytestr[1:2]
+        if bit == "1":
             return ON
         else:
             return OFF
@@ -1002,7 +1009,11 @@ class GlassmanOQ500(Instrument):
             else:
                 message: str = \
                     self._construct_set_message(hv_on_cmd=True,
-                                                hv_off_cmd=False)
+                                                hv_off_cmd=False,
+                                                normalized_voltage_cmd=
+                                                self.vi_setpoints[0],
+                                                normalized_current_cmd=
+                                                self.vi_setpoints[1])
 
                 self.query(message, validator=self._acknowledge_validator)
         else:
@@ -1030,32 +1041,30 @@ class GlassmanOQ500(Instrument):
     @measurer
     def measure_voltage(self) -> Float:
         response = self.query(self._wrap_message("Q"))
-        voltage = self._check_response_message(response)[4:7]
-        voltage_int = [int(v, 16) for v in voltage]
-        voltage_combined = int.from_bytes(voltage_int, byteorder='big')
-        voltage_normalized = voltage_combined / 0x3FF
+        voltage = self._check_response_message(response)[1:4]
+        voltage_normalized = int(voltage, 16) / 0x3FF
         voltage_outp = voltage_normalized * self.max_output_voltage_volts
         return voltage_outp
     
     @measurer
     def measure_current(self) -> Float:
         response = self.query(self._wrap_message("Q"))
-        current = self._check_response_message(response)[1:4]
-        current_int = [int(i, 16) for i in current]
-        current_combined = int.from_bytes(current_int, byteorder='big')
-        current_normalized = current_combined / 0x3FF
+        current = self._check_response_message(response)[4:7]
+        current_normalized = int(current, 16) / 0x3FF
         current_outp = current_normalized * self.max_output_current_mA
         return current_outp
     
     @measurer
     def measure_fault_state(self) -> Toggle:
         response = self.query(self._wrap_message("Q"))
-        if response[10:13][1:2] == "1":
+        response = self._check_response_message(response)[10:13][1:2]
+        bytestr = bin(int(response))[2:].zfill(4)
+        bit = bytestr[2:3]
+        if bit == "1":
             warnings.warn("GlassmanOQ500: Power supply is in a fault state. A PS reset "
                           "command must be sent (via 'reset' knob) to clear "
                           "fault before setting new values!")
             return ON  # fault detected
-        elif response[10:13][1:2] == "0":
+        elif bit == "0":
             return OFF  # no fault
-        else:
-            return ON
+
