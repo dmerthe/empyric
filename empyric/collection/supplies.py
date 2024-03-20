@@ -966,9 +966,7 @@ class GlassmanOQ500(Instrument):
             normalized_current_cmd = self.vi_setpoints[1]/self.max_output_current_mA
             message: str = self._construct_set_message(
                 normalized_voltage_cmd=normalized_voltage_cmd,
-                normalized_current_cmd=normalized_current_cmd) # ,
-                # hv_on_cmd=True,
-                # hv_off_cmd=False)
+                normalized_current_cmd=normalized_current_cmd)
             self.query(message, validator=self._acknowledge_validator)
 
     @setter
@@ -982,9 +980,7 @@ class GlassmanOQ500(Instrument):
             normalized_current_cmd = current_mA/self.max_output_current_mA
             message: str = self._construct_set_message(
                 normalized_voltage_cmd=normalized_voltage_cmd,
-                normalized_current_cmd=normalized_current_cmd ) # ,
-                # hv_on_cmd=True,
-                # hv_off_cmd=False)  # DEBUG
+                normalized_current_cmd=normalized_current_cmd)
             self.query(message, validator=self._acknowledge_validator)
 
 
@@ -1007,14 +1003,17 @@ class GlassmanOQ500(Instrument):
                 warnings.warn("GlassmanOQ500: Waiting for voltage and current "
                               "setpoints to be set in order to set output ON.")
             else:
+                normalized_voltage_cmd = self.vi_setpoints[0] \
+                                         / self.max_output_voltage_volts
+                normalized_current_cmd = self.vi_setpoints[1] \
+                                         / self.max_output_current_mA
                 message: str = \
                     self._construct_set_message(hv_on_cmd=True,
                                                 hv_off_cmd=False,
                                                 normalized_voltage_cmd=
-                                                self.vi_setpoints[0],
+                                                normalized_voltage_cmd,
                                                 normalized_current_cmd=
-                                                self.vi_setpoints[1])
-
+                                                normalized_current_cmd)
                 self.query(message, validator=self._acknowledge_validator)
         else:
             message: str = \
