@@ -386,6 +386,10 @@ class AsyncExperiment(Experiment):
         if self.terminated:
             raise StopIteration
 
+        if self.running or self.holding:
+            # Append new state to experiment data set
+            self.data.loc[self.state.name] = self.state
+
         return self.state
 
     async def _update_variable(self, name):
