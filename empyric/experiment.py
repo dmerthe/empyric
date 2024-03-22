@@ -1,4 +1,5 @@
 # Tools for defining and running experiments
+import asyncio
 import collections
 import datetime
 import importlib
@@ -351,6 +352,18 @@ class Experiment:
 
     def __repr__(self):
         return "Experiment"
+
+
+class AsyncExperiment(Experiment):
+    """
+    Asynchronous version of Experiment
+    """
+
+    async def _update_variable(self, name):
+
+        super()._update_variable(name)
+
+        await asyncio.create_task(self._update_variable(name))
 
 
 class Alarm:
