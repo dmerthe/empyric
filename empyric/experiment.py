@@ -432,7 +432,8 @@ class AsyncExperiment(Experiment):
 
         super().terminate(reason=reason)
 
-        self._thread.join()
+        if self._thread is not None:
+            self._thread.join()
 
 
 class Alarm:
@@ -888,9 +889,20 @@ def convert_runcard(runcard):
 
             routines[name] = available_routines[_type](**specs)
 
-    converted_runcard["Experiment"] = Experiment(
-        variables, routines=routines, end=runcard["Settings"].get("end", None)
-    )
+    # Create the experiment
+    async_experiment = False
+    if 'Settings' in runcard:
+        if runcard['Settings'].get('async', False):
+            async_experiment = True
+
+    if async_experiment:
+        converted_runcard["Experiment"] = AsyncExperiment(
+            variables, routines=routines, end=runcard["Settings"].get("end", None)
+        )
+    else:
+        converted_runcard["Experiment"] = Experiment(
+            variables, routines=routines, end=runcard["Settings"].get("end", None)
+        )
 
     # Alarms section
     alarms = {}
