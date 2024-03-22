@@ -359,11 +359,80 @@ class AsyncExperiment(Experiment):
     Asynchronous version of Experiment
     """
 
+    def __init__(
+            self,
+            variables: dict,
+            routines: dict = None,
+            end: Union[numbers.Number, str, None] = None,
+    ):
+        super().__init__(variables, routines, end)
+        self._thread = None
+
+    def __next__(self):
+
+        # Start the clock and loop on first call
+        if self.state.name is None:  # first step of the experiment
+            self.start()
+            self.status = Experiment.RUNNING + ": initializing..."
+
+        # Update time
+        self.state["Time"] = self.clock.time
+        self.state.name = datetime.datetime.now()
+
+        # End the experiment, if the duration of the experiment has passed
+        if self.clock.time > self.end:
+            self.terminate()
+
+        if self.terminated:
+            raise StopIteration
+
+        return self.state
+
     async def _update_variable(self, name):
+        """Update named variable"""
+        if self.running or self.holding:
+            super()._update_variable(name)
 
-        super()._update_variable(name)
+        if not self.terminated:
+            await asyncio.create_task(self._update_variable(name))
 
-        await asyncio.create_task(self._update_variable(name))
+    async def _update_routine(self, name):
+        """Update named routine"""
+        if self.running:
+            super()._update_routine(name)
+
+        if not self.terminated:
+            await asyncio.create_task(self._update_routine(name))
+
+    async def _run_loop(self):
+        """Set up and run updating loop"""
+        for name in self.variables:
+            asyncio.create_task(self._update_variable(name))
+
+        for name in self.routines:
+            asyncio.create_task(self._update_routine(name))
+
+        async def experiment_loop():
+            while not self.terminated:
+                await asyncio.sleep(0.1)
+
+        await experiment_loop()
+
+    def start(self):
+
+        super().start()
+
+        self._thread = threading.Thread(
+            target=asyncio.run, args=(self._run_loop(),)
+        )
+
+        self._thread.start()
+
+    def terminate(self, reason=None):
+
+        super().terminate(reason=reason)
+
+        self._thread.join()
 
 
 class Alarm:
