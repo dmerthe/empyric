@@ -11,6 +11,7 @@ Settings:
  plot interval: 1
  save interval: 10
  end: 3 minutes
+ async: True
 
 Instruments:
 

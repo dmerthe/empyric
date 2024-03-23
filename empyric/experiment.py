@@ -55,6 +55,7 @@ class Experiment:
     HOLDING = "Holding"  # Routines are stopped, but measurements are ongoing
     STOPPED = "Stopped"  # Both routines and measurements are stopped
     TERMINATED = "Terminated"
+
     # Experiment has either finished or has been terminated by the user
 
     @property
@@ -92,10 +93,10 @@ class Experiment:
         return "Terminated" in self.status
 
     def __init__(
-        self,
-        variables: dict,
-        routines: dict = None,
-        end: Union[numbers.Number, str, None] = None,
+            self,
+            variables: dict,
+            routines: dict = None,
+            end: Union[numbers.Number, str, None] = None,
     ):
         self.variables = variables
         # dict of the form {..., name: variable, ...}
@@ -398,7 +399,7 @@ class AsyncExperiment(Experiment):
             super()._update_variable(name)
 
         if not self.terminated:
-            await asyncio.create_task(self._update_variable(name))
+            asyncio.create_task(self._update_variable(name))
 
     async def _update_routine(self, name):
         """Update named routine"""
@@ -406,15 +407,15 @@ class AsyncExperiment(Experiment):
             super()._update_routine(name)
 
         if not self.terminated:
-            await asyncio.create_task(self._update_routine(name))
+            asyncio.create_task(self._update_routine(name))
 
     async def _run_loop(self):
         """Set up and run updating loop"""
-        for name in self.variables:
-            asyncio.create_task(self._update_variable(name))
 
-        for name in self.routines:
-            asyncio.create_task(self._update_routine(name))
+        await asyncio.gather(
+            *([self._update_variable(name) for name in self.variables]
+              + [self._update_routine(name) for name in self.routines])
+        )
 
         async def experiment_loop():
             while not self.terminated:
