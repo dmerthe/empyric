@@ -447,9 +447,9 @@ class Alarm:
     protocol
     """
 
-    def __init__(self, condition, variables, protocol=None):
+    def __init__(self, condition, definitions, protocol=None):
         self.trigger_variable = _variables.Expression(
-            expression=condition, definitions=variables
+            expression=condition, definitions=definitions
         )
 
         if protocol:
