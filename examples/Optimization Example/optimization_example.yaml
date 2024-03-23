@@ -7,7 +7,7 @@ Description:
  comments: Who is Mike? There is no Test Stand 1
 
 Settings:
- step interval: 0.05
+ step interval: 0.1
  plot interval: 1
  save interval: 10
  end: 3 minutes

@@ -131,10 +131,8 @@ class Experiment:
 
         self.timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
+        self.state = pd.Series(name=None, dtype=object)
         self.data = pd.DataFrame(columns=["Time"] + list(variables.keys()))
-
-        self.state = pd.Series({column: None for column in self.data.columns})
-        self.state["Time"] = 0
 
         self._status = Experiment.READY
         self.status_locked = True
@@ -146,7 +144,7 @@ class Experiment:
         # Start the clock on first call
         if self.state.name is None:  # first step of the experiment
             self.start()
-            self.status = Experiment.RUNNING + ": initializing..."
+            self.status = Experiment.RUNNING
 
         # Update time
         self.state["Time"] = self.clock.time
@@ -379,29 +377,30 @@ class AsyncExperiment(Experiment):
         # Start the clock and loop on first call
         if self.state.name is None:  # first step of the experiment
             self.start()
-            self.status = Experiment.RUNNING + ": initializing..."
-
-        # Update time
-        self.state["Time"] = self.clock.time
-        self.state.name = datetime.datetime.now()
+            self.status = Experiment.RUNNING
 
         # End the experiment, if the duration of the experiment has passed
         if self.clock.time > self.end:
             self.terminate()
 
-        if self.terminated:
-            raise StopIteration
-
-        if self.running or self.holding:
+        if (self.running or self.holding) and self.state.name is not None:
             # Append new state to experiment data set
             self.data.loc[self.state.name] = self.state
+
+        elif self.terminated:
+            raise StopIteration
 
         return self.state
 
     async def _update_variable(self, name):
         """Update named variable"""
         if self.running or self.holding:
+
             super()._update_variable(name)
+
+            # Update time
+            self.state["Time"] = self.clock.time
+            self.state.name = datetime.datetime.now()
 
         if not self.terminated:
             asyncio.create_task(self._update_variable(name))
@@ -409,6 +408,11 @@ class AsyncExperiment(Experiment):
     async def _update_routine(self, name):
         """Update named routine"""
         if self.running:
+
+            # Update time
+            self.state["Time"] = self.clock.time
+            self.state.name = datetime.datetime.now()
+
             super()._update_routine(name)
 
         if not self.terminated:
