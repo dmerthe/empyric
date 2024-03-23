@@ -35,8 +35,9 @@ logger = logging.getLogger()
 class Experiment:
     """
     An iterable class which represents an experiment; iterates through any
-    assigned routines,and retrieves and stores the values of all experiment
-    variables.
+    assigned routines, and retrieves and stores the values of all experiment
+    variables. Each variable and routine is updated once per iteration, and each
+    iteration blocks until all variables and routines are updated.
 
     The constructor take a `variables` argument in the form of a dictionary with the
     format {..., name: variable, ...}, which contains all of the variables controlled
@@ -358,6 +359,10 @@ class Experiment:
 class AsyncExperiment(Experiment):
     """
     Asynchronous version of Experiment
+
+    Each variable and routine is updated as quickly as possible independent of the
+    experiment iteration. Every time a variable is updated, the corresponding entry in
+    `state` is also updated.
     """
 
     def __init__(
