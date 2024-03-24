@@ -370,7 +370,7 @@ class AsyncExperiment(Experiment):
         end: Union[numbers.Number, str, None] = None,
     ):
         super().__init__(variables, routines, end)
-        self._thread = None
+        self._updating_thread = None
 
     def __next__(self):
         # Start the clock and loop on first call
@@ -434,15 +434,15 @@ class AsyncExperiment(Experiment):
     def start(self):
         super().start()
 
-        self._thread = threading.Thread(target=asyncio.run, args=(self._run_loop(),))
+        self._updating_thread = threading.Thread(target=asyncio.run, args=(self._run_loop(),))
 
-        self._thread.start()
+        self._updating_thread.start()
 
     def terminate(self, reason=None):
         super().terminate(reason=reason)
 
-        if self._thread is not None:
-            self._thread.join()
+        if self._updating_thread is not None:
+            self._updating_thread.join()
 
 
 class Alarm:
