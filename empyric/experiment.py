@@ -94,10 +94,10 @@ class Experiment:
         return "Terminated" in self.status
 
     def __init__(
-            self,
-            variables: dict,
-            routines: dict = None,
-            end: Union[numbers.Number, str, None] = None,
+        self,
+        variables: dict,
+        routines: dict = None,
+        end: Union[numbers.Number, str, None] = None,
     ):
         self.variables = variables
         # dict of the form {..., name: variable, ...}
@@ -364,16 +364,15 @@ class AsyncExperiment(Experiment):
     """
 
     def __init__(
-            self,
-            variables: dict,
-            routines: dict = None,
-            end: Union[numbers.Number, str, None] = None,
+        self,
+        variables: dict,
+        routines: dict = None,
+        end: Union[numbers.Number, str, None] = None,
     ):
         super().__init__(variables, routines, end)
         self._thread = None
 
     def __next__(self):
-
         # Start the clock and loop on first call
         if self.state.name is None:  # first step of the experiment
             self.start()
@@ -395,7 +394,6 @@ class AsyncExperiment(Experiment):
     async def _update_variable(self, name):
         """Update named variable"""
         if self.running or self.holding:
-
             super()._update_variable(name)
 
             # Update time
@@ -408,7 +406,6 @@ class AsyncExperiment(Experiment):
     async def _update_routine(self, name):
         """Update named routine"""
         if self.running:
-
             # Update time
             self.state["Time"] = self.clock.time
             self.state.name = datetime.datetime.now()
@@ -422,8 +419,10 @@ class AsyncExperiment(Experiment):
         """Set up and run updating loop"""
 
         await asyncio.gather(
-            *([self._update_variable(name) for name in self.variables]
-              + [self._update_routine(name) for name in self.routines])
+            *(
+                [self._update_variable(name) for name in self.variables]
+                + [self._update_routine(name) for name in self.routines]
+            )
         )
 
         async def experiment_loop():
@@ -433,17 +432,13 @@ class AsyncExperiment(Experiment):
         await experiment_loop()
 
     def start(self):
-
         super().start()
 
-        self._thread = threading.Thread(
-            target=asyncio.run, args=(self._run_loop(),)
-        )
+        self._thread = threading.Thread(target=asyncio.run, args=(self._run_loop(),))
 
         self._thread.start()
 
     def terminate(self, reason=None):
-
         super().terminate(reason=reason)
 
         if self._thread is not None:
@@ -905,8 +900,8 @@ def convert_runcard(runcard):
 
     # Create the experiment
     async_experiment = False
-    if 'Settings' in runcard:
-        if runcard['Settings'].get('async', False):
+    if "Settings" in runcard:
+        if runcard["Settings"].get("async", False):
             async_experiment = True
 
     if async_experiment:
