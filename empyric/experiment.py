@@ -370,6 +370,7 @@ class AsyncExperiment(Experiment):
         end: Union[numbers.Number, str, None] = None,
     ):
         super().__init__(variables, routines, end)
+        self._taskgroup = asyncio.TaskGroup()
         self._updating_thread = None
 
     def __next__(self):
@@ -405,7 +406,7 @@ class AsyncExperiment(Experiment):
             self.state.name = datetime.datetime.now()
 
         if not self.terminated:
-            asyncio.create_task(self._update_variable(name))
+            self._taskgroup.create_task(self._update_variable(name))
 
     async def _update_routine(self, name):
         """Update named routine"""
@@ -421,24 +422,18 @@ class AsyncExperiment(Experiment):
             await update()
 
         if not self.terminated:
-            asyncio.create_task(self._update_routine(name))
+            self._taskgroup.create_task(self._update_routine(name))
 
     async def _run_loop(self):
-        """Set up and run updating loop"""
+        """Run updating loop for variables and routines"""
 
-        # Start the routine and variable update iterations
-        await asyncio.gather(
-            *(
-                [self._update_variable(name) for name in self.variables]
-                + [self._update_routine(name) for name in self.routines]
-            )
-        )
+        async with self._taskgroup as taskgroup:
 
-        async def experiment_loop():
-            while not self.terminated:
-                await asyncio.sleep(0.1)
+            for name in self.variables:
+                taskgroup.create_task(self._update_variable(name))
 
-        await experiment_loop()
+            for name in self.routines:
+                taskgroup.create_task(self._update_routine(name))
 
     def start(self):
         super().start()
