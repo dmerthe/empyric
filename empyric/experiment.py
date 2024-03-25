@@ -396,7 +396,7 @@ class AsyncExperiment(Experiment):
         if self.running or self.holding:
 
             async def update():
-                super()._update_variable(name)
+                Experiment._update_variable(self, name)
 
             await update()
 
@@ -416,7 +416,7 @@ class AsyncExperiment(Experiment):
             self.state.name = datetime.datetime.now()
 
             async def update():
-                super()._update_routine(name)
+                Experiment._update_routine(self, name)
 
             await update()
 
