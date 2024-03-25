@@ -394,7 +394,11 @@ class AsyncExperiment(Experiment):
     async def _update_variable(self, name):
         """Update named variable"""
         if self.running or self.holding:
-            super()._update_variable(name)
+
+            async def update():
+                super()._update_variable(name)
+
+            await update()
 
             # Update time
             self.state["Time"] = self.clock.time
@@ -406,11 +410,15 @@ class AsyncExperiment(Experiment):
     async def _update_routine(self, name):
         """Update named routine"""
         if self.running:
+
             # Update time
             self.state["Time"] = self.clock.time
             self.state.name = datetime.datetime.now()
 
-            super()._update_routine(name)
+            async def update():
+                super()._update_routine(name)
+
+            await update()
 
         if not self.terminated:
             asyncio.create_task(self._update_routine(name))
@@ -418,6 +426,7 @@ class AsyncExperiment(Experiment):
     async def _run_loop(self):
         """Set up and run updating loop"""
 
+        # Start the routine and variable update iterations
         await asyncio.gather(
             *(
                 [self._update_variable(name) for name in self.variables]
