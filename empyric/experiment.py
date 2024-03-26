@@ -131,7 +131,9 @@ class Experiment:
 
         self.timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
-        self.state = pd.Series(name=None, dtype=object)
+        self.state = pd.Series(
+            name=None, data={name: None for name in self.variables}, dtype=object
+        )
         self.data = pd.DataFrame(columns=["Time"] + list(variables.keys()))
 
         self._status = Experiment.READY
@@ -370,7 +372,7 @@ class AsyncExperiment(Experiment):
         end: Union[numbers.Number, str, None] = None,
     ):
         super().__init__(variables, routines, end)
-        self._taskgroup = asyncio.TaskGroup()
+        self._taskgroup = None
         self._updating_thread = None
 
     def __next__(self):
@@ -427,7 +429,9 @@ class AsyncExperiment(Experiment):
     async def _run_loop(self):
         """Run updating loop for variables and routines"""
 
-        async with self._taskgroup as taskgroup:
+        async with asyncio.TaskGroup() as taskgroup:
+
+            self._taskgroup = taskgroup
 
             for name in self.variables:
                 taskgroup.create_task(self._update_variable(name))
