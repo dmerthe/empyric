@@ -5,6 +5,7 @@ from empyric.adapters import *
 from empyric.collection.instrument import *
 from empyric.types import Toggle, Float, ON, OFF
 
+
 class Keithley2260B(Instrument):
     """
     Keithley 2260B power supply, usually either 360 W or 720 W
@@ -843,42 +844,53 @@ class BK9140(Instrument):
         self.write(":INST:SEL 3")
         return float(self.query("SOUR:VOLT?"))
 
+
 class GlassmanOQ500(Instrument):
     """
     Glassman OQ series high voltage power supply (500 kV / 10 mA).
 
-    
+
     """
 
     name = "GlassmanOQ"
 
-    supported_adapters = ((Serial, {"baud_rate": 9600,
-                                    "write_termination": '\r',
-                                    "read_termination": '\r',
-                                    "lib": "pyserial"}),)
+    supported_adapters = (
+        (
+            Serial,
+            {
+                "baud_rate": 9600,
+                "write_termination": "\r",
+                "read_termination": "\r",
+                "lib": "pyserial",
+            },
+        ),
+    )
 
-    knobs = ("max voltage", "max current", "output enable", 'reset')
+    knobs = ("max voltage", "max current", "output enable", "reset")
 
     meters = ("voltage", "current", "fault state")
 
-    SOH: bytes = b'\x01'
-    EOM: bytes = b'\x0D'
+    SOH: bytes = b"\x01"
+    EOM: bytes = b"\x0D"
 
     max_output_voltage_volts = 500000.0  # 500kV
     max_output_current_mA = 20  # 20 mA
 
     vi_setpoints = [None, None]
+
     def _compute_checksum(self, message_segment: bytes) -> bytes:
-        crc = sum(struct.unpack('>'+'B'*len(message_segment), message_segment)) % 256
-        return bytes(format(crc, 'X'), 'utf-8')
-    
+        crc = (
+            sum(struct.unpack(">" + "B" * len(message_segment), message_segment)) % 256
+        )
+        return bytes(format(crc, "X"), "utf-8")
+
     def _test_checksum(self, message: bytes) -> bool:
         calculated_crc = self._compute_checksum(message[1:-2])
         return message[-2:] == calculated_crc
-    
+
     def _wrap_message(self, message_content) -> str:
         if type(message_content) != bytes:
-            message_content = message_content.encode('utf-8')
+            message_content = message_content.encode("utf-8")
         message = self.SOH
         message += message_content
         calculated_crc = self._compute_checksum(message_content)
@@ -886,12 +898,14 @@ class GlassmanOQ500(Instrument):
         # message += self.EOM
         return message.decode()
 
-    def _construct_set_message(self,
-                               normalized_voltage_cmd: (float | None) = None,
-                               normalized_current_cmd: (float | None) = None,
-                               hv_on_cmd: (bool | None) = None,
-                               hv_off_cmd: (bool | None) = None,
-                               reset_cmd: (bool | None) = None) -> str:
+    def _construct_set_message(
+        self,
+        normalized_voltage_cmd: (float | None) = None,
+        normalized_current_cmd: (float | None) = None,
+        hv_on_cmd: (bool | None) = None,
+        hv_off_cmd: (bool | None) = None,
+        reset_cmd: (bool | None) = None,
+    ) -> str:
         # process inputs
         if normalized_voltage_cmd is not None:
             self.normalized_voltage_cmd = normalized_voltage_cmd
@@ -911,47 +925,60 @@ class GlassmanOQ500(Instrument):
             self.reset_cmd = reset_cmd
 
         # construct message
-        message: bytes = b'S'  # command identifier
-        message += bytes(format(int(0xFFF*self.normalized_voltage_cmd),
-                                'X').zfill(3), 'utf-8')
-        message += bytes(format(int(0xFFF*self.normalized_current_cmd),
-                                'X').zfill(3), 'utf-8')
-        message += b'000000'  # bytes 9-14
-        message += bytes(format(int((self.reset_cmd << 2) ^
-                                    (self.hv_on_cmd << 1) ^
-                                    self.hv_off_cmd), 'X'), 'utf-8')
+        message: bytes = b"S"  # command identifier
+        message += bytes(
+            format(int(0xFFF * self.normalized_voltage_cmd), "X").zfill(3), "utf-8"
+        )
+        message += bytes(
+            format(int(0xFFF * self.normalized_current_cmd), "X").zfill(3), "utf-8"
+        )
+        message += b"000000"  # bytes 9-14
+        message += bytes(
+            format(
+                int((self.reset_cmd << 2) ^ (self.hv_on_cmd << 1) ^ self.hv_off_cmd),
+                "X",
+            ),
+            "utf-8",
+        )
         return self._wrap_message(message)
-    
-    def _check_response_message(self, message) -> (bool | None):
-        if message == '':
+
+    def _check_response_message(self, message) -> bool | None:
+        if message == "":
             return None
-        if self._test_checksum(message.encode('utf-8')):
-            if message[0] == 'R':
+        if self._test_checksum(message.encode("utf-8")):
+            if message[0] == "R":
                 # Check for fault state on byte 11, bit 1
                 ps_fault = message[10:13][1:2]
                 if ps_fault == "1":
-                    warnings.warn("GlassmanOQ500: Power supply is in a fault state. "
-                                  "A PS reset command must be sent "
-                                  "(via 'reset' knob) to clear fault "
-                                  "before setting new values!")
+                    warnings.warn(
+                        "GlassmanOQ500: Power supply is in a fault state. "
+                        "A PS reset command must be sent "
+                        "(via 'reset' knob) to clear fault "
+                        "before setting new values!"
+                    )
                 return message
             else:
-                raise KeyError(f'GlassmanOQ500: Incorrect Message Type [{message[0]}]'
-                               f' in decode_response_message()')
+                raise KeyError(
+                    f"GlassmanOQ500: Incorrect Message Type [{message[0]}]"
+                    f" in decode_response_message()"
+                )
         else:
             print(f"Checksum failed: {message}")
-            raise ValueError('GlassmanOQ500: Checksum error in '
-                             'decode_response_message()')
+            raise ValueError(
+                "GlassmanOQ500: Checksum error in " "decode_response_message()"
+            )
 
-    def _acknowledge_validator(self, message) -> (bool | None):
-        if message == '':
+    def _acknowledge_validator(self, message) -> bool | None:
+        if message == "":
             return None
-        if message == 'A':
+        if message == "A":
             return True
-        elif message[0] == 'E':
-            warnings.warn(f"GlassmanOQ500: Error message received "
-                          f"during set command: {message}. "
-                          f"See manual for further details.")
+        elif message[0] == "E":
+            warnings.warn(
+                f"GlassmanOQ500: Error message received "
+                f"during set command: {message}. "
+                f"See manual for further details."
+            )
         else:
             return False
 
@@ -959,30 +986,37 @@ class GlassmanOQ500(Instrument):
     def set_max_voltage(self, voltage_Volts: Float):
         self.vi_setpoints[0] = voltage_Volts
         if self.vi_setpoints[1] is None:
-            warnings.warn(f"GlassmanOQ500: Waiting for current setpoint "
-                          f"to set voltage to {voltage_Volts} V.")
+            warnings.warn(
+                f"GlassmanOQ500: Waiting for current setpoint "
+                f"to set voltage to {voltage_Volts} V."
+            )
         else:
-            normalized_voltage_cmd = voltage_Volts/self.max_output_voltage_volts
-            normalized_current_cmd = self.vi_setpoints[1]/self.max_output_current_mA
+            normalized_voltage_cmd = voltage_Volts / self.max_output_voltage_volts
+            normalized_current_cmd = self.vi_setpoints[1] / self.max_output_current_mA
             message: str = self._construct_set_message(
                 normalized_voltage_cmd=normalized_voltage_cmd,
-                normalized_current_cmd=normalized_current_cmd)
+                normalized_current_cmd=normalized_current_cmd,
+            )
             self.query(message, validator=self._acknowledge_validator)
 
     @setter
     def set_max_current(self, current_mA: Float):
         self.vi_setpoints[1] = current_mA
         if self.vi_setpoints[0] is None:
-            warnings.warn(f"GlassmanOQ500: Waiting for voltage setpoint "
-                          f"to set current to {current_mA} mA.")
+            warnings.warn(
+                f"GlassmanOQ500: Waiting for voltage setpoint "
+                f"to set current to {current_mA} mA."
+            )
         else:
-            normalized_voltage_cmd = self.vi_setpoints[0]/self.max_output_voltage_volts
-            normalized_current_cmd = current_mA/self.max_output_current_mA
+            normalized_voltage_cmd = (
+                self.vi_setpoints[0] / self.max_output_voltage_volts
+            )
+            normalized_current_cmd = current_mA / self.max_output_current_mA
             message: str = self._construct_set_message(
                 normalized_voltage_cmd=normalized_voltage_cmd,
-                normalized_current_cmd=normalized_current_cmd)
+                normalized_current_cmd=normalized_current_cmd,
+            )
             self.query(message, validator=self._acknowledge_validator)
-
 
     @getter
     def get_output_enable(self) -> Toggle:
@@ -1000,40 +1034,44 @@ class GlassmanOQ500(Instrument):
     def set_output_enable(self, output: Toggle):
         if output == ON:
             if self.vi_setpoints[0] is None or self.vi_setpoints[1] is None:
-                warnings.warn("GlassmanOQ500: Waiting for voltage and current "
-                              "setpoints to be set in order to set output ON.")
+                warnings.warn(
+                    "GlassmanOQ500: Waiting for voltage and current "
+                    "setpoints to be set in order to set output ON."
+                )
             else:
-                normalized_voltage_cmd = self.vi_setpoints[0] \
-                                         / self.max_output_voltage_volts
-                normalized_current_cmd = self.vi_setpoints[1] \
-                                         / self.max_output_current_mA
-                message: str = \
-                    self._construct_set_message(hv_on_cmd=True,
-                                                hv_off_cmd=False,
-                                                normalized_voltage_cmd=
-                                                normalized_voltage_cmd,
-                                                normalized_current_cmd=
-                                                normalized_current_cmd)
+                normalized_voltage_cmd = (
+                    self.vi_setpoints[0] / self.max_output_voltage_volts
+                )
+                normalized_current_cmd = (
+                    self.vi_setpoints[1] / self.max_output_current_mA
+                )
+                message: str = self._construct_set_message(
+                    hv_on_cmd=True,
+                    hv_off_cmd=False,
+                    normalized_voltage_cmd=normalized_voltage_cmd,
+                    normalized_current_cmd=normalized_current_cmd,
+                )
                 self.query(message, validator=self._acknowledge_validator)
         else:
-            message: str = \
-                self._construct_set_message(hv_off_cmd=True,
-                                            hv_on_cmd=False,
-                                            normalized_voltage_cmd=0.0,
-                                            normalized_current_cmd=0.0)
+            message: str = self._construct_set_message(
+                hv_off_cmd=True,
+                hv_on_cmd=False,
+                normalized_voltage_cmd=0.0,
+                normalized_current_cmd=0.0,
+            )
 
             self.query(message, validator=self._acknowledge_validator)
 
     @setter
     def set_reset(self, reset: Toggle):
         if reset == ON:
-            message: str = self._construct_set_message(reset_cmd=True,
-                                                       normalized_current_cmd=0.0,
-                                                       normalized_voltage_cmd=0.0)
+            message: str = self._construct_set_message(
+                reset_cmd=True, normalized_current_cmd=0.0, normalized_voltage_cmd=0.0
+            )
             self.query(message, validator=self._acknowledge_validator)
-            message: str = self._construct_set_message(reset_cmd=False,
-                                                       normalized_current_cmd=0.0,
-                                                       normalized_voltage_cmd=0.0)
+            message: str = self._construct_set_message(
+                reset_cmd=False, normalized_current_cmd=0.0, normalized_voltage_cmd=0.0
+            )
             self.query(message, validator=self._acknowledge_validator)
             return OFF
 
@@ -1044,7 +1082,7 @@ class GlassmanOQ500(Instrument):
         voltage_normalized = int(voltage, 16) / 0x3FF
         voltage_outp = voltage_normalized * self.max_output_voltage_volts
         return voltage_outp
-    
+
     @measurer
     def measure_current(self) -> Float:
         response = self.query(self._wrap_message("Q"))
@@ -1052,7 +1090,7 @@ class GlassmanOQ500(Instrument):
         current_normalized = int(current, 16) / 0x3FF
         current_outp = current_normalized * self.max_output_current_mA
         return current_outp
-    
+
     @measurer
     def measure_fault_state(self) -> Toggle:
         response = self.query(self._wrap_message("Q"))
@@ -1060,9 +1098,11 @@ class GlassmanOQ500(Instrument):
         bytestr = bin(int(response))[2:].zfill(4)
         bit = bytestr[2:3]
         if bit == "1":
-            warnings.warn("GlassmanOQ500: Power supply is in a fault state. A PS reset "
-                          "command must be sent (via 'reset' knob) to clear "
-                          "fault before setting new values!")
+            warnings.warn(
+                "GlassmanOQ500: Power supply is in a fault state. A PS reset "
+                "command must be sent (via 'reset' knob) to clear "
+                "fault before setting new values!"
+            )
             return ON  # fault detected
         elif bit == "0":
             return OFF  # no fault
