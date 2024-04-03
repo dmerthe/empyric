@@ -13,6 +13,7 @@ import time
 import tkinter as tk
 from tkinter.filedialog import askopenfilename
 from typing import Union
+from warnings import warn
 
 import numpy as np
 import pandas as pd
@@ -222,10 +223,12 @@ class Experiment:
 
             try:
                 value = self.variables[name].value
-            except AdapterError:
+            except AdapterError as adapter_error:
                 value = None
-            except ValueError:
+                warn(str(adapter_error))
+            except ValueError as value_error:
                 value = None
+                warn(str(value_error))
 
             self.variables[name]._eval_event.set()
             # unblock threads evaluating dependents
@@ -253,7 +256,10 @@ class Experiment:
         """Update a routine according to the current state"""
 
         try:
-            self.routines[name].update(self.state)
+            try:
+                self.routines[name].update(self.state)
+            except AdapterError as adapter_error:
+                warn(str(adapter_error))
         except BaseException as err:
             self.terminate()
             raise err
@@ -406,6 +412,8 @@ class AsyncExperiment(Experiment):
             # Update time
             self.state["Time"] = self.clock.time
             self.state.name = datetime.datetime.now()
+        elif self.stopped:
+            await asyncio.sleep(0.1)
 
         if not self.terminated:
             self._taskgroup.create_task(self._update_variable(name))
@@ -422,6 +430,8 @@ class AsyncExperiment(Experiment):
                 Experiment._update_routine(self, name)
 
             await update()
+        elif self.stopped:
+            await asyncio.sleep(0.1)
 
         if not self.terminated:
             self._taskgroup.create_task(self._update_routine(name))
@@ -430,7 +440,8 @@ class AsyncExperiment(Experiment):
         """Run updating loop for variables and routines"""
 
         async with asyncio.TaskGroup() as taskgroup:
-
+            # Only exits when all tasks are finished,
+            # i.e. when the experiment is terminated
             self._taskgroup = taskgroup
 
             for name in self.variables:
