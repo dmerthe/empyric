@@ -129,7 +129,7 @@ class Variable:
             return self._value - other
 
     def __bool__(self):
-        return np.bool(self._value)
+        return np.bool_(self._value)
 
     def __eq__(self, other):
         if isinstance(other, Variable):
@@ -211,23 +211,29 @@ class Knob(Variable):
         Set an instrument knob to value
         """
 
-        if self.upper_limit and value > self.upper_limit:
-            self.instrument.set(
-                self.knob, (self.upper_limit - self.offset) / self.multiplier
-            )
-        elif self.lower_limit and value < self.lower_limit:
-            self.instrument.set(
-                self.knob, (self.lower_limit - self.offset) / self.multiplier
-            )
-        else:
-            if isinstance(value, numbers.Number):
-                self.instrument.set(self.knob, (value - self.offset) / self.multiplier)
+        try:
+
+            if self.upper_limit and value > self.upper_limit:
+                self.instrument.set(
+                    self.knob, (self.upper_limit - self.offset) / self.multiplier
+                )
+            elif self.lower_limit and value < self.lower_limit:
+                self.instrument.set(
+                    self.knob, (self.lower_limit - self.offset) / self.multiplier
+                )
             else:
-                self.instrument.set(self.knob, value)
+                if isinstance(value, numbers.Number):
+                    self.instrument.set(self.knob, (value - self.offset) / self.multiplier)
+                else:
+                    self.instrument.set(self.knob, value)
+
+        except TypeError as type_error:
+
+            warnings.warn(str(type_error))
 
         self._value = self.instrument.__getattribute__(self.knob.replace(" ", "_"))
 
-        if isinstance(value, numbers.Number):
+        if isinstance(self._value, numbers.Number):
             self._value = self.multiplier * self._value + self.offset
 
     def __str__(self):

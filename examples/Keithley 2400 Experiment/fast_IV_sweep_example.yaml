@@ -13,7 +13,7 @@ Instruments:
  Sourcemeter:
   type: Keithley2400
   address: 10  # replace with your GPIB
-  prologix address: 'COM5'  # delete or replace with your own
+#  prologix address: 'COM5'  # delete or replace with your own
   presets:
    voltage range: 20
    current limit: 1.05e-3

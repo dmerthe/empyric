@@ -14,6 +14,7 @@ Settings:
  plot interval: 5
  save interval: 10
  end: 60
+# async: True
 
 Instruments:
  Henon Mapper:

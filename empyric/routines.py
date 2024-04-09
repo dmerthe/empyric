@@ -1171,7 +1171,7 @@ class ModbusServer(Routine):
         self.server = None  # assigned in _run_async_server
         self.ip_address = kwargs.get("address", get_ip_address())
         self.port = kwargs.get("port", 502)
-
+        # TODO: warn when port is off-limits due to permissions
         self.server_thread = threading.Thread(
             target=asyncio.run, args=(self._run_async_server(),)
         )

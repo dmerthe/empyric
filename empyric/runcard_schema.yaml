@@ -12,6 +12,7 @@ map:
     step interval: {type: any},
     save interval: {type: any},
     plot interval: {type: any},
+    async: {type: bool},
     end: {type: any}
   }}
 
@@ -59,22 +60,22 @@ map:
     }}
   }}
 
-  Alarms: {map: {
-    regex;(.+): {required: true, map: {  # alarm name
-      protocol: {type: str},
-      condition: {type: str, required: true},
-      definitions: {map: {
-        regex;(.+): {type: str, required: true}
-      }}
-    }}
-  }}
-
   Routines: {map: {
     regex;(.+): {required: true, map: {  # routine name
       type: {type: str, required: true},
       regex;(.+): {type: any}
     }}
   }}
+
+  Alarms: { map: {
+    regex;(.+): { required: true, map: { # alarm name
+      protocol: { type: str },
+      condition: { type: str, required: true },
+      definitions: { map: {
+        regex;(.+): { type: str, required: true }
+      } }
+    } }
+  } }
 
   Plots: {map: {
     regex;(.+): {required: true, map: {  # plot name

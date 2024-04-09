@@ -1,4 +1,5 @@
 # Tools for defining and running experiments
+import asyncio
 import collections
 import datetime
 import importlib
@@ -12,6 +13,7 @@ import time
 import tkinter as tk
 from tkinter.filedialog import askopenfilename
 from typing import Union
+from warnings import warn
 
 import numpy as np
 import pandas as pd
@@ -34,8 +36,9 @@ logger = logging.getLogger()
 class Experiment:
     """
     An iterable class which represents an experiment; iterates through any
-    assigned routines,and retrieves and stores the values of all experiment
-    variables.
+    assigned routines, and retrieves and stores the values of all experiment
+    variables. Each variable and routine is updated once per iteration, and each
+    iteration blocks until all variables and routines are updated.
 
     The constructor take a `variables` argument in the form of a dictionary with the
     format {..., name: variable, ...}, which contains all of the variables controlled
@@ -54,6 +57,7 @@ class Experiment:
     HOLDING = "Holding"  # Routines are stopped, but measurements are ongoing
     STOPPED = "Stopped"  # Both routines and measurements are stopped
     TERMINATED = "Terminated"
+
     # Experiment has either finished or has been terminated by the user
 
     @property
@@ -128,10 +132,10 @@ class Experiment:
 
         self.timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
+        self.state = pd.Series(
+            name=None, data={name: None for name in self.variables}, dtype=object
+        )
         self.data = pd.DataFrame(columns=["Time"] + list(variables.keys()))
-
-        self.state = pd.Series({column: None for column in self.data.columns})
-        self.state["Time"] = 0
 
         self._status = Experiment.READY
         self.status_locked = True
@@ -143,7 +147,7 @@ class Experiment:
         # Start the clock on first call
         if self.state.name is None:  # first step of the experiment
             self.start()
-            self.status = Experiment.RUNNING + ": initializing..."
+            self.status = Experiment.RUNNING
 
         # Update time
         self.state["Time"] = self.clock.time
@@ -219,10 +223,12 @@ class Experiment:
 
             try:
                 value = self.variables[name].value
-            except AdapterError:
+            except AdapterError as adapter_error:
                 value = None
-            except ValueError:
+                warn(str(adapter_error))
+            except ValueError as value_error:
                 value = None
+                warn(str(value_error))
 
             self.variables[name]._eval_event.set()
             # unblock threads evaluating dependents
@@ -250,7 +256,10 @@ class Experiment:
         """Update a routine according to the current state"""
 
         try:
-            self.routines[name].update(self.state)
+            try:
+                self.routines[name].update(self.state)
+            except AdapterError as adapter_error:
+                warn(str(adapter_error))
         except BaseException as err:
             self.terminate()
             raise err
@@ -353,15 +362,117 @@ class Experiment:
         return "Experiment"
 
 
+class AsyncExperiment(Experiment):
+    """
+    Asynchronous version of Experiment
+
+    Each variable and routine is updated as quickly as possible independent of the
+    experiment iteration. Every time a variable is updated, the corresponding entry in
+    `state` is also updated.
+    """
+
+    def __init__(
+        self,
+        variables: dict,
+        routines: dict = None,
+        end: Union[numbers.Number, str, None] = None,
+    ):
+        super().__init__(variables, routines, end)
+        self._taskgroup = None
+        self._updating_thread = None
+
+    def __next__(self):
+        # Start the clock and loop on first call
+        if self.state.name is None:  # first step of the experiment
+            self.start()
+            self.status = Experiment.RUNNING
+
+        # End the experiment, if the duration of the experiment has passed
+        if self.clock.time > self.end:
+            self.terminate()
+
+        if (self.running or self.holding) and self.state.name is not None:
+            # Append new state to experiment data set
+            self.data.loc[self.state.name] = self.state
+
+        elif self.terminated:
+            raise StopIteration
+
+        return self.state
+
+    async def _update_variable(self, name):
+        """Update named variable"""
+        if self.running or self.holding:
+
+            async def update():
+                Experiment._update_variable(self, name)
+
+            await update()
+
+            # Update time
+            self.state["Time"] = self.clock.time
+            self.state.name = datetime.datetime.now()
+        elif self.stopped:
+            await asyncio.sleep(0.1)
+
+        if not self.terminated:
+            self._taskgroup.create_task(self._update_variable(name))
+
+    async def _update_routine(self, name):
+        """Update named routine"""
+        if self.running:
+
+            # Update time
+            self.state["Time"] = self.clock.time
+            self.state.name = datetime.datetime.now()
+
+            async def update():
+                Experiment._update_routine(self, name)
+
+            await update()
+        elif self.stopped:
+            await asyncio.sleep(0.1)
+
+        if not self.terminated:
+            self._taskgroup.create_task(self._update_routine(name))
+
+    async def _run_loop(self):
+        """Run updating loop for variables and routines"""
+
+        async with asyncio.TaskGroup() as taskgroup:
+            # Only exits when all tasks are finished,
+            # i.e. when the experiment is terminated
+            self._taskgroup = taskgroup
+
+            for name in self.variables:
+                taskgroup.create_task(self._update_variable(name))
+
+            for name in self.routines:
+                taskgroup.create_task(self._update_routine(name))
+
+    def start(self):
+        super().start()
+
+        self._updating_thread = threading.Thread(target=asyncio.run, args=(self._run_loop(),))
+
+        self._updating_thread.start()
+
+    def terminate(self, reason=None):
+        super().terminate(reason=reason)
+
+        if self._updating_thread is not None:
+            self._updating_thread.join()
+
+
 class Alarm:
     """
     Triggers if a condition among variables is met and indicates the response
     protocol
     """
 
-    def __init__(self, condition, variables, protocol=None):
+    def __init__(self, condition, definitions, protocol=None):
         self.trigger_variable = _variables.Expression(
-            expression=condition, definitions=variables
+            expression=condition, definitions=definitions
         )
 
         if protocol:
@@ -806,9 +917,20 @@ def convert_runcard(runcard):
 
             routines[name] = available_routines[_type](**specs)
 
-    converted_runcard["Experiment"] = Experiment(
-        variables, routines=routines, end=runcard["Settings"].get("end", None)
-    )
+    # Create the experiment
+    async_experiment = False
+    if "Settings" in runcard:
+        if runcard["Settings"].get("async", False):
+            async_experiment = True
+
+    if async_experiment:
+        converted_runcard["Experiment"] = AsyncExperiment(
+            variables, routines=routines, end=runcard["Settings"].get("end", None)
+        )
+    else:
+        converted_runcard["Experiment"] = Experiment(
+            variables, routines=routines, end=runcard["Settings"].get("end", None)
+        )
 
     # Alarms section
     alarms = {}
