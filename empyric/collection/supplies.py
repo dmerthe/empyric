@@ -1107,11 +1107,10 @@ class GlassmanOQ500(Instrument):
         elif bit == "0":
             return OFF  # no fault
 
+
 class PWX1500L(Instrument):
     name = "PWX1500L"
 
-    read_term = "\r\n"
-    write_term = "\r\n"
     supported_adapters = (
         (Socket, {"read_termination": "\r\n", "write_termination": "\r\n"}),
     )
@@ -1120,7 +1119,6 @@ class PWX1500L(Instrument):
 
     meters = ("voltage", "current")
 
-    
     @measurer
     def measure_current(self) -> Float:
         def validator(response):
