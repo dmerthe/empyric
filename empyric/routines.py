@@ -514,7 +514,7 @@ class Sequence(Routine):
 
         self.iteration = (self.iteration + 1) % len(self.values[0])
 
-        if self.repeat and self.iteration == 0:
+        if self.iteration == 0 and not self.repeat:
             self.end = state["Time"]  # set to end immediately
 
     def finish(self, state):
