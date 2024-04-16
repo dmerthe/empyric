@@ -129,7 +129,7 @@ class Variable:
             return self._value - other
 
     def __bool__(self):
-        return np.bool_(self._value)
+        return bool(self._value)
 
     def __eq__(self, other):
         if isinstance(other, Variable):
