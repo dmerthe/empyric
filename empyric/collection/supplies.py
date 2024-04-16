@@ -1106,3 +1106,67 @@ class GlassmanOQ500(Instrument):
             return ON  # fault detected
         elif bit == "0":
             return OFF  # no fault
+
+
+class PWX1500L(Instrument):
+    name = "PWX1500L"
+
+    supported_adapters = (
+        (Socket, {"read_termination": "\r\n", "write_termination": "\r\n"}),
+    )
+
+    knobs = ("max voltage", "max current", "output")
+
+    meters = ("voltage", "current")
+
+    @measurer
+    def measure_current(self) -> Float:
+        def validator(response):
+            return bool(re.match("[\+\-]\d+\.\d\d\d", response))
+
+        return float(self.query("MEAS:CURR?", validator=validator))
+
+    @measurer
+    def measure_voltage(self) -> Float:
+        def validator(response):
+            return bool(re.match("[\+\-]\d+\.\d\d\d", response))
+
+        return float(self.query("MEAS:VOLT?", validator=validator))
+
+    @setter
+    def set_max_voltage(self, voltage: Float):
+        self.write("VOLT %.2f" % voltage)
+
+    @setter
+    def set_max_current(self, current: Float):
+        self.write("CURR %.2f" % current)
+
+    @setter
+    def set_output(self, output: Toggle):
+        if output == ON:
+            self.write("OUTP ON")
+        elif output == OFF:
+            self.write("OUTP OFF")
+
+    @getter
+    def get_output(self) -> Toggle:
+        response = self.query("OUTP?")
+
+        if response == "0":
+            return OFF
+        elif response == "1":
+            return ON
+
+    @getter
+    def get_max_current(self) -> Float:
+        def validator(response):
+            return bool(re.match("[\+\-]\d+\.\d\d\d", response))
+
+        return float(self.query("MEAS:CURR?", validator=validator))
+
+    @getter
+    def get_max_voltage(self) -> Float:
+        def validator(response):
+            return bool(re.match("[\+\-]\d+\.\d\d\d", response))
+
+        return float(self.query("MEAS:VOLT?", validator=validator))
