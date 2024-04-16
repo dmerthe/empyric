@@ -133,7 +133,9 @@ class Experiment:
         self.timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
         self.state = pd.Series(
-            name=None, data={name: None for name in self.variables}, dtype=object
+            name=None,
+            data={**{'Time': None}, **{name: None for name in self.variables}},
+            dtype=object
         )
         self.data = pd.DataFrame(columns=["Time"] + list(variables.keys()))
 
