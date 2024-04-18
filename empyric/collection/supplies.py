@@ -1162,11 +1162,11 @@ class PWX1500L(Instrument):
         def validator(response):
             return bool(re.match("[\+\-]\d+\.\d\d\d", response))
 
-        return float(self.query("MEAS:CURR?", validator=validator))
+        return float(self.query("CURR?", validator=validator))
 
     @getter
     def get_max_voltage(self) -> Float:
         def validator(response):
             return bool(re.match("[\+\-]\d+\.\d\d\d", response))
 
-        return float(self.query("MEAS:VOLT?", validator=validator))
+        return float(self.query("VOLT?", validator=validator))
