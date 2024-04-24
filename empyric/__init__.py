@@ -10,8 +10,6 @@ except ImportError:
 
 from empyric.experiment import Manager
 
-# TODO add logging.FileHandler to drop log into file in working directory
-
 # List of testable features.
 # Tests are invoked at the command line with `empyric --test <feature>`
 testable_features = [
