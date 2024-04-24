@@ -214,6 +214,8 @@ class Instrument:
     # happens in the same thread, which is the norm.
     lock = RLock()
 
+    raise_connection_error = True
+
     def __init__(
         self, address=None, adapter=None, presets=None, postsets=None, **kwargs
     ):
@@ -230,8 +232,9 @@ class Instrument:
         """
 
         self.address = address
-
-        self.knobs = ("connected",) + self.knobs
+        
+        if "connected" not in self.knobs:
+            self.knobs = ("connected",) + self.knobs
 
         adapter_connected = False
         if adapter:
@@ -298,7 +301,14 @@ class Instrument:
         :param kwargs: any arguments for the adapter's write method
         :return: whatever is returned by the adapter's write method
         """
-        return self.adapter.write(*args, **kwargs)
+
+        try:
+            return self.adapter.write(*args, **kwargs)
+        except AdapterError as adapter_error:
+            if self.raise_connection_error:
+                raise adapter_error
+            else:
+                logger.error(str(adapter_error))
 
     def read(self, *args, **kwargs):
         """
@@ -309,7 +319,13 @@ class Instrument:
         :return: whatever is returned by the adapter's read method
         """
 
-        return self.adapter.read(*args, **kwargs)
+        try:
+            return self.adapter.read(*args, **kwargs)
+        except AdapterError as adapter_error:
+            if self.raise_connection_error:
+                raise adapter_error
+            else:
+                logger.error(str(adapter_error))
 
     def query(self, *args, **kwargs):
         """
@@ -320,7 +336,13 @@ class Instrument:
         :return: whatever is returned by the adapter's query method
         """
 
-        return self.adapter.query(*args, **kwargs)
+        try:
+            return self.adapter.query(*args, **kwargs)
+        except AdapterError as adapter_error:
+            if self.raise_connection_error:
+                raise adapter_error
+            else:
+                logger.error(str(adapter_error))
 
     def set(self, knob: str, value):
         """
@@ -378,16 +400,22 @@ class Instrument:
         :return: None
         """
 
-        if self.adapter.connected:
-            self.adapter.disconnect()
+        try:
+            if self.adapter.connected:
+                self.adapter.disconnect()
 
-        self.__init__(
-            address=self.address,
-            adapter=self.adapter if self.address is None else None,
-            presets=self.presets,
-            postsets=self.postsets,
-            **self.kwargs,
-        )
+            self.__init__(
+                address=self.address,
+                adapter=self.adapter if self.address is None else None,
+                presets=self.presets,
+                postsets=self.postsets,
+                **self.kwargs,
+            )
+        except ConnectionError as connection_error:
+            if self.raise_connection_error:
+                raise connection_error
+            else:
+                logger.error(str(connection_error))
 
     def disconnect(self):
         """
@@ -398,9 +426,23 @@ class Instrument:
 
         if self.adapter.connected:
             for knob, value in self.postsets.items():
-                self.set(knob, value)
 
-            self.adapter.disconnect()
+                try:
+                    self.set(knob, value)
+                except AdapterError as adapter_error:
+                    if self.raise_connection_error:
+                        raise adapter_error
+                    else:
+                        logger.error(str(adapter_error))
+
+            try:
+                self.adapter.disconnect()
+            except ConnectionError as connection_error:
+                if self.raise_connection_error:
+                    raise connection_error
+                else:
+                    logger.error(str(connection_error))
+
         else:
             raise ConnectionError(f"adapter for {self.name} is not connected!")
 
