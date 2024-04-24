@@ -2,13 +2,12 @@ import importlib
 import socket
 import time
 import re
-from warnings import warn
+
 from threading import Lock
 
 import numpy as np
-from empyric import logger
 
-from empyric.tools import read_from_socket, write_to_socket
+from empyric.tools import logger, read_from_socket, write_to_socket
 
 
 def chaperone(method):

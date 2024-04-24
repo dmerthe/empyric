@@ -1,6 +1,7 @@
 import argparse
 import logging
-import datetime
+
+from empyric.tools import logger
 
 try:
     import pytest
@@ -8,13 +9,6 @@ except ImportError:
     pytest = None
 
 from empyric.experiment import Manager
-
-# Set up logging
-logger = logging.getLogger("empyric")
-
-log_stream_handler = logging.StreamHandler()
-log_stream_handler.setLevel(logging.WARNING)
-logger.addHandler(log_stream_handler)
 
 # TODO add logging.FileHandler to drop log into file in working directory
 

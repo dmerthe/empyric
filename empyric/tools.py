@@ -2,8 +2,15 @@ import time
 import select
 import socket
 import numbers
+import logging
 import numpy as np
 
+# Set up logging
+logger = logging.getLogger("empyric")
+
+log_stream_handler = logging.StreamHandler()
+log_stream_handler.setLevel(logging.WARNING)
+logger.addHandler(log_stream_handler)
 
 # Tools for time-keeping
 def convert_time(time_value):
