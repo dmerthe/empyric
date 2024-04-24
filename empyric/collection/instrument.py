@@ -232,7 +232,7 @@ class Instrument:
         """
 
         self.address = address
-        
+
         if "connected" not in self.knobs:
             self.knobs = ("connected",) + self.knobs
 
@@ -426,7 +426,6 @@ class Instrument:
 
         if self.adapter.connected:
             for knob, value in self.postsets.items():
-
                 try:
                     self.set(knob, value)
                 except AdapterError as adapter_error:

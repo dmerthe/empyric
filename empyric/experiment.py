@@ -134,8 +134,8 @@ class Experiment:
 
         self.state = pd.Series(
             name=None,
-            data={**{'Time': None}, **{name: None for name in self.variables}},
-            dtype=object
+            data={**{"Time": None}, **{name: None for name in self.variables}},
+            dtype=object,
         )
         self.data = pd.DataFrame(columns=["Time"] + list(variables.keys()))
 
@@ -423,7 +423,6 @@ class AsyncExperiment(Experiment):
     async def _update_routine(self, name):
         """Update named routine"""
         if self.running:
-
             # Update time
             self.state["Time"] = self.clock.time
             self.state.name = datetime.datetime.now()
@@ -455,7 +454,9 @@ class AsyncExperiment(Experiment):
     def start(self):
         super().start()
 
-        self._updating_thread = threading.Thread(target=asyncio.run, args=(self._run_loop(),))
+        self._updating_thread = threading.Thread(
+            target=asyncio.run, args=(self._run_loop(),)
+        )
 
         self._updating_thread.start()
 

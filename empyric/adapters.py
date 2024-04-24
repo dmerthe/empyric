@@ -21,7 +21,6 @@ def chaperone(method):
     """
 
     def wrapped_method(self, *args, validator=None, **kwargs):
-
         self.lock.acquire()
 
         traceback = None
@@ -35,7 +34,6 @@ def chaperone(method):
                 try:
                     self.connect()
                 except Exception as exception:
-
                     traceback = exception.__traceback__
 
                     logger.error(
@@ -1383,7 +1381,6 @@ class Modbus(Adapter):
         return self._read(*args, **kwargs)
 
     def disconnect(self):
-
         while self.backend.connected:
             self.backend.close()
             time.sleep(self.delay)

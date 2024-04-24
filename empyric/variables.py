@@ -212,7 +212,6 @@ class Knob(Variable):
         """
 
         try:
-
             if self.upper_limit and value > self.upper_limit:
                 self.instrument.set(
                     self.knob, (self.upper_limit - self.offset) / self.multiplier
@@ -223,12 +222,13 @@ class Knob(Variable):
                 )
             else:
                 if isinstance(value, numbers.Number):
-                    self.instrument.set(self.knob, (value - self.offset) / self.multiplier)
+                    self.instrument.set(
+                        self.knob, (value - self.offset) / self.multiplier
+                    )
                 else:
                     self.instrument.set(self.knob, value)
 
         except TypeError as type_error:
-
             warnings.warn(str(type_error))
 
         self._value = self.instrument.__getattribute__(self.knob.replace(" ", "_"))
