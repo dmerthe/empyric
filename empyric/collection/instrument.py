@@ -206,14 +206,6 @@ class Instrument:
 
     meters = tuple()
 
-    # This lock is used to prevent commands executed in separate threads from
-    # interfering with each other. The lock is acquired in the setter, getter
-    # and measurer wrapper functions and then released when the wrapped
-    # operation is complete. Using an RLock allows set, get and measure
-    # methods to call other such methods without blocking, as long as it
-    # happens in the same thread, which is the norm.
-    lock = RLock()
-
     raise_connection_error = True
 
     def __init__(
@@ -265,6 +257,14 @@ class Instrument:
 
         if self.address:
             self.name = self.name + "@" + str(self.address)
+
+        # This lock is used to prevent commands executed in separate threads from
+        # interfering with each other. The lock is acquired in the setter, getter
+        # and measurer wrapper functions and then released when the wrapped
+        # operation is complete. Using an RLock allows set, get and measure
+        # methods to call other such methods without blocking, as long as it
+        # happens in the same thread, which is the norm.
+        self.lock = RLock()
 
         # Get existing knob settings, if possible
         for knob in self.knobs:
