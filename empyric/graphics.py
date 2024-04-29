@@ -122,7 +122,7 @@ class Plotter:
             elif style == "averaged":
                 self._plot_basic(name, averaged=True)
             elif style == "errorbars":
-                self._plot_basis(name, errorbars=True)
+                self._plot_basic(name, errorbars=True)
             elif style == "parametric":
                 self._plot_parametric(name)
             else:
@@ -469,9 +469,8 @@ class ExperimentGUI:
                     if instrument.name not in self.instruments:
                         self.instruments[instrument.name] = instrument
 
-        if ("plots" in kwargs and kwargs["plotter"] is not None) or (
-            "plotter" in kwargs and kwargs["plotter"] is not None
-        ):
+        if "plots" in kwargs or 'plotter' in kwargs:
+
             if "plotter" in kwargs:
                 self.plotter = kwargs["plotter"]
             else:

@@ -5,7 +5,8 @@ import os
 import sys
 import threading
 from empyric.instruments import HenonMapper
-from empyric.experiment import Variable, Alarm, Experiment
+from empyric.experiment import Alarm, Experiment
+from empyric.variables import Meter
 from empyric.graphics import ExperimentGUI
 
 import matplotlib
@@ -26,16 +27,26 @@ os.chdir(directory)
 
 henon_mapper = HenonMapper()
 
-x = Variable(instrument=henon_mapper, meter="x")
-y = Variable(instrument=henon_mapper, meter="y")
+x = Meter(instrument=henon_mapper, meter="x")
+y = Meter(instrument=henon_mapper, meter="y")
 
-alarm = Alarm(y, ">0")
+alarm = Alarm('y > 0', definitions={'y': y})
 
 experiment = Experiment(
     {"x": x, "y": y}
 )  # an experiment that simply measures the values of x and y over time
 
-plots = {"Henon Plot": {"x": "x", "y": "y", "style": "parametric", "marker": "o"}}
+plots = {
+    "Henon Plot": {
+        "x": "x", "y": "y", "style": "parametric",
+        "configure":
+            {
+                "marker": "o",
+                "linestyle": "None",
+                "markersize": 3
+             },
+    }
+}
 gui = ExperimentGUI(
     experiment, alarms={"y>0": alarm}, title="Henon Map Example", plots=plots
 )
@@ -45,7 +56,7 @@ def run_experiment():
     for state in experiment:
         print(state)
 
-        if state["time"] >= 60:
+        if state["Time"] >= 60:
             experiment.terminate()
 
         time.sleep(1)
