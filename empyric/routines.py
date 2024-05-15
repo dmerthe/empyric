@@ -111,6 +111,7 @@ class Routine:
             self._duration = np.inf
 
         self.prepped = False
+        self.running = False
         self.finished = False
 
         for key, value in kwargs.items():
@@ -146,6 +147,8 @@ class Routine:
                     self.start = np.nan
                     self.end = np.nan
 
+                self.running = False
+
                 return
 
             elif state["Time"] < self.start:
@@ -153,6 +156,9 @@ class Routine:
                 if not self.prepped and not self.delay_prep:
                     self.prep(state)
                     self.prepped = True
+
+                self.running = False
+
                 return
 
             elif state["Time"] >= self.end:
@@ -165,6 +171,8 @@ class Routine:
                     for name, knob in self.knobs.items():
                         if knob._controller == self:
                             knob._controller = None
+
+                self.running = False
 
                 return
 
@@ -187,6 +195,8 @@ class Routine:
                     elif self.assert_control:
                         # assert control if needed
                         knob._controller = self
+
+                self.running = True
 
                 update(self, state)
 
