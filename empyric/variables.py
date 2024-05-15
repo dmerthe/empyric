@@ -185,6 +185,9 @@ class Knob(Variable):
         if type_hints:
             arg_hints = list(type_hints)
             self._type = type_hints[arg_hints[0]]
+        else:
+            warnings.warn(f"Unable to determine data dtype of {knob} on {instrument}; assuming 64-bit float")
+            self._type = np.float64
 
         self._value = None
 
@@ -286,7 +289,7 @@ class Meter(Variable):
 
         self._type = typing.get_type_hints(
             getattr(instrument, "measure_" + meter.replace(" ", "_"))
-        ).get("return", None)
+        ).get("return", np.float64)
 
         self._value = None
 

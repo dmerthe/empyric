@@ -8,7 +8,7 @@ import tkinter as tk
 import pandas as pd
 import pandas.errors
 
-from empyric.types import recast, Type, Float
+from empyric.types import recast, Type, Float, String
 from empyric.routines import SocketServer, ModbusServer
 
 if sys.platform == "darwin":
@@ -384,13 +384,13 @@ class Plotter:
             columns = []
             max_len = 0  # maximum length of columns
             for i, element in enumerate(row):
-                if type(element) == str and os.path.isfile(element):
+                if isinstance(element, str) and os.path.isfile(element):
                     file_read = False
                     attempt = 0
                     while not file_read:
                         try:
                             expanded_element = list(
-                                pd.read_csv(element)[labels[i]].values
+                                pd.read_csv(element, dtype=np.float64)[labels[i]].values
                             )
 
                             file_read = True
@@ -406,15 +406,15 @@ class Plotter:
                     expanded_element = list(element)
 
                     expanded_element = [
-                        value if value is not None else np.nan
+                        np.float64(value) if value is not None else np.nan
                         for value in expanded_element
                     ]
 
                 else:
-                    if element is None:
+                    if not isinstance(element, numbers.Number):
                         element = np.nan
 
-                    expanded_element = [element]
+                    expanded_element = [np.float64(element)]
 
                 max_len = np.max([len(expanded_element), max_len])
 
