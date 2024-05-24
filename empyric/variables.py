@@ -758,11 +758,10 @@ class Parameter(Variable):
     _settable = True  #:
 
     def __init__(self, parameter: Union[float, int, bool, str, Toggle, np.ndarray]):
-        self.parameter = parameter
-        self._value = parameter
+        self._value = recast(parameter)
 
         for name, _type in types.supported.items():
-            if isinstance(parameter, _type):
+            if isinstance(self._value, _type):
                 self._type = _type
 
     @property
@@ -775,7 +774,6 @@ class Parameter(Variable):
     @Variable.setter_type_validator
     def value(self, value):
         """Set the parameter value"""
-        self.parameter = value
         self._value = value
 
     def __str__(self):
