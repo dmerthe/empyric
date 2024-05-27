@@ -34,6 +34,7 @@ def setter(method):
 
     @wraps(method)
     def wrapped_method(*args, **kwargs):
+
         self = args[0]
         value = args[1]
 
@@ -45,6 +46,10 @@ def setter(method):
         self.lock.acquire()
 
         try:
+
+            args = list(args)
+            args[1] = recast(args[1], to=dtype)
+
             returned_value = method(*args, **kwargs)
 
             # The knob attribute is set to the returned value of the method, or
