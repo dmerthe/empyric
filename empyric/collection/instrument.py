@@ -267,6 +267,8 @@ class Instrument:
 
         if self.address:
             self.name = self.name + "@" + str(self.address)
+        else:
+            self.name = self.name + "@" + hex(id(self))
 
         # Get existing knob settings, if possible
         for knob in self.knobs:
