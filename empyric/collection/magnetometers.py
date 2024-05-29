@@ -29,7 +29,7 @@ class AlphaLabMR3(Instrument):
     )
 
     def _measure_field(self) -> list:
-        """Get """
+        """Get the magnetic field vector"""
 
         self.write('\x03\x00\x00\x00\x00\x00')
 
@@ -73,4 +73,5 @@ class AlphaLabMR3(Instrument):
 
     @measurer
     def measure_field_norm(self) -> Float:
+        """Measure the magnetic field vector and compute the magnitude"""
         return np.linalg.norm(self._measure_field())
