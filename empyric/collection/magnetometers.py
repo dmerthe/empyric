@@ -31,15 +31,21 @@ class AlphaLabMR3(Instrument):
     def _measure_field(self) -> list:
         """Get the magnetic field vector"""
 
+        # clear buffer
+        if self.adapter.in_waiting:
+            self.adapter.read(bytes=self.adapter.in_waiting, decode=False)
+
         self.write('\x03\x00\x00\x00\x00\x00')
 
-        response = self.read(bytes=4000, decode=False)
+        time = self.read(bytes=6, decode=False)
+        Bx = self.read(bytes=6, decode=False)
+        By = self.read(bytes=6, decode=False)
+        Bz = self.read(bytes=6, decode=False)
+        end_byte = self.read(bytes=1, decode=False)
 
-        fieldx, fieldy, fieldz = response[6:12], response[12:18], response[18:24]
+        B_values = []
 
-        field_values = []
-
-        for component in (fieldx, fieldy, fieldz):
+        for component in (Bx, By, Bz):
 
             sgn_dec_bits = format(component[1], 'b')
 
@@ -55,9 +61,9 @@ class AlphaLabMR3(Instrument):
 
             numerical_value = sign * int_value * 10 ** (-decimal_places)
 
-            field_values.append(numerical_value)
+            B_values.append(numerical_value)
 
-        return field_values
+        return B_values
 
     @measurer
     def measure_field_x(self) -> Float:
