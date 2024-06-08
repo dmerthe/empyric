@@ -265,7 +265,7 @@ class Instrument:
                     message = message + f"{error}\n"
                 raise ConnectionError(message)
 
-        if '@' not in self.name:
+        if "@" not in self.name:
             if self.address:
                 self.name = self.name + "@" + str(self.address)
             else:

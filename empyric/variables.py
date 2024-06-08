@@ -186,7 +186,9 @@ class Knob(Variable):
             arg_hints = list(type_hints)
             self._type = type_hints[arg_hints[0]]
         else:
-            warnings.warn(f"Unable to determine data dtype of {knob} on {instrument}; assuming 64-bit float")
+            warnings.warn(
+                f"Unable to determine data dtype of {knob} on {instrument}; assuming 64-bit float"
+            )
             self._type = np.float64
 
         self._value = None
@@ -226,7 +228,9 @@ class Knob(Variable):
                 )
             else:
                 if isinstance(value, numbers.Number):
-                    self.instrument.set(self.knob, (value - self.offset) / self.multiplier)
+                    self.instrument.set(
+                        self.knob, (value - self.offset) / self.multiplier
+                    )
                 else:
                     self.instrument.set(self.knob, value)
 

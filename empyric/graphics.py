@@ -469,8 +469,10 @@ class ExperimentGUI:
                     if instrument.name not in self.instruments:
                         self.instruments[instrument.name] = instrument
 
-        if kwargs.get('plots', None) is not None \
-                or kwargs.get('plotter', None) is not None:
+        if (
+            kwargs.get("plots", None) is not None
+            or kwargs.get("plotter", None) is not None
+        ):
 
             if "plotter" in kwargs:
                 self.plotter = kwargs["plotter"]

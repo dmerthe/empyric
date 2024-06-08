@@ -289,7 +289,7 @@ class Serial(Adapter):
                     "M": pyvisa.constants.Parity(3),  # mark
                     "S": pyvisa.constants.Parity(4),  # space
                 }[self.parity],
-                timeout=1000*self.timeout,  # timeout argument is in milliseconds
+                timeout=1000 * self.timeout,  # timeout argument is in milliseconds
                 write_termination=self.write_termination,
                 read_termination=self.read_termination,
             )
@@ -439,9 +439,9 @@ class Serial(Adapter):
     @property
     def in_waiting(self):
 
-        if self.lib == 'pyserial':
+        if self.lib == "pyserial":
             return self.backend.in_waiting
-        elif self.lib == 'pyvisa':
+        elif self.lib == "pyvisa":
             return self.backend.bytes_in_buffer
 
 

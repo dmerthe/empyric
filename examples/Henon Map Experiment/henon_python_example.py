@@ -30,7 +30,7 @@ henon_mapper = HenonMapper()
 x = Meter(instrument=henon_mapper, meter="x")
 y = Meter(instrument=henon_mapper, meter="y")
 
-alarm = Alarm('y > 0', definitions={'y': y})
+alarm = Alarm("y > 0", definitions={"y": y})
 
 experiment = Experiment(
     {"x": x, "y": y}
@@ -38,13 +38,10 @@ experiment = Experiment(
 
 plots = {
     "Henon Plot": {
-        "x": "x", "y": "y", "style": "parametric",
-        "configure":
-            {
-                "marker": "o",
-                "linestyle": "None",
-                "markersize": 3
-             },
+        "x": "x",
+        "y": "y",
+        "style": "parametric",
+        "configure": {"marker": "o", "linestyle": "None", "markersize": 3},
     }
 }
 gui = ExperimentGUI(
