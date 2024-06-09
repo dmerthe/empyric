@@ -2,12 +2,11 @@ import importlib
 import socket
 import time
 import re
-from warnings import warn
 from threading import Lock
 
 import numpy as np
 
-from empyric.tools import read_from_socket, write_to_socket
+from empyric.tools import read_from_socket, write_to_socket, logger
 
 
 def chaperone(method):
@@ -37,6 +36,12 @@ def chaperone(method):
 
         while reconnects < self.max_reconnects:
             if not self.connected:
+
+                logger.info(
+                    f'Connecting to {self.instrument.name} '
+                    f'at {self.instrument.address}'
+                )
+
                 time.sleep(self.delay)
                 self.connect()
                 reconnects += 1
@@ -45,6 +50,12 @@ def chaperone(method):
 
             while attempts < self.max_attempts:
                 try:
+
+                    logger.info(
+                        f'Communicating with {self.instrument.name} '
+                        f'at {self.instrument.address}: {method}({args})'
+                    )
+
                     response = method(self, *args, **kwargs)
 
                     if validator and not validator(response):
@@ -59,13 +70,19 @@ def chaperone(method):
                     elif attempts > 0 or reconnects > 0:
                         print("Resolved")
 
+                    logger.info(
+                        f'Communication with {self.instrument.name} '
+                        f'at {self.instrument.address} successful '
+                        f'with response: {response}'
+                    )
+
                     self.lock.release()
                     return response
 
                 except Exception as exception:
                     traceback = exception.__traceback__
 
-                    warn(
+                    logger.warning(
                         f"Encountered '{exception}' while trying "
                         f"to talk to {self.instrument.name}"
                     )
@@ -74,6 +91,12 @@ def chaperone(method):
 
             # getting here means attempts have maxed out;
             # disconnect adapter and potentially reconnect on next iteration
+
+            logger.info(
+                f'Disconnecting from {self.instrument.name} '
+                f'at {self.instrument.address}'
+            )
+
             self.disconnect()
 
         # Getting here means that both attempts and reconnects have been maxed out

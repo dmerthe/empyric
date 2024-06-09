@@ -1,6 +1,8 @@
 import typing
 from threading import RLock
 from functools import wraps
+
+from empyric.tools import logger
 from empyric.adapters import *
 from empyric.types import recast, Type, ON, OFF, Toggle
 
@@ -32,6 +34,8 @@ def setter(method):
     else:
         dtype = Type
 
+    logger.info(f'knob {" ".join(knob.split("_"))} dtype is {dtype}')
+
     @wraps(method)
     def wrapped_method(*args, **kwargs):
 
@@ -39,7 +43,7 @@ def setter(method):
         value = args[1]
 
         if not self.adapter.connected and knob != "connected":
-            print(f"Instrument {self.name} is disconnected; unable to set {knob}")
+            logger.warn(f"Instrument {self.name} is disconnected; unable to set {knob}")
             self.__setattr__(knob, None)
             return
 
@@ -50,11 +54,19 @@ def setter(method):
             args = list(args)
             args[1] = recast(args[1], to=dtype)
 
+            logger.info(f'setting {knob} on {self.name} to {value}')
+
             returned_value = method(*args, **kwargs)
 
             # The knob attribute is set to the returned value of the method, or
             # the value argument if the returned value is None
             if returned_value is not None:
+
+                logger.info(
+                    f'value returned by set method for {knob} on {self.name} '
+                    f'is {returned_value} instead of applied value {value}'
+                )
+
                 self.__setattr__(knob, recast(returned_value, to=dtype))
             else:
                 self.__setattr__(knob, recast(value, to=dtype))
@@ -78,22 +90,34 @@ def getter(method):
 
     dtype = typing.get_type_hints(method).get("return", Type)
 
+    logger.info(f'knob {" ".join(knob.split("_"))} dtype is {dtype}')
+
     @wraps(method)
     def wrapped_method(*args, **kwargs):
         self = args[0]
 
         if not self.adapter.connected and knob != "connected":
             self.__setattr__(knob, None)
-            print(f"Instrument {self.name} is disconnected; unable to get {knob}")
+            logger.warn(f"Instrument {self.name} is disconnected; unable to get {knob}")
             return
 
         self.lock.acquire()
 
         try:
+
+            logger.info(f'getting value of {knob} on {self.name}...')
+
             value = recast(method(*args, **kwargs), to=dtype)
+
+            logger.info(f'retrieved value of {knob} on {self.name} is {value}')
         except AttributeError as err:
             # catches most errors caused by the adapter returning None
             if "NoneType" in str(err):
+
+                logger.info(
+                    f'unable to retrieve non-null value for {knob} on {self.name}'
+                )
+
                 value = None
             else:
                 raise AttributeError(err)
@@ -121,6 +145,8 @@ def measurer(method):
 
     dtype = typing.get_type_hints(method).get("return", Type)
 
+    logger.info(f'meter {" ".join(meter.split("_"))} dtype is {dtype}')
+
     @wraps(method)
     def wrapped_method(*args, **kwargs):
         self = args[0]
@@ -133,10 +159,20 @@ def measurer(method):
         self.lock.acquire()
 
         try:
+
+            logger.info(f'measuring value of {meter} on {self.name}...')
+
             value = recast(method(*args, **kwargs), to=dtype)
+
+            logger.info(f'measured value of {meter} on {self.name} is {value}')
         except AttributeError as err:
             # catches most errors caused by the adapter returning None
             if "NoneType" in str(err):
+
+                logger.info(
+                    f'unable to measure non-null value for {meter} on {self.name}'
+                )
+
                 value = None
             else:
                 raise AttributeError(err)
@@ -370,7 +406,9 @@ class Instrument:
         """
 
         try:
-            measure_method = self.__getattribute__("measure_" + meter.replace(" ", "_"))
+            measure_method = self.__getattribute__(
+                "measure_" + meter.replace(" ", "_")
+            )
         except AttributeError:
             raise AttributeError(f"{meter} cannot be measured on {self.name}")
 

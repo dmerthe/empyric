@@ -381,6 +381,6 @@ class ModbusClient(Instrument):
     instance in other experiments to control variables.
     """
 
-    name = "DataClient"
+    name = "ModbusClient"
 
     supported_adapters = ((Modbus, {}),)
