@@ -900,11 +900,11 @@ class GlassmanOQ500(Instrument):
 
     def _construct_set_message(
         self,
-        normalized_voltage_cmd: (float | None) = None,
-        normalized_current_cmd: (float | None) = None,
-        hv_on_cmd: (bool | None) = None,
-        hv_off_cmd: (bool | None) = None,
-        reset_cmd: (bool | None) = None,
+        normalized_voltage_cmd: float | None = None,
+        normalized_current_cmd: float | None = None,
+        hv_on_cmd: bool | None = None,
+        hv_off_cmd: bool | None = None,
+        reset_cmd: bool | None = None,
     ) -> str:
         # process inputs
         if normalized_voltage_cmd is not None:

@@ -387,7 +387,7 @@ class AlicatMFC(Instrument):
     meters = (
         "flow rate",  # actual flow rate in SCCM
         "temperature",  # temperature in degrees C
-        "pressure"
+        "pressure",
         # pressure in PSI (absolute, gauge or differential,
         # depending on device configuration)
     )

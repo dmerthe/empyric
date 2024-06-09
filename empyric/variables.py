@@ -188,10 +188,12 @@ class Knob(Variable):
             arg_hints = list(type_hints)
             self._type = type_hints[arg_hints[0]]
         else:
+
             logger.warning(
                 f"Unable to determine data dtype of {knob} on {instrument}; "
                 "assuming 64-bit float"
             )
+
             self._type = np.float64
 
         self._value = None
