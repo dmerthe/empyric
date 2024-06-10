@@ -34,7 +34,7 @@ def setter(method):
     else:
         dtype = Type
 
-    logger.info(f'knob {" ".join(knob.split("_"))} dtype is {dtype}')
+    logger.info(f'Knob {" ".join(knob.split("_"))} dtype is {dtype}')
 
     @wraps(method)
     def wrapped_method(*args, **kwargs):
@@ -54,7 +54,7 @@ def setter(method):
             args = list(args)
             args[1] = recast(args[1], to=dtype)
 
-            logger.info(f'setting {knob} on {self.name} to {value}')
+            logger.info(f'Setting {knob} on {self.name} to {value}')
 
             returned_value = method(*args, **kwargs)
 
@@ -63,7 +63,7 @@ def setter(method):
             if returned_value is not None:
 
                 logger.info(
-                    f'value returned by set method for {knob} on {self.name} '
+                    f'Value returned by set method for {knob} on {self.name} '
                     f'is {returned_value} instead of applied value {value}'
                 )
 
@@ -90,7 +90,7 @@ def getter(method):
 
     dtype = typing.get_type_hints(method).get("return", Type)
 
-    logger.info(f'knob {" ".join(knob.split("_"))} dtype is {dtype}')
+    logger.info(f'Knob {" ".join(knob.split("_"))} dtype is {dtype}')
 
     @wraps(method)
     def wrapped_method(*args, **kwargs):
@@ -105,17 +105,17 @@ def getter(method):
 
         try:
 
-            logger.info(f'getting value of {knob} on {self.name}...')
+            logger.info(f'Getting value of {knob} on {self.name}...')
 
             value = recast(method(*args, **kwargs), to=dtype)
 
-            logger.info(f'retrieved value of {knob} on {self.name} is {value}')
+            logger.info(f'Retrieved value of {knob} on {self.name} is {value}')
         except AttributeError as err:
             # catches most errors caused by the adapter returning None
             if "NoneType" in str(err):
 
                 logger.info(
-                    f'unable to retrieve non-null value for {knob} on {self.name}'
+                    f'Unable to retrieve non-null value for {knob} on {self.name}'
                 )
 
                 value = None
@@ -145,7 +145,7 @@ def measurer(method):
 
     dtype = typing.get_type_hints(method).get("return", Type)
 
-    logger.info(f'meter {" ".join(meter.split("_"))} dtype is {dtype}')
+    logger.info(f'Meter {" ".join(meter.split("_"))} dtype is {dtype}')
 
     @wraps(method)
     def wrapped_method(*args, **kwargs):
@@ -160,17 +160,17 @@ def measurer(method):
 
         try:
 
-            logger.info(f'measuring value of {meter} on {self.name}...')
+            logger.info(f'Measuring value of {meter} on {self.name}...')
 
             value = recast(method(*args, **kwargs), to=dtype)
 
-            logger.info(f'measured value of {meter} on {self.name} is {value}')
+            logger.info(f'Measured value of {meter} on {self.name} is {value}')
         except AttributeError as err:
             # catches most errors caused by the adapter returning None
             if "NoneType" in str(err):
 
                 logger.info(
-                    f'unable to measure non-null value for {meter} on {self.name}'
+                    f'Unable to measure non-null value for {meter} on {self.name}'
                 )
 
                 value = None
