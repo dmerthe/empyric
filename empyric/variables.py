@@ -436,6 +436,8 @@ class Expression(Variable):
 
         self.last_evaluation = time.time()
 
+        logger.info(f'Expression {self.expression} evaluated to {self._value}')
+
         return self._value
 
     def __str__(self):
@@ -851,13 +853,13 @@ class Parameter(Variable):
         self._value = recast(parameter)
 
         for name, _type in supported_types.items():
-            if isinstance(self._value, _type):
+            if isinstance(self._value, _type) and _type is not Type:
 
                 self._type = _type
 
-                logger.info(
-                    f'Setting data type of parameter {self._value} to {self._type}'
-                )
+        logger.info(
+            f'Setting data type of parameter {self._value} to {self._type}'
+        )
 
     @property
     @Variable.getter_type_validator
