@@ -255,7 +255,7 @@ class Experiment:
                     self.state[name] = None
             else:
                 self.state[name] = value
-        except BaseException as err:
+        except Exception as err:
             self.terminate()
             raise err
 
@@ -453,6 +453,7 @@ class AsyncExperiment(Experiment):
                 Experiment._update_routine(self, name)
 
             await update()
+
         elif self.stopped:
             await asyncio.sleep(0.1)
 

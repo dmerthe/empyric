@@ -1,3 +1,6 @@
+import asyncio
+import time
+
 import numpy as np
 
 from empyric.types import Float
@@ -20,30 +23,30 @@ class AlphaLabMR3(Instrument):
     )
 
     meters = (
-        "field x",  # x component of magnetic field
-        "field y",
-        "field z",
-        "field norm",  # magnitude of the magnetic field
+        'x component',  # x component of magnetic field
+        'y component',
+        'z component',
+        'magnitude'  # magnitude of the magnetic field
     )
 
     def _measure_field(self) -> list:
         """Get the magnetic field vector"""
 
         # clear buffer
-        if self.adapter.in_waiting:
+        while self.adapter.in_waiting:
             self.adapter.read(bytes=self.adapter.in_waiting, decode=False)
+            time.sleep(0.1)
 
-        self.write("\x03\x00\x00\x00\x00\x00")
+        response = self.query('\x03\x00\x00\x00\x00\x00', bytes=31, decode=False)
 
-        time = self.read(bytes=6, decode=False)
-        Bx = self.read(bytes=6, decode=False)
-        By = self.read(bytes=6, decode=False)
-        Bz = self.read(bytes=6, decode=False)
-        end_byte = self.read(bytes=1, decode=False)
+        _time = response[:6]
+        vector = response[6:12], response[12:18], response[18:24]
+        magnitude = response[24:30]
+        end_byte = response[30]
 
         B_values = []
 
-        for component in (Bx, By, Bz):
+        for component in vector:
 
             sgn_dec_bits = format(component[1], "b")
 
@@ -64,18 +67,21 @@ class AlphaLabMR3(Instrument):
         return B_values
 
     @measurer
-    def measure_field_x(self) -> Float:
+    def measure_x_component(self) -> Float:
+        """Measure the x component of the magnetic field"""
         return self._measure_field()[0]
 
     @measurer
-    def measure_field_y(self) -> Float:
+    def measure_y_component(self) -> Float:
+        """Measure the y component of the magnetic field"""
         return self._measure_field()[1]
 
     @measurer
-    def measure_field_z(self) -> Float:
+    def measure_z_component(self) -> Float:
+        """Measure the z component of the magnetic field"""
         return self._measure_field()[2]
 
     @measurer
-    def measure_field_norm(self) -> Float:
+    def measure_magnitude(self) -> Float:
         """Measure the magnetic field vector and compute the magnitude"""
         return np.linalg.norm(self._measure_field())
