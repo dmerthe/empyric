@@ -472,45 +472,28 @@ class LabJackT7(Instrument):
 
     Only reading the default 14 inputs as voltages is currently supported, but
     this may eventually be expanded.
+
+    Each `AIN#_EF` knob applies an interpretation to the value of `AIN#`, based on
+    settings of AIN#_EF_INDEX and AIN#_CONFIG_A, AIN#_CONFIG_B, AIN#_CONFIG_C,
+    AIN#_CONFIG_E. Currently, the EF_INDEX and CONFIG_A can be accessed through the
+    corresponding private methods.
     """
 
     name = "LabJackT7"
 
     supported_adapters = ((Modbus, {}),)
 
-    knobs = ("DIO0", "DIO1", "DIO2", "DIO3", "DIO4", "DIO5", "DIO6", "DIO7")
+    knobs = (
+        "DIO0", "DIO1", "DIO2", "DIO3", "DIO4", "DIO5", "DIO6", "DIO7",
+    )
 
     meters = (
-        "AIN0",
-        "AIN1",
-        "AIN2",
-        "AIN3",
-        "AIN4",
-        "AIN5",
-        "AIN6",
-        "AIN7",
-        "AIN8",
-        "AIN9",
-        "AIN10",
-        "AIN11",
-        "AIN12",
-        "AIN13",
+        "AIN0", "AIN1", "AIN2", "AIN3", "AIN4", "AIN5", "AIN6",
+        "AIN7", "AIN8", "AIN9", "AIN10", "AIN11", "AIN12", "AIN13",
         "AIN all",
         "device temperature",
-        "AIN0TC",
-        "AIN1TC",
-        "AIN2TC",
-        "AIN3TC",
-        "AIN4TC",
-        "AIN5TC",
-        "AIN6TC",
-        "AIN7TC",
-        "AIN8TC",
-        "AIN9TC",
-        "AIN10TC",
-        "AIN11TC",
-        "AIN12TC",
-        "AIN13TC",
+        "AIN0_EF", "AIN1_EF", "AIN2_EF", "AIN3_EF", "AIN4_EF", "AIN5_EF", "AIN6_EF",
+        "AIN7_EF", "AIN8_EF", "AIN9_EF", "AIN10_EF", "AIN11_EF", "AIN12_EF", "AIN13_EF",
     )
 
     def _set_DION(self, n, value: Integer):
@@ -518,12 +501,6 @@ class LabJackT7(Instrument):
 
     def _get_DION(self, n) -> Integer:
         return self.read(3, 2000 + n, count=1, _type="16bit_uint")
-
-    def _measure_AIN(self, n) -> Float:
-        return self.read(3, 2 * n, count=2, _type="32bit_float")
-
-    def _measure_AIN_EF_READ_A(self, n) -> Float:
-        return self.read(3, 2 * n + 7000, count=2, _type="32bit_float")
 
     @setter
     def set_DIO0(self, value: Integer):
@@ -588,6 +565,9 @@ class LabJackT7(Instrument):
     @getter
     def get_DIO7(self) -> Integer:
         return self._get_DION(7)
+
+    def _measure_AIN(self, n) -> Float:
+        return self.read(3, 2 * n, count=2, _type="32bit_float")
 
     @measurer
     def measure_AIN0(self) -> Float:
@@ -655,58 +635,94 @@ class LabJackT7(Instrument):
         """Device temperature in C"""
         return self.read(4, 60052, count=2, _type="32bit_float") - 273.15
 
+    def _set_ef_index(self, n: int, index: int):
+        """
+        The EF_INDEX is an integer that allows interpreting the AIN#s,
+        for example as temperature readings from thermocouples or RTDS.
+        List of index values:
+        0 = None(disabled); 1 = Offset and Slope; 3 = Max/Min/Avg; 4 = Resistance;
+        5 = Average and Threshold; 10 = RMS Flex; 11 = FlexRMS;
+        20 = Thermocouple type E; 21 = Thermocouple type J; 22 = Thermocouple type K;
+        23 = Thermocouple type R; 24 = Thermocouple type T; 25 = Thermocouple type S;
+        27 = Thermocouple type N; 28 = Thermocouple type B; 30 = Thermocouple type C;
+        40 = RTD model PT100; 41 = RTD model PT500; 42 = RTD model PT1000;
+        50 = Thermistor Steinhart-Hart; 51 = Thermistor Beta.
+        """
+
+        if index not in range(52):
+            raise ValueError('EF_INDEX must be an integer between 0 and 51')
+
+        self.write(16, 9000 + 2*n, index, _type="32bit_uint")
+
+    def _get_ef_index(self, n: int):
+        return self.read(3, 9000 + 2*n, count=2, _type="32bit_uint")
+
+    def _set_ef_config_a(self, n: int, config: int):
+        """0 = K, 1 = C, 2 = F"""
+
+        if config not in range(3):
+            raise ValueError('EF_CONFIG_A must be 0, 1 or 2')
+
+        self.write(16, 9300 + 2*n, config, _type="32bit_uint")
+
+    def _get_ef_config_a(self, n):
+        return self.read(3, 9300 + 2 * n, count=2, _type="32bit_uint")
+
+    def _measure_AIN_EF_READ_A(self, n) -> Float:
+        return self.read(3, 7000 + 2 * n, count=2, _type="32bit_float")
+
     @measurer
-    def measure_AIN0TC(self) -> Float:
+    def measure_AIN0_EF(self) -> Float:
         return self._measure_AIN_EF_READ_A(0)
 
     @measurer
-    def measure_AIN1TC(self) -> Float:
+    def measure_AIN1_EF(self) -> Float:
         return self._measure_AIN_EF_READ_A(1)
 
     @measurer
-    def measure_AIN2TC(self) -> Float:
+    def measure_AIN2_EF(self) -> Float:
         return self._measure_AIN_EF_READ_A(2)
 
     @measurer
-    def measure_AIN3TC(self) -> Float:
+    def measure_AIN3_EF(self) -> Float:
         return self._measure_AIN_EF_READ_A(3)
 
     @measurer
-    def measure_AIN4TC(self) -> Float:
+    def measure_AIN4_EF(self) -> Float:
         return self._measure_AIN_EF_READ_A(4)
 
     @measurer
-    def measure_AIN5TC(self) -> Float:
+    def measure_AIN5_EF(self) -> Float:
         return self._measure_AIN_EF_READ_A(5)
 
     @measurer
-    def measure_AIN6TC(self) -> Float:
+    def measure_AIN6_EF(self) -> Float:
         return self._measure_AIN_EF_READ_A(6)
 
     @measurer
-    def measure_AIN7TC(self) -> Float:
+    def measure_AIN7_EF(self) -> Float:
         return self._measure_AIN_EF_READ_A(7)
 
     @measurer
-    def measure_AIN8TC(self) -> Float:
+    def measure_AIN8_EF(self) -> Float:
         return self._measure_AIN_EF_READ_A(8)
 
     @measurer
-    def measure_AIN9TC(self) -> Float:
+    def measure_AIN9_EF(self) -> Float:
         return self._measure_AIN_EF_READ_A(9)
 
     @measurer
-    def measure_AIN10TC(self) -> Float:
+    def measure_AIN10_EF(self) -> Float:
         return self._measure_AIN_EF_READ_A(10)
 
     @measurer
-    def measure_AIN11TC(self) -> Float:
+    def measure_AIN11_EF(self) -> Float:
         return self._measure_AIN_EF_READ_A(11)
 
     @measurer
-    def measure_AIN12TC(self) -> Float:
+    def measure_AIN12_EF(self) -> Float:
         return self._measure_AIN_EF_READ_A(12)
 
     @measurer
-    def measure_AIN13TC(self) -> Float:
+    def measure_AIN13_EF(self) -> Float:
         return self._measure_AIN_EF_READ_A(13)
