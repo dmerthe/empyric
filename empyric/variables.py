@@ -381,7 +381,7 @@ class Expression(Variable):
 
         expression = self.expression
 
-        logger.info(f'Evaluating expression {expression}')
+        logger.debug(f'Evaluating expression {expression}')
 
         # carets represent exponents
         expression = expression.replace("^", "**")
@@ -422,7 +422,7 @@ class Expression(Variable):
                     elif np.isinf(value):
                         log_str += f"\n{name} = +/-Inf"
 
-                logger.info(log_str)
+                logger.debug(log_str)
 
                 self._value = None
 
@@ -436,7 +436,7 @@ class Expression(Variable):
 
         self.last_evaluation = time.time()
 
-        logger.info(f'Expression {self.expression} evaluated to {self._value}')
+        logger.debug(f'Expression {self.expression} evaluated to {self._value}')
 
         return self._value
 
@@ -644,7 +644,7 @@ class Remote(Variable):
 
             if self._type is not None:
 
-                logger.info(
+                logger.debug(
                     f'Retrieving value of type {self._type} '
                     f'starting at register {self.alias}'
                     f'from Modbus server at {self.server}...'
@@ -654,7 +654,7 @@ class Remote(Variable):
                     fcode, self.alias, count=4, _type=self.type_map[self._type]
                 )
 
-                logger.info(
+                logger.debug(
                     f'Value retrieved starting at register {self.alias} '
                     f'from Modbus server at {self.server} is {self._value}'
                 )
@@ -662,7 +662,7 @@ class Remote(Variable):
         else:
             write_to_socket(self._socket, f"{self.alias} ?")
 
-            logger.info(
+            logger.debug(
                 f'Retrieving value of type {self._type} '
                 f'with alias {self.alias}'
                 f'from socket server at {self.server}...'
@@ -687,15 +687,15 @@ class Remote(Variable):
                             to=self._type if self._type is not None else Type,
                         )
 
-                logger.info(
+                logger.debug(
                     f'Value with alias {self.alias} retrieved '
                     f'from socket server at {self.server} is {self._value}'
                 )
 
-            except BaseException as error:
+            except Exception as error:
                 logger.warning(
                     f"Unable to retrieve value of {self.alias} "
-                    f'from server at {self.server}; got error "{error}"'
+                    f'from {self.protocol} server at {self.server}: "{error}"'
                 )
 
         if isinstance(self._value, numbers.Number):
@@ -726,7 +726,7 @@ class Remote(Variable):
 
         else:
 
-            logger.info(
+            logger.debug(
                 f'Writing value {value} to variable with alias {self.alias} '
                 f'on socket server at {self.server}...'
             )
@@ -781,7 +781,7 @@ class Remote(Variable):
 
         if self.protocol == "modbus":
 
-            logger.info(
+            logger.debug(
                 f'Getting data type of variable starting at register {self.alias}'
                 f'on Modbus server at {self.server}...'
             )
@@ -797,14 +797,14 @@ class Remote(Variable):
                 3: Float,
             }.get(type_int, None)
 
-            logger.info(
+            logger.debug(
                 f'Data type of variable starting at register {self.alias} '
                 f'on Modbus server at {self.server} is {self._type}'
             )
 
         else:
 
-            logger.info(
+            logger.debug(
                 f'Getting data type of variable with alias {self.alias}'
                 f'on socket server at {self.server}...'
             )
@@ -820,7 +820,7 @@ class Remote(Variable):
             else:
                 self._type = None
 
-            logger.info(
+            logger.debug(
                 f'Data type of variable with alias {self.alias} '
                 f'on socket server at {self.server} is {self._type}'
             )
@@ -857,7 +857,7 @@ class Parameter(Variable):
 
                 self._type = _type
 
-        logger.info(
+        logger.debug(
             f'Setting data type of parameter {self._value} to {self._type}'
         )
 

@@ -37,7 +37,7 @@ def chaperone(method):
         while reconnects < self.max_reconnects:
             if not self.connected:
 
-                logger.info(
+                logger.debug(
                     f'Connecting to {self.instrument.name} '
                     f'at {self.instrument.address}'
                 )
@@ -51,7 +51,7 @@ def chaperone(method):
             while attempts < self.max_attempts:
                 try:
 
-                    logger.info(
+                    logger.debug(
                         f'Communicating with {self.instrument.name} '
                         f'at {self.instrument.address}: {method}({args})'
                     )
@@ -70,7 +70,7 @@ def chaperone(method):
                     elif attempts > 0 or reconnects > 0:
                         print("Resolved")
 
-                    logger.info(
+                    logger.debug(
                         f'Communication with {self.instrument.name} '
                         f'at {self.instrument.address} successful '
                         f'with response: {response}'
@@ -92,7 +92,7 @@ def chaperone(method):
             # getting here means attempts have maxed out;
             # disconnect adapter and potentially reconnect on next iteration
 
-            logger.info(
+            logger.debug(
                 f'Disconnecting from {self.instrument.name} '
                 f'at {self.instrument.address}'
             )
