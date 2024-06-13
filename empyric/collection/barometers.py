@@ -89,4 +89,7 @@ class KJLSPARC(Instrument):
 
         response = self.query('vac?')
 
-        return float(response[4:])
+        if response[4:] == 'ERROR':
+            return np.nan
+        else:
+            return float(response[4:])
