@@ -3,8 +3,8 @@ from threading import RLock
 from functools import wraps
 
 from empyric.tools import logger
-from empyric.adapters import *
 from empyric.types import recast, Type, ON, OFF, Toggle
+from empyric.adapters import Adapter
 
 
 def setter(method):

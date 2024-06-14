@@ -2,13 +2,12 @@ import os
 import datetime
 import re
 from typing import Union
-
 import numpy as np
 import pandas as pd
 
-from empyric.collection.instrument import Instrument, setter, getter, measurer
-from empyric.adapters import GPIB
 from empyric.types import Toggle, ON, OFF, String, Float, Array
+from empyric.adapters import GPIB
+from empyric.collection.instrument import Instrument, setter, getter, measurer
 
 
 class Keithley2400(Instrument):

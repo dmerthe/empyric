@@ -1,8 +1,12 @@
+import re
 import struct
+import socket
+import numpy as np
 
-from empyric.adapters import *
-from empyric.collection.instrument import *
+from empyric.tools import logger
 from empyric.types import Toggle, Float, ON, OFF
+from empyric.adapters import Serial, Socket, GPIB
+from empyric.collection.instrument import Instrument, setter, getter, measurer
 
 
 class Keithley2260B(Instrument):
