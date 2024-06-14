@@ -43,7 +43,9 @@ def setter(method):
         value = args[1]
 
         if not self.adapter.connected and knob != "connected":
-            logger.warn(f"Instrument {self.name} is disconnected; unable to set {knob}")
+            logger.warning(
+                f"Instrument {self.name} is disconnected; unable to set {knob}"
+            )
             self.__setattr__(knob, None)
             return
 
@@ -98,7 +100,9 @@ def getter(method):
 
         if not self.adapter.connected and knob != "connected":
             self.__setattr__(knob, None)
-            logger.warn(f"Instrument {self.name} is disconnected; unable to get {knob}")
+            logger.warning(
+                f"Instrument {self.name} is disconnected; unable to get {knob}"
+            )
             return
 
         self.lock.acquire()

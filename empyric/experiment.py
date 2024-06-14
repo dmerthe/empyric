@@ -13,7 +13,6 @@ import time
 import tkinter as tk
 from tkinter.filedialog import askopenfilename
 from typing import Union
-from warnings import warn
 
 import numpy as np
 import pandas as pd

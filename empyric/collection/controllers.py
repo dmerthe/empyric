@@ -88,7 +88,9 @@ class OmegaCN7500(Instrument):
     def set_proportional_band(self, P: Integer):
         round_P = round(P)
         if P != round_P:
-            warn(f"Proportional band value {P} will be rounded to {round_P}")
+            logger.warning(
+                f"Proportional band value {P} will be rounded to {round_P}"
+            )
         self.write(6, 0x1009, round_P)
 
     @getter
@@ -99,7 +101,9 @@ class OmegaCN7500(Instrument):
     def set_integration_time(self, Ti: Integer):
         round_Ti = round(Ti)
         if Ti != round_Ti:
-            warn(f"Integration time value {Ti} will be rounded to {round_Ti}")
+            logger.warning(
+                f"Integration time value {Ti} will be rounded to {round_Ti}"
+            )
         self.write(6, 0x100A, round_Ti)
 
     @getter
@@ -110,7 +114,9 @@ class OmegaCN7500(Instrument):
     def set_derivative_time(self, Td: Integer):
         round_Td = round(Td)
         if Td != round_Td:
-            warn(f"Derivative time value {Td} will be rounded to {round_Td}")
+            logger.warning(
+                f"Derivative time value {Td} will be rounded to {round_Td}"
+            )
         self.write(6, 0x100B, round_Td)
 
     @getter

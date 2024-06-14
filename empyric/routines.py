@@ -6,7 +6,6 @@ import queue
 import threading
 import asyncio
 import time
-import warnings
 from typing import Union
 
 import select
@@ -25,7 +24,7 @@ from empyric.tools import (
     autobind_socket,
     read_from_socket,
     write_to_socket,
-    get_ip_address,
+    get_ip_address, logger,
 )
 from empyric.types import (
     recast,
@@ -604,7 +603,7 @@ class Optimization(Routine):
                 )
         else:
             if sign is not None:
-                warnings.warn(
+                logger.warning(
                     "The signs of Maximization and Minimization routines cannot be "
                     "changed"
                 )
