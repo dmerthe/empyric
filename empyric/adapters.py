@@ -14,11 +14,11 @@ def chaperone(method):
     Wraps all write, read and query methods of the adapters; monitors and
     handles communication issues.
 
-    :param method: (callable) method to be wrapped
-    :return: (callable) wrapped method
+    :param method: (coroutine) adapter method to be wrapped
+    :return: (coroutine) wrapped adapter method
     """
 
-    def wrapped_method(self, *args, validator=None, **kwargs):
+    async def wrapped_method(self, *args, validator=None, **kwargs):
         if not self.connected:
             raise AdapterError(
                 "Adapter is not connected for instrument "
@@ -56,7 +56,7 @@ def chaperone(method):
                         f'at {self.instrument.address}: {method}({args})'
                     )
 
-                    response = method(self, *args, **kwargs)
+                    response = await method(self, *args, **kwargs)
 
                     if validator and not validator(response):
                         if hasattr(response, "__len__") and len(response) > 100:
@@ -187,7 +187,7 @@ class Adapter:
         self.connected = True
 
     @chaperone
-    def write(self, *args, validator=None, **kwargs):
+    async def write(self, *args, validator=None, **kwargs):
         """
         Write a command.
 
@@ -205,7 +205,7 @@ class Adapter:
             raise AttributeError(self.__name__ + " adapter has no _write method")
 
     @chaperone
-    def read(self, *args, validator=None, **kwargs):
+    async def read(self, *args, validator=None, **kwargs):
         """
         Read an awaiting message.
 
@@ -223,7 +223,7 @@ class Adapter:
             raise AttributeError(self.__name__ + " adapter has no _read method")
 
     @chaperone
-    def query(self, *args, validator=None, **kwargs):
+    async def query(self, *args, validator=None, **kwargs):
         """
         Submit a query.
 
