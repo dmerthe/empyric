@@ -910,7 +910,7 @@ def convert_runcard(runcard):
             for variable in definitions.values():
                 if variable not in variables:
                     raise KeyError(
-                        f"variable {variable} specified for alarm {name} "
+                        f"variable {variable} specified for expression {name} "
                         f"is not in Variables!"
                     )
 
