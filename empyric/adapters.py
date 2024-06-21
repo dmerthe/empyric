@@ -1,8 +1,9 @@
+import asyncio
 import importlib
 import socket
 import time
 import re
-from threading import Lock
+from asyncio import Lock
 
 import numpy as np
 
@@ -25,82 +26,78 @@ def chaperone(method):
                 f"at address {self.instrument.address}"
             )
 
-        self.lock.acquire()
+        async with self.lock:
 
-        # Catch communication errors and either try to repeat communication
-        # or reset the connection
+            traceback = None
 
-        traceback = None
+            reconnects = 0
 
-        reconnects = 0
+            while reconnects < self.max_reconnects:
+                if not self.connected:
 
-        while reconnects < self.max_reconnects:
-            if not self.connected:
+                    logger.debug(
+                        f'Connecting to {self.instrument.name} '
+                        f'at {self.instrument.address}'
+                    )
+
+                    await asyncio.sleep(self.delay)
+                    self.connect()
+                    reconnects += 1
+
+                attempts = 0
+
+                while attempts < self.max_attempts:
+                    try:
+
+                        logger.debug(
+                            f'Communicating with {self.instrument.name} '
+                            f'at {self.instrument.address}: {method}({args})'
+                        )
+
+                        response = await method(self, *args, **kwargs)
+
+                        if validator and not validator(response):
+                            if hasattr(response, "__len__") and len(response) > 100:
+                                response = str(response[:50]) + "..." + str(response[-50:])
+
+                            raise ValueError(
+                                f"invalid response, {response}, "
+                                f"from {method.__name__} method"
+                            )
+
+                        elif attempts > 0 or reconnects > 0:
+                            print("Resolved")
+
+                        logger.debug(
+                            f'Communication with {self.instrument.name} '
+                            f'at {self.instrument.address} successful '
+                            f'with response: {response}'
+                        )
+
+                        self.lock.release()
+                        return response
+
+                    except Exception as exception:
+                        traceback = exception.__traceback__
+
+                        logger.warning(
+                            f"Encountered '{exception}' while trying "
+                            f"to talk to {self.instrument.name}"
+                        )
+
+                        attempts += 1
+
+                # getting here means attempts have maxed out;
+                # disconnect adapter and potentially reconnect on next iteration
 
                 logger.debug(
-                    f'Connecting to {self.instrument.name} '
+                    f'Disconnecting from {self.instrument.name} '
                     f'at {self.instrument.address}'
                 )
 
-                time.sleep(self.delay)
-                self.connect()
-                reconnects += 1
-
-            attempts = 0
-
-            while attempts < self.max_attempts:
-                try:
-
-                    logger.debug(
-                        f'Communicating with {self.instrument.name} '
-                        f'at {self.instrument.address}: {method}({args})'
-                    )
-
-                    response = await method(self, *args, **kwargs)
-
-                    if validator and not validator(response):
-                        if hasattr(response, "__len__") and len(response) > 100:
-                            response = str(response[:50]) + "..." + str(response[-50:])
-
-                        raise ValueError(
-                            f"invalid response, {response}, "
-                            f"from {method.__name__} method"
-                        )
-
-                    elif attempts > 0 or reconnects > 0:
-                        print("Resolved")
-
-                    logger.debug(
-                        f'Communication with {self.instrument.name} '
-                        f'at {self.instrument.address} successful '
-                        f'with response: {response}'
-                    )
-
-                    self.lock.release()
-                    return response
-
-                except Exception as exception:
-                    traceback = exception.__traceback__
-
-                    logger.warning(
-                        f"Encountered '{exception}' while trying "
-                        f"to talk to {self.instrument.name}"
-                    )
-
-                    attempts += 1
-
-            # getting here means attempts have maxed out;
-            # disconnect adapter and potentially reconnect on next iteration
-
-            logger.debug(
-                f'Disconnecting from {self.instrument.name} '
-                f'at {self.instrument.address}'
-            )
-
-            self.disconnect()
+                self.disconnect()
 
         # Getting here means that both attempts and reconnects have been maxed out
-        self.lock.release()
 
         raise AdapterError(
             f"Unable to communicate with {self.instrument.name}! "
