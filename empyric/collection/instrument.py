@@ -4,7 +4,7 @@ from functools import wraps
 
 from empyric.tools import logger
 from empyric.types import recast, Type, ON, OFF, Toggle
-from empyric.adapters import Adapter
+from empyric.adapters import Adapter, AdapterError
 
 
 def setter(method):
@@ -251,7 +251,7 @@ class Instrument:
 
     meters = tuple()
 
-    raise_connection_error = True
+    ignore_errors = False
 
     def __init__(
         self, address=None, adapter=None, presets=None, postsets=None, **kwargs
@@ -353,10 +353,10 @@ class Instrument:
         try:
             return self.adapter.write(*args, **kwargs)
         except AdapterError as adapter_error:
-            if self.raise_connection_error:
-                raise adapter_error
-            else:
+            if self.ignore_errors:
                 logger.error(str(adapter_error))
+            else:
+                raise adapter_error
 
     def read(self, *args, **kwargs):
         """
@@ -370,10 +370,10 @@ class Instrument:
         try:
             return self.adapter.read(*args, **kwargs)
         except AdapterError as adapter_error:
-            if self.raise_connection_error:
-                raise adapter_error
-            else:
+            if self.ignore_errors:
                 logger.error(str(adapter_error))
+            else:
+                raise adapter_error
 
     def query(self, *args, **kwargs):
         """
@@ -387,10 +387,10 @@ class Instrument:
         try:
             return self.adapter.query(*args, **kwargs)
         except AdapterError as adapter_error:
-            if self.raise_connection_error:
-                raise adapter_error
-            else:
+            if self.ignore_errors:
                 logger.error(str(adapter_error))
+            else:
+                raise adapter_error
 
     def set(self, knob: str, value):
         """
@@ -462,10 +462,10 @@ class Instrument:
                 **self.kwargs,
             )
         except ConnectionError as connection_error:
-            if self.raise_connection_error:
-                raise connection_error
-            else:
+            if self.ignore_errors:
                 logger.error(str(connection_error))
+            else:
+                raise connection_error
 
     def disconnect(self):
         """
@@ -479,18 +479,18 @@ class Instrument:
                 try:
                     self.set(knob, value)
                 except AdapterError as adapter_error:
-                    if self.raise_connection_error:
-                        raise adapter_error
-                    else:
+                    if self.ignore_errors:
                         logger.error(str(adapter_error))
+                    else:
+                        raise adapter_error
 
             try:
                 self.adapter.disconnect()
             except ConnectionError as connection_error:
-                if self.raise_connection_error:
-                    raise connection_error
-                else:
+                if self.ignore_errors:
                     logger.error(str(connection_error))
+                else:
+                    raise connection_error
 
         else:
             raise ConnectionError(f"adapter for {self.name} is not connected!")

@@ -8,9 +8,9 @@ try:
 except ImportError:
     pytest = None
 
+from empyric.tools import logger, log_stream_handler
 from empyric.experiment import Manager
 
-from empyric.tools import logger, log_stream_handler
 
 # List of testable features.
 # Tests are invoked at the command line with `empyric --test <feature>`

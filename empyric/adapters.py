@@ -92,7 +92,7 @@ def chaperone(method):
                     traceback = exception.__traceback__
 
 
-                    logger.warning(
+                    logger.error(
                         f"Encountered '{exception}' while trying "
                         f"to talk to {self.instrument.name}"
                     )
@@ -1416,7 +1416,6 @@ class Modbus(Adapter):
     def disconnect(self):
         while self.backend.connected:
             self.backend.close()
-            time.sleep(self.delay)
 
         self.connected = False
 
