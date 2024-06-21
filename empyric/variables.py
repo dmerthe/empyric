@@ -395,6 +395,8 @@ class Expression(Variable):
                 expression = expression.replace(shorthand, longhand)
 
         try:
+            # TODO: refactor to avoid "need at least one array to concatenate" error
+            # that happens sometimes on shutdown
             all_values = np.concatenate(
                 [np.atleast_1d(val).flatten() for val in variables.values()]
             )
