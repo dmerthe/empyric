@@ -1180,6 +1180,10 @@ class Modbus(Adapter):
     def busy(self, busy):
         self._busy = busy
 
+    @property
+    def connected(self):
+        return self.backend.connected
+
     def connect(self):
         client = importlib.import_module(".client", package="pymodbus")
 
@@ -1192,9 +1196,9 @@ class Modbus(Adapter):
                 self.protocol = "UDP"
 
                 if len(address) == 1:
-                    address.append(
-                        502
-                    )  # standard Modbus UDP port (fascinating that it's the same as TCP)
+                    address.append(502)
+                    # standard Modbus UDP port (fascinating that it's the same as TCP)
+
                 self.backend = client.ModbusUdpClient(
                     host=address[0], port=int(address[1])
                 )
@@ -1251,9 +1255,6 @@ class Modbus(Adapter):
 
         # Utility for decoding data
         self._decoder_cls = payload_module.BinaryPayloadDecoder
-
-        if self.backend.connected:
-            self.connected = True
 
     def _write(self, func_code, address, values, _type="16bit_uint"):
         """
@@ -1414,11 +1415,9 @@ class Modbus(Adapter):
         return self._read(*args, **kwargs)
 
     def disconnect(self):
-        while self.backend.connected:
+        while self.connected:
             self.backend.close()
-            time.sleep(self.delay)
-
-        self.connected = False
+            time.sleep(0.1)
 
 
 class Phidget(Adapter):
