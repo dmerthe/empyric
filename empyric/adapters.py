@@ -7,7 +7,7 @@ from threading import Lock
 
 import numpy as np
 
-from empyric.tools import logger, read_from_socket, write_to_socket
+from empyric.tools import read_from_socket, write_to_socket, logger
 
 
 def chaperone(method):
@@ -28,6 +28,12 @@ def chaperone(method):
 
         while reconnects < self.max_reconnects:
             if not self.connected:
+
+                logger.debug(
+                    f'Connecting to {self.instrument.name} '
+                    f'at {self.instrument.address}'
+                )
+
                 time.sleep(self.delay * reconnects)
 
                 try:
@@ -48,6 +54,12 @@ def chaperone(method):
 
             while attempts < self.max_attempts:
                 try:
+
+                    logger.debug(
+                        f'Communicating with {self.instrument.name} '
+                        f'at {self.instrument.address}: {method}({args})'
+                    )
+
                     response = method(self, *args, **kwargs)
 
                     if validator and not validator(response):
@@ -66,13 +78,21 @@ def chaperone(method):
                         )
 
                     # Successful communication
+
+                    logger.debug(
+                        f'Communication with {self.instrument.name} '
+                        f'at {self.instrument.address} successful '
+                        f'with response: {response}'
+                    )
+
                     self.lock.release()
                     return response
 
                 except Exception as exception:
                     traceback = exception.__traceback__
 
-                    logger.error(
+
+                    logger.warning(
                         f"Encountered '{exception}' while trying "
                         f"to talk to {self.instrument.name}"
                     )
@@ -81,6 +101,12 @@ def chaperone(method):
 
             # getting here means attempts have maxed out;
             # disconnect adapter and potentially reconnect on next iteration
+
+            logger.debug(
+                f'Disconnecting from {self.instrument.name} '
+                f'at {self.instrument.address}'
+            )
+
             self.disconnect()
 
         # Getting here means that both attempts and reconnects have been maxed out
@@ -297,7 +323,7 @@ class Serial(Adapter):
                     "M": pyvisa.constants.Parity(3),  # mark
                     "S": pyvisa.constants.Parity(4),  # space
                 }[self.parity],
-                timeout=self.timeout,
+                timeout=1000 * self.timeout,  # timeout argument is in milliseconds
                 write_termination=self.write_termination,
                 read_termination=self.read_termination,
             )
@@ -443,6 +469,14 @@ class Serial(Adapter):
         again = "y" in input("Try again? [y/n]").lower()
         if again:
             Serial.locate()
+
+    @property
+    def in_waiting(self):
+
+        if self.lib == "pyserial":
+            return self.backend.in_waiting
+        elif self.lib == "pyvisa":
+            return self.backend.bytes_in_buffer
 
 
 class GPIB(Adapter):

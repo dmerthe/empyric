@@ -13,7 +13,6 @@ import time
 import tkinter as tk
 from tkinter.filedialog import askopenfilename
 from typing import Union
-from warnings import warn
 
 import numpy as np
 import pandas as pd
@@ -28,7 +27,7 @@ from empyric import instruments as _instruments
 from empyric import routines as _routines
 from empyric.adapters import AdapterError
 from empyric.tools import convert_time, Clock
-from empyric.types import recast, Boolean, Toggle, Integer, Float, ON
+from empyric.types import recast
 
 logger = logging.getLogger()
 
@@ -146,6 +145,7 @@ class Experiment:
         self.saved = []  # list of saved data entries
 
     def __next__(self):
+
         # Start the clock on first call
         if self.state.name is None:  # first step of the experiment
             self.start()
@@ -154,6 +154,8 @@ class Experiment:
         # Update time
         self.state["Time"] = self.clock.time
         self.state.name = datetime.datetime.now()
+
+        logger.info(f'Iterating experiment (t = {self.state["Time"]} s)')
 
         if self.stopped:
             return self.state
@@ -220,17 +222,22 @@ class Experiment:
             if isinstance(self.variables[name], _variables.Expression):
                 for symbol, dependee in self.variables[name].definitions.items():
                     if hasattr(dependee, "_eval_event"):
-                        # wait for dependee to be evaluated
+
+                        logger.debug(
+                            f'Expression {name} is waiting for {symbol} to be evaluated'
+                        )
+
                         dependee._eval_event.wait()
 
             try:
                 value = self.variables[name].value
+                logger.info(f'{name} evaluated to {value}')
             except AdapterError as adapter_error:
                 value = None
-                warn(str(adapter_error))
+                logger.warning(f'Unable to evaluate {name}: {adapter_error}')
             except ValueError as value_error:
                 value = None
-                warn(str(value_error))
+                logger.warning(f'Unable to evaluate {name}: {value_error}')
 
             self.variables[name]._eval_event.set()
             # unblock threads evaluating dependents
@@ -250,7 +257,7 @@ class Experiment:
                     self.state[name] = None
             else:
                 self.state[name] = value
-        except BaseException as err:
+        except Exception as err:
             self.terminate()
             raise err
 
@@ -261,8 +268,8 @@ class Experiment:
             try:
                 self.routines[name].update(self.state)
             except AdapterError as adapter_error:
-                warn(str(adapter_error))
-        except BaseException as err:
+                logger.warning(f'Unable to update routine {name}: {adapter_error}')
+        except Exception as err:
             self.terminate()
             raise err
 
@@ -282,6 +289,8 @@ class Experiment:
 
         if directory:
             path = os.path.join(directory, path)
+
+        logger.info(f'Saving experiment data to {path}')
 
         if not os.path.exists(path):
             # if this is a new file, write column headers
@@ -308,6 +317,8 @@ class Experiment:
         """
         self.clock.start()
 
+        logger.info('Starting experiment')
+
         self.status_locked = False
         self.status = Experiment.RUNNING
         self.status_locked = True
@@ -319,6 +330,8 @@ class Experiment:
         :return: None
         """
         self.clock.stop()
+
+        logger.info(f'Holding experiment ({reason})')
 
         self.status_locked = False
         self.status = Experiment.HOLDING
@@ -334,6 +347,8 @@ class Experiment:
         """
         self.clock.stop()
 
+        logger.info(f'Stopping experiment ({reason})')
+
         self.status_locked = False
         self.status = Experiment.STOPPED
         if reason:
@@ -347,6 +362,9 @@ class Experiment:
 
         :return: None
         """
+
+        logger.info(f'Terminating experiment ({reason})')
+
         self.stop()
         self.save()
 
@@ -384,10 +402,13 @@ class AsyncExperiment(Experiment):
         self._updating_thread = None
 
     def __next__(self):
+
         # Start the clock and loop on first call
         if self.state.name is None:  # first step of the experiment
             self.start()
             self.status = Experiment.RUNNING
+
+        logger.info(f'Iterating experiment (t = {self.state["Time"]} s)')
 
         # End the experiment, if the duration of the experiment has passed
         if self.clock.time > self.end:
@@ -431,6 +452,7 @@ class AsyncExperiment(Experiment):
                 Experiment._update_routine(self, name)
 
             await update()
+
         elif self.stopped:
             await asyncio.sleep(0.1)
 
@@ -505,6 +527,8 @@ class Manager:
         a YAML file
         """
 
+        logger.info(f"Initializing experiment manager...")
+
         if runcard:
             self.runcard = runcard
         else:
@@ -521,6 +545,9 @@ class Manager:
                 raise ValueError("a valid runcard was not selected!")
 
         if isinstance(self.runcard, str):
+
+            logger.info(f'Parsing runcard from file ({self.runcard})...')
+
             if os.path.exists(self.runcard):
                 dirname = os.path.dirname(self.runcard)
                 if dirname != "":
@@ -533,7 +560,9 @@ class Manager:
             else:
                 raise FileNotFoundError(f'invalid runcard path "{self.runcard}"')
         elif isinstance(self.runcard, dict):
-            pass
+
+            logger.info(f'Parsing runcard from dictionary...')
+
         else:
             raise TypeError(
                 f"runcard given to Manager must be a path to a YAML file "
@@ -547,6 +576,8 @@ class Manager:
         self.instruments = converted_runcard["Instruments"]
         self.alarms = converted_runcard["Alarms"]
         self.plotter = converted_runcard.get("Plotter", None)
+
+        logger.info('Building experiment from runcard...')
 
         self.experiment = converted_runcard["Experiment"]
 
@@ -589,10 +620,12 @@ class Manager:
             yaml.dump(self.runcard, runcard_file)
 
         # Run experiment loop in separate thread
+        logger.info(f'Starting {experiment_name}')
         experiment_thread = threading.Thread(target=self._run)
         experiment_thread.start()
 
         # Set up the GUI for user interaction
+        logger.info('Launching GUI')
         self.gui = _graphics.ExperimentGUI(
             self.experiment,
             alarms=self.alarms,
@@ -606,8 +639,10 @@ class Manager:
         self.gui.run()
 
         experiment_thread.join()
+        logger.info('Experiment complete; cleaning up...')
 
         # Disconnect instruments
+        logger.info('Disconnecting from instruments')
         for instrument in self.instruments.values():
             instrument.disconnect()
 
@@ -615,10 +650,12 @@ class Manager:
 
         # Cancel follow-up if experiment terminated by user
         if self.experiment.terminated and "user" in self.experiment.status:
+            logger.info('Cancelling follow-up experiment')
             self.followup = None
 
         # Execute the follow-up experiment if there is one
         if self.followup:
+            logger.info('Running follow-up experiment')
             if "yaml" in self.followup:
                 self.__init__(self.followup)
                 self.run(directory=directory)
@@ -714,6 +751,9 @@ class RuncardError(BaseException):
 
 
 def validate_runcard(runcard):
+
+    logger.info('Validating runcard')
+
     is_dict = isinstance(runcard, dict)
     is_ordereddict = isinstance(runcard, collections.OrderedDict)
 
@@ -773,6 +813,8 @@ def convert_runcard(runcard):
     * The Plots section is converted into a corresponding ``Plotter`` instance.
     """
 
+    logger.info('Building experiment from runcard')
+
     # if runcard argument is a path to a YAML file, load into a dictionary
     if type(runcard) == str:
         yaml = YAML()
@@ -804,6 +846,9 @@ def convert_runcard(runcard):
 
     instruments = {}
     for name, specs in runcard.get("Instruments", {}).items():
+
+        logger.info(f'Initializing instrument {name}')
+
         specs = specs.copy()
         _type = specs.pop("type")
         address = specs.get("address", None)
@@ -833,6 +878,9 @@ def convert_runcard(runcard):
     # Variables section
     variables = {}
     for name, specs in runcard["Variables"].items():
+
+        logger.info(f'Initializing variable {name}')
+
         if "meter" in specs:
             instrument = converted_runcard["Instruments"][specs["instrument"]]
             gate = specs.get("gate", None)
@@ -861,7 +909,7 @@ def convert_runcard(runcard):
             for variable in definitions.values():
                 if variable not in variables:
                     raise KeyError(
-                        f"variable {variable} specified for alarm {name} "
+                        f"variable {variable} specified for expression {name} "
                         f"is not in Variables!"
                     )
 
@@ -901,6 +949,9 @@ def convert_runcard(runcard):
     routines = {}
     if "Routines" in runcard:
         for name, specs in runcard["Routines"].items():
+
+            logger.info(f'Initializing routine {name}')
+
             specs = specs.copy()  # avoids modifying the runcard
             _type = specs.pop("type")
 
@@ -927,10 +978,16 @@ def convert_runcard(runcard):
             async_experiment = True
 
     if async_experiment:
+
+        logger.info('Initializing synchronous experiment')
+
         converted_runcard["Experiment"] = AsyncExperiment(
             variables, routines=routines, end=runcard["Settings"].get("end", None)
         )
     else:
+
+        logger.info('Initializing asynchronous experiment')
+
         converted_runcard["Experiment"] = Experiment(
             variables, routines=routines, end=runcard["Settings"].get("end", None)
         )
@@ -939,6 +996,9 @@ def convert_runcard(runcard):
     alarms = {}
     if "Alarms" in runcard:
         for name, specs in runcard["Alarms"].items():
+
+            logger.info(f'Initializing alarm {name}')
+
             condition = specs.copy()["condition"]
             definitions = specs.copy().get("definitions", {})
 
@@ -965,6 +1025,9 @@ def convert_runcard(runcard):
 
     # Plots section
     if "Plots" in runcard:
+
+        logger.info('Initializing plotter')
+
         converted_runcard["Plotter"] = _graphics.Plotter(
             converted_runcard["Experiment"].data, settings=runcard["Plots"]
         )

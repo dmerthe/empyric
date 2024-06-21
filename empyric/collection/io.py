@@ -1,9 +1,8 @@
 import re
 
-from empyric.collection.instrument import Instrument, setter, getter, measurer
+from empyric.types import recast, Float
 from empyric.adapters import Socket, Modbus
-from empyric.types import recast, Boolean, Toggle, Integer, Float, Array
-from enum import Enum
+from empyric.collection.instrument import Instrument, setter, getter, measurer
 
 
 class BrainboxesED560(Instrument):

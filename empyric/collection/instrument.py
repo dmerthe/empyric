@@ -1,8 +1,10 @@
 import typing
 from threading import RLock
 from functools import wraps
-from empyric.adapters import *
+
+from empyric.tools import logger
 from empyric.types import recast, Type, ON, OFF, Toggle
+from empyric.adapters import Adapter
 
 
 def setter(method):
@@ -32,24 +34,41 @@ def setter(method):
     else:
         dtype = Type
 
+    logger.debug(f'Knob {" ".join(knob.split("_"))} dtype is {dtype}')
+
     @wraps(method)
     def wrapped_method(*args, **kwargs):
+
         self = args[0]
         value = args[1]
 
         if not self.adapter.connected and knob != "connected":
-            print(f"Instrument {self.name} is disconnected; unable to set {knob}")
+            logger.warning(
+                f"Instrument {self.name} is disconnected; unable to set {knob}"
+            )
             self.__setattr__(knob, None)
             return
 
         self.lock.acquire()
 
         try:
+
+            args = list(args)
+            args[1] = recast(args[1], to=dtype)
+
+            logger.debug(f'Setting {knob} on {self.name} to {value}')
+
             returned_value = method(*args, **kwargs)
 
             # The knob attribute is set to the returned value of the method, or
             # the value argument if the returned value is None
             if returned_value is not None:
+
+                logger.debug(
+                    f'Value returned by set method for {knob} on {self.name} '
+                    f'is {returned_value} instead of applied value {value}'
+                )
+
                 self.__setattr__(knob, recast(returned_value, to=dtype))
             else:
                 self.__setattr__(knob, recast(value, to=dtype))
@@ -73,22 +92,36 @@ def getter(method):
 
     dtype = typing.get_type_hints(method).get("return", Type)
 
+    logger.debug(f'Knob {" ".join(knob.split("_"))} dtype is {dtype}')
+
     @wraps(method)
     def wrapped_method(*args, **kwargs):
         self = args[0]
 
         if not self.adapter.connected and knob != "connected":
             self.__setattr__(knob, None)
-            print(f"Instrument {self.name} is disconnected; unable to get {knob}")
+            logger.warning(
+                f"Instrument {self.name} is disconnected; unable to get {knob}"
+            )
             return
 
         self.lock.acquire()
 
         try:
+
+            logger.debug(f'Getting value of {knob} on {self.name}...')
+
             value = recast(method(*args, **kwargs), to=dtype)
+
+            logger.debug(f'Retrieved value of {knob} on {self.name} is {value}')
         except AttributeError as err:
             # catches most errors caused by the adapter returning None
             if "NoneType" in str(err):
+
+                logger.debug(
+                    f'Unable to retrieve non-null value for {knob} on {self.name}'
+                )
+
                 value = None
             else:
                 raise AttributeError(err)
@@ -116,6 +149,8 @@ def measurer(method):
 
     dtype = typing.get_type_hints(method).get("return", Type)
 
+    logger.debug(f'Meter {" ".join(meter.split("_"))} dtype is {dtype}')
+
     @wraps(method)
     def wrapped_method(*args, **kwargs):
         self = args[0]
@@ -128,10 +163,20 @@ def measurer(method):
         self.lock.acquire()
 
         try:
+
+            logger.debug(f'Measuring value of {meter} on {self.name}...')
+
             value = recast(method(*args, **kwargs), to=dtype)
+
+            logger.debug(f'Measured value of {meter} on {self.name} is {value}')
         except AttributeError as err:
             # catches most errors caused by the adapter returning None
             if "NoneType" in str(err):
+
+                logger.debug(
+                    f'Unable to measure non-null value for {meter} on {self.name}'
+                )
+
                 value = None
             else:
                 raise AttributeError(err)
@@ -255,8 +300,11 @@ class Instrument:
                     message = message + f"{error}\n"
                 raise ConnectionError(message)
 
-        if self.address:
-            self.name = self.name + "@" + str(self.address)
+        if "@" not in self.name:
+            if self.address:
+                self.name = self.name + "@" + str(self.address)
+            else:
+                self.name = self.name + "@" + hex(id(self))
 
         # This lock is used to prevent commands executed in separate threads from
         # interfering with each other. The lock is acquired in the setter, getter
@@ -384,7 +432,9 @@ class Instrument:
         """
 
         try:
-            measure_method = self.__getattribute__("measure_" + meter.replace(" ", "_"))
+            measure_method = self.__getattribute__(
+                "measure_" + meter.replace(" ", "_")
+            )
         except AttributeError:
             raise AttributeError(f"{meter} cannot be measured on {self.name}")
 

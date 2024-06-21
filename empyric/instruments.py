@@ -12,6 +12,7 @@ from empyric.collection.spectrometers import *
 from empyric.collection.virtual import *
 from empyric.collection.generators import *
 from empyric.collection.scopes import *
+from empyric.collection.magnetometers import *
 from empyric.collection.io import *
 
 supported = {
