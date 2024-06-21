@@ -4,7 +4,7 @@ from functools import wraps
 
 from empyric.tools import logger
 from empyric.types import recast, Type, ON, OFF, Toggle
-from empyric.adapters import Adapter
+from empyric.adapters import Adapter, AdapterError
 
 
 def setter(method):
@@ -251,13 +251,7 @@ class Instrument:
 
     meters = tuple()
 
-    # This lock is used to prevent commands executed in separate threads from
-    # interfering with each other. The lock is acquired in the setter, getter
-    # and measurer wrapper functions and then released when the wrapped
-    # operation is complete. Using an RLock allows set, get and measure
-    # methods to call other such methods without blocking, as long as it
-    # happens in the same thread, which is the norm.
-    lock = RLock()
+    ignore_errors = False
 
     def __init__(
         self, address=None, adapter=None, presets=None, postsets=None, **kwargs
@@ -276,7 +270,8 @@ class Instrument:
 
         self.address = address
 
-        self.knobs = ("connected",) + self.knobs
+        if "connected" not in self.knobs:
+            self.knobs = ("connected",) + self.knobs
 
         adapter_connected = False
         if adapter:
@@ -310,6 +305,14 @@ class Instrument:
                 self.name = self.name + "@" + str(self.address)
             else:
                 self.name = self.name + "@" + hex(id(self))
+
+        # This lock is used to prevent commands executed in separate threads from
+        # interfering with each other. The lock is acquired in the setter, getter
+        # and measurer wrapper functions and then released when the wrapped
+        # operation is complete. Using an RLock allows set, get and measure
+        # methods to call other such methods without blocking, as long as it
+        # happens in the same thread, which is the norm.
+        self.lock = RLock()
 
         # Get existing knob settings, if possible
         for knob in self.knobs:
@@ -346,7 +349,14 @@ class Instrument:
         :param kwargs: any arguments for the adapter's write method
         :return: whatever is returned by the adapter's write method
         """
-        return self.adapter.write(*args, **kwargs)
+
+        try:
+            return self.adapter.write(*args, **kwargs)
+        except AdapterError as adapter_error:
+            if self.ignore_errors:
+                logger.error(str(adapter_error))
+            else:
+                raise adapter_error
 
     def read(self, *args, **kwargs):
         """
@@ -357,7 +367,13 @@ class Instrument:
         :return: whatever is returned by the adapter's read method
         """
 
-        return self.adapter.read(*args, **kwargs)
+        try:
+            return self.adapter.read(*args, **kwargs)
+        except AdapterError as adapter_error:
+            if self.ignore_errors:
+                logger.error(str(adapter_error))
+            else:
+                raise adapter_error
 
     def query(self, *args, **kwargs):
         """
@@ -368,7 +384,13 @@ class Instrument:
         :return: whatever is returned by the adapter's query method
         """
 
-        return self.adapter.query(*args, **kwargs)
+        try:
+            return self.adapter.query(*args, **kwargs)
+        except AdapterError as adapter_error:
+            if self.ignore_errors:
+                logger.error(str(adapter_error))
+            else:
+                raise adapter_error
 
     def set(self, knob: str, value):
         """
@@ -428,16 +450,22 @@ class Instrument:
         :return: None
         """
 
-        if self.adapter.connected:
-            self.adapter.disconnect()
+        try:
+            if self.adapter.connected:
+                self.adapter.disconnect()
 
-        self.__init__(
-            address=self.address,
-            adapter=self.adapter if self.address is None else None,
-            presets=self.presets,
-            postsets=self.postsets,
-            **self.kwargs,
-        )
+            self.__init__(
+                address=self.address,
+                adapter=self.adapter if self.address is None else None,
+                presets=self.presets,
+                postsets=self.postsets,
+                **self.kwargs,
+            )
+        except ConnectionError as connection_error:
+            if self.ignore_errors:
+                logger.error(str(connection_error))
+            else:
+                raise connection_error
 
     def disconnect(self):
         """
@@ -448,9 +476,22 @@ class Instrument:
 
         if self.adapter.connected:
             for knob, value in self.postsets.items():
-                self.set(knob, value)
+                try:
+                    self.set(knob, value)
+                except AdapterError as adapter_error:
+                    if self.ignore_errors:
+                        logger.error(str(adapter_error))
+                    else:
+                        raise adapter_error
 
-            self.adapter.disconnect()
+            try:
+                self.adapter.disconnect()
+            except ConnectionError as connection_error:
+                if self.ignore_errors:
+                    logger.error(str(connection_error))
+                else:
+                    raise connection_error
+
         else:
             raise ConnectionError(f"adapter for {self.name} is not connected!")
 

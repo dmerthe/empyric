@@ -444,7 +444,6 @@ class AsyncExperiment(Experiment):
     async def _update_routine(self, name):
         """Update named routine"""
         if self.running:
-
             # Update time
             self.state["Time"] = self.clock.time
             self.state.name = datetime.datetime.now()

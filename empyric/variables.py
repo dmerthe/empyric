@@ -222,7 +222,6 @@ class Knob(Variable):
         """
 
         try:
-
             if self.upper_limit and value > self.upper_limit:
                 self.instrument.set(
                     self.knob, (self.upper_limit - self.offset) / self.multiplier
