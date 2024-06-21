@@ -1416,6 +1416,7 @@ class Modbus(Adapter):
     def disconnect(self):
         while self.backend.connected:
             self.backend.close()
+            time.sleep(self.delay)
 
         self.connected = False
 
