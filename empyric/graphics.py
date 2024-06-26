@@ -1,3 +1,4 @@
+import _tkinter
 import numbers
 import os.path
 import time
@@ -873,8 +874,11 @@ class ExperimentGUI:
         plt.pause(0.1)  # give GUI and plotter enough time to wrap up
         self.root.update()
 
-        self.root.destroy()
-        self.root.quit()
+        try:
+            self.root.destroy()
+            self.root.quit()
+        except _tkinter.TclError:
+            pass
 
     @staticmethod
     def _entry_enter(entry, variable, root):

@@ -890,6 +890,8 @@ class SocketServer(Routine):
         self.clients_queue = queue.Queue(1)
         self.clients_queue.put({})
 
+        self._taskgroup = None
+
         self.running = True
 
         self.state = {}
@@ -906,14 +908,13 @@ class SocketServer(Routine):
         self.server_thread.join()
 
     async def _run_async_server(self):
-        asyncio.create_task(self._accept_connections())
-        asyncio.create_task(self._process_requests())
 
-        async def server_forever():
-            while self.running:
-                await asyncio.sleep(0.1)
+        async with asyncio.TaskGroup() as taskgroup:
 
-        await server_forever()
+            self._taskgroup = taskgroup
+
+            self._taskgroup.create_task(self._accept_connections())
+            self._taskgroup.create_task(self._process_requests())
 
     async def _accept_connections(self):
         if self.running:
@@ -928,14 +929,14 @@ class SocketServer(Routine):
 
                 self.clients_queue.put(clients)
 
-                print(f"Client at {address} has connected")
+                logger.info(f"Client at {address} has connected")
 
             except socket.timeout:
                 pass
 
-            await asyncio.sleep(0.001)
+            await asyncio.sleep(0.1)
 
-            asyncio.create_task(self._accept_connections())
+            self._taskgroup.create_task(self._accept_connections())
 
         else:
             # Close sockets
@@ -1078,9 +1079,9 @@ class SocketServer(Routine):
                     clients[address] = None
 
             self.clients_queue.put(clients)
-            await asyncio.sleep(0.001)
+            await asyncio.sleep(0.01)
 
-            asyncio.create_task(self._process_requests())
+            self._taskgroup.create_task(self._process_requests())
 
     @Routine.enabler
     def update(self, state):
@@ -1176,6 +1177,8 @@ class ModbusServer(Routine):
 
         # Run server
         self.server = None  # assigned in _run_async_server
+        self._taskgroup = None
+
         self.ip_address = kwargs.get("address", get_ip_address())
         self.port = kwargs.get("port", 502)
         # TODO: warn when port is off-limits due to permissions
@@ -1239,7 +1242,7 @@ class ModbusServer(Routine):
     async def _update_registers(self):
         if self.state is None:  # do nothing if state is undefined
             await asyncio.sleep(0.1)
-            asyncio.create_task(self._update_registers())
+            self._taskgroup.create_task(self._update_registers())
             return
 
         # Store readwrite variable values in holding registers (fc = 3)
@@ -1323,22 +1326,24 @@ class ModbusServer(Routine):
 
         await asyncio.sleep(0.1)
 
-        asyncio.create_task(self._update_registers())
+        self._taskgroup.create_task(self._update_registers())
 
     async def _run_async_server(self):
-        asyncio.create_task(self._update_registers())
 
-        server = importlib.import_module(".server", package="pymodbus")
+        with asyncio.TaskGroup() as taskgroup:
 
-        self.server = server.ModbusTcpServer(
-            self.context, identity=self.identity, address=(self.ip_address, self.port)
-        )
+            self._taskgroup = taskgroup
 
-        try:
-            await self.server.serve_forever()
-        except asyncio.exceptions.CancelledError:
-            # Server shutdown cancels the _update_registers task
-            pass
+            self._taskgroup.create_task(self._update_registers())
+
+            server = importlib.import_module(".server", package="pymodbus")
+
+            self.server = server.ModbusTcpServer(
+                self.context, identity=self.identity,
+                address=(self.ip_address, self.port)
+            )
+
+            self._taskgroup.create_task(server.serve_forever())
 
     @Routine.enabler
     def update(self, state):

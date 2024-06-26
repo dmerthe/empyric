@@ -15,11 +15,9 @@ Settings:
 
 Variables:
  Knob a: # This remote variable is settable (knob on server)
-  server: 192.168.86.26::6174  # replace with the ip address and port of your server
- Coordinate Vector:
-  server: 192.168.86.26::6174
+  server: 192.168.86.243::6174  # replace with the ip address and port of your server
  Distance r: # This remote variable is not settable (expression on server)
-  server: 192.168.86.26::6174  # replace with the ip address and port of your server
+  server: 192.168.86.243::6174  # replace with the ip address and port of your server
 
 Plots:
  R Plot:
