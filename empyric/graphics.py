@@ -1,4 +1,3 @@
-import _tkinter
 import numbers
 import os.path
 import time
@@ -877,7 +876,7 @@ class ExperimentGUI:
         try:
             self.root.destroy()
             self.root.quit()
-        except _tkinter.TclError:
+        except tk.TclError:
             pass
 
     @staticmethod
