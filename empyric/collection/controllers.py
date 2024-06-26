@@ -365,11 +365,11 @@ class MKSGSeries(Instrument):
         return self.read(3, 0xA000, count=2, _type="32bit_float")
 
     @setter
-    def set_ramp_time(self, ramp_time: Float):
+    def set_ramp_time(self, ramp_time: Integer):
         self.write(16, 0xA002, int(ramp_time), _type="32bit_uint")
 
     @getter
-    def get_ramp_time(self) -> Float:
+    def get_ramp_time(self) -> Integer:
         return self.read(3, 0xA002, count=2, _type="32bit_uint")
 
     @measurer

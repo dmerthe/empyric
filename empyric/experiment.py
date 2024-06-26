@@ -444,7 +444,6 @@ class AsyncExperiment(Experiment):
     async def _update_routine(self, name):
         """Update named routine"""
         if self.running:
-
             # Update time
             self.state["Time"] = self.clock.time
             self.state.name = datetime.datetime.now()
@@ -910,7 +909,7 @@ def convert_runcard(runcard):
             for variable in definitions.values():
                 if variable not in variables:
                     raise KeyError(
-                        f"variable {variable} specified for alarm {name} "
+                        f"variable {variable} specified for expression {name} "
                         f"is not in Variables!"
                     )
 
