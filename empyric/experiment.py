@@ -660,7 +660,6 @@ class Manager:
             next_save = self.last_save + self.save_interval
             if self.experiment.clock.time >= next_save:
                 save_thread = threading.Thread(target=self.experiment.save)
-                logging.info('Saving experiment data')
                 save_thread.start()
                 self.last_save = self.experiment.clock.time
 
