@@ -1,6 +1,10 @@
-from empyric.adapters import *
-from empyric.types import Toggle, ON, OFF, Float, Integer, String
-from empyric.collection.instrument import *
+import re
+import numpy as np
+
+from empyric.tools import logger
+from empyric.types import Float, Integer, String, Toggle, ON, OFF
+from empyric.adapters import Modbus, ModbusSerial, Socket
+from empyric.collection.instrument import Instrument, setter, getter, measurer
 
 
 class OmegaCN7500(Instrument):
@@ -88,7 +92,9 @@ class OmegaCN7500(Instrument):
     def set_proportional_band(self, P: Integer):
         round_P = round(P)
         if P != round_P:
-            warn(f"Proportional band value {P} will be rounded to {round_P}")
+            logger.warning(
+                f"Proportional band value {P} will be rounded to {round_P}"
+            )
         self.write(6, 0x1009, round_P)
 
     @getter
@@ -99,7 +105,9 @@ class OmegaCN7500(Instrument):
     def set_integration_time(self, Ti: Integer):
         round_Ti = round(Ti)
         if Ti != round_Ti:
-            warn(f"Integration time value {Ti} will be rounded to {round_Ti}")
+            logger.warning(
+                f"Integration time value {Ti} will be rounded to {round_Ti}"
+            )
         self.write(6, 0x100A, round_Ti)
 
     @getter
@@ -110,7 +118,9 @@ class OmegaCN7500(Instrument):
     def set_derivative_time(self, Td: Integer):
         round_Td = round(Td)
         if Td != round_Td:
-            warn(f"Derivative time value {Td} will be rounded to {round_Td}")
+            logger.warning(
+                f"Derivative time value {Td} will be rounded to {round_Td}"
+            )
         self.write(6, 0x100B, round_Td)
 
     @getter
@@ -355,11 +365,11 @@ class MKSGSeries(Instrument):
         return self.read(3, 0xA000, count=2, _type="32bit_float")
 
     @setter
-    def set_ramp_time(self, ramp_time: Float):
+    def set_ramp_time(self, ramp_time: Integer):
         self.write(16, 0xA002, int(ramp_time), _type="32bit_uint")
 
     @getter
-    def get_ramp_time(self) -> Float:
+    def get_ramp_time(self) -> Integer:
         return self.read(3, 0xA002, count=2, _type="32bit_uint")
 
     @measurer

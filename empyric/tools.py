@@ -2,11 +2,13 @@ import time
 import select
 import socket
 import numbers
+import logging
 import numpy as np
 import logging
 
 # Set up logging
 logger = logging.getLogger("empyric")
+
 logger.setLevel(logging.WARNING)
 
 log_stream_handler = logging.StreamHandler()

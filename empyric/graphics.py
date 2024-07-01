@@ -185,8 +185,8 @@ class Plotter:
             if len(ys) > 1:  # a legend will be made
                 plot_kwargs["label"] = ys
 
-            xscale = self.settings[name].get("x scale", "linear")
-            yscale = self.settings[name].get("y scale", "linear")
+            xscale = self.settings[name].get("xscale", "linear")
+            yscale = self.settings[name].get("yscale", "linear")
 
             if x == "Time":
                 ax.xaxis.set_major_locator(self.date_locator)
@@ -290,8 +290,8 @@ class Plotter:
             fig.scalarmappable.set_array(np.linspace(s_min, s_max, 1000))
             fig.cbar = plt.colorbar(fig.scalarmappable, ax=ax)
 
-            xscale = self.settings[name].get("x scale", "linear")
-            yscale = self.settings[name].get("y scale", "linear")
+            xscale = self.settings[name].get("xscale", "linear")
+            yscale = self.settings[name].get("yscale", "linear")
 
             if xscale == "linear":
                 ax.ticklabel_format(axis="x", style="sci", scilimits=(-2, 4))

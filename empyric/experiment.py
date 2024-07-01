@@ -13,7 +13,6 @@ import time
 import tkinter as tk
 from tkinter.filedialog import askopenfilename
 from typing import Union
-from warnings import warn
 
 import numpy as np
 import pandas as pd
@@ -27,6 +26,7 @@ from empyric import graphics as _graphics
 from empyric import instruments as _instruments
 from empyric import routines as _routines
 from empyric.adapters import AdapterError
+
 from empyric.tools import convert_time, Clock, logger
 from empyric.types import recast, Boolean, Toggle, Integer, Float, ON
 
@@ -217,23 +217,26 @@ class Experiment:
     def _update_variable(self, name):
         """Retrieve and store a variable value"""
 
-        logger.info(f'Updating experiment variable {name}')
-
         try:
             if isinstance(self.variables[name], _variables.Expression):
                 for symbol, dependee in self.variables[name].definitions.items():
                     if hasattr(dependee, "_eval_event"):
-                        # wait for dependee to be evaluated
+
+                        logger.debug(
+                            f'Expression {name} is waiting for {symbol} to be evaluated'
+                        )
+
                         dependee._eval_event.wait()
 
             try:
                 value = self.variables[name].value
+                logger.info(f'{name} evaluated to {value}')
             except AdapterError as adapter_error:
                 value = None
-                warn(str(adapter_error))
+                logger.warning(f'Unable to evaluate {name}: {adapter_error}')
             except ValueError as value_error:
                 value = None
-                warn(str(value_error))
+                logger.warning(f'Unable to evaluate {name}: {value_error}')
 
             self.variables[name]._eval_event.set()
             # unblock threads evaluating dependents
@@ -260,14 +263,12 @@ class Experiment:
     def _update_routine(self, name):
         """Update a routine according to the current state"""
 
-        logger.info(f'Updating experiment routine {name}')
-
         try:
             try:
                 self.routines[name].update(self.state)
             except AdapterError as adapter_error:
-                warn(str(adapter_error))
-        except BaseException as err:
+                logger.warning(f'Unable to update routine {name}: {adapter_error}')
+        except Exception as err:
             self.terminate()
             raise err
 
@@ -458,7 +459,6 @@ class AsyncExperiment(Experiment):
     async def _update_routine(self, name):
         """Update named routine"""
         if self.running:
-
             # Update time
             self.state["Time"] = self.clock.time
             self.state.name = datetime.datetime.now()
@@ -902,7 +902,7 @@ def convert_runcard(runcard):
             for variable in definitions.values():
                 if variable not in variables:
                     raise KeyError(
-                        f"variable {variable} specified for alarm {name} "
+                        f"variable {variable} specified for expression {name} "
                         f"is not in Variables!"
                     )
 

@@ -1,7 +1,7 @@
 # Function/signal generators
+from empyric.types import ON, OFF, Toggle, String, Float
 from empyric.adapters import Socket
-from empyric.instruments import Instrument, setter, getter, measurer
-from empyric.types import ON, OFF, Toggle, Integer, String, Float, recast
+from empyric.instruments import Instrument, setter, getter
 
 
 class SiglentSDG1000(Instrument):

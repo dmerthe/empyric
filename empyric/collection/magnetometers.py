@@ -1,10 +1,7 @@
-import asyncio
 import time
-
 import numpy as np
 
 from empyric.types import Float
-
 from empyric.adapters import Serial
 from empyric.instruments import Instrument, measurer
 

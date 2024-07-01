@@ -85,6 +85,8 @@ map:
       style: {type: str},
       xlabel: {type:  str},
       ylabel: {type: str},
+      xscale: {type: str},  # linear or log x-axis scale
+      yscale: {type: str},  # linear or log y-axis scale
       configure: {map: {
         regex;(.+): {type: any}  # keyword args passed to matplotlib
       }}

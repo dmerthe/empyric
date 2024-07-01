@@ -1,9 +1,9 @@
 # A human is just another instrument
 import time
 
-from empyric.adapters import *
-from empyric.collection.instrument import *
 from empyric.types import String, Float
+from empyric.adapters import Adapter
+from empyric.collection.instrument import Instrument, setter, measurer
 
 
 class ConsoleUser(Instrument):
