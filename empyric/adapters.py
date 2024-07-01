@@ -170,7 +170,7 @@ class Adapter:
         if hasattr(self, "connected") and self.connected:
             try:
                 self.disconnect()
-            except BaseException as err:
+            except Exception as err:
                 print(f"Error while disconnecting {self.instrument.name}:", err)
                 pass
 
