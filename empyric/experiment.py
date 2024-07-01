@@ -399,9 +399,6 @@ class AsyncExperiment(Experiment):
         super().__init__(variables, routines, end)
         self.loop = None
 
-        self.variable_updating_tasks = {}
-        self.routine_updating_tasks = {}
-
     def __next__(self):
 
         # Start the clock and loop on first call
@@ -430,12 +427,10 @@ class AsyncExperiment(Experiment):
         self.loop = asyncio.get_running_loop()
 
         for name in self.variables:
-            task = self.loop.create_task(self._update_variable(name))
-            self.variable_updating_tasks[name] = task
+            self.loop.create_task(self._update_variable(name))
 
         for name in self.routines:
-            task = self.loop.create_task(self._update_routine(name))
-            self.routine_updating_tasks[name] = task
+            self.loop.create_task(self._update_routine(name))
 
     async def _update_variable(self, name):
         """Update named variable"""
@@ -453,8 +448,7 @@ class AsyncExperiment(Experiment):
             await asyncio.sleep(0)
 
         if not self.terminated:
-            task = self.loop.create_task(self._update_variable(name))
-            self.variable_updating_tasks[name] = task
+            self.loop.create_task(self._update_variable(name))
 
     async def _update_routine(self, name):
         """Update named routine"""
@@ -472,8 +466,7 @@ class AsyncExperiment(Experiment):
             await asyncio.sleep(0)
 
         if not self.terminated:
-            task = self.loop.create_task(self._update_routine(name))
-            self.routine_updating_tasks[name] = task
+            self.loop.create_task(self._update_routine(name))
 
 
 class Alarm:
@@ -667,6 +660,7 @@ class Manager:
             next_save = self.last_save + self.save_interval
             if self.experiment.clock.time >= next_save:
                 save_thread = threading.Thread(target=self.experiment.save)
+                logging.info('Saving experiment data')
                 save_thread.start()
                 self.last_save = self.experiment.clock.time
 

@@ -1182,7 +1182,17 @@ class Modbus(Adapter):
 
     @property
     def connected(self):
-        return self.backend.connected
+        try:
+            return self.backend.connected
+        except AttributeError:
+            return False
+
+    @connected.setter
+    def connected(self, connected):
+        if connected and not self.connected:
+            self.connect()
+        elif not connected and self.connected:
+            self.disconnect()
 
     def connect(self):
         client = importlib.import_module(".client", package="pymodbus")
