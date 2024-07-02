@@ -1,3 +1,4 @@
+import asyncio
 import typing
 from threading import RLock
 from functools import wraps
@@ -298,7 +299,7 @@ class Instrument:
                 )
                 for error in errors:
                     message = message + f"{error}\n"
-                raise ConnectionError(message)
+                raise AdapterError(message)
 
         if "@" not in self.name:
             if self.address:

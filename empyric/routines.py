@@ -905,9 +905,18 @@ class SocketServer(Routine):
     def terminate(self):
         # Kill client handling threads
         self.running = False
+
+        logger.info(
+            f'Shutting down SocketServer at {self.ip_address}::{self.port}'
+        )
+
         self.server_thread.join()
 
     async def _run_async_server(self):
+
+        logger.info(
+            f'Starting SocketServer at {self.ip_address}::{self.port}'
+        )
 
         async with asyncio.TaskGroup() as taskgroup:
 
@@ -1179,9 +1188,12 @@ class ModbusServer(Routine):
         self.server = None  # assigned in _run_async_server
         self._taskgroup = None
 
+        self.running = True
+
         self.ip_address = kwargs.get("address", get_ip_address())
         self.port = kwargs.get("port", 502)
         # TODO: warn when port is off-limits due to permissions
+
         self.server_thread = threading.Thread(
             target=asyncio.run, args=(self._run_async_server(),)
         )
@@ -1240,9 +1252,13 @@ class ModbusServer(Routine):
         return wrapped_method
 
     async def _update_registers(self):
+
         if self.state is None:  # do nothing if state is undefined
             await asyncio.sleep(0.1)
-            self._taskgroup.create_task(self._update_registers())
+
+            if self.running:
+                self._taskgroup.create_task(self._update_registers())
+
             return
 
         # Store readwrite variable values in holding registers (fc = 3)
@@ -1326,30 +1342,43 @@ class ModbusServer(Routine):
 
         await asyncio.sleep(0.1)
 
-        self._taskgroup.create_task(self._update_registers())
+        if self.running:
+            self._taskgroup.create_task(self._update_registers())
 
     async def _run_async_server(self):
 
-        with asyncio.TaskGroup() as taskgroup:
+        logger.info(
+            f'Starting ModbusServer at {self.ip_address}::{self.port}'
+        )
+
+        async with asyncio.TaskGroup() as taskgroup:
 
             self._taskgroup = taskgroup
 
-            self._taskgroup.create_task(self._update_registers())
-
             server = importlib.import_module(".server", package="pymodbus")
 
+            # ModbusTcPServer needs to be instantiated inside a running async loop
             self.server = server.ModbusTcpServer(
                 self.context, identity=self.identity,
                 address=(self.ip_address, self.port)
             )
 
-            self._taskgroup.create_task(server.serve_forever())
+            self._taskgroup.create_task(self.server.serve_forever())
+
+            self._taskgroup.create_task(self._update_registers())
 
     @Routine.enabler
     def update(self, state):
         self.state = state
 
     def terminate(self):
+
+        logger.info(
+            f'Shutting down ModbusServer at {self.ip_address}::{self.port}'
+        )
+
+        self.running = False
+
         asyncio.run(self.server.shutdown())
 
 

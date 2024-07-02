@@ -26,10 +26,8 @@ from empyric import graphics as _graphics
 from empyric import instruments as _instruments
 from empyric import routines as _routines
 from empyric.adapters import AdapterError
-from empyric.tools import convert_time, Clock
+from empyric.tools import convert_time, Clock, logger
 from empyric.types import recast
-
-logger = logging.getLogger()
 
 
 class Experiment:
@@ -430,6 +428,7 @@ class AsyncExperiment(Experiment):
             async def update():
                 Experiment._update_variable(self, name)
 
+            logger.debug(f'Updating variable {name}')
             await update()
 
             # Update time
@@ -451,6 +450,7 @@ class AsyncExperiment(Experiment):
             async def update():
                 Experiment._update_routine(self, name)
 
+            logger.debug(f'Updating routine {name}')
             await update()
 
         elif self.stopped:

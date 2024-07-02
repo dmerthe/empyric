@@ -1171,6 +1171,11 @@ class Modbus(Adapter):
     def connected(self):
         return self.backend.connected
 
+    @connected.setter
+    def connected(self, connected):
+        # Do nothing; setter needed for Adapter constructor
+        pass
+
     def connect(self):
         client = importlib.import_module(".client", package="pymodbus")
 
