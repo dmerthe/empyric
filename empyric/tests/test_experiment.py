@@ -18,45 +18,45 @@ def test_experiment(tmp_path):
 
     echo = Echo()
 
-    echo_in = Knob(instrument=echo, knob='input')
-    echo_out = Meter(instrument=echo, meter='output')
+    echo_in = Knob(instrument=echo, knob="input")
+    echo_out = Meter(instrument=echo, meter="output")
 
-    variables = {'Echo In': echo_in, 'Echo Out': echo_out}
+    variables = {"Echo In": echo_in, "Echo Out": echo_out}
 
     step_up_routine = Timecourse(
-        knobs={'Echo In': echo_in},
+        knobs={"Echo In": echo_in},
         times=[0.1, 0.2, 0.3, 0.4, 0.5],
-        values=[10, 20, 30, 40, 50]
+        values=[10, 20, 30, 40, 50],
     )
 
-    routines = {'Step Up Timecourse': step_up_routine, }
+    routines = {
+        "Step Up Timecourse": step_up_routine,
+    }
 
-    experiment = Experiment(variables, routines=routines, end='with routines')
+    experiment = Experiment(variables, routines=routines, end="with routines")
 
     for _ in experiment:
         time.sleep(0.001)
 
     # check that experiment ended on time
-    assert round(experiment.state['Time'], 1) == 0.5
+    assert round(experiment.state["Time"], 1) == 0.5
     assert round(echo_out.value) == 50
 
     # check data saving
     experiment.save()
 
-    assert any(glob.glob('data_*.csv'))
+    assert any(glob.glob("data_*.csv"))
 
 
 # Use Henon runcard example for testing
 tests_dir = os.path.dirname(__file__)
 
 test_runcard_path = os.path.abspath(
-    os.path.join(
-        tests_dir, 'henon_runcard_example.yaml'
-    )
+    os.path.join(tests_dir, "henon_runcard_example.yaml")
 )
 
-def test_runcard_validation():
 
+def test_runcard_validation():
     try:
         assert os.path.isfile(test_runcard_path)
     except AssertionError:
@@ -70,11 +70,10 @@ def test_runcard_validation():
 
 
 def test_manager(tmp_path):
-
     manager = Manager(test_runcard_path)
 
     # Check that the runcard loaded
-    assert manager.description['name'] == 'Henon Map Experiment'
+    assert manager.description["name"] == "Henon Map Experiment"
 
     # Run a short version of the Henon Map example experiment
     manager.experiment.end = 10

@@ -2,8 +2,26 @@ import time
 import select
 import socket
 import numbers
+import logging
 import numpy as np
+import logging
 
+# Set up logging
+logger = logging.getLogger("empyric")
+
+logger.setLevel(logging.WARNING)
+
+log_stream_handler = logging.StreamHandler()
+log_stream_handler.setLevel(logging.WARNING)
+log_stream_handler.setFormatter(
+    logging.Formatter(
+        '%(asctime)s: %(message)s'
+    )
+)
+
+logger.addHandler(log_stream_handler)
+
+# TODO add logging.FileHandler to drop log into file in working directory
 
 # Tools for time-keeping
 def convert_time(time_value):
@@ -27,21 +45,28 @@ def convert_time(time_value):
     elif isinstance(time_value, str):
         # times can be specified in the runcard with units, such as minutes,
         # hours or days, e.g. "6 hours"
-        time_parts = time_value.split(' ')
+        time_parts = time_value.split(" ")
 
         if len(time_parts) == 1:
             return float(time_parts[0])
         elif len(time_parts) == 2:
             value, unit = time_parts
             value = float(value)
-            return value * {
-                'seconds': 1, 'second': 1,
-                'minutes': 60, 'minute': 60,
-                'hours': 3600, 'hour': 3600,
-                'days': 86400, 'day': 86400
-            }[unit]
+            return (
+                value
+                * {
+                    "seconds": 1,
+                    "second": 1,
+                    "minutes": 60,
+                    "minute": 60,
+                    "hours": 3600,
+                    "hour": 3600,
+                    "days": 86400,
+                    "day": 86400,
+                }[unit]
+            )
         else:
-            raise ValueError(f'Unrecognized time format for {time_value}!')
+            raise ValueError(f"Unrecognized time format for {time_value}!")
 
 
 class Clock:
@@ -50,7 +75,6 @@ class Clock:
     """
 
     def __init__(self):
-
         self.start_time = self.stop_time = time.time()  # initially stopped
         self.stoppage = 0  # total time during which the clock has been stopped
 
@@ -99,7 +123,7 @@ def find_nearest(allowed, value, overestimate=False, underestimate=False):
 
 
 # Tools for handling sockets
-def get_ip_address(remote_ip='8.8.8.8', remote_port=80):
+def get_ip_address(remote_ip="8.8.8.8", remote_port=80):
     """
     Connect to a server to resolve IP address; defaults to Google's DNS server
     if `remote_ip` and `remote_port` are not specified
@@ -129,13 +153,14 @@ def autobind_socket(_socket):
             pass
 
     if not bound:
-        raise IOError(f'unable to bind socket at {ip_address} to any port!')
+        raise IOError(f"unable to bind socket at {ip_address} to any port!")
 
     return ip_address, port
 
 
-def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1,
-                     decode=True, chunk_size=4096):
+def read_from_socket(
+    _socket, nbytes=None, termination="\r", timeout=None, decode=True, chunk_size=4096
+):
     """
     Read from a socket, with some effort taken to get the whole message.
 
@@ -148,22 +173,16 @@ def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1,
                         otherwise.
     :param timeout: (numbers.Number) communication timeout in seconds;
                     used for both the `select.select` and `_socket.recv`
-                    functions.
+                    functions; defaults to existing timeout of _socket.
     :param decode: (bool) whether to return decoded string (True) or raw bytes
                    message (False); defaults to True.
     :param chunk_size: (int) number of bytes to read on each call to recv method.
     """
 
-    # Block until the socket is readable or until timeout
-    if timeout:
-        readable = _socket in select.select([_socket], [], [], timeout)[0]
-    else:
-        readable = _socket in select.select([_socket], [], [])[0]
-
-    if not readable:
-        return None
-
     default_timeout = _socket.gettimeout()  # save default timeout
+
+    if timeout is None:
+        timeout = default_timeout
 
     _socket.settimeout(timeout)
 
@@ -172,7 +191,7 @@ def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1,
 
         if termination is None:
             raise ValueError(
-                'nbytes must be a non-negative integer if termination is None'
+                "nbytes must be a non-negative integer if termination is None"
             )
 
     null_responses = 0
@@ -182,7 +201,6 @@ def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1,
         termination = termination.encode()
 
     def is_terminated(message):
-
         if isinstance(termination, bytes):
             return termination in message
         elif callable(termination):
@@ -190,13 +208,26 @@ def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1,
         else:
             return False
 
-    message = b''
+    message = b""
 
     while len(message) < nbytes and null_responses < max_nulls:
-
-        part = b''
+        part = b""
 
         remaining_bytes = nbytes - len(message)
+
+        # Check for readability and errors
+        if timeout:
+            rlist, _, xlist = select.select([_socket], [], [_socket], timeout)
+        else:
+            rlist, _, xlist = select.select([_socket], [], [_socket])
+
+        readable = _socket in rlist
+        in_error = _socket in xlist
+
+        if not readable:
+            break
+        elif in_error:
+            raise ConnectionError("an exception has been raised for the socket")
 
         try:
 
@@ -206,13 +237,15 @@ def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1,
                 part = _socket.recv(chunk_size)
 
         except ConnectionResetError as err:
-            print(f'Warning: {err}')
+            print(
+                f"Warning: while reading from socket at {_socket.getsockname()}, "
+                f"got error: {err}"
+            )
             break
         except socket.timeout:
             pass
 
         if len(part) > 0:
-
             message = message + part
 
             if is_terminated(message):
@@ -229,27 +262,28 @@ def read_from_socket(_socket, nbytes=None, termination='\r', timeout=1,
         return message
 
 
-def write_to_socket(_socket, message, termination='\r', timeout=1):
+def write_to_socket(_socket, message, termination="\r", timeout=None):
     """
     Write a message to a socket, with care taken to get the whole message
     transmitted.
 
     :param _socket: (socket.Socket) socket to write to.
-    :param message: (str) message to send.
+    :param message: (str/bytes) message to send.
     :param termination: (str/bytes) expected message termination character(s).
-    :param timeout: (numbers.Number) timeout for `select.select` call.
+    :param timeout: (numbers.Number) timeout for `select.select` call; defaults to
+    existing timeout of _socket.
     """
 
-    # Block until the socket is writeable or until timeout
-    if timeout:
-        writeable = _socket in select.select([], [_socket], [], timeout)[1]
+    if timeout is None:
+        timeout = _socket.gettimeout()
+
+    if isinstance(message, str):
+        bytes_message = (message + termination).encode()
+    elif isinstance(message, bytes):
+        bytes_message = message + termination.encode()
     else:
-        writeable = _socket in select.select([], [_socket], [])[1]
+        raise ValueError("message argument must be either string or bytes")
 
-    if not writeable:
-        return 0
-
-    bytes_message = (message + termination).encode()
     msg_len = len(bytes_message)
 
     failures = 0
@@ -258,6 +292,14 @@ def write_to_socket(_socket, message, termination='\r', timeout=1):
     total_sent = 0
 
     while total_sent < msg_len and failures < max_failures:
+        # Block until the socket is writeable or until timeout
+        if timeout:
+            writeable = _socket in select.select([], [_socket], [], timeout)[1]
+        else:
+            writeable = _socket in select.select([], [_socket], [])[1]
+
+        if not writeable:
+            break
 
         sent = _socket.send(bytes_message[total_sent:])
 
@@ -267,8 +309,8 @@ def write_to_socket(_socket, message, termination='\r', timeout=1):
         total_sent = total_sent + sent
 
     if total_sent < msg_len:
-        raise IOError(
-            f'Socket connection to {_socket.getsockname()} is broken!'
+        raise ConnectionError(
+            f"Socket connection to {_socket.getsockname()} is broken!"
         )
 
     return total_sent

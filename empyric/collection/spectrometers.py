@@ -1,9 +1,10 @@
 import time
-import numpy as np
 import struct
-from empyric.adapters import *
-from empyric.collection.instrument import *
+import numpy as np
+
 from empyric.types import Float, Integer, Array
+from empyric.adapters import Serial
+from empyric.collection.instrument import Instrument, setter, getter, measurer
 
 
 class SRSRGA(Instrument):
@@ -12,42 +13,28 @@ class SRSRGA(Instrument):
     from 100 to 300 amu
     """
 
-    name = 'SRS-RGA'
+    name = "SRS-RGA"
 
     supported_adapters = (
-        (
-            Serial,
-            {'baud_rate': 28800, 'timeout': 300, 'read_termination': '\n\r'}
-        ),
+        (Serial, {"baud_rate": 28800, "timeout": 300, "read_termination": "\n\r"}),
     )
 
     knobs = (
-        'initialize'
-        'filament current',
-        'mass',
-        'masses',
-        'mass range',
-        'ppsf',  # partial pressure sensitivity factor
-        'tpsf'  # total pressure sensitivity factor
+        "initialize" "filament current",
+        "mass",
+        "masses",
+        "mass range",
+        "ppsf",  # partial pressure sensitivity factor
+        "tpsf",  # total pressure sensitivity factor
     )
 
-    presets = {
-        'filament current': 1
-    }
+    presets = {"filament current": 1}
 
-    postsets = {
-        'filament current': 0
-    }
+    postsets = {"filament current": 0}
 
-    meters = {
-        'filament current',
-        'single',
-        'spectrum',
-        'total pressure'
-    }
+    meters = {"filament current", "single", "spectrum", "total pressure"}
 
     def __init__(self, *args, **kwargs):
-
         Instrument.__init__(self, *args, **kwargs)
 
     @setter
@@ -55,40 +42,39 @@ class SRSRGA(Instrument):
         # current is in mA
 
         if current >= 3.5:
-            self.query('FL3.5')
+            self.query("FL3.5")
         elif current <= 0:
-            self.query('FL0')
+            self.query("FL0")
         else:
-            self.query('FL'+f'{np.round(current, 2)}')
+            self.query("FL" + f"{np.round(current, 2)}")
 
         time.sleep(5)
 
     @measurer
     def measure_filament_current(self) -> Float:
-        return float(self.query('FL?'))
+        return float(self.query("FL?"))
 
     @setter
     def set_mass(self, mass: Integer):
-        self.write('ML' + f'{mass}')
+        self.write("ML" + f"{mass}")
 
     @getter
     def get_mass(self) -> Integer:
-        return int(self.query('ML?'))
+        return int(self.query("ML?"))
 
     @setter
     def set_masses(self, masses: Array):
         initial_mass, final_mass = masses[0], masses[-1]
 
-        self.write('MI' + f'{int(initial_mass)}')
-        self.write('MF' + f'{int(final_mass)}')
+        self.write("MI" + f"{int(initial_mass)}")
+        self.write("MF" + f"{int(final_mass)}")
 
         self.mass_range = [initial_mass, final_mass]
 
     @getter
     def get_masses(self) -> Array:
-
-        initial_mass = int(self.query('MI?'))
-        final_mass = int(self.query('MF?'))
+        initial_mass = int(self.query("MI?"))
+        final_mass = int(self.query("MF?"))
 
         self.mass_range = [initial_mass, final_mass]
 
@@ -96,57 +82,54 @@ class SRSRGA(Instrument):
 
     @setter
     def set_mass_range(self, mass_range: Array):
-
         initial_mass, final_mass = mass_range
 
-        self.write('MI' + f'{int(initial_mass)}')
-        self.write('MF' + f'{int(final_mass)}')
+        self.write("MI" + f"{int(initial_mass)}")
+        self.write("MF" + f"{int(final_mass)}")
 
         self.masses = np.arange(initial_mass, final_mass + 1)
 
     @getter
     def get_mass_range(self) -> Array:
-        initial_mass = int(self.query('MI?'))
-        final_mass = int(self.query('MF?'))
+        initial_mass = int(self.query("MI?"))
+        final_mass = int(self.query("MF?"))
 
         self.masses = np.arange(initial_mass, final_mass + 1)
 
         return [initial_mass, final_mass]
 
-
     @setter
     def set_ppsf(self, value: Float):
-        self.write(f'SP{value}')
+        self.write(f"SP{value}")
 
     @getter
     def get_ppsf(self) -> Float:
-        return float(self.query('SP?'))
+        return float(self.query("SP?"))
 
     @setter
     def set_tpsf(self, value: Float):
-        self.write(f'ST{value}')
+        self.write(f"ST{value}")
 
     @getter
     def get_tpsf(self) -> Float:
-        return float(self.query('ST?'))
+        return float(self.query("ST?"))
 
     @measurer
     def measure_spectrum(self) -> Array:
-        response = self.query(
-            'HS1', num_bytes=4*(len(self.masses)+1), decode=False
+        response = self.query("HS1", num_bytes=4 * (len(self.masses) + 1), decode=False)
+        return (
+            np.array(struct.unpack("<" + "i" * (len(self.masses) + 1), response))[:-1]
+            * 1.0e-16
+            / self.ppsf
+            * 1000
         )
-        return np.array(
-            struct.unpack('<'+'i'*(len(self.masses)+1), response)
-        )[:-1] * 1.0e-16 / self.ppsf * 1000
 
     @measurer
     def measure_single(self) -> Float:
-        response = self.query(
-            'MR'+f'{int(self.mass)}', num_bytes=4, decode=False
-        )
-        return struct.unpack('<i', response)[0] * 1.0e-16 / self.ppsf * 1000
+        response = self.query("MR" + f"{int(self.mass)}", num_bytes=4, decode=False)
+        return struct.unpack("<i", response)[0] * 1.0e-16 / self.ppsf * 1000
 
     @measurer
     def measure_total_pressure(self) -> Float:
-        response = self.query('TP?', num_bytes=4, decode=False)
-        return struct.unpack('<i', response)[0] * 1.0e-16 / self.tpsf * 1000
+        response = self.query("TP?", num_bytes=4, decode=False)
+        return struct.unpack("<i", response)[0] * 1.0e-16 / self.tpsf * 1000

@@ -12,7 +12,11 @@ from empyric.collection.spectrometers import *
 from empyric.collection.virtual import *
 from empyric.collection.generators import *
 from empyric.collection.scopes import *
+from empyric.collection.magnetometers import *
 from empyric.collection.io import *
 
-supported = {key: value for key, value in vars().items()
-             if type(value) is type and issubclass(value, Instrument)}
+supported = {
+    key: value
+    for key, value in vars().items()
+    if type(value) is type and issubclass(value, Instrument)
+}

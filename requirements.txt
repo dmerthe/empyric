@@ -1,7 +1,9 @@
+# Required for ReadTheDocs
+dill
 numpy
-scipy
-matplotlib>=3.6
 pandas
-pykwalify
-ruamel.yaml
 pytest
+matplotlib
+pykwalify
+bayesian-optimization
+sphinx-rtd-theme

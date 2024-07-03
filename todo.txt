@@ -1,7 +1,7 @@
-- Subclass Variable; need to break out into Knob, Meter, Expression and Remote (or something like that)
-- Generalize knob and meter parts of routine section of convert_runcard method
-- Support SQL (as alternative to CSV data files)
+- Support SQL (as alternative to CSV data files) (Jake and Patrick working on it)
 - Testing and development for more robust alarm behavior
-- Change PrologixGPIBUSB backend to PyVISA
-- Add output limits to BrainboxesED560
-- Add remote-sense/4-wire to Keithley2400
+- Add remote-sense/4-wire to Keithley2400 [Probably done - Mark to remove]
+- Add Infinicon QCM sensor (Mark will decide)?
+- Add Phidget temperature and humidity sensor (Mark working on it)
+- Flagging for invalid data/experiment
+- Change PrologixGPIBUSB backend to PyVISA (low priority/unnecessary)

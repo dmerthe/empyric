@@ -1,7 +1,10 @@
 import typing
+from threading import RLock
 from functools import wraps
-from empyric.adapters import *
-from empyric.types import recast, Type
+
+from empyric.tools import logger
+from empyric.types import recast, Type, ON, OFF, Toggle
+from empyric.adapters import Adapter, AdapterError
 
 
 def setter(method):
@@ -16,19 +19,22 @@ def setter(method):
     attribute.
 
     :param method: (callable) method to be wrapped
+
     :return: wrapped method
     """
 
-    knob = '_'.join(method.__name__.split('_')[1:])
+    knob = "_".join(method.__name__.split("_")[1:])
 
     type_hints = typing.get_type_hints(method)
-    type_hints.pop('self', None)
-    type_hints.pop('return', None)
+    type_hints.pop("self", None)
+    type_hints.pop("return", None)
 
     if type_hints:
         dtype = type_hints[list(type_hints)[0]]
     else:
         dtype = Type
+
+    logger.debug(f'Knob {" ".join(knob.split("_"))} dtype is {dtype}')
 
     @wraps(method)
     def wrapped_method(*args, **kwargs):
@@ -36,14 +42,38 @@ def setter(method):
         self = args[0]
         value = args[1]
 
-        returned_value = method(*args, **kwargs)
+        if not self.adapter.connected and knob != "connected":
+            logger.warning(
+                f"Instrument {self.name} is disconnected; unable to set {knob}"
+            )
+            self.__setattr__(knob, None)
+            return
 
-        # The knob attribute is set to the returned value of the method, or
-        # the value argument if the returned value is None
-        if returned_value is not None:
-            self.__setattr__(knob, recast(returned_value, to=dtype))
-        else:
-            self.__setattr__(knob, recast(value, to=dtype))
+        self.lock.acquire()
+
+        try:
+
+            args = list(args)
+            args[1] = recast(args[1], to=dtype)
+
+            logger.debug(f'Setting {knob} on {self.name} to {value}')
+
+            returned_value = method(*args, **kwargs)
+
+            # The knob attribute is set to the returned value of the method, or
+            # the value argument if the returned value is None
+            if returned_value is not None:
+
+                logger.debug(
+                    f'Value returned by set method for {knob} on {self.name} '
+                    f'is {returned_value} instead of applied value {value}'
+                )
+
+                self.__setattr__(knob, recast(returned_value, to=dtype))
+            else:
+                self.__setattr__(knob, recast(value, to=dtype))
+        finally:
+            self.lock.release()
 
     return wrapped_method
 
@@ -54,17 +84,50 @@ def getter(method):
     retrieved knob values.
 
     :param method: (callable) method to be wrapped
+
     :return: wrapped method
     """
 
-    knob = '_'.join(method.__name__.split('_')[1:])
+    knob = "_".join(method.__name__.split("_")[1:])
 
-    dtype = typing.get_type_hints(method).get('return', Type)
+    dtype = typing.get_type_hints(method).get("return", Type)
+
+    logger.debug(f'Knob {" ".join(knob.split("_"))} dtype is {dtype}')
 
     @wraps(method)
     def wrapped_method(*args, **kwargs):
         self = args[0]
-        value = recast(method(*args, **kwargs), to=dtype)
+
+        if not self.adapter.connected and knob != "connected":
+            self.__setattr__(knob, None)
+            logger.warning(
+                f"Instrument {self.name} is disconnected; unable to get {knob}"
+            )
+            return
+
+        self.lock.acquire()
+
+        try:
+
+            logger.debug(f'Getting value of {knob} on {self.name}...')
+
+            value = recast(method(*args, **kwargs), to=dtype)
+
+            logger.debug(f'Retrieved value of {knob} on {self.name} is {value}')
+        except AttributeError as err:
+            # catches most errors caused by the adapter returning None
+            if "NoneType" in str(err):
+
+                logger.debug(
+                    f'Unable to retrieve non-null value for {knob} on {self.name}'
+                )
+
+                value = None
+            else:
+                raise AttributeError(err)
+        finally:
+            self.lock.release()
+
         self.__setattr__(knob, value)
 
         return value
@@ -78,17 +141,48 @@ def measurer(method):
     measured value.
 
     :param method: (callable) method to be wrapped
+
     :return: wrapped method
     """
 
-    meter = '_'.join(method.__name__.split('_')[1:])
+    meter = "_".join(method.__name__.split("_")[1:])
 
-    dtype = typing.get_type_hints(method).get('return', Type)
+    dtype = typing.get_type_hints(method).get("return", Type)
+
+    logger.debug(f'Meter {" ".join(meter.split("_"))} dtype is {dtype}')
 
     @wraps(method)
     def wrapped_method(*args, **kwargs):
         self = args[0]
-        value = recast(method(*args, **kwargs), to=dtype)
+
+        if not self.adapter.connected:
+            self.__setattr__(meter, None)
+            print(f"Instrument {self.name} is disconnected; unable to measure {meter}")
+            return
+
+        self.lock.acquire()
+
+        try:
+
+            logger.debug(f'Measuring value of {meter} on {self.name}...')
+
+            value = recast(method(*args, **kwargs), to=dtype)
+
+            logger.debug(f'Measured value of {meter} on {self.name} is {value}')
+        except AttributeError as err:
+            # catches most errors caused by the adapter returning None
+            if "NoneType" in str(err):
+
+                logger.debug(
+                    f'Unable to measure non-null value for {meter} on {self.name}'
+                )
+
+                value = None
+            else:
+                raise AttributeError(err)
+        finally:
+            self.lock.release()
+
         self.__setattr__(meter, value)
 
         return value
@@ -109,7 +203,9 @@ class Instrument:
       contains an adapter class that the instrument can be used with and a
       dictionary of adapter settings.
     * ``knobs``: tuple of the names of all knobs that can be set on the
-      instrument.
+      instrument. Every instrument has a ``connected`` (``Toggle``) knob, for
+      convenience, whose set method calls the instruments ``connect`` or ``disconnect``
+      methods, if set to ``ON`` or ``OFF`` respectively.
     * ``presets``: dictionary of knob settings to apply when the instrument is
       instantiated.
       The keys are the names of the knobs and the values are the knob values.
@@ -118,13 +214,34 @@ class Instrument:
     * ``meters``: tuple of the names of all meters that can be measured on
       this instrument.
 
+    Every knob of an instrument has an associated ``set_[knob]`` method, which sends
+    commands to the physical instrument that change the value of the knob to the given
+    value. Each ``set_[knob]`` method should be wrapped by the ``setter`` function
+    defined above.
+
+    Every knob may also have an associated ``get_[knob]`` method, which queries the
+    value of the knob from the physical instrument, and should be wrapped by the
+    ``getter`` function defined above.
+
+    Every meter of an instrument has an associated ``measure_[meter]`` method, which
+    queries the value of a quantity measured by the physical instrument, and should be
+    wrapped by the ``measurer`` function defined above.
+
+    For convenience, the ``setter``, ``getter`` and ```measurer`` functions augment the
+    corresponding methods primarily by enforcing typing on the method arguments and the
+    returned values, and storing the last known values of knobs and meters in the
+    corresponding attribute of the Instrument instance. For example, if a meter called
+    ""temperature" is retrieved via the corresponding ``measure_temperature`` method of
+    the instrument ``thermometer``, the wrapping ``measurer`` function will assign that
+    temperature value to ``thermometer.temperature``. If the expected data type is a
+    floating point number, the ``measurer`` function additionally converts whatever the
+    bare ``measure_temperature`` method returns to a 64-bit floating point value.
+
     """
 
-    name = 'Instrument'
+    name = "Instrument"
 
-    supported_adapters = (
-        (Adapter, {}),
-    )
+    supported_adapters = ((Adapter, {}),)
 
     knobs = tuple()
 
@@ -134,9 +251,10 @@ class Instrument:
 
     meters = tuple()
 
+    ignore_errors = False
+
     def __init__(
-            self, address=None, adapter=None, presets=None, postsets=None,
-            **kwargs
+        self, address=None, adapter=None, presets=None, postsets=None, **kwargs
     ):
         """
 
@@ -150,10 +268,10 @@ class Instrument:
         :param kwargs: (dict) any keyword args for the adapter
         """
 
-        if address:
-            self.address = address
-        else:
-            self.address = None
+        self.address = address
+
+        if "connected" not in self.knobs:
+            self.knobs = ("connected",) + self.knobs
 
         adapter_connected = False
         if adapter:
@@ -167,28 +285,43 @@ class Instrument:
                     adapter_connected = True
                     break
                 except BaseException as error:
-                    msg = f'in trying {_adapter.__name__} adapter, ' \
-                          f'got {type(error).__name__}: {error}'
+                    msg = (
+                        f"in trying {_adapter.__name__} adapter, "
+                        f"got {type(error).__name__}: {error}"
+                    )
                     errors.append(msg)
 
             if not adapter_connected:
-                message = f'unable to connect an adapter to ' \
-                          f'instrument {self.name} at address {address}:\n'
+                message = (
+                    f"unable to connect an adapter to "
+                    f"instrument {self.name} at address {address}:\n"
+                )
                 for error in errors:
                     message = message + f"{error}\n"
                 raise ConnectionError(message)
 
-        if self.address:
-            self.name = self.name + '@' + str(self.address)
+        if "@" not in self.name:
+            if self.address:
+                self.name = self.name + "@" + str(self.address)
+            else:
+                self.name = self.name + "@" + hex(id(self))
+
+        # This lock is used to prevent commands executed in separate threads from
+        # interfering with each other. The lock is acquired in the setter, getter
+        # and measurer wrapper functions and then released when the wrapped
+        # operation is complete. Using an RLock allows set, get and measure
+        # methods to call other such methods without blocking, as long as it
+        # happens in the same thread, which is the norm.
+        self.lock = RLock()
 
         # Get existing knob settings, if possible
         for knob in self.knobs:
-            if hasattr(self, 'get_' + knob.replace(' ', '_')):
+            if hasattr(self, "get_" + knob.replace(" ", "_")):
                 # retrieves the knob value from the instrument
-                self.__getattribute__('get_' + knob.replace(' ', '_'))()
+                self.__getattribute__("get_" + knob.replace(" ", "_"))()
             else:
                 # knob value is unknown until it is set
-                self.__setattr__(knob.replace(' ', '_'), None)
+                self.__setattr__(knob.replace(" ", "_"), None)
 
         # Apply presets
         if presets:
@@ -200,6 +333,8 @@ class Instrument:
         # Get postsets
         if postsets:
             self.postsets = {**self.postsets, **postsets}
+
+        self.kwargs = kwargs
 
     def __repr__(self):
         return self.name
@@ -214,7 +349,14 @@ class Instrument:
         :param kwargs: any arguments for the adapter's write method
         :return: whatever is returned by the adapter's write method
         """
-        return self.adapter.write(*args, **kwargs)
+
+        try:
+            return self.adapter.write(*args, **kwargs)
+        except AdapterError as adapter_error:
+            if self.ignore_errors:
+                logger.error(str(adapter_error))
+            else:
+                raise adapter_error
 
     def read(self, *args, **kwargs):
         """
@@ -225,7 +367,13 @@ class Instrument:
         :return: whatever is returned by the adapter's read method
         """
 
-        return self.adapter.read(*args, **kwargs)
+        try:
+            return self.adapter.read(*args, **kwargs)
+        except AdapterError as adapter_error:
+            if self.ignore_errors:
+                logger.error(str(adapter_error))
+            else:
+                raise adapter_error
 
     def query(self, *args, **kwargs):
         """
@@ -236,7 +384,13 @@ class Instrument:
         :return: whatever is returned by the adapter's query method
         """
 
-        return self.adapter.query(*args, **kwargs)
+        try:
+            return self.adapter.query(*args, **kwargs)
+        except AdapterError as adapter_error:
+            if self.ignore_errors:
+                logger.error(str(adapter_error))
+            else:
+                raise adapter_error
 
     def set(self, knob: str, value):
         """
@@ -248,7 +402,7 @@ class Instrument:
         """
 
         try:
-            set_method = getattr(self, 'set_' + knob.replace(' ', '_'))
+            set_method = getattr(self, "set_" + knob.replace(" ", "_"))
         except AttributeError as err:
             raise AttributeError(f"{knob} cannot be set on {self.name}\n{err}")
 
@@ -264,10 +418,10 @@ class Instrument:
 
         """
 
-        if hasattr(self, 'get_' + knob.replace(' ', '_')):
-            return getattr(self, 'get_' + knob.replace(' ', '_'))()
+        if hasattr(self, "get_" + knob.replace(" ", "_")):
+            return getattr(self, "get_" + knob.replace(" ", "_"))()
         else:
-            return getattr(self, knob.replace(' ', '_'))
+            return getattr(self, knob.replace(" ", "_"))
 
     def measure(self, meter: str):
         """
@@ -279,13 +433,39 @@ class Instrument:
 
         try:
             measure_method = self.__getattribute__(
-                'measure_' + meter.replace(' ', '_'))
+                "measure_" + meter.replace(" ", "_")
+            )
         except AttributeError:
             raise AttributeError(f"{meter} cannot be measured on {self.name}")
 
         measurement = measure_method()
 
         return measurement
+
+    def connect(self):
+        """
+        (Re)Connect to the instrument. This is useful when communications are lost and
+        a new connection is required.
+
+        :return: None
+        """
+
+        try:
+            if self.adapter.connected:
+                self.adapter.disconnect()
+
+            self.__init__(
+                address=self.address,
+                adapter=self.adapter if self.address is None else None,
+                presets=self.presets,
+                postsets=self.postsets,
+                **self.kwargs,
+            )
+        except ConnectionError as connection_error:
+            if self.ignore_errors:
+                logger.error(str(connection_error))
+            else:
+                raise connection_error
 
     def disconnect(self):
         """
@@ -296,8 +476,41 @@ class Instrument:
 
         if self.adapter.connected:
             for knob, value in self.postsets.items():
-                self.set(knob, value)
+                try:
+                    self.set(knob, value)
+                except AdapterError as adapter_error:
+                    if self.ignore_errors:
+                        logger.error(str(adapter_error))
+                    else:
+                        raise adapter_error
 
-            self.adapter.disconnect()
+            try:
+                self.adapter.disconnect()
+            except ConnectionError as connection_error:
+                if self.ignore_errors:
+                    logger.error(str(connection_error))
+                else:
+                    raise connection_error
+
         else:
             raise ConnectionError(f"adapter for {self.name} is not connected!")
+
+    @setter
+    def set_connected(self, state: Toggle):
+        if state == ON:
+            if self.adapter.connected:
+                print(f"{self.name} is already connected")
+            else:
+                self.connect()
+        elif state == OFF:
+            if self.adapter.connected:
+                self.disconnect()
+            else:
+                print(f"{self.name} is already disconnected")
+
+    @getter
+    def get_connected(self) -> Toggle:
+        if self.adapter.connected:
+            return ON
+        else:
+            return OFF

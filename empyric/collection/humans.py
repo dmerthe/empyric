@@ -1,9 +1,9 @@
 # A human is just another instrument
 import time
 
-from empyric.adapters import *
-from empyric.collection.instrument import *
 from empyric.types import String, Float
+from empyric.adapters import Adapter
+from empyric.collection.instrument import Instrument, setter, measurer
 
 
 class ConsoleUser(Instrument):
@@ -14,26 +14,23 @@ class ConsoleUser(Instrument):
     between input requests
     """
 
-    name = 'ConsoleUser'
+    name = "ConsoleUser"
 
-    supported_adapters = (
-        (Adapter, {}),
-    )
+    supported_adapters = ((Adapter, {}),)
 
-    knobs = ('prompt',  # message or query to send to user
-             'cooldown')  # minimum time before sending repeat messages
+    knobs = (
+        "prompt",  # message or query to send to user
+        "cooldown",
+    )  # minimum time before sending repeat messages
 
-    presets = {
-        'cooldown': 0,
-        'prompt': '?'
-    }
+    presets = {"cooldown": 0, "prompt": "?"}
 
-    meters = ('response',)
+    meters = ("response",)
 
-    response = ''
+    response = ""
 
-    last_prompt = ''
-    last_sent = float('-inf')
+    last_prompt = ""
+    last_sent = float("-inf")
 
     @setter
     def set_prompt(self, prompt: String):
@@ -45,11 +42,9 @@ class ConsoleUser(Instrument):
 
     @measurer
     def measure_response(self) -> String:
-
-        new_prompt = (self.prompt != self.last_prompt)
+        new_prompt = self.prompt != self.last_prompt
 
         if time.time() >= self.last_sent + self.cooldown or new_prompt:
-
             response = input(self.prompt)
 
             self.last_prompt = self.prompt

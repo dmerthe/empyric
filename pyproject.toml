@@ -1,0 +1,38 @@
+[tool.poetry]
+name = "empyric"
+version = "0.2.7"
+description = "A package for experiment automation"
+authors = ["Daniel Merthe <dmerthe@gmail.com>"]
+readme = "README.md"
+repository = "https://github.com/dmerthe/empyric"
+packages = [
+    { include = "empyric"},
+]
+classifiers = [
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+numpy = "1.24.3"
+scipy = "^1.10"
+matplotlib = "3.6.2"
+pandas = "1.5.3"
+pykwalify = "1.8.0"
+bayesian-optimization = "1.4.3"
+dill = "0.3.7"
+"ruamel.yaml" = "0.17.21"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "*"
+pylint = "*"
+black = "*"
+
+[tool.poetry.scripts]
+empyric = "empyric:execute"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
