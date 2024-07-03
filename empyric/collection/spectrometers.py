@@ -1,9 +1,10 @@
 import time
-import numpy as np
 import struct
-from empyric.adapters import *
-from empyric.collection.instrument import *
+import numpy as np
+
 from empyric.types import Float, Integer, Array
+from empyric.adapters import Serial
+from empyric.collection.instrument import Instrument, setter, getter, measurer
 
 
 class SRSRGA(Instrument):

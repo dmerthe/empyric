@@ -4,15 +4,17 @@ import numbers
 import socket
 import time
 import typing
-import warnings
 from functools import wraps
+
+import dill
 import numpy as np  # used in Expression's eval call
 
 from empyric.collection.instrument import Instrument
 
-from empyric import instruments, types
-from empyric.tools import write_to_socket, read_from_socket
-from empyric.types import *
+from empyric.instruments import ModbusClient
+from empyric.tools import write_to_socket, read_from_socket, logger
+from empyric.types import supported as supported_types, recast
+from empyric.types import Type, Boolean, Float, Integer, Toggle, ON, Array
 
 
 class Variable:
@@ -73,7 +75,7 @@ class Variable:
 
                 recasted_value = recast(value)
 
-                for _type in types.supported.values():
+                for _type in supported_types.values():
                     if isinstance(recasted_value, _type):
                         self._type = _type
                         setter(self, recasted_value)
@@ -101,7 +103,7 @@ class Variable:
 
                 recasted_value = recast(value)
 
-                for _type in types.supported.values():
+                for _type in supported_types.values():
                     if isinstance(recasted_value, _type):
                         self._type = _type
                         self._value = recasted_value
@@ -165,10 +167,10 @@ class Knob(Variable):
         self,
         instrument: Instrument,
         knob: str,
-        lower_limit: Union[float, int] = None,
-        upper_limit: Union[float, int] = None,
-        multiplier: Union[float, int] = 1,
-        offset: Union[float, int] = 0,
+        lower_limit: typing.Union[float, int] = None,
+        upper_limit: typing.Union[float, int] = None,
+        multiplier: typing.Union[float, int] = 1,
+        offset: typing.Union[float, int] = 0,
     ):
         self.instrument = instrument
         self.knob = knob  # name of the knob on instrument
@@ -185,6 +187,14 @@ class Knob(Variable):
         if type_hints:
             arg_hints = list(type_hints)
             self._type = type_hints[arg_hints[0]]
+        else:
+
+            logger.warning(
+                f"Unable to determine data dtype of {knob} on {instrument}; "
+                "assuming 64-bit float"
+            )
+
+            self._type = np.float64
 
         self._value = None
 
@@ -212,7 +222,6 @@ class Knob(Variable):
         """
 
         try:
-
             if self.upper_limit and value > self.upper_limit:
                 self.instrument.set(
                     self.knob, (self.upper_limit - self.offset) / self.multiplier
@@ -223,21 +232,25 @@ class Knob(Variable):
                 )
             else:
                 if isinstance(value, numbers.Number):
-                    self.instrument.set(self.knob, (value - self.offset) / self.multiplier)
+                    self.instrument.set(
+                        self.knob, (value - self.offset) / self.multiplier
+                    )
                 else:
                     self.instrument.set(self.knob, value)
 
         except TypeError as type_error:
 
-            warnings.warn(str(type_error))
+            logger.warning(str(type_error))
 
-        self._value = self.instrument.__getattribute__(self.knob.replace(" ", "_"))
+        self._value = self.instrument.__getattribute__(
+            self.knob.replace(" ", "_")
+        )
 
         if isinstance(self._value, numbers.Number):
             self._value = self.multiplier * self._value + self.offset
 
     def __str__(self):
-        return f"Knob({self._value})"
+        return f"Knob({self.value})"
 
 
 class Meter(Variable):
@@ -271,8 +284,8 @@ class Meter(Variable):
         instrument: Instrument,
         meter: str,
         gate=None,
-        multiplier: Union[float, int] = 1,
-        offset: Union[float, int] = 0,
+        multiplier: typing.Union[float, int] = 1,
+        offset: typing.Union[float, int] = 0,
     ):
         self.instrument = instrument
         self.meter = meter
@@ -286,7 +299,7 @@ class Meter(Variable):
 
         self._type = typing.get_type_hints(
             getattr(instrument, "measure_" + meter.replace(" ", "_"))
-        ).get("return", None)
+        ).get("return", np.float64)
 
         self._value = None
 
@@ -310,7 +323,7 @@ class Meter(Variable):
         return self._value
 
     def __str__(self):
-        return f"Meter({self._value})"
+        return f"Meter({self.value})"
 
 
 class Expression(Variable):
@@ -367,6 +380,8 @@ class Expression(Variable):
 
         expression = self.expression
 
+        logger.debug(f'Evaluating expression {expression}')
+
         # carets represent exponents
         expression = expression.replace("^", "**")
 
@@ -392,27 +407,47 @@ class Expression(Variable):
             if valid_values:
                 self._value = eval(expression, {**globals(), **variables}, locals())
             else:
+
+                log_str = (
+                    f"Dependencies for {expression} contain invalid values: "
+                )
+
+                for name, value in variables.items():
+
+                    if value is None:
+                        log_str += f"\n{name} = None"
+                    elif np.isnan(value):
+                        log_str += f"\n{name} = NaN"
+                    elif np.isinf(value):
+                        log_str += f"\n{name} = +/-Inf"
+
+                logger.debug(log_str)
+
                 self._value = None
 
         except Exception as err:
-            warnings.warn(
+
+            logger.warning(
                 f"Unable to evaluate expression {self.expression} due to error: {err}"
             )
+
             self._value = None
 
         self.last_evaluation = time.time()
 
+        logger.debug(f'Expression {self.expression} evaluated to {self._value}')
+
         return self._value
 
     def __str__(self):
-        if len(str(self.value)) < 100:
-            return f"Expression({self.expression} = {self.value})"
-        elif isinstance(self.value, Array):
-            return f"Expression({self.expression} = Array{np.shape(self.value)}"
+        if len(str(self.value)) < 100:  # first call to value evaluates expression
+            return f"Expression({self.expression} = {self._value})"
+        elif isinstance(self._value, Array):
+            return f"Expression({self.expression} = Array{np.shape(self._value)}"
         else:
             return (
                 f"Expression({self.expression} = "
-                f"{str(self.value)[:50]} ... {str(self.value)[-50:]}"
+                f"{str(self._value)[:50]} ... {str(self._value)[-50:]}"
             )
 
     # Utility functions for Fourier analysis
@@ -563,13 +598,13 @@ class Remote(Variable):
     def __init__(
         self,
         server: str,
-        alias: Union[int, str],
+        alias: typing.Union[int, str],
         protocol: str = None,
         settable: bool = False,  # needed for modbus protocol
-        lower_limit: Union[float, int] = None,
-        upper_limit: Union[float, int] = None,
-        multiplier: Union[float, int] = 1,
-        offset: Union[float, int] = 0,
+        lower_limit: typing.Union[float, int] = None,
+        upper_limit: typing.Union[float, int] = None,
+        multiplier: typing.Union[float, int] = 1,
+        offset: typing.Union[float, int] = 0,
     ):
         self.server = server
         self.alias = alias
@@ -580,7 +615,7 @@ class Remote(Variable):
         self.offset = offset
 
         if protocol == "modbus":
-            self._client = instruments.ModbusClient(server)
+            self._client = ModbusClient(server)
             self._settable = settable
 
         else:
@@ -607,12 +642,30 @@ class Remote(Variable):
             fcode = 3 if self.settable else 4
 
             if self._type is not None:
+
+                logger.debug(
+                    f'Retrieving value of type {self._type} '
+                    f'starting at register {self.alias}'
+                    f'from Modbus server at {self.server}...'
+                )
+
                 self._value = self._client.read(
                     fcode, self.alias, count=4, _type=self.type_map[self._type]
                 )
 
+                logger.debug(
+                    f'Value retrieved starting at register {self.alias} '
+                    f'from Modbus server at {self.server} is {self._value}'
+                )
+
         else:
             write_to_socket(self._socket, f"{self.alias} ?")
+
+            logger.debug(
+                f'Retrieving value of type {self._type} '
+                f'with alias {self.alias}'
+                f'from socket server at {self.server}...'
+            )
 
             response = read_from_socket(self._socket, timeout=60, decode=False)
 
@@ -633,10 +686,15 @@ class Remote(Variable):
                             to=self._type if self._type is not None else Type,
                         )
 
-            except BaseException as error:
-                print(
-                    f"Warning: unable to retrieve value of {self.alias} "
-                    f'from server at {self.server}; got error "{error}"'
+                logger.debug(
+                    f'Value with alias {self.alias} retrieved '
+                    f'from socket server at {self.server} is {self._value}'
+                )
+
+            except Exception as error:
+                logger.warning(
+                    f"Unable to retrieve value of {self.alias} "
+                    f'from {self.protocol} server at {self.server}: "{error}"'
                 )
 
         if isinstance(self._value, numbers.Number):
@@ -657,21 +715,33 @@ class Remote(Variable):
             value = (value - self.offset) / self.multiplier
 
         if self.protocol == "modbus":
+
+            logger.info(
+                f'Writing value {value} to variable starting at register {self.alias}'
+                f'on Modbus server at {self.server}...'
+            )
+
             self._client.write(16, self.alias, value, _type=self.type_map[self._type])
 
         else:
+
+            logger.debug(
+                f'Writing value {value} to variable with alias {self.alias} '
+                f'on socket server at {self.server}...'
+            )
+
             write_to_socket(self._socket, f"{self.alias} {value}")
 
             check = read_from_socket(self._socket, timeout=60)
 
             if check == "" or check is None:
-                print(
-                    f"Warning: received no response from server at "
+                logger.warning(
+                    f"Received no response from server at "
                     f"{self.server} while trying to set {self.alias}"
                 )
             elif "Error" in check:
-                print(
-                    f'Warning: got response "{check}" while trying to set '
+                logger.warning(
+                    f'Got response "{check}" while trying to set '
                     f"{self.alias} on server at {self.server}"
                 )
             else:
@@ -679,21 +749,21 @@ class Remote(Variable):
                     check_value = recast(check.split(f"{self.alias} ")[1])
 
                     if value != check_value:
-                        print(
-                            f"Warning: attempted to set {self.alias} on "
+                        logger.warning(
+                            f"Attempted to set {self.alias} on "
                             f"server at {self.server} to {value} but "
                             f"checked value is {check_value}"
                         )
 
                 except ValueError as val_err:
-                    print(
-                        f"Warning: unable to check value while setting "
+                    logger.warning(
+                        f"Unable to check value while setting "
                         f"{self.alias} on server at {self.server}; "
                         f'got error "{val_err}"'
                     )
                 except IndexError as ind_err:
-                    print(
-                        f"Warning: unable to check value while setting "
+                    logger.warning(
+                        f"Unable to check value while setting "
                         f"{self.alias} on server at {self.server}; "
                         f'got error "{ind_err}"'
                     )
@@ -709,6 +779,12 @@ class Remote(Variable):
         """Get the data type of the remote variable"""
 
         if self.protocol == "modbus":
+
+            logger.debug(
+                f'Getting data type of variable starting at register {self.alias}'
+                f'on Modbus server at {self.server}...'
+            )
+
             fcode = 3 if self.settable else 4
 
             type_int = self._client.read(fcode, self.alias + 4, _type="16bit_int")
@@ -720,17 +796,33 @@ class Remote(Variable):
                 3: Float,
             }.get(type_int, None)
 
+            logger.debug(
+                f'Data type of variable starting at register {self.alias} '
+                f'on Modbus server at {self.server} is {self._type}'
+            )
+
         else:
+
+            logger.debug(
+                f'Getting data type of variable with alias {self.alias}'
+                f'on socket server at {self.server}...'
+            )
+
             write_to_socket(self._socket, f"{self.alias} type?")
 
             response = read_from_socket(self._socket, timeout=60)
 
             if response is not None:
-                for _type in types.supported:
+                for _type in supported_types:
                     if str(_type) in response.split(self.alias)[-1]:
-                        self._type = types.supported.get(_type, None)
+                        self._type = supported_types.get(_type, None)
             else:
                 self._type = None
+
+            logger.debug(
+                f'Data type of variable with alias {self.alias} '
+                f'on socket server at {self.server} is {self._type}'
+            )
 
     def get_settable(self):
         """Get settability of remote variable"""
@@ -740,7 +832,7 @@ class Remote(Variable):
         self._settable = response == f"{self.alias} settable"
 
     def __str__(self):
-        return f"Remote({self.alias}@{self.server} = {self._value})"
+        return f"Remote({self.alias}@{self.server} = {self.value})"
 
 
 class Parameter(Variable):
@@ -754,13 +846,19 @@ class Parameter(Variable):
 
     _settable = True  #:
 
-    def __init__(self, parameter: Union[float, int, bool, str, Toggle, np.ndarray]):
-        self.parameter = parameter
-        self._value = parameter
+    def __init__(
+            self, parameter: typing.Union[float, int, bool, str, Toggle, np.ndarray]
+    ):
+        self._value = recast(parameter)
 
-        for name, _type in types.supported.items():
-            if isinstance(parameter, _type):
+        for name, _type in supported_types.items():
+            if isinstance(self._value, _type) and _type is not Type:
+
                 self._type = _type
+
+        logger.debug(
+            f'Setting data type of parameter {self._value} to {self._type}'
+        )
 
     @property
     @Variable.getter_type_validator
@@ -772,11 +870,10 @@ class Parameter(Variable):
     @Variable.setter_type_validator
     def value(self, value):
         """Set the parameter value"""
-        self.parameter = value
         self._value = value
 
     def __str__(self):
-        return f"Parameter({self._value})"
+        return f"Parameter({self.value})"
 
 
 supported = {

@@ -1,7 +1,8 @@
 import importlib
+
+from empyric.types import recast, String, Float
 from empyric.adapters import Phidget, Serial
 from empyric.instruments import Instrument, setter, measurer
-from empyric.types import recast, String, Float
 
 
 class Phidget1101(Instrument):

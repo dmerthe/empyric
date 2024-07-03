@@ -8,7 +8,7 @@ import tkinter as tk
 import pandas as pd
 import pandas.errors
 
-from empyric.types import recast, Type, Float
+from empyric.types import recast, Type, Float, String
 from empyric.routines import SocketServer, ModbusServer
 
 if sys.platform == "darwin":
@@ -122,7 +122,7 @@ class Plotter:
             elif style == "averaged":
                 self._plot_basic(name, averaged=True)
             elif style == "errorbars":
-                self._plot_basis(name, errorbars=True)
+                self._plot_basic(name, errorbars=True)
             elif style == "parametric":
                 self._plot_parametric(name)
             else:
@@ -185,8 +185,8 @@ class Plotter:
             if len(ys) > 1:  # a legend will be made
                 plot_kwargs["label"] = ys
 
-            xscale = self.settings[name].get("x scale", "linear")
-            yscale = self.settings[name].get("y scale", "linear")
+            xscale = self.settings[name].get("xscale", "linear")
+            yscale = self.settings[name].get("yscale", "linear")
 
             if x == "Time":
                 ax.xaxis.set_major_locator(self.date_locator)
@@ -290,8 +290,8 @@ class Plotter:
             fig.scalarmappable.set_array(np.linspace(s_min, s_max, 1000))
             fig.cbar = plt.colorbar(fig.scalarmappable, ax=ax)
 
-            xscale = self.settings[name].get("x scale", "linear")
-            yscale = self.settings[name].get("y scale", "linear")
+            xscale = self.settings[name].get("xscale", "linear")
+            yscale = self.settings[name].get("yscale", "linear")
 
             if xscale == "linear":
                 ax.ticklabel_format(axis="x", style="sci", scilimits=(-2, 4))
@@ -384,13 +384,13 @@ class Plotter:
             columns = []
             max_len = 0  # maximum length of columns
             for i, element in enumerate(row):
-                if type(element) == str and os.path.isfile(element):
+                if isinstance(element, str) and os.path.isfile(element):
                     file_read = False
                     attempt = 0
                     while not file_read:
                         try:
                             expanded_element = list(
-                                pd.read_csv(element)[labels[i]].values
+                                pd.read_csv(element, dtype=np.float64)[labels[i]].values
                             )
 
                             file_read = True
@@ -406,15 +406,15 @@ class Plotter:
                     expanded_element = list(element)
 
                     expanded_element = [
-                        value if value is not None else np.nan
+                        np.float64(value) if value is not None else np.nan
                         for value in expanded_element
                     ]
 
                 else:
-                    if element is None:
+                    if not isinstance(element, numbers.Number):
                         element = np.nan
 
-                    expanded_element = [element]
+                    expanded_element = [np.float64(element)]
 
                 max_len = np.max([len(expanded_element), max_len])
 
@@ -469,9 +469,11 @@ class ExperimentGUI:
                     if instrument.name not in self.instruments:
                         self.instruments[instrument.name] = instrument
 
-        if ("plots" in kwargs and kwargs["plotter"] is not None) or (
-            "plotter" in kwargs and kwargs["plotter"] is not None
+        if (
+            kwargs.get("plots", None) is not None
+            or kwargs.get("plotter", None) is not None
         ):
+
             if "plotter" in kwargs:
                 self.plotter = kwargs["plotter"]
             else:

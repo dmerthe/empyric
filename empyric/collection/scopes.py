@@ -1,8 +1,12 @@
+import re
 import struct
+import time
+import numpy as np
+
 from empyric.tools import find_nearest
-from empyric.adapters import *
-from empyric.collection.instrument import *
-from empyric.types import Float, Array, Integer, String, Boolean
+from empyric.types import Float, Array, Integer, String
+from empyric.adapters import USB, Socket
+from empyric.collection.instrument import Instrument, setter, getter, measurer
 
 
 class TekTDSScope(Instrument):

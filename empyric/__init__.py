@@ -1,22 +1,16 @@
 import argparse
 import logging
-import datetime
+
+from empyric.tools import logger
 
 try:
     import pytest
 except ImportError:
     pytest = None
 
+from empyric.tools import logger, log_stream_handler
 from empyric.experiment import Manager
 
-# Set up logging
-logger = logging.getLogger("empyric")
-
-log_stream_handler = logging.StreamHandler()
-log_stream_handler.setLevel(logging.WARNING)
-logger.addHandler(log_stream_handler)
-
-# TODO add logging.FileHandler to drop log into file in working directory
 
 # List of testable features.
 # Tests are invoked at the command line with `empyric --test <feature>`
@@ -56,14 +50,25 @@ def execute():
         "-t", "--test", nargs="*", help="test empyric installation and components"
     )
 
-    parser.add_argument("-b", "--debug", nargs="*", help="run empyric in debug mode")
+    parser.add_argument(
+        "-b", "--debug", nargs="*", help="set logger level to DEBUG"
+    )
+
+    parser.add_argument(
+        "-i", "--info", nargs="*", help="set logger level to INFO"
+    )
 
     args = parser.parse_args()
 
     if args.debug is not None:
         logger.setLevel(logging.DEBUG)
         log_stream_handler.setLevel(logging.DEBUG)
-        logger.debug("Running in debug mode...")
+        logger.info("Logger level set to DEBUG")
+
+    if args.info is not None:
+        logger.setLevel(logging.INFO)
+        log_stream_handler.setLevel(logging.INFO)
+        logger.info("Logger level set to INFO")
 
     if args.test is not None:
         if pytest is None:

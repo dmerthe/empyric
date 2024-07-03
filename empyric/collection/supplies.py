@@ -1,9 +1,12 @@
+import re
 import struct
-import warnings
+import socket
+import numpy as np
 
-from empyric.adapters import *
-from empyric.collection.instrument import *
+from empyric.tools import logger
 from empyric.types import Toggle, Float, ON, OFF
+from empyric.adapters import Serial, Socket, GPIB
+from empyric.collection.instrument import Instrument, setter, getter, measurer
 
 
 class Keithley2260B(Instrument):
@@ -900,11 +903,11 @@ class GlassmanOQ500(Instrument):
 
     def _construct_set_message(
         self,
-        normalized_voltage_cmd: (float | None) = None,
-        normalized_current_cmd: (float | None) = None,
-        hv_on_cmd: (bool | None) = None,
-        hv_off_cmd: (bool | None) = None,
-        reset_cmd: (bool | None) = None,
+        normalized_voltage_cmd: float | None = None,
+        normalized_current_cmd: float | None = None,
+        hv_on_cmd: bool | None = None,
+        hv_off_cmd: bool | None = None,
+        reset_cmd: bool | None = None,
     ) -> str:
         # process inputs
         if normalized_voltage_cmd is not None:
@@ -950,7 +953,7 @@ class GlassmanOQ500(Instrument):
                 # Check for fault state on byte 11, bit 1
                 ps_fault = message[10:13][1:2]
                 if ps_fault == "1":
-                    warnings.warn(
+                    logger.warning(
                         "GlassmanOQ500: Power supply is in a fault state. "
                         "A PS reset command must be sent "
                         "(via 'reset' knob) to clear fault "
@@ -974,7 +977,7 @@ class GlassmanOQ500(Instrument):
         if message == "A":
             return True
         elif message[0] == "E":
-            warnings.warn(
+            logger.warning(
                 f"GlassmanOQ500: Error message received "
                 f"during set command: {message}. "
                 f"See manual for further details."
@@ -986,7 +989,7 @@ class GlassmanOQ500(Instrument):
     def set_max_voltage(self, voltage_Volts: Float):
         self.vi_setpoints[0] = voltage_Volts
         if self.vi_setpoints[1] is None:
-            warnings.warn(
+            logger.warning(
                 f"GlassmanOQ500: Waiting for current setpoint "
                 f"to set voltage to {voltage_Volts} V."
             )
@@ -1003,7 +1006,7 @@ class GlassmanOQ500(Instrument):
     def set_max_current(self, current_mA: Float):
         self.vi_setpoints[1] = current_mA
         if self.vi_setpoints[0] is None:
-            warnings.warn(
+            logger.warning(
                 f"GlassmanOQ500: Waiting for voltage setpoint "
                 f"to set current to {current_mA} mA."
             )
@@ -1034,7 +1037,7 @@ class GlassmanOQ500(Instrument):
     def set_output_enable(self, output: Toggle):
         if output == ON:
             if self.vi_setpoints[0] is None or self.vi_setpoints[1] is None:
-                warnings.warn(
+                logger.warning(
                     "GlassmanOQ500: Waiting for voltage and current "
                     "setpoints to be set in order to set output ON."
                 )
@@ -1098,7 +1101,7 @@ class GlassmanOQ500(Instrument):
         bytestr = bin(int(response))[2:].zfill(4)
         bit = bytestr[2:3]
         if bit == "1":
-            warnings.warn(
+            logger.warning(
                 "GlassmanOQ500: Power supply is in a fault state. A PS reset "
                 "command must be sent (via 'reset' knob) to clear "
                 "fault before setting new values!"
@@ -1106,3 +1109,67 @@ class GlassmanOQ500(Instrument):
             return ON  # fault detected
         elif bit == "0":
             return OFF  # no fault
+
+
+class PWX1500L(Instrument):
+    name = "PWX1500L"
+
+    supported_adapters = (
+        (Socket, {"read_termination": "\r\n", "write_termination": "\r\n"}),
+    )
+
+    knobs = ("max voltage", "max current", "output")
+
+    meters = ("voltage", "current")
+
+    @measurer
+    def measure_current(self) -> Float:
+        def validator(response):
+            return bool(re.match("[\+\-]\d+\.\d\d\d", response))
+
+        return float(self.query("MEAS:CURR?", validator=validator))
+
+    @measurer
+    def measure_voltage(self) -> Float:
+        def validator(response):
+            return bool(re.match("[\+\-]\d+\.\d\d\d", response))
+
+        return float(self.query("MEAS:VOLT?", validator=validator))
+
+    @setter
+    def set_max_voltage(self, voltage: Float):
+        self.write("VOLT %.2f" % voltage)
+
+    @setter
+    def set_max_current(self, current: Float):
+        self.write("CURR %.2f" % current)
+
+    @setter
+    def set_output(self, output: Toggle):
+        if output == ON:
+            self.write("OUTP ON")
+        elif output == OFF:
+            self.write("OUTP OFF")
+
+    @getter
+    def get_output(self) -> Toggle:
+        response = self.query("OUTP?")
+
+        if response == "0":
+            return OFF
+        elif response == "1":
+            return ON
+
+    @getter
+    def get_max_current(self) -> Float:
+        def validator(response):
+            return bool(re.match("[\+\-]\d+\.\d\d\d", response))
+
+        return float(self.query("CURR?", validator=validator))
+
+    @getter
+    def get_max_voltage(self) -> Float:
+        def validator(response):
+            return bool(re.match("[\+\-]\d+\.\d\d\d", response))
+
+        return float(self.query("VOLT?", validator=validator))

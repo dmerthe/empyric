@@ -31,8 +31,8 @@ class Toggle(Type):
     Convenience class for handling toggle variables, which are either off or on.
     """
 
-    on_values = [True, 1, "1", "ON", "On", "on", b"ON", b"On", b"on"]
-    off_values = [False, 0, "0", "OFF", "Off", "off", b"OFF", b"Off", b"off"]
+    on_values = [True, 1, 1.0, "1", "ON", "On", "on", b"ON", b"On", b"on"]
+    off_values = [False, 0, 0.0, "0", "OFF", "Off", "off", b"OFF", b"Off", b"off"]
 
     def __init__(self, state: Union[str, bool, int, type]):
         if hasattr(state, "on"):
@@ -49,6 +49,9 @@ class Toggle(Type):
 
     def __int__(self):
         return 1 if self.on else 0
+
+    def __float__(self):
+        return 1.0 if self.on else 0.0
 
     def __str__(self):
         return "ON" if self.on else "OFF"

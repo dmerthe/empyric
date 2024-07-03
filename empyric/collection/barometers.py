@@ -1,7 +1,8 @@
 import re
-from empyric.adapters import *
-from empyric.collection.instrument import *
-from empyric.types import Toggle, ON, OFF, String, Boolean, Integer, Float
+
+from empyric.types import Toggle, ON, OFF, Integer, Float
+from empyric.adapters import Serial
+from empyric.collection.instrument import Instrument, setter, getter, measurer
 
 
 class BRAX3000(Instrument):
@@ -69,3 +70,27 @@ class BRAX3000(Instrument):
         response = self.query("#RDIG<CR>", validator=validator)
 
         return float(re.findall("\d\.\d+E-?\d\d", response)[0])
+
+
+class KJLSPARC(Instrument):
+    """
+    Kurt J Lesker cold cathode gauge controller
+    """
+
+    name = "KJLSPARC"
+
+    supported_adapters = (
+        (Serial, {"baud_rate": 115200, "read_termination": "\r", "timeout": 1.0}),
+    )
+
+    meters = ("pressure",)
+
+    @measurer
+    def measure_pressure(self) -> Float:
+
+        response = self.query('vac?')
+
+        if response[4:] == 'ERROR':
+            return np.nan
+        else:
+            return float(response[4:])
