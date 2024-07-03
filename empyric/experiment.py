@@ -422,6 +422,7 @@ class AsyncExperiment(Experiment):
         return self.state
 
     def start(self):
+
         super().start()
 
         self.loop = asyncio.get_running_loop()
@@ -434,39 +435,31 @@ class AsyncExperiment(Experiment):
 
     async def _update_variable(self, name):
         """Update named variable"""
-        if self.running or self.holding:
+        while not self.terminated:
+            if self.running or self.holding:
 
-            async def update():
-                Experiment._update_variable(self, name)
+                await asyncio.to_thread(Experiment._update_variable, self, name)
 
-            await update()
+                # Update time
+                self.state["Time"] = self.clock.time
+                self.state.name = datetime.datetime.now()
 
-            # Update time
-            self.state["Time"] = self.clock.time
-            self.state.name = datetime.datetime.now()
-        elif self.stopped:
-            await asyncio.sleep(0)
-
-        if not self.terminated:
-            self.loop.create_task(self._update_variable(name))
+            elif self.stopped:
+                await asyncio.sleep(0)  # give other updating tasks a chance to run
 
     async def _update_routine(self, name):
         """Update named routine"""
-        if self.running:
-            # Update time
-            self.state["Time"] = self.clock.time
-            self.state.name = datetime.datetime.now()
+        while not self.terminated:
+            if self.running:
 
-            async def update():
-                Experiment._update_routine(self, name)
+                # Update time
+                self.state["Time"] = self.clock.time
+                self.state.name = datetime.datetime.now()
 
-            await update()
+                await asyncio.to_thread(Experiment._update_routine, self, name)
 
-        elif self.stopped:
-            await asyncio.sleep(0)
-
-        if not self.terminated:
-            self.loop.create_task(self._update_routine(name))
+            elif self.holding or self.stopped:
+                await asyncio.sleep(0)  # give other updating tasks a chance to run
 
 
 class Alarm:
