@@ -35,9 +35,14 @@ def setter(method):
         dtype = None
 
     if dtype is None:
+
+        qualname = method.__qualname__
+
+        instr_class = qualname.split(".")[0]
+
         logger.warning(
-            f'Instrument method {method.__name__} does not have type hints; '
-            'assuming 64-bit floating point return value.'
+            f'Instrument {instr_class} method {method.__name__} does not have type '
+            f'hints; assuming 64-bit floating point value argument'
         )
         dtype = Float
 
@@ -100,9 +105,13 @@ def getter(method):
     dtype = typing.get_type_hints(method).get("return", None)
 
     if dtype is None:
+        qualname = method.__qualname__
+
+        instr_class = qualname.split(".")[0]
+
         logger.warning(
-            f'Instrument method {method.__name__} does not have type hints; '
-            'assuming 64-bit floating point return value.'
+            f'Instrument {instr_class} method {method.__name__} does not have type '
+            f'hints; assuming 64-bit floating point return value.'
         )
         dtype = Float
 
@@ -164,9 +173,13 @@ def measurer(method):
     dtype = typing.get_type_hints(method).get("return", None)
 
     if dtype is None:
+        qualname = method.__qualname__
+
+        instr_class = qualname.split(".")[0]
+
         logger.warning(
-            f'Instrument method {method.__name__} does not have type hints; '
-            'assuming 64-bit floating point return value.'
+            f'Instrument {instr_class} method {method.__name__} does not have type '
+            f'hints; assuming 64-bit floating point return value.'
         )
         dtype = Float
 
