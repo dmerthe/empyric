@@ -3,7 +3,7 @@ from threading import RLock
 from functools import wraps
 
 from empyric.tools import logger
-from empyric.types import recast, Type, ON, OFF, Toggle
+from empyric.types import recast, Type, ON, OFF, Toggle, Float
 from empyric.adapters import Adapter, AdapterError
 
 
@@ -32,7 +32,14 @@ def setter(method):
     if type_hints:
         dtype = type_hints[list(type_hints)[0]]
     else:
-        dtype = Type
+        dtype = None
+
+    if dtype is None:
+        logger.warning(
+            f'Instrument method {method.__name__} does not have type hints; '
+            'assuming 64-bit floating point return value.'
+        )
+        dtype = Float
 
     logger.debug(f'Knob {" ".join(knob.split("_"))} dtype is {dtype}')
 
@@ -90,7 +97,14 @@ def getter(method):
 
     knob = "_".join(method.__name__.split("_")[1:])
 
-    dtype = typing.get_type_hints(method).get("return", Type)
+    dtype = typing.get_type_hints(method).get("return", None)
+
+    if dtype is None:
+        logger.warning(
+            f'Instrument method {method.__name__} does not have type hints; '
+            'assuming 64-bit floating point return value.'
+        )
+        dtype = Float
 
     logger.debug(f'Knob {" ".join(knob.split("_"))} dtype is {dtype}')
 
@@ -147,7 +161,14 @@ def measurer(method):
 
     meter = "_".join(method.__name__.split("_")[1:])
 
-    dtype = typing.get_type_hints(method).get("return", Type)
+    dtype = typing.get_type_hints(method).get("return", None)
+
+    if dtype is None:
+        logger.warning(
+            f'Instrument method {method.__name__} does not have type hints; '
+            'assuming 64-bit floating point return value.'
+        )
+        dtype = Float
 
     logger.debug(f'Meter {" ".join(meter.split("_"))} dtype is {dtype}')
 

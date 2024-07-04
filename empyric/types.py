@@ -134,7 +134,7 @@ Array.register(pd.DataFrame)
 supported = {
     key: value
     for key, value in vars().items()
-    if type(value) is abc.ABCMeta and issubclass(value, Type)
+    if type(value) is abc.ABCMeta and issubclass(value, Type) and value is not Type
 }
 
 

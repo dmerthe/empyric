@@ -3,7 +3,6 @@ import asyncio
 import collections
 import datetime
 import importlib
-import logging
 import numbers
 import os
 import pathlib
@@ -28,7 +27,7 @@ from empyric import routines as _routines
 from empyric.adapters import AdapterError
 
 from empyric.tools import convert_time, Clock, logger
-from empyric.types import recast, Boolean, Toggle, Integer, Float, ON
+from empyric.types import recast
 
 
 class Experiment:
@@ -135,7 +134,10 @@ class Experiment:
             data={**{"Time": None}, **{name: None for name in self.variables}},
             dtype=object,
         )
-        self.data = pd.DataFrame(columns=["Time"] + list(variables.keys()))
+        self.data = pd.DataFrame(
+            columns=["Time"] + list(variables.keys()),
+            dtype=object
+        )
 
         self._status = Experiment.READY
         self.status_locked = True

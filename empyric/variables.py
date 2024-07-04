@@ -13,7 +13,7 @@ from empyric.collection.instrument import Instrument
 
 from empyric.instruments import ModbusClient
 from empyric.tools import write_to_socket, read_from_socket, logger
-from empyric.types import supported as supported_types, recast
+from empyric.types import supported as supported_types, recast, String, OFF, Complex
 from empyric.types import Type, Boolean, Float, Integer, Toggle, ON, Array
 
 
@@ -371,6 +371,46 @@ class Expression(Variable):
         self.expression = expression
         self.definitions = definitions if definitions is not None else {}
 
+        self.resolve_type()
+
+    def resolve_type(self):
+        """Determine the data type of the expression"""
+
+        def generate_example(_type):
+            """Generate examples of the give data type"""
+
+            examples_dict = {
+                None: None,
+                Boolean: np.random.choice([True, False]),
+                Toggle: np.random.choice([ON, OFF]),
+                Integer: np.random.randint(1, 6174),
+                Float: np.random.rand(),
+                Complex: np.random.rand() + 1j*np.random.rand(),
+                String: np.random.choice(['here', 'are', 'some', 'examples']),
+                Array: np.random.rand(6174)
+            }
+
+            return examples_dict[_type]
+
+        definitions = self.definitions  # make a reference of definitions
+
+        # replace variables with dummy parameters of the same types
+        self.definitions = {
+            name: Parameter(
+                generate_example(var.type)
+            ) for name, var in self.definitions.items()
+        }
+
+        # Evaluate based on dummy definitions and determine type from value
+        dummy_value = self.value
+
+        for supported_type in supported_types.values():
+            if isinstance(dummy_value, supported_type):
+                self._type = supported_type
+                break
+
+        self.definitions = definitions  # restore definitions
+
     @property
     @Variable.getter_type_validator
     def value(self):
@@ -625,8 +665,12 @@ class Remote(Variable):
 
             self._socket.connect((server_ip, int(server_port)))
 
-            self.get_settable()
-            self.get_type()
+            write_to_socket(self._socket, f"{self.alias} settable?")
+
+            response = read_from_socket(self._socket, timeout=60)
+            self._settable = response == f"{self.alias} settable"
+
+        self.resolve_type()
 
     @property
     @Variable.getter_type_validator
@@ -636,7 +680,7 @@ class Remote(Variable):
         """
 
         if self._type is None:
-            self.get_type()
+            self.resolve_type()
 
         if self.protocol == "modbus":
             fcode = 3 if self.settable else 4
@@ -716,7 +760,7 @@ class Remote(Variable):
 
         if self.protocol == "modbus":
 
-            logger.info(
+            logger.debug(
                 f'Writing value {value} to variable starting at register {self.alias}'
                 f'on Modbus server at {self.server}...'
             )
@@ -775,7 +819,7 @@ class Remote(Variable):
             self._socket.shutdown(socket.SHUT_RDWR)
             self._socket.close()
 
-    def get_type(self):
+    def resolve_type(self):
         """Get the data type of the remote variable"""
 
         if self.protocol == "modbus":
@@ -824,13 +868,6 @@ class Remote(Variable):
                 f'on socket server at {self.server} is {self._type}'
             )
 
-    def get_settable(self):
-        """Get settability of remote variable"""
-        write_to_socket(self._socket, f"{self.alias} settable?")
-
-        response = read_from_socket(self._socket, timeout=60)
-        self._settable = response == f"{self.alias} settable"
-
     def __str__(self):
         return f"Remote({self.alias}@{self.server} = {self.value})"
 
@@ -852,8 +889,7 @@ class Parameter(Variable):
         self._value = recast(parameter)
 
         for name, _type in supported_types.items():
-            if isinstance(self._value, _type) and _type is not Type:
-
+            if isinstance(self._value, _type):
                 self._type = _type
 
         logger.debug(
