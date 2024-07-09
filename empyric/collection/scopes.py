@@ -244,11 +244,10 @@ class TekTDSScope(Instrument):
 class MulticompProScope(Instrument):
     """
     Multicomp Pro PC Oscilloscope.
-
-    NOT TESTED
     """
 
     supported_adapters = (
+        (Socket, {'timeout': 1.0}),
         (USB, {"delay": 1}),
         # acquisitions can take a long time
     )
@@ -276,7 +275,7 @@ class MulticompProScope(Instrument):
     )
 
     presets = {
-        "resolution": "100000",
+        "resolution": 1e4,
         "sweep mode": "SINGLE",
         "trigger source": 1,
     }
@@ -338,6 +337,8 @@ class MulticompProScope(Instrument):
     _sweep_modes = ["AUTO", "NORMAL", "NORM", "SINGLE", "SING"]
 
     _acquiring = False
+
+    sample_rate = None
 
     @setter
     def set_horz_scale(self, scale):
@@ -451,13 +452,13 @@ class MulticompProScope(Instrument):
         if resolution not in self._resolutions:
             raise ValueError(
                 f"Invalid memory depth! "
-                f"Memory depth must be one of: {', '.join(self._resolutions)}"
+                f"Memory depth must be one of: {', '.join(str(self._resolutions))}"
             )
 
         self.write(":ACQ:DEPMEM " + self._resolutions[resolution])
 
     @getter
-    def get_resolution(self):
+    def get_resolution(self) -> Integer:
         res_rev = {val: key for key, val in self._resolutions.items()}
 
         return res_rev[self.query(":ACQ:DEPMEM?")[:-2]]
@@ -486,7 +487,7 @@ class MulticompProScope(Instrument):
     def _read_preamble(self, channel):
         info_dict = {}
 
-        preamble = self.query(":WAV:PRE?", binary=True)
+        preamble = self.query(":WAV:PRE?", decode=False)
 
         header, info = preamble[:11], preamble[11:]
 
@@ -526,7 +527,7 @@ class MulticompProScope(Instrument):
                     f"reading from channel {channel}"
                 )
 
-        self._sample_rate = info["sample rate"]
+        self.sample_rate = info_dict["sample rate"]
 
         return info_dict
 
@@ -540,14 +541,12 @@ class MulticompProScope(Instrument):
             return None
 
         # Only 256k data points can be read at a time
-        resolution = int(
-            self.get_resolution().replace("K", "000").replace("M", "000000")
-        )
+        resolution = self.get_resolution()
 
         if resolution < 256000:  # can get all data in one pass
             self.write(":WAV:RANG 0, %d" % resolution)
 
-            raw_response = self.query(":WAV:FETC?", binary=True)
+            raw_response = self.query(":WAV:FETC?", decode=False)
 
             header, byte_data = raw_response[:11], raw_response[11:]
 
@@ -566,13 +565,13 @@ class MulticompProScope(Instrument):
             while offset + size <= resolution:
                 self.write(":WAV:RANG %d, %d" % (offset, size))
 
-                raw_response = self.query(":WAV:FETC?", binary=True)
+                raw_response = self.query(":WAV:FETC?", decode=False)
 
                 header, byte_data = raw_response[:11], raw_response[11:]
 
                 data_len = int(header[2:]) // 2
 
-                voltages[offset : offset + size] = scale * (
+                voltages[offset: offset + size] = scale * (
                     np.array(struct.unpack(f"<{data_len}h", byte_data), dtype=float)
                     / 6400
                     - zero
@@ -602,7 +601,7 @@ class MulticompProScope(Instrument):
 
         self.write(":WAV:END CH1")
 
-        return data[1]
+        return data
 
     @measurer
     def measure_channel_2(self):
@@ -617,7 +616,7 @@ class MulticompProScope(Instrument):
 
         self.write(":WAV:END CH2")
 
-        return data[1]
+        return data
 
 
 class SiglentSDS1000(Instrument):
