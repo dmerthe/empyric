@@ -244,8 +244,6 @@ class TekTDSScope(Instrument):
 class MulticompProScope(Instrument):
     """
     Multicomp Pro PC Oscilloscope.
-
-    NOT TESTED
     """
 
     supported_adapters = (
@@ -539,7 +537,6 @@ class MulticompProScope(Instrument):
         if info:
             scale = info["scale"]
             zero = info["zero"]
-            print(f'zero = {zero}, scale = {scale}')
         else:
             return None
 
