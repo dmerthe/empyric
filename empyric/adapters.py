@@ -2,11 +2,12 @@ import importlib
 import socket
 import time
 import re
+
 from threading import Lock
 
 import numpy as np
 
-from empyric.tools import read_from_socket, write_to_socket
+from empyric.tools import read_from_socket, write_to_socket, logger
 
 
 def chaperone(method):
@@ -19,31 +20,46 @@ def chaperone(method):
     """
 
     def wrapped_method(self, *args, validator=None, **kwargs):
-        if not self.connected:
-            raise AdapterError(
-                "Adapter is not connected for instrument "
-                f"at address {self.instrument.address}"
-            )
-
         self.lock.acquire()
 
-        # Catch communication errors and either try to repeat communication
-        # or reset the connection
+        traceback = None
 
         reconnects = 0
 
         while reconnects < self.max_reconnects:
-
             if not self.connected:
-                print("Reconnecting...")
-                time.sleep(self.delay)
-                self.connect()
+
+                logger.debug(
+                    f'Connecting to {self.instrument.name} '
+                    f'at {self.instrument.address}'
+                )
+
+                time.sleep(self.delay * reconnects)
+
+                try:
+                    self.connect()
+                except Exception as exception:
+                    traceback = exception.__traceback__
+
+                    logger.error(
+                        f"Encountered '{exception}' while trying "
+                        f"to connect to {self.instrument.name}"
+                    )
+
+                    continue
+
                 reconnects += 1
 
             attempts = 0
 
             while attempts < self.max_attempts:
                 try:
+
+                    logger.debug(
+                        f'Communicating with {self.instrument.name} '
+                        f'at {self.instrument.address}: {method}({args})'
+                    )
+
                     response = method(self, *args, **kwargs)
 
                     if validator and not validator(response):
@@ -56,33 +72,58 @@ def chaperone(method):
                         )
 
                     elif attempts > 0 or reconnects > 0:
-                        print("Resolved")
+                        logger.info(
+                            f"Communication issue with {self.instrument.name} "
+                            "is resolved"
+                        )
+
+                    # Successful communication
+
+                    logger.debug(
+                        f'Communication with {self.instrument.name} '
+                        f'at {self.instrument.address} successful '
+                        f'with response: {response}'
+                    )
 
                     self.lock.release()
                     return response
 
-                except BaseException as err:
-                    print(
-                        f"Encountered {err} while trying "
+                except Exception as exception:
+                    traceback = exception.__traceback__
+
+
+                    logger.error(
+                        f"Encountered '{exception}' while trying "
                         f"to talk to {self.instrument.name}"
-                        "\nRetrying..."
                     )
+
                     attempts += 1
 
             # getting here means attempts have maxed out;
             # disconnect adapter and potentially reconnect on next iteration
+
+            logger.debug(
+                f'Disconnecting from {self.instrument.name} '
+                f'at {self.instrument.address}'
+            )
+
             self.disconnect()
 
         # Getting here means that both attempts and reconnects have been maxed out
+        # and the communication was unsuccessful
         self.lock.release()
-        raise AdapterError(f"Unable to communicate with {self.instrument.name}!")
+
+        raise AdapterError(
+            f"Unable to communicate with {self.instrument.name}! "
+            f"(after {attempts} attempts & {reconnects} reconnects)"
+        ).with_traceback(traceback)
 
     wrapped_method.__doc__ = method.__doc__  # keep method doc string
 
     return wrapped_method
 
 
-class AdapterError(BaseException):
+class AdapterError(ConnectionError):
     pass
 
 
@@ -140,7 +181,7 @@ class Adapter:
         if hasattr(self, "connected") and self.connected:
             try:
                 self.disconnect()
-            except BaseException as err:
+            except Exception as err:
                 print(f"Error while disconnecting {self.instrument.name}:", err)
                 pass
 
@@ -258,9 +299,7 @@ class Serial(Adapter):
     def connect(self):
         # First try connecting with PyVISA
         if self.lib == "pyvisa":
-
             if "COM" in self.instrument.address:
-
                 com_port = int(re.search("\d+", self.instrument.address)[0])
 
                 print(
@@ -284,7 +323,7 @@ class Serial(Adapter):
                     "M": pyvisa.constants.Parity(3),  # mark
                     "S": pyvisa.constants.Parity(4),  # space
                 }[self.parity],
-                timeout=self.timeout,
+                timeout=1000 * self.timeout,  # timeout argument is in milliseconds
                 write_termination=self.write_termination,
                 read_termination=self.read_termination,
             )
@@ -292,7 +331,6 @@ class Serial(Adapter):
         # Then try connecting with PySerial
         elif self.lib == "pyserial":
             if "ASRL" in self.instrument.address:
-
                 com_port = int(re.search("\d+", self.instrument.address)[0])
 
                 print(
@@ -431,6 +469,14 @@ class Serial(Adapter):
         again = "y" in input("Try again? [y/n]").lower()
         if again:
             Serial.locate()
+
+    @property
+    def in_waiting(self):
+
+        if self.lib == "pyserial":
+            return self.backend.in_waiting
+        elif self.lib == "pyvisa":
+            return self.backend.bytes_in_buffer
 
 
 class GPIB(Adapter):
@@ -1059,7 +1105,7 @@ class ModbusSerial(Adapter):
 class Modbus(Adapter):
     """
     Handles communication with instruments via the Modbus communication
-    protocol, over either TCP or serial ports, using PyModbus.
+    protocol, over either TCP, UDP, or serial ports, using PyModbus.
     """
 
     kwargs = (
@@ -1072,6 +1118,7 @@ class Modbus(Adapter):
         "stop bits",
         "parity",
         "delay",
+        "protocol",
     )
 
     slave_id = 0
@@ -1100,7 +1147,7 @@ class Modbus(Adapter):
     parity = "N"
     delay = 0.05
 
-    _protocol = None
+    protocol = None
 
     # This dict contains all active Modbus serial adapters. When a new adapter
     # is initialized with the same com port as an existing one, it uses the
@@ -1116,12 +1163,13 @@ class Modbus(Adapter):
 
     @property
     def busy(self):
-        if self._protocol == "Serial":
+        address = self.instrument.address.split("::")
+        if self.protocol == "Serial":
             return bool(
                 sum(
                     [
                         adapter._busy
-                        for adapter in Modbus._serial_adapters.get(self.port, [])
+                        for adapter in Modbus._serial_adapters.get(address[0], [])
                     ]
                 )
             )
@@ -1132,6 +1180,20 @@ class Modbus(Adapter):
     def busy(self, busy):
         self._busy = busy
 
+    @property
+    def connected(self):
+        try:
+            return self.backend.connected
+        except AttributeError:
+            return False
+
+    @connected.setter
+    def connected(self, connected):
+        if connected and not self.connected:
+            self.connect()
+        elif not connected and self.connected:
+            self.disconnect()
+
     def connect(self):
         client = importlib.import_module(".client", package="pymodbus")
 
@@ -1139,38 +1201,54 @@ class Modbus(Adapter):
         address = self.instrument.address.split("::")
 
         if re.match("\d+\.\d+\.\d+\.\d+", address[0]):
-            # Modbus TCP
-            self._protocol = "TCP"
+            if str(self.protocol).upper() == "UDP":
+                # Modbus UDP
+                self.protocol = "UDP"
 
-            if len(address) == 1:
-                address.append(502)  # standard Modbus TCP port
+                if len(address) == 1:
+                    address.append(502)
+                    # standard Modbus UDP port (fascinating that it's the same as TCP)
 
-            self.backend = client.ModbusTcpClient(host=address[0], port=int(address[1]))
+                self.backend = client.ModbusUdpClient(
+                    host=address[0], port=int(address[1])
+                )
 
-            self.backend.connect()
+                self.backend.connect()
+            else:
+                # Modbus TCP
+                self.protocol = "TCP"
 
+                if len(address) == 1:
+                    address.append(502)  # standard Modbus TCP port
+
+                self.backend = client.ModbusTcpClient(
+                    host=address[0], port=int(address[1])
+                )
+
+                self.backend.connect()
         else:
             # Modbus Serial
-            self._protocol = "Serial"
+            self.protocol = "Serial"
 
             if len(address) == 1:
                 # assume slave id is zero if not specified
-                port, slave_id = address[0], 0
-
+                if not hasattr(self, "slave_id"):
+                    self.slave_id = 0
+                port = address[0]
             else:
-                port, slave_id = address
+                port, self.slave_id = address
 
             if port in Modbus._serial_adapters:
                 Modbus._serial_adapters[port].append(self)
 
                 # use existing backend
-                self.backend = Modbus._serial_adapters[port].backend
+                self.backend = Modbus._serial_adapters[port][0].backend
 
             else:
                 Modbus._serial_adapters[port] = [self]
 
                 self.backend = client.ModbusSerialClient(
-                    address=port,
+                    port=port,
                     baudrate=self.baud_rate,
                     bytesize=self.byte_size,
                     parity=self.parity,
@@ -1178,8 +1256,6 @@ class Modbus(Adapter):
                 )
 
                 self.backend.connect()
-
-            self.slave_id = slave_id
 
         # Get data reading/writing utility classes
         payload_module = importlib.import_module(".payload", package="pymodbus")
@@ -1190,9 +1266,7 @@ class Modbus(Adapter):
         # Utility for decoding data
         self._decoder_cls = payload_module.BinaryPayloadDecoder
 
-        self.connected = True
-
-    def _write(self, func_code, address, values, _type=None):
+    def _write(self, func_code, address, values, _type="16bit_uint"):
         """
         Write values to coils (func_code = 5 [single] or 15 [multiple]) or
         holding registers (func_code = 6 [single] or 16 [multiple]).
@@ -1200,21 +1274,48 @@ class Modbus(Adapter):
         The Modbus data type for decoding registers is specified by the `_type`
         argument. Valid values for `_type` are listed in the `_types` attribute.
         """
+        if _type and _type not in self.types:
+            raise TypeError(
+                "invalid _type argument; must be one of:\n" ", ".join(self.types)
+            )
+
+        # Enumerate modbus write functions
+        write_functions = {
+            5: self.backend.write_coil,
+            15: self.backend.write_coils,
+            6: self.backend.write_register,
+            16: self.backend.write_registers,
+        }
 
         values = np.array([values]).flatten()
 
-        if func_code not in [5, 15, 6, 16]:
-            raise ValueError(f"invalid Modbus function code {func_code}")
+        if func_code == 5:
+            # Write single coil
+            if len(values) == 1:
+                bool_value = bool(values[0])
+            else:
+                raise TypeError(
+                    "Invalid [values] argument for function code 5"
+                    "(write single coil); "
+                    "[values] must have a length of 1"
+                )
 
-        if _type and _type not in self.types:
-            raise TypeError(
-                "invalid _type argument; must be one of:\n" + ", ".join(self.types)
-            )
+            response = self.backend.write_coil(address, bool_value, slave=self.slave_id)
 
-        if "5" in str(func_code):
-            # Write coils
-
-            bool_values = [bool(value) for value in values]
+            if response.function_code == 5:
+                return "Success"
+            else:
+                raise AdapterError(f"Error writing to coil on {self.instrument.name}")
+        elif func_code == 15:
+            # Write multiple coils
+            if len(values) > 1:
+                bool_values = [bool(value) for value in values]
+            else:
+                raise TypeError(
+                    "Invalid [values] argument for function code 15"
+                    "(write multiple coils); "
+                    "[values] must have a length greater than 1"
+                )
 
             response = self.backend.write_coils(
                 address, bool_values, slave=self.slave_id
@@ -1224,15 +1325,10 @@ class Modbus(Adapter):
                 return "Success"
             else:
                 raise AdapterError(
-                    f"error writing to coil(s) on {self.instrument.name}"
+                    f"Error writing to coil(s) on {self.instrument.name}"
                 )
-
-        else:
-            # Write registers
-
-            if _type is None:
-                _type = "16bit_uint"
-
+        elif func_code == 16 or func_code == 6:
+            # Write multiple registers
             builder = self._builder_cls(
                 byteorder=self.byte_order, wordorder=self.word_order
             )
@@ -1250,11 +1346,15 @@ class Modbus(Adapter):
                 return "Success"
             else:
                 raise AdapterError(
-                    f"error writing to register(s) on {self.instrument.name} "
-                    "for writing coils/registers"
+                    f"Error writing to register(s) on {self.instrument.name}"
                 )
+        else:
+            raise TypeError(
+                f"Invalid function code [{func_code}]. Function code options are "
+                f"5, 15, 6, or 16. See docs for details."
+            )
 
-    def _read(self, func_code, address, count=1, _type=None):
+    def _read(self, func_code, address, count=1, _type="16bit_uint"):
         """
         Read from coils (func_code = 1), discrete inputs (func_code = 2),
         holding registers (func_code = 3), or input registers (func_code = 4).
@@ -1294,7 +1394,6 @@ class Modbus(Adapter):
 
         elif func_code in [3, 4]:
             # Read holding registers or input registers
-
             registers = read_functions[func_code](
                 address, count=count, slave=self.slave_id
             ).registers
@@ -1326,9 +1425,9 @@ class Modbus(Adapter):
         return self._read(*args, **kwargs)
 
     def disconnect(self):
-        self.backend.close()
-
-        self.connected = False
+        while self.connected:
+            self.backend.close()
+            time.sleep(0.1)
 
 
 class Phidget(Adapter):

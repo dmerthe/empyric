@@ -14,6 +14,7 @@ Settings:
  plot interval: 5
  save interval: 10
  end: 60
+# async: True
 
 Instruments:
  Henon Mapper:
@@ -49,7 +50,9 @@ Variables:
 
 Alarms:
  r > 1:
-  condition: 'Distance r > 1'
+  condition: 'r > 1'
+  definitions:
+   r: Distance r
   protocol: hold
 
 Plots:

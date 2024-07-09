@@ -31,8 +31,8 @@ class Toggle(Type):
     Convenience class for handling toggle variables, which are either off or on.
     """
 
-    on_values = [True, 1, "1", "ON", "On", "on", b"ON", b"On", b"on"]
-    off_values = [False, 0, "0", "OFF", "Off", "off", b"OFF", b"Off", b"off"]
+    on_values = [True, 1, 1.0, "1", "ON", "On", "on", b"ON", b"On", b"on"]
+    off_values = [False, 0, 0.0, "0", "OFF", "Off", "off", b"OFF", b"Off", b"off"]
 
     def __init__(self, state: Union[str, bool, int, type]):
         if hasattr(state, "on"):
@@ -49,6 +49,9 @@ class Toggle(Type):
 
     def __int__(self):
         return 1 if self.on else 0
+
+    def __float__(self):
+        return 1.0 if self.on else 0.0
 
     def __str__(self):
         return "ON" if self.on else "OFF"
@@ -90,6 +93,16 @@ class Float(Type):
 
 Float.register(float)
 Float.register(np.floating)
+
+
+class Complex(Type):
+    """Abstract base class for `float` and `numpy.floating`"""
+
+    pass
+
+
+Complex.register(complex)
+Complex.register(np.complex128)
 
 
 class String(Type):
@@ -172,10 +185,11 @@ def recast(value: Any, to: type = Type) -> Union[Type, None]:
                     return np.int64(value)
                 elif issubclass(dtype, Float):
                     return np.float64(value)
+                elif issubclass(dtype, Complex):
+                    return np.complex128(value)
                 elif issubclass(dtype, String):
                     return np.str_(value)
                 elif issubclass(dtype, Array) and np.ndim(value) > 0:
-
                     if isinstance(value, np.ndarray):
                         return value
                     else:
@@ -198,6 +212,8 @@ def recast(value: Any, to: type = Type) -> Union[Type, None]:
             return np.int64(value)
         elif isinstance(value, Float):
             return np.float64(value)
+        elif isinstance(value, Complex):
+            return np.complex128(value)
         elif isinstance(value, String):
             if value.lower() == "true":  # boolean True
                 return np.bool_(True)
@@ -217,7 +233,7 @@ def recast(value: Any, to: type = Type) -> Union[Type, None]:
             else:
                 return value  # must be an actual string
         elif isinstance(value, bytes):
-            if value[:5] == b'dlpkl':
+            if value[:5] == b"dlpkl":
                 # pickled object
                 return dill.loads(value[5:])
             else:

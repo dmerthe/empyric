@@ -1,6 +1,10 @@
-from empyric.adapters import *
-from empyric.types import Toggle, ON, OFF, Float, Integer, String
-from empyric.collection.instrument import *
+import re
+import numpy as np
+
+from empyric.tools import logger
+from empyric.types import Float, Integer, String, Toggle, ON, OFF
+from empyric.adapters import Modbus, ModbusSerial, Socket
+from empyric.collection.instrument import Instrument, setter, getter, measurer
 
 
 class OmegaCN7500(Instrument):
@@ -12,10 +16,31 @@ class OmegaCN7500(Instrument):
 
     supported_adapters = (
         (
-            ModbusSerial,
-            {"slave_mode": "rtu", "baud_rate": 38400, "parity": "N", "delay": 0.2},
+            Modbus,
+            {"baud_rate": 38400, "parity": "N", "delay": 0.2, "slave_id": 1},
         ),
     )
+
+    scale_factors = {
+        0: 0.1,  # K-Type Thermocouple
+        1: 0.1,  # J-Type Thermocouple
+        2: 0.1,  # T-Type Thermocouple
+        3: 0.1,  # E-Type Thermocouple
+        4: 0.1,  # N-Type Thermocouple
+        5: 0.1,  # R-Type Thermocouple
+        6: 0.1,  # S-Type Thermocouple
+        7: 0.1,  # B-Type Thermocouple
+        8: 0.1,  # L-Type Thermocouple
+        9: 0.1,  # U-Type Thermocouple
+        10: 0.1,  # TXK-Type Thermocouple
+        11: 0.1,  # JPt100-Type RTD
+        12: 0.1,  # Pt100-Type RTD
+        13: 0.001,  # 0-5V Analog Input
+        14: 0.001,  # 0-10V Analog Input
+        15: 0.001,  # 0-20mA Analog Input
+        16: 0.001,  # 4-20mA Analog Input
+        17: 0.001,  # 0-50mV Analog Input
+    }
 
     knobs = (
         "output",
@@ -23,58 +48,116 @@ class OmegaCN7500(Instrument):
         "proportional band",
         "integration time",
         "derivative time",
+        "sensor type",
     )
 
-    meters = ("temperature", "power")
+    meters = ("temperature", "power", "output level")
 
     @setter
     def set_output(self, state: Toggle):
         if state == ON:
             # turn on output & start PID control
-            self.backend.write_bit(0x814, 1)
+            self.write(5, 0x0814, 1)
         elif state == OFF:
             # turn off output & stop PID control
-            self.backend.write_bit(0x814, 0)
+            self.write(5, 0x0814, 0)
+
+    @getter
+    def get_output(self) -> Toggle:
+        result = self.read(1, 0x0814)
+        if result:
+            return ON
+        else:
+            return OFF
 
     @setter
     def set_setpoint(self, setpoint: Float):
-        self.write(0x1001, int(10 * setpoint))
+        if self.get_sensor_type() in self.scale_factors.keys():
+            scaler = self.scale_factors[self.get_sensor_type()]
+        else:
+            scaler = 0.1
+
+        self.write(6, 0x1001, int(setpoint / scaler))
 
     @getter
     def get_setpoint(self) -> Float:
-        return self.read(0x1001) / 10
+        if self.get_sensor_type() in self.scale_factors.keys():
+            scaler = self.scale_factors[self.get_sensor_type()]
+        else:
+            scaler = 0.1
+
+        return self.read(3, 0x1001) * scaler
 
     @setter
     def set_proportional_band(self, P: Integer):
-        self.write(0x1009, P)
+        round_P = round(P)
+        if P != round_P:
+            logger.warning(
+                f"Proportional band value {P} will be rounded to {round_P}"
+            )
+        self.write(6, 0x1009, round_P)
 
     @getter
     def get_proportional_band(self) -> Integer:
-        return self.read(0x1009)
+        return self.read(3, 0x1009)
 
     @setter
     def set_integration_time(self, Ti: Integer):
-        self.write(0x100A, Ti)
+        round_Ti = round(Ti)
+        if Ti != round_Ti:
+            logger.warning(
+                f"Integration time value {Ti} will be rounded to {round_Ti}"
+            )
+        self.write(6, 0x100A, round_Ti)
 
     @getter
     def get_integration_time(self) -> Integer:
-        return self.read(0x100A)
+        return self.read(3, 0x100A)
 
     @setter
     def set_derivative_time(self, Td: Integer):
-        self.write(0x100B, Td)
+        round_Td = round(Td)
+        if Td != round_Td:
+            logger.warning(
+                f"Derivative time value {Td} will be rounded to {round_Td}"
+            )
+        self.write(6, 0x100B, round_Td)
 
     @getter
     def get_derivative_time(self) -> Integer:
-        return self.read(0x100B)
+        return self.read(3, 0x100B)
+
+    @setter
+    def set_sensor_type(self, sensor_type: Integer):
+        self.write(6, 0x1004, sensor_type)
+
+    @getter
+    def get_sensor_type(self) -> Integer:
+        return self.read(3, 0x1004)
 
     @measurer
     def measure_temperature(self) -> Float:
-        return self.read(0x1000) / 10
+        if self.get_sensor_type() in self.scale_factors.keys():
+            scaler = self.scale_factors[self.get_sensor_type()]
+        else:
+            scaler = 0.1
+        return self.read(3, 0x1000) * scaler
 
     @measurer
     def measure_power(self) -> Float:
-        return self.read(0x1000) / 10
+        if self.get_sensor_type() in self.scale_factors.keys():
+            scaler = self.scale_factors[self.get_sensor_type()]
+        else:
+            scaler = 0.1
+        return self.read(3, 0x1000) * scaler
+
+    @getter
+    def measure_output_level(self) -> Float:
+        if self.get_sensor_type() in self.scale_factors.keys():
+            scaler = self.scale_factors[self.get_sensor_type()]
+        else:
+            scaler = 0.1
+        return self.read(3, 0x1012) * scaler
 
 
 class OmegaPlatinum(Instrument):
@@ -282,11 +365,11 @@ class MKSGSeries(Instrument):
         return self.read(3, 0xA000, count=2, _type="32bit_float")
 
     @setter
-    def set_ramp_time(self, ramp_time: Float):
+    def set_ramp_time(self, ramp_time: Integer):
         self.write(16, 0xA002, int(ramp_time), _type="32bit_uint")
 
     @getter
-    def get_ramp_time(self) -> Float:
+    def get_ramp_time(self) -> Integer:
         return self.read(3, 0xA002, count=2, _type="32bit_uint")
 
     @measurer
@@ -314,7 +397,7 @@ class AlicatMFC(Instrument):
     meters = (
         "flow rate",  # actual flow rate in SCCM
         "temperature",  # temperature in degrees C
-        "pressure"
+        "pressure",
         # pressure in PSI (absolute, gauge or differential,
         # depending on device configuration)
     )

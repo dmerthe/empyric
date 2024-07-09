@@ -1,9 +1,8 @@
 import re
 
-from empyric.collection.instrument import Instrument, setter, getter, measurer
+from empyric.types import recast, Float
 from empyric.adapters import Socket, Modbus
-from empyric.types import recast, Boolean, Toggle, Integer, Float, Array
-from enum import Enum
+from empyric.collection.instrument import Instrument, setter, getter, measurer
 
 
 class BrainboxesED560(Instrument):
@@ -157,27 +156,19 @@ class ADAM6024(Instrument):
         "analog_out1_type": "0~10V",
     }
 
-    AIN_TYPES = {
-        "4~20mA": 0x07,
-        "+/-10V": 0x08,
-        "0~20mA": 0x0D
-    }
+    AIN_TYPES = {"4~20mA": 0x07, "+/-10V": 0x08, "0~20mA": 0x0D}
 
-    AOUT_TYPES = {
-        "0~20mA": 0x00,
-        "4~20mA": 0x01,
-        "0~10V": 0x02
-    }
+    AOUT_TYPES = {"0~20mA": 0x00, "4~20mA": 0x01, "0~10V": 0x02}
 
     def _measure_AIN(self, n) -> Float:
         raw = self.read(4, n, _type="16bit_uint")
         match self._get_AIN_type(n):
             case "4~20mA":
-                return raw/65535.0 * 16 + 4
+                return raw / 65535.0 * 16 + 4
             case "+/-10V":
-                return raw/65535.0 * 20 - 10
+                return raw / 65535.0 * 20 - 10
             case "0~20mA":
-                return raw/65535.0 * 20
+                return raw / 65535.0 * 20
             case _:
                 raise TypeError("Unrecognized Type")
                 return None
@@ -185,11 +176,11 @@ class ADAM6024(Instrument):
     def _set_AOUT(self, n, value) -> Float:
         match self._get_AOUT_type(n):
             case "0~20mA":
-                scaled_value = int((value)/20.0*((2**12)-1))
+                scaled_value = int((value) / 20.0 * ((2**12) - 1))
             case "4~20mA":
-                scaled_value = int((value-4)/16.0*((2**12)-1))
+                scaled_value = int((value - 4) / 16.0 * ((2**12) - 1))
             case "0~10V":
-                scaled_value = int((value)/10.0*((2**12)-1))
+                scaled_value = int((value) / 10.0 * ((2**12) - 1))
             case _:
                 scaled_value = None
                 raise TypeError("Unrecognized Type")
@@ -199,11 +190,11 @@ class ADAM6024(Instrument):
         raw = self.read(4, 10 + n, _type="16bit_uint")
         match self._get_AOUT_type(n):
             case "0~20mA":
-                return raw/float(2**12-1) * 20
+                return raw / float(2**12 - 1) * 20
             case "4~20mA":
-                return raw/float(2**12-1) * 16 + 4
+                return raw / float(2**12 - 1) * 16 + 4
             case "0~10V":
-                return raw/float(2**12-1) * 10
+                return raw / float(2**12 - 1) * 10
             case _:
                 raise TypeError("Unrecognized Type")
                 return None

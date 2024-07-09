@@ -1,9 +1,9 @@
 import time
 import numpy as np
-from empyric.instruments import Instrument
-from empyric.instruments import setter, measurer
+
+from empyric.types import Float, String
+from empyric.instruments import Instrument, setter, measurer
 from empyric.adapters import Adapter, Modbus
-from empyric.types import Boolean, Toggle, Integer, Float, String, Array
 
 
 class Clock(Instrument):
@@ -307,17 +307,14 @@ class RandomWalk(Instrument):
 
     @setter
     def set_mean(self, mean: Float):
-
         self._mean = mean
 
     @setter
     def set_step(self, step: Float):
-
         self._step = step
 
     @setter
     def set_affinity(self, affinity: Float):
-
         self._affinity = affinity
 
     @measurer
@@ -384,6 +381,6 @@ class ModbusClient(Instrument):
     instance in other experiments to control variables.
     """
 
-    name = "DataClient"
+    name = "ModbusClient"
 
     supported_adapters = ((Modbus, {}),)

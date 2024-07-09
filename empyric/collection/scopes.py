@@ -1,8 +1,12 @@
+import re
 import struct
+import time
+import numpy as np
+
 from empyric.tools import find_nearest
-from empyric.adapters import *
-from empyric.collection.instrument import *
 from empyric.types import Float, Array, Integer, String
+from empyric.adapters import USB, Socket
+from empyric.collection.instrument import Instrument, setter, getter, measurer
 
 
 class TekTDSScope(Instrument):
@@ -649,6 +653,8 @@ class SiglentSDS1000(Instrument):
         "ch4 position",
         "trigger source",
         "trigger level",
+        "trigger mode",
+        "arm",
         "acquire mode",
         "memory size",
         "averages",
@@ -854,7 +860,6 @@ class SiglentSDS1000(Instrument):
 
     @getter
     def get_trigger_source(self) -> Integer:
-
         def validator(response):
             return "SR,C" in response
 
@@ -866,6 +871,20 @@ class SiglentSDS1000(Instrument):
             return -1
 
         return response
+
+    @setter
+    def set_trigger_mode(self, mode: String):
+        if mode.upper() in ["AUTO", "NORM", "SINGLE", "STOP"]:
+            self.write(f"TRMD {mode.upper()}")
+        else:
+            return self.get_trigger_mode()
+
+    @getter
+    def get_trigger_mode(self) -> String:
+        try:
+            return self.query("TRMD?")[5:]
+        except IndexError:
+            return None
 
     @setter
     def set_acquire_mode(self, mode: String):
@@ -932,26 +951,16 @@ class SiglentSDS1000(Instrument):
 
     # Channel measurements
     def _measure_chn_waveform(self, n):
-        # Set trigger mode to NORMAL
-        self.write("TRMD NORM")
-
-        # Wait for trigger
-        triggered = False
-        wait_time = 0.0
-        while not triggered and wait_time < 30.0:
-            status = self.query("INR?")
-            triggered = status == "INR 8193"
-            wait_time += 0.25
+        ready = False
+        while not ready:
             time.sleep(0.25)
-
-        if not triggered:
-            return None
+            ready = "1" in self.query("*OPC?")
 
         # Enable channel if needed
-        channel_enabled = "ON" in self.query("C%d:TRA?" % n)
-        if not channel_enabled:
-            self.write("C%d:TRA ON" % n)
-            time.sleep(3)
+        ch_enabled_query = self.query("C%d:TRA?" % n)
+        if "ON" not in ch_enabled_query:
+            print(f"Warning: CH{n} is not enabled; cannot retrieve waveform")
+            return None
 
         self.write("WFSU SP,0,NP,0,FP,0")  # setup to get all data points
 
@@ -969,11 +978,16 @@ class SiglentSDS1000(Instrument):
                 return False
 
         self.adapter.read_termination = is_terminated
+        max_attempts = self.adapter.max_attempts
+        self.adapter.max_attempts = 1
 
         def validator(response):
             """
             Checks for correct header, size, message length and termination.
             """
+
+            if response == b"":
+                return True  # no data
 
             if response is None:
                 return False
@@ -982,27 +996,35 @@ class SiglentSDS1000(Instrument):
 
             header = response[:13]
             if header != (b"C%d:WF DAT2,#9" % n):
+                print("invalid header", header)
                 return False
 
             size = response[13:22]
             try:
                 size = int(size)
             except ValueError:
+                print("invalid data size", size)
                 return False
 
             data = response[22:-2]
             if len(data) != size:
+                print("truncated data", len(data))
                 return False
 
             termination = response[-2:]
             if termination != b"\n\n":
+                print("no termination", response[-2:])
                 return False
 
             return True
 
         response = self.query("C%d:WF? DAT2" % n, decode=False, validator=validator)
 
+        if response == b"":
+            return None
+
         self.adapter.read_termination = "\n"  # restore normal read termination
+        self.adapter.max_attempts = max_attempts
 
         header, size, waveform = response[:13], response[13:22], response[22:-2]
         size = int(size)

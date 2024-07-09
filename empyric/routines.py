@@ -1,11 +1,9 @@
 import importlib
 import numbers
-import os.path
 import socket
 import queue
 import threading
 import asyncio
-import time
 from typing import Union
 
 import select
@@ -14,6 +12,8 @@ import functools
 import dill
 import numpy as np
 import pandas as pd
+from scipy.optimize import minimize as scipy_minimize
+from scipy.optimize._minimize import MINIMIZE_METHODS as scipy_minimize_methods
 
 from bayes_opt import BayesianOptimization, UtilityFunction
 
@@ -22,7 +22,7 @@ from empyric.tools import (
     autobind_socket,
     read_from_socket,
     write_to_socket,
-    get_ip_address,
+    get_ip_address, logger,
 )
 from empyric.types import (
     recast,
@@ -73,6 +73,7 @@ class Routine:
         self,
         knobs: dict,
         enable: String = None,
+        delay_prep: Boolean = False,
         start: Union[Float, String] = None,
         end: Union[Float, String] = None,
         duration: Union[Float, String] = None,
@@ -84,6 +85,8 @@ class Routine:
             knob._controller = None  # to control access to knob
 
         self.enable = enable
+
+        self.delay_prep = delay_prep
 
         if start is not None:
             if start == "on enable":
@@ -105,6 +108,7 @@ class Routine:
             self._duration = np.inf
 
         self.prepped = False
+        self.running = False
         self.finished = False
 
         for key, value in kwargs.items():
@@ -140,13 +144,17 @@ class Routine:
                     self.start = np.nan
                     self.end = np.nan
 
+                self.running = False
+
                 return
 
             elif state["Time"] < self.start:
                 # prepare routine before starting, if needed
-                if not self.prepped:
+                if not self.prepped and not self.delay_prep:
                     self.prep(state)
                     self.prepped = True
+
+                self.running = False
 
                 return
 
@@ -161,6 +169,8 @@ class Routine:
                         if knob._controller == self:
                             knob._controller = None
 
+                self.running = False
+
                 return
 
             else:
@@ -168,6 +178,7 @@ class Routine:
 
                 if not self.prepped:
                     self.prep(state)
+                    self.prepped = True
 
                 if self._start_on_enable and np.isnan(self.start):
                     # set start time to time of most recent state evaluation
@@ -181,6 +192,8 @@ class Routine:
                     elif self.assert_control:
                         # assert control if needed
                         knob._controller = self
+
+                self.running = True
 
                 update(self, state)
 
@@ -221,6 +234,8 @@ class Routine:
         """
         Makes any final actions after the routine ends
         """
+
+        pass
 
 
 class Set(Routine):
@@ -361,9 +376,7 @@ class Timecourse(Routine):
                 try:
                     key = [col for col in df.columns if "time" in col.lower][0]
                 except IndexError:
-                    raise KeyError(
-                        f"No 'times' values found in {t_elem[0]}"
-                    )
+                    raise KeyError(f"No 'times' values found in {t_elem[0]}")
 
                 self.times[i] = df[key].values
 
@@ -372,7 +385,8 @@ class Timecourse(Routine):
 
                 try:
                     key = [
-                        col for col in df.columns
+                        col
+                        for col in df.columns
                         if col == "values" or col == list(self.knobs)[i]
                     ][0]
                 except IndexError:
@@ -391,6 +405,8 @@ class Timecourse(Routine):
 
         if "end" not in kwargs:
             self.end = np.max(self.times)
+
+        self.ramp = kwargs.get("ramp", True)
 
     @Routine.enabler
     def update(self, state):
@@ -416,10 +432,14 @@ class Timecourse(Routine):
             if next_value in list(state.keys()):
                 next_value = state[next_value]
 
-            # Ramp linearly between numerical values
-            value = last_value + (next_value - last_value) * (
-                state["Time"] - last_time
-            ) / (next_time - last_time)
+            if self.ramp:
+                # Ramp linearly between numerical values
+                value = last_value + (next_value - last_value) * (
+                    state["Time"] - last_time
+                ) / (next_time - last_time)
+            else:
+                # or just set to last value
+                value = last_value
 
             self.knobs[knob].value = value
 
@@ -465,14 +485,15 @@ class Sequence(Routine):
         else:
             self.values = values
 
-        # Times and/or values can be stored in CSV files
+        # Values can be stored in CSV files
         for i, v_elem in enumerate(self.values):
             if type(v_elem[0]) == str and ".csv" in v_elem[0]:
                 df = pd.read_csv(v_elem[0])
 
                 try:
                     key = [
-                        col for col in df.columns
+                        col
+                        for col in df.columns
                         if col == "values" or col == list(self.knobs)[i]
                     ][0]
                 except IndexError:
@@ -483,6 +504,8 @@ class Sequence(Routine):
                 self.values[i] = [recast(val) for val in df[key].values]
 
         self.values = np.array(self.values, dtype=object)
+
+        self.repeat = kwargs.get("repeat", True)
 
         self.iteration = 0
 
@@ -498,6 +521,9 @@ class Sequence(Routine):
 
         self.iteration = (self.iteration + 1) % len(self.values[0])
 
+        if self.iteration == 0 and not self.repeat:
+            self.end = state["Time"]  # set to end immediately
+
     def finish(self, state):
         # Upon routine completion, set each knob to its final value
         for knob, value in zip(self.knobs.values(), self.values[:, -1]):
@@ -508,42 +534,77 @@ class Sequence(Routine):
                     knob.value = value
 
 
-class Maximization(Routine):
+class Optimization(Routine):
     """
-    Maximize a meter or expression influenced by the set of knobs.
-
-    This routine uses a `bayesian optimizer
-    <https://github.com/bayesian-optimization/BayesianOptimization>`_, which models
-    the relation between the knobs and the meter as a gaussian process.
+    Maximize or minimize a meter or expression influenced by the set of knobs.
 
     The `bounds` parameter is an Nx2 array containing the upper and lower limits for
     each of the N knobs that defines the parameter space over which the knob values can
     be explored.
 
+    The `sign` argument determines whether the routine maximizes (sign = +1.0) or
+    minimizes (-1.0) the `meter` value by tuning the `knobs`. The `Maximization` and
+    `Minimization` subclasses have implied signs, so this argument should not be used
+    with those.
+
     The `max_deltas` parameter is a value or 1-D array of values which are the
     maximum change in a single step the knob(s) can take.
 
-    The `kappa` parameter determines how much time the algorithm spends
-    exploring the parameter space away from the maximum versus the parameter
-    space in the vicinity of the maximum. Higher `kappa` leads to more
-    exploration, lower `kappa` leads to more "exploitation" of the maximum.
+    The `settling_time` is the amount of time to wait before changing knob settings and
+    evaluating the meter.
+
+    The `method` parameter specifies the algorith to use for optimization. The default
+    method is a simple random walk search for the optimal knob settings. If `method` is
+    set to 'bayesian' this routine uses a `bayesian optimizer
+    <https://github.com/bayesian-optimization/BayesianOptimization>`_, which models
+    the relation between the knobs and the meter as a gaussian process. Additionally,
+    any of the methods available to the `scipy.optimize.maximize` function are also
+    available; any keyword arguments accepted by that function can also be accepted by
+    the constructor of the `Optimizer` class.
+
+    The `iterations` parameter determines how many iterations the optimization
+    algorithm is allowed before returning a result. When the iterations are complete,
+    the algorithm is restarted anew.
+
+    The `samples` parameter is how many values of the meter to average together on each
+    iteration to evaluate the optimality of the current knobs settings.
+
+    The default optimizer accepts a `recency` keyword argument, which is the weight
+    given to the most recent best meter value at the best knob settings compared to
+    previously obtained values. This can be useful when the meter is noisy and the
+    relationship between the meter and knobs is changing over time.
     """
 
-    _sign = 1.0
-
-    _last_setting = -np.inf
+    _sign = None
 
     def __init__(
         self,
         knobs: dict,
         meter: String,
-        bounds: Array,
-        max_deltas: Array = None,
+        bounds: Union[list, tuple, np.ndarray],
+        sign: Float = None,
+        max_deltas: Union[float, int, list, tuple, np.ndarray] = None,
         settling_time: Union[Float, String] = 0.0,
-        method=None,
+        method: String = None,
+        iterations: int = 100,
+        samples: int = 1,
         **kwargs,
     ):
         Routine.__init__(self, knobs, **kwargs)
+
+        if self._sign is None:
+            if sign == 1.0 or sign == -1.0:
+                self._sign = sign
+            else:
+                raise ValueError(
+                    "sign must be either +1.0 (maximization) or -1.0 (minimization)"
+                )
+        else:
+            if sign is not None:
+                logger.warning(
+                    "The signs of Maximization and Minimization routines cannot be "
+                    "changed"
+                )
 
         self.bounds = {
             knob: subbounds
@@ -552,8 +613,10 @@ class Maximization(Routine):
 
         if max_deltas:
             if np.ndim(max_deltas) == 0:
+                # a single maximum change for all knobs
                 self.max_deltas = np.array([max_deltas] * len(knobs))
             elif np.ndim(max_deltas) == 1 and len(max_deltas) == len(knobs):
+                # individual maximum changes for each knob
                 self.max_deltas = np.array(max_deltas)
             else:
                 ValueError(
@@ -564,31 +627,35 @@ class Maximization(Routine):
         else:
             self.max_deltas = np.array([np.inf] * len(self.knobs))
 
+        # name of the meter to check from state argument of update
         self.meter = meter
 
-        self.best_meter = None
-        self.best_knobs = [None for _ in self.knobs]
+        # Record best settings when an optimum is found
+        self.best_meter = -self._sign * np.inf
+        self.best_knobs = {name: None for name in self.knobs}
 
-        self.optimizer = BayesianOptimization(
-            f=None,
-            verbose=0,
-            pbounds=self.bounds,
-            random_state=6174,
-            allow_duplicate_points=True,
-        )
+        if "sign" in kwargs:
+            self._sign = float(kwargs.pop("sign"))
 
-        self.method = method if method is not None else "bayesian"
+        self.method = method
 
         self.settling_time = convert_time(settling_time)
 
+        self.iterations = iterations
+
+        self.samples = int(samples)
+
+        self._optimizer_thread = None
+        self._meter_queue = queue.Queue(1)
+
         self.options = kwargs
+
+        self._last_setting = -np.inf
+
+        self._state = None
 
     @Routine.enabler
     def update(self, state):
-        if self.method == "bayesian":
-            self._update_bayesian(state)
-
-    def _update_bayesian(self, state):
         non_numeric_knobs = [
             not isinstance(state[knob], numbers.Number) for knob in self.knobs
         ]
@@ -598,54 +665,199 @@ class Maximization(Routine):
             return
 
         if not isinstance(state[self.meter], numbers.Number):
-            # undefined target value; take no action
+            # undefined meter value; take no action
             return
 
         if state["Time"] < self._last_setting + self.settling_time:
+            # still settling; take no action
             return
 
-        self.optimizer.register(
-            params={knob: state[knob] for knob in self.knobs},
-            target=self._sign * state[self.meter],
-        )
+        # Reinitialize the optimizer, if iterations have completed
+        if not self._optimizer_thread.is_alive():
+            self.prep(state, start_optimizer_thread=True)
 
-        suggestion = self.optimizer.suggest(self.util_func)
+        self._state = state
 
-        for i, (knob, value) in enumerate(suggestion.items()):
-            if value is None or not np.isfinite(value):
-                pass
-            elif np.abs(value - state[knob]) <= self.max_deltas[i]:
-                self.knobs[knob].value = value
-            else:
-                sign = (value - state[knob]) / np.abs(value - state[knob])
-                self.knobs[knob].value = state[knob] + sign * self.max_deltas[i]
+        self._meter_queue.put(state[self.meter])
 
-        self._last_setting = state["Time"]
-
-        self.best_meter = self.optimizer.max["target"]
-        self.best_knobs = self.optimizer.max["params"]
-
-        if np.isfinite(self.end):
-            kappa = self._kappa0 * (self.end - state["Time"]) / self._duration
-            self.util_func.kappa = kappa
-
-    def prep(self, state):
+    def prep(self, state, start_optimizer_thread=False):
         if self.method == "bayesian":
-            self._kappa0 = self.options.get("kappa", 2.5)
-            self.util_func = UtilityFunction(
-                kappa=self._kappa0,  # exploration vs. exploitation parameter
+            self._bayesian_optimizer = BayesianOptimization(
+                f=lambda *args, **x: self._sign
+                * self._eval_func([x[name] for name in self.knobs]),
+                verbose=0,
+                pbounds=self.bounds,
+                random_state=6174,
+                allow_duplicate_points=True,
             )
 
+            self._bayesian_optimizer.probe(
+                {name: knob.value for name, knob in self.knobs.items()}
+            )
+
+            optimizer_function = self._bayesian_optimizer.maximize
+            optimizer_args = []
+            optimizer_kwargs = {"init_points": 1, "n_iter": self.iterations}
+
+        elif self.method in scipy_minimize_methods:
+            options = {"maxiter": self.iterations}
+
+            x0 = np.array([knob.value for knob in self.knobs.values()])
+
+            if self.method.lower() == "nelder-mead":
+                options["adaptive"] = True
+
+                # Generate an initial simplex based on either max deltas or bounds
+                bounds = np.array([(lb, ub) for lb, ub, in self.bounds.values()])
+
+                if np.all(np.isfinite(self.max_deltas)):
+                    d = self.max_deltas
+                else:
+                    d = 0.5 * np.diff(bounds, axis=1).flatten()
+
+                N = len(x0)
+
+                simplex = np.empty((N + 1, N), dtype=np.float64)
+                simplex[0] = x0
+                for k in range(N):
+                    y = np.array(x0, copy=True)
+                    if y[k] != 0:
+                        y[k] = y[k] + d[k]
+                    else:
+                        y[k] = d[k]
+
+                    y[k] = y[k] + d[k]
+
+                    if y[k] < bounds[k][0]:
+                        y[k] = bounds[k][0]
+                    elif y[k] > bounds[k][1]:
+                        y[k] = bounds[k][1]
+
+                    simplex[k + 1] = y
+
+                options["initial_simplex"] = simplex
+
+            optimizer_function = scipy_minimize
+            optimizer_args = [lambda x: -self._sign * self._eval_func(x), x0]
+            optimizer_kwargs = {
+                "method": self.method,
+                "bounds": [bounds for bounds in self.bounds.values()],
+                "options": options,
+            }
+
+        else:
+            # use default optimization algorithm
+            optimizer_function = self._default_optimization
+            optimizer_args = [
+                lambda x: self._eval_func(x),
+                [knob.value for knob in self.knobs.values()],
+            ]
+            optimizer_kwargs = {
+                "bounds": [bounds for bounds in self.bounds.values()],
+                "max_deltas": self.max_deltas,
+                "iterations": self.iterations,
+                "sign": self._sign,
+                "recency": self.options.get("recency", 1.0),
+            }
+
+        self._optimizer_thread = threading.Thread(
+            target=optimizer_function, args=optimizer_args, kwargs=optimizer_kwargs
+        )
+
+        if start_optimizer_thread:
+            self._optimizer_thread.start()
+            self._optimizer_thread.started = True
+        else:
+            self._optimizer_thread.started = False
+
     def finish(self, state):
+        # Shutdown _optimizer_thread
+        if hasattr(self, "_meter_queue") and self._optimizer_thread.is_alive():
+            self._meter_queue.put(StopIteration)
+
+        # Apply optimal knob settings
         for i, (knob, value) in enumerate(self.best_knobs.items()):
             if value is None or not np.isfinite(value):
                 print(f"Warning: No optimal value was found for {knob}")
             else:
                 self.knobs[knob].value = value
 
+    def terminate(self):
+        # Shutdown _optimizer_thread
+        if self._optimizer_thread is not None and self._optimizer_thread.is_alive():
+            self._meter_queue.put(StopIteration)
 
-class Minimization(Maximization):
-    """Same as Maximization except that the sign of the meter is inverted"""
+    def _eval_func(self, x):
+        """
+        Emulates a function which takes knobs values as inputs and returns the
+        resulting meter output, but only evaluates at most once per call to the
+        update method.
+        """
+
+        for i, knob in enumerate(self.knobs.values()):
+            knob.value = x[i]
+
+        if self._state is not None:
+            self._last_setting = self._state["Time"]
+
+        values = []
+        while len(values) < self.samples:
+            # wait until invoked update method provides a new meter value
+            new_value = self._meter_queue.get()
+
+            if new_value == StopIteration:
+                raise SystemExit  # terminate the enclosing _optimization_thread
+            else:
+                values.append(new_value)
+
+        value = np.mean(values)
+
+        # If this is the best configuration so far, store knob and meter values
+        if self._sign * value > self._sign * self.best_meter:
+            self.best_meter = value
+            self.best_knobs = {name: knob.value for name, knob in self.knobs.items()}
+
+        return value
+
+    @staticmethod
+    def _default_optimization(
+        func, p0, bounds=None, max_deltas=None, sign=1.0, iterations=100, recency=1.0
+    ):
+        """Very basic random step optimization algorithm"""
+        pbest = p = np.array(p0)
+        fbest = func(p0)
+
+        for i in range(iterations):
+            # generate new knobs settings
+            dp = np.array(
+                [max_delta * (2 * np.random.rand() - 1) for max_delta in max_deltas]
+            )
+
+            p = p + dp
+
+            if bounds:
+                p = np.max([p, np.array(bounds)[:, 0]], axis=0)  # enforce lower bounds
+                p = np.min([p, np.array(bounds)[:, 1]], axis=0)  # enforce upper bounds
+
+            f = func(p)  # evaluate the meter
+            if sign * f > sign * fbest:  # new best settings found; store values
+                pbest = p
+                fbest = f
+            else:  # reevaluate meter at best knob settings
+                p = pbest
+                fbest = recency * func(p) + (1 - recency) * fbest
+
+        return pbest, fbest
+
+
+class Maximization(Optimization):
+    """Alias for `Optimization` with `sign` implicitly set to +1.0"""
+
+    _sign = +1.0
+
+
+class Minimization(Optimization):
+    """Alias for `Optimization` with `sign` implicitly set to -1.0"""
 
     _sign = -1.0
 
@@ -682,24 +894,33 @@ class SocketServer(Routine):
 
         self.state = {}
 
-        self.acc_conn_thread = threading.Thread(target=self.accept_connections)
+        self.server_thread = threading.Thread(
+            target=asyncio.run, args=(self._run_async_server(),)
+        )
 
-        self.acc_conn_thread.start()
-
-        self.proc_requ_thread = threading.Thread(target=self.process_requests)
-
-        self.proc_requ_thread.start()
+        self.server_thread.start()
 
     def terminate(self):
         # Kill client handling threads
         self.running = False
-        self.acc_conn_thread.join()
-        self.proc_requ_thread.join()
+        self.server_thread.join()
 
-    def accept_connections(self):
-        while self.running:
+    async def _run_async_server(self):
+        asyncio.create_task(self._accept_connections())
+        asyncio.create_task(self._process_requests())
+
+        async def server_forever():
+            while self.running:
+                await asyncio.sleep(0.1)
+
+        await server_forever()
+
+    async def _accept_connections(self):
+        if self.running:
             try:
                 (client, address) = self.socket.accept()
+
+                client.settimeout(1)
 
                 clients = self.clients_queue.get()
 
@@ -712,33 +933,36 @@ class SocketServer(Routine):
             except socket.timeout:
                 pass
 
-            time.sleep(0.001)
+            await asyncio.sleep(0.001)
 
-        # Close sockets
-        try:
-            self.socket.shutdown(socket.SHUT_RDWR)
-        except OSError:  # socket was not connected
-            pass
-        self.socket.close()
+            asyncio.create_task(self._accept_connections())
 
-        clients = self.clients_queue.get()
-
-        for address, client in clients.items():
+        else:
+            # Close sockets
             try:
-                client.shutdown(socket.SHUT_RDWR)
-                client.close()
-            except ConnectionError:
-                # client is already disconnected
+                self.socket.shutdown(socket.SHUT_RDWR)
+            except OSError:  # socket was not connected
                 pass
-            except OSError:
-                # client is already disconnected
-                pass
+            self.socket.close()
 
-        # Return empty clients dict to queue so process_requests can exit
-        self.clients_queue.put({})
+            clients = self.clients_queue.get()
 
-    def process_requests(self):
-        while self.running:
+            for address, client in clients.items():
+                try:
+                    client.shutdown(socket.SHUT_RDWR)
+                    client.close()
+                except ConnectionError:
+                    # client is already disconnected
+                    pass
+                except OSError:
+                    # client is already disconnected
+                    pass
+
+            # Return empty clients dict to queue so process_requests can exit
+            self.clients_queue.put({})
+
+    async def _process_requests(self):
+        if self.running:
             clients = self.clients_queue.get()
 
             # Purge disconnected clients
@@ -754,6 +978,9 @@ class SocketServer(Routine):
                 try:
                     request = read_from_socket(client, chunk_size=1)
                 except ConnectionError:
+                    print(f"Connection issue with client at {address}")
+                    client.shutdown(socket.SHUT_RDWR)
+                    client.close()
                     clients[address] = None
                     continue
 
@@ -781,7 +1008,7 @@ class SocketServer(Routine):
                             _type = None
                             value = self.state[alias]
 
-                            if isinstance(value, String) and '.csv' in value:
+                            if isinstance(value, String) and ".csv" in value:
                                 # value is an Array stored in a CSV file
                                 _type = Array
                             else:
@@ -800,7 +1027,7 @@ class SocketServer(Routine):
                         elif alias in self.state:
                             _value = self.state[alias]
 
-                            if isinstance(_value, String) and '.csv' in _value:
+                            if isinstance(_value, String) and ".csv" in _value:
                                 # value is an array, list or tuple stored in CSV file
                                 df = pd.read_csv(_value)
 
@@ -816,7 +1043,7 @@ class SocketServer(Routine):
 
                         if isinstance(_value, Array):
                             # pickle arrays and send as bytes
-                            outgoing_message = f'{alias} dlpkl'.encode()
+                            outgoing_message = f"{alias} dlpkl".encode()
                             outgoing_message += dill.dumps(
                                 _value, protocol=dill.HIGHEST_PROTOCOL
                             )
@@ -841,6 +1068,7 @@ class SocketServer(Routine):
                 # Send outgoing message
                 if outgoing_message is not None:
                     write_to_socket(client, outgoing_message)
+                    message_sent = True
 
                 # Remove clients with problematic connections
                 exceptional = client in select.select([], [], [client], 0)[2]
@@ -850,8 +1078,9 @@ class SocketServer(Routine):
                     clients[address] = None
 
             self.clients_queue.put(clients)
+            await asyncio.sleep(0.001)
 
-            time.sleep(0.001)
+            asyncio.create_task(self._process_requests())
 
     @Routine.enabler
     def update(self, state):
@@ -893,7 +1122,12 @@ class ModbusServer(Routine):
 
     assert_control = False
 
-    def __init__(self, knobs: dict = None, meters: Array = None, **kwargs):
+    def __init__(
+        self,
+        knobs: dict = None,
+        meters: Union[list, tuple, np.ndarray] = None,
+        **kwargs,
+    ):
         if knobs is None:
             knobs = {}
 
@@ -922,13 +1156,12 @@ class ModbusServer(Routine):
         DataBlock = datastore.ModbusSequentialDataBlock
 
         # Set up a PyModbus TCP Server
-        datastore.ModbusSlaveContext.setValues = self.setValues_decorator(
-            datastore.ModbusSlaveContext.setValues
-        )
 
         self.slave = datastore.ModbusSlaveContext(
             ir=DataBlock.create(), hr=DataBlock.create()
         )
+
+        self.slave.setValues = self.setValues_decorator(self.slave.setValues)
 
         self.context = datastore.ModbusServerContext(slaves=self.slave, single=True)
 
@@ -945,7 +1178,7 @@ class ModbusServer(Routine):
         self.server = None  # assigned in _run_async_server
         self.ip_address = kwargs.get("address", get_ip_address())
         self.port = kwargs.get("port", 502)
-
+        # TODO: warn when port is off-limits due to permissions
         self.server_thread = threading.Thread(
             target=asyncio.run, args=(self._run_async_server(),)
         )
@@ -960,13 +1193,12 @@ class ModbusServer(Routine):
         """
 
         @functools.wraps(setValues_method)
-        def wrapped_method(self2, *args, from_vars=False):
+        def wrapped_method(*args, from_vars=False):
             if from_vars:
                 # update context from variables
-                return setValues_method(self2, *args)
+                return setValues_method(*args)
             else:
                 # update variables according to the request
-
                 fc_as_hex, address, values = args
 
                 if fc_as_hex != 16:

@@ -11,6 +11,7 @@ Settings:
  plot interval: 1
  save interval: 10
  end: 3 minutes
+ async: True
 
 Instruments:
 
@@ -62,8 +63,9 @@ Routines:
    - [-1, 1]
    - [-1, 1]
   max deltas: 0.1
-  kappa: 2.5  # exploration vs. exploitation parameter
-  start: 0
+  method: powell
+  samples: 5
+  start: 5
   end: 60
 
  Maximization Routine:
@@ -76,6 +78,7 @@ Routines:
    - [-1, 1]
    - [-1, 1]
   max deltas: 0.1
-  kappa: 3.0  # exploration vs. exploitation parameter
-  start: 90
-  end: 150
+  method: bayesian
+  samples: 10
+  start: 65
+  end: 120

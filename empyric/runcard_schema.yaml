@@ -12,6 +12,7 @@ map:
     step interval: {type: any},
     save interval: {type: any},
     plot interval: {type: any},
+    async: {type: bool},
     end: {type: any}
   }}
 
@@ -52,17 +53,10 @@ map:
       dtype: {type: str},
       settable: {type: bool},
 
-      hidden: {type: bool}  # whether to show in GUI
-    }}
-  }}
+      hidden: {type: bool},  # whether to show in GUI
 
-  Alarms: {map: {
-    regex;(.+): {required: true, map: {  # alarm name
-      protocol: {type: str},
-      condition: {type: str, required: true},
-      definitions: {map: {
-        regex;(.+): {type: str, required: true}
-      }}
+      multiplier: { type: number },  # for knob, meter and remote type variables
+      offset: { type: number }  # for knob, meter and remote type variables
     }}
   }}
 
@@ -73,6 +67,16 @@ map:
     }}
   }}
 
+  Alarms: { map: {
+    regex;(.+): { required: true, map: { # alarm name
+      protocol: { type: str },
+      condition: { type: str, required: true },
+      definitions: { map: {
+        regex;(.+): { type: str, required: true }
+      } }
+    } }
+  } }
+
   Plots: {map: {
     regex;(.+): {required: true, map: {  # plot name
       x: {type: any},
@@ -81,6 +85,8 @@ map:
       style: {type: str},
       xlabel: {type:  str},
       ylabel: {type: str},
+      xscale: {type: str},  # linear or log x-axis scale
+      yscale: {type: str},  # linear or log y-axis scale
       configure: {map: {
         regex;(.+): {type: any}  # keyword args passed to matplotlib
       }}
