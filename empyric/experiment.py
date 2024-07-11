@@ -11,6 +11,7 @@ import sys
 import threading
 import time
 import tkinter as tk
+import warnings
 from tkinter.filedialog import askopenfilename
 from typing import Union
 
@@ -135,7 +136,10 @@ class Experiment:
             data={**{"Time": None}, **{name: None for name in self.variables}},
             dtype=object,
         )
-        self.data = pd.DataFrame(columns=["Time"] + list(variables.keys()))
+        self.data = pd.DataFrame(
+            columns=["Time"] + list(variables.keys()),
+            dtype=object
+        )
 
         self._status = Experiment.READY
         self.status_locked = True
@@ -200,7 +204,9 @@ class Experiment:
             self.status = base_status
 
             # Append new state to experiment data set
-            self.data.loc[self.state.name] = self.state
+            with warnings.catch_warnings():
+                warnings.simplefilter(action='ignore', category=FutureWarning)
+                self.data.loc[self.state.name] = self.state
 
         # End the experiment, if the duration of the experiment has passed
         if self.clock.time > self.end:
@@ -414,7 +420,9 @@ class AsyncExperiment(Experiment):
 
         if (self.running or self.holding) and self.state.name is not None:
             # Append new state to experiment data set
-            self.data.loc[self.state.name] = self.state
+            with warnings.catch_warnings():
+                warnings.simplefilter(action='ignore', category=FutureWarning)
+                self.data.loc[self.state.name] = self.state
 
         elif self.terminated:
             raise StopIteration
