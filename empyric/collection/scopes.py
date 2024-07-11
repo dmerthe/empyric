@@ -4,7 +4,7 @@ import time
 import numpy as np
 
 from empyric.tools import find_nearest
-from empyric.types import Float, Array, Integer, String
+from empyric.types import Float, Array, Integer, String, Boolean
 from empyric.adapters import USB, Socket
 from empyric.collection.instrument import Instrument, setter, getter, measurer
 
@@ -341,13 +341,13 @@ class MulticompProScope(Instrument):
     sample_rate = None
 
     @setter
-    def set_horz_scale(self, scale):
+    def set_horz_scale(self, scale: Float):
         new_time_scale = find_nearest(list(self._time_scales.keys()), scale)
 
         self.write(":HORI:SCAL " + self._time_scales[new_time_scale])
 
     @getter
-    def get_horz_scale(self):
+    def get_horz_scale(self) -> Float:
         time_scales_rev = {val: key for key, val in self._time_scales.items()}
 
         time_scale_str = self.query(":HORI:SCAL?")[:-2]
@@ -355,11 +355,11 @@ class MulticompProScope(Instrument):
         return time_scales_rev[time_scale_str]
 
     @setter
-    def set_horz_position(self, offset):
+    def set_horz_position(self, offset: Float):
         self.write(":HORI:OFFS " + str(offset))
 
     @getter
-    def get_horz_position(self):
+    def get_horz_position(self) -> Float:
         return float(self.query(":HORI:OFFS?")[:-2])
 
     def _set_scale_ch(self, channel, scale):
@@ -383,23 +383,23 @@ class MulticompProScope(Instrument):
         self.write((":CH%d:OFFS " % channel) + str(position))
 
     @setter
-    def set_scale_ch(self, scale, channel=None):
+    def set_scale_ch(self, scale: Float, channel=None):
         self._set_scale_ch(channel, scale)
 
     @getter
-    def get_scale_ch(self, channel=None):
+    def get_scale_ch(self, channel=None) -> Float:
         return self._get_scale_ch(channel)
 
     @setter
-    def set_position_ch(self, position, channel=None):
+    def set_position_ch(self, position: Float, channel=None):
         self._set_position_ch(channel, position)
 
     @getter
-    def get_position_ch(self, channel=None):
+    def get_position_ch(self, channel=None) -> Float:
         return float(self.query(":CH%d:OFFS?" % channel)[:-2])
 
     @setter
-    def set_sweep_mode(self, mode):
+    def set_sweep_mode(self, mode: String):
         if mode.upper() not in self._sweep_modes:
             raise ValueError(
                 f"Invalid sweep mode! "
@@ -409,15 +409,15 @@ class MulticompProScope(Instrument):
         self.write(":TRIG:SING:SWE " + mode.upper())
 
     @getter
-    def get_sweep_mode(self):
+    def get_sweep_mode(self) -> String:
         return self.query(":TRIG:SING:SWE?")[:-2].upper()
 
     @setter
-    def set_trigger_source(self, source):
+    def set_trigger_source(self, source: String):
         self.write(":TRIG:SING:EDGE:SOUR CH%d" % int(source))
 
     @getter
-    def get_trigger_source(self):
+    def get_trigger_source(self) -> String:
         source = self.query(":TRIG:SING:EDGE:SOUR?")[:-2]
 
         if source == "CH1":
@@ -426,7 +426,7 @@ class MulticompProScope(Instrument):
             return 2
 
     @setter
-    def set_trigger_level(self, level_volts):
+    def set_trigger_level(self, level_volts: Float):
         trigger_source = self.get_trigger_source()
 
         scale = self._get_scale_ch(trigger_source)
@@ -436,7 +436,7 @@ class MulticompProScope(Instrument):
         self.write(":TRIG:SING:EDGE:LEV " + level_div)
 
     @getter
-    def get_trigger_level(self):
+    def get_trigger_level(self) -> Float:
         trigger_source = self.get_trigger_source()
 
         scale = self._get_scale_ch(trigger_source)
@@ -444,11 +444,11 @@ class MulticompProScope(Instrument):
         return float(self.query(":TRIG:SING:EDGE:LEV?")[:-2]) * scale
 
     @measurer
-    def measure_trigger_status(self):
+    def measure_trigger_status(self) -> String:
         return self.query(":TRIG:STATUS?")[:-2]
 
     @setter
-    def set_resolution(self, resolution):
+    def set_resolution(self, resolution: Integer):
         if resolution not in self._resolutions:
             raise ValueError(
                 f"Invalid memory depth! "
@@ -464,12 +464,12 @@ class MulticompProScope(Instrument):
         return res_rev[self.query(":ACQ:DEPMEM?")[:-2]]
 
     @setter
-    def set_state(self, state):
+    def set_state(self, state: String):
         if state.upper() in ["RUN", "STOP"]:
             self.write(f":{state.upper()}")
 
     @setter
-    def set_acquire(self, _):
+    def set_acquire(self, _: Boolean):
         self._acquiring = True
 
         self.set_sweep_mode("SINGLE")
@@ -589,7 +589,7 @@ class MulticompProScope(Instrument):
         return voltages
 
     @measurer
-    def measure_channel_1(self):
+    def measure_channel_1(self) -> Array:
         if not self._acquiring:
             self.set_acquire(True)
 
@@ -604,7 +604,7 @@ class MulticompProScope(Instrument):
         return data
 
     @measurer
-    def measure_channel_2(self):
+    def measure_channel_2(self) -> Array:
         if not self._acquiring:
             self.set_acquire(True)
 
