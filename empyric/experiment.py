@@ -453,7 +453,7 @@ class AsyncExperiment(Experiment):
                 self.state.name = datetime.datetime.now()
 
             elif self.stopped:
-                await asyncio.sleep(0)  # give other updating tasks a chance to run
+                await asyncio.sleep(0.1)  # give other updating tasks a chance to run
 
     async def _update_routine(self, name):
         """Update named routine"""
@@ -467,7 +467,7 @@ class AsyncExperiment(Experiment):
                 await asyncio.to_thread(Experiment._update_routine, self, name)
 
             elif self.holding or self.stopped:
-                await asyncio.sleep(0)  # give other updating tasks a chance to run
+                await asyncio.sleep(0.1)  # give other updating tasks a chance to run
 
 
 class Alarm:
