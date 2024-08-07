@@ -1,12 +1,9 @@
 import importlib
 import numbers
-import os.path
 import socket
 import queue
 import threading
 import asyncio
-import time
-import warnings
 from typing import Union
 
 import select
@@ -25,7 +22,7 @@ from empyric.tools import (
     autobind_socket,
     read_from_socket,
     write_to_socket,
-    get_ip_address,
+    get_ip_address, logger,
 )
 from empyric.types import (
     recast,
@@ -303,7 +300,8 @@ class Ramp(Routine):
         self.now = state["Time"]
 
         if self.then is None or self.then < self.start:
-            self.then = state["Time"]
+            self.then = self.now
+            return
 
         for knob, rate, target in zip(self.knobs, self.rates, self.targets):
             # target and rate can be variables
@@ -334,7 +332,7 @@ class Ramp(Routine):
             else:
                 self.knobs[knob].value = val_nxt
 
-        self.then = state["Time"]
+        self.then = self.now
 
 
 class Timecourse(Routine):
@@ -413,13 +411,17 @@ class Timecourse(Routine):
 
     @Routine.enabler
     def update(self, state):
+
+        now = state["Time"]
+
         knobs_times_values = zip(self.knobs, self.times, self.values)
+
         for knob, times, values in knobs_times_values:
-            if np.min(times) > state["Time"] or np.max(times) < state["Time"]:
+            if np.min(times) > now or np.max(times) < now:
                 continue
 
-            j_last = np.argwhere(times <= state["Time"]).flatten()[-1]
-            j_next = np.argwhere(times > state["Time"]).flatten()[0]
+            j_last = np.argwhere(times <= now).flatten()[-1]
+            j_next = np.argwhere(times > now).flatten()[0]
 
             last_time = times[j_last]
             next_time = times[j_next]
@@ -438,7 +440,7 @@ class Timecourse(Routine):
             if self.ramp:
                 # Ramp linearly between numerical values
                 value = last_value + (next_value - last_value) * (
-                    state["Time"] - last_time
+                    now - last_time
                 ) / (next_time - last_time)
             else:
                 # or just set to last value
@@ -604,7 +606,7 @@ class Optimization(Routine):
                 )
         else:
             if sign is not None:
-                warnings.warn(
+                logger.warning(
                     "The signs of Maximization and Minimization routines cannot be "
                     "changed"
                 )

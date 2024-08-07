@@ -1,9 +1,12 @@
+import re
 import struct
-import warnings
+import socket
+import numpy as np
 
-from empyric.adapters import *
-from empyric.collection.instrument import *
+from empyric.tools import logger
 from empyric.types import Toggle, Float, ON, OFF
+from empyric.adapters import Serial, Socket, GPIB
+from empyric.collection.instrument import Instrument, setter, getter, measurer
 
 
 class Keithley2260B(Instrument):
@@ -950,7 +953,7 @@ class GlassmanOQ500(Instrument):
                 # Check for fault state on byte 11, bit 1
                 ps_fault = message[10:13][1:2]
                 if ps_fault == "1":
-                    warnings.warn(
+                    logger.warning(
                         "GlassmanOQ500: Power supply is in a fault state. "
                         "A PS reset command must be sent "
                         "(via 'reset' knob) to clear fault "
@@ -974,7 +977,7 @@ class GlassmanOQ500(Instrument):
         if message == "A":
             return True
         elif message[0] == "E":
-            warnings.warn(
+            logger.warning(
                 f"GlassmanOQ500: Error message received "
                 f"during set command: {message}. "
                 f"See manual for further details."
@@ -986,7 +989,7 @@ class GlassmanOQ500(Instrument):
     def set_max_voltage(self, voltage_Volts: Float):
         self.vi_setpoints[0] = voltage_Volts
         if self.vi_setpoints[1] is None:
-            warnings.warn(
+            logger.warning(
                 f"GlassmanOQ500: Waiting for current setpoint "
                 f"to set voltage to {voltage_Volts} V."
             )
@@ -1003,7 +1006,7 @@ class GlassmanOQ500(Instrument):
     def set_max_current(self, current_mA: Float):
         self.vi_setpoints[1] = current_mA
         if self.vi_setpoints[0] is None:
-            warnings.warn(
+            logger.warning(
                 f"GlassmanOQ500: Waiting for voltage setpoint "
                 f"to set current to {current_mA} mA."
             )
@@ -1034,7 +1037,7 @@ class GlassmanOQ500(Instrument):
     def set_output_enable(self, output: Toggle):
         if output == ON:
             if self.vi_setpoints[0] is None or self.vi_setpoints[1] is None:
-                warnings.warn(
+                logger.warning(
                     "GlassmanOQ500: Waiting for voltage and current "
                     "setpoints to be set in order to set output ON."
                 )
@@ -1098,7 +1101,7 @@ class GlassmanOQ500(Instrument):
         bytestr = bin(int(response))[2:].zfill(4)
         bit = bytestr[2:3]
         if bit == "1":
-            warnings.warn(
+            logger.warning(
                 "GlassmanOQ500: Power supply is in a fault state. A PS reset "
                 "command must be sent (via 'reset' knob) to clear "
                 "fault before setting new values!"

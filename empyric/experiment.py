@@ -11,9 +11,9 @@ import sys
 import threading
 import time
 import tkinter as tk
+import warnings
 from tkinter.filedialog import askopenfilename
 from typing import Union
-from warnings import warn
 
 import numpy as np
 import pandas as pd
@@ -27,10 +27,9 @@ from empyric import graphics as _graphics
 from empyric import instruments as _instruments
 from empyric import routines as _routines
 from empyric.adapters import AdapterError
-from empyric.tools import convert_time, Clock
-from empyric.types import recast, Boolean, Toggle, Integer, Float, ON
 
-logger = logging.getLogger()
+from empyric.tools import convert_time, Clock, logger
+from empyric.types import recast, Boolean, Toggle, Integer, Float, ON
 
 
 class Experiment:
@@ -137,7 +136,10 @@ class Experiment:
             data={**{"Time": None}, **{name: None for name in self.variables}},
             dtype=object,
         )
-        self.data = pd.DataFrame(columns=["Time"] + list(variables.keys()))
+        self.data = pd.DataFrame(
+            columns=["Time"] + list(variables.keys()),
+            dtype=object
+        )
 
         self._status = Experiment.READY
         self.status_locked = True
@@ -202,7 +204,9 @@ class Experiment:
             self.status = base_status
 
             # Append new state to experiment data set
-            self.data.loc[self.state.name] = self.state
+            with warnings.catch_warnings():
+                warnings.simplefilter(action='ignore', category=FutureWarning)
+                self.data.loc[self.state.name] = self.state
 
         # End the experiment, if the duration of the experiment has passed
         if self.clock.time > self.end:
@@ -219,23 +223,26 @@ class Experiment:
     def _update_variable(self, name):
         """Retrieve and store a variable value"""
 
-        logger.info(f'Updating experiment variable {name}')
-
         try:
             if isinstance(self.variables[name], _variables.Expression):
                 for symbol, dependee in self.variables[name].definitions.items():
                     if hasattr(dependee, "_eval_event"):
-                        # wait for dependee to be evaluated
+
+                        logger.debug(
+                            f'Expression {name} is waiting for {symbol} to be evaluated'
+                        )
+
                         dependee._eval_event.wait()
 
             try:
                 value = self.variables[name].value
+                logger.info(f'{name} evaluated to {value}')
             except AdapterError as adapter_error:
                 value = None
-                warn(str(adapter_error))
+                logger.warning(f'Unable to evaluate {name}: {adapter_error}')
             except ValueError as value_error:
                 value = None
-                warn(str(value_error))
+                logger.warning(f'Unable to evaluate {name}: {value_error}')
 
             self.variables[name]._eval_event.set()
             # unblock threads evaluating dependents
@@ -262,14 +269,12 @@ class Experiment:
     def _update_routine(self, name):
         """Update a routine according to the current state"""
 
-        logger.info(f'Updating experiment routine {name}')
-
         try:
             try:
                 self.routines[name].update(self.state)
             except AdapterError as adapter_error:
-                warn(str(adapter_error))
-        except BaseException as err:
+                logger.warning(f'Unable to update routine {name}: {adapter_error}')
+        except Exception as err:
             self.terminate()
             raise err
 
@@ -398,8 +403,7 @@ class AsyncExperiment(Experiment):
         end: Union[numbers.Number, str, None] = None,
     ):
         super().__init__(variables, routines, end)
-        self._taskgroup = None
-        self._updating_thread = None
+        self.loop = None
 
     def __next__(self):
 
@@ -416,78 +420,54 @@ class AsyncExperiment(Experiment):
 
         if (self.running or self.holding) and self.state.name is not None:
             # Append new state to experiment data set
-            self.data.loc[self.state.name] = self.state
+            with warnings.catch_warnings():
+                warnings.simplefilter(action='ignore', category=FutureWarning)
+                self.data.loc[self.state.name] = self.state
 
         elif self.terminated:
             raise StopIteration
 
         return self.state
 
+    def start(self):
+
+        super().start()
+
+        self.loop = asyncio.get_running_loop()
+
+        for name in self.variables:
+            self.loop.create_task(self._update_variable(name))
+
+        for name in self.routines:
+            self.loop.create_task(self._update_routine(name))
+
     async def _update_variable(self, name):
         """Update named variable"""
-        if self.running or self.holding:
+        while not self.terminated:
+            if self.running or self.holding:
 
-            async def update():
-                Experiment._update_variable(self, name)
+                await asyncio.to_thread(Experiment._update_variable, self, name)
 
-            await update()
+                # Update time
+                self.state["Time"] = self.clock.time
+                self.state.name = datetime.datetime.now()
 
-            # Update time
-            self.state["Time"] = self.clock.time
-            self.state.name = datetime.datetime.now()
-        elif self.stopped:
-            await asyncio.sleep(0.1)
-
-        if not self.terminated:
-            self._taskgroup.create_task(self._update_variable(name))
+            elif self.stopped:
+                await asyncio.sleep(0.1)  # give other updating tasks a chance to run
 
     async def _update_routine(self, name):
         """Update named routine"""
-        if self.running:
+        while not self.terminated:
+            if self.running:
 
-            # Update time
-            self.state["Time"] = self.clock.time
-            self.state.name = datetime.datetime.now()
+                # Update time
+                self.state["Time"] = self.clock.time
+                self.state.name = datetime.datetime.now()
 
-            async def update():
-                Experiment._update_routine(self, name)
+                await asyncio.to_thread(Experiment._update_routine, self, name)
 
-            await update()
-
-        elif self.stopped:
-            await asyncio.sleep(0.1)
-
-        if not self.terminated:
-            self._taskgroup.create_task(self._update_routine(name))
-
-    async def _run_loop(self):
-        """Run updating loop for variables and routines"""
-
-        async with asyncio.TaskGroup() as taskgroup:
-            # Only exits when all tasks are finished,
-            # i.e. when the experiment is terminated
-            self._taskgroup = taskgroup
-
-            for name in self.variables:
-                taskgroup.create_task(self._update_variable(name))
-
-            for name in self.routines:
-                taskgroup.create_task(self._update_routine(name))
-
-    def start(self):
-        super().start()
-
-        self._updating_thread = threading.Thread(
-            target=asyncio.run, args=(self._run_loop(),)
-        )
-
-        self._updating_thread.start()
-
-    def terminate(self, reason=None):
-        super().terminate(reason=reason)
-
-        if self._updating_thread is not None:
-            self._updating_thread.join()
+            elif self.holding or self.stopped:
+                await asyncio.sleep(0.1)  # give other updating tasks a chance to run
 
 
 class Alarm:
@@ -622,7 +602,7 @@ class Manager:
 
         # Run experiment loop in separate thread
         logger.info(f'Starting {experiment_name}')
-        experiment_thread = threading.Thread(target=self._run)
+        experiment_thread = threading.Thread(target=asyncio.run, args=(self._run(),))
         experiment_thread.start()
 
         # Set up the GUI for user interaction
@@ -664,10 +644,17 @@ class Manager:
                 self.__init__(self.runcard)
                 self.run(directory=directory)
 
-    def _run(self):
+    async def _run(self):
         # Run in a separate thread
 
         for state in self.experiment:
+
+            logger.info(
+                'state =' + '.,'.join(
+                    [f'{key}: {value}' for key, value in state.items()]
+                )
+            )
+
             step_start = time.time()
 
             # Save experimental data periodically
@@ -740,8 +727,7 @@ class Manager:
 
             remaining_time = self.step_interval - (step_end - step_start)
 
-            if remaining_time > 0:
-                time.sleep(remaining_time)
+            await asyncio.sleep(max([remaining_time, 0.0]))
 
     def __repr__(self):
         return "Manager"

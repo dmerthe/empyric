@@ -1,9 +1,9 @@
 import time
 import numpy as np
-from empyric.instruments import Instrument
-from empyric.instruments import setter, measurer
+
+from empyric.types import Float, String
+from empyric.instruments import Instrument, setter, measurer
 from empyric.adapters import Adapter, Modbus
-from empyric.types import Boolean, Toggle, Integer, Float, String, Array
 
 
 class Clock(Instrument):

@@ -2,11 +2,13 @@ import time
 import select
 import socket
 import numbers
+import logging
 import numpy as np
 import logging
 
 # Set up logging
 logger = logging.getLogger("empyric")
+
 logger.setLevel(logging.WARNING)
 
 log_stream_handler = logging.StreamHandler()
@@ -228,11 +230,6 @@ def read_from_socket(
             raise ConnectionError("an exception has been raised for the socket")
 
         try:
-            # Check again that socket is readable
-            readable = select.select([_socket], [], [], timeout)[0]
-
-            if not readable:
-                break
 
             if remaining_bytes < chunk_size:
                 part = _socket.recv(remaining_bytes)

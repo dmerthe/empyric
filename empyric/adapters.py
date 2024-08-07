@@ -2,6 +2,7 @@ import importlib
 import socket
 import time
 import re
+
 from threading import Lock
 
 import numpy as np
@@ -19,16 +20,7 @@ def chaperone(method):
     """
 
     def wrapped_method(self, *args, validator=None, **kwargs):
-        if not self.connected:
-            raise AdapterError(
-                "Adapter is not connected for instrument "
-                f"at address {self.instrument.address}"
-            )
-
         self.lock.acquire()
-
-        # Catch communication errors and either try to repeat communication
-        # or reset the connection
 
         traceback = None
 
@@ -37,13 +29,25 @@ def chaperone(method):
         while reconnects < self.max_reconnects:
             if not self.connected:
 
-                logger.info(
+                logger.debug(
                     f'Connecting to {self.instrument.name} '
                     f'at {self.instrument.address}'
                 )
 
-                time.sleep(self.delay)
-                self.connect()
+                time.sleep(self.delay * reconnects)
+
+                try:
+                    self.connect()
+                except Exception as exception:
+                    traceback = exception.__traceback__
+
+                    logger.error(
+                        f"Encountered '{exception}' while trying "
+                        f"to connect to {self.instrument.name}"
+                    )
+
+                    continue
+
                 reconnects += 1
 
             attempts = 0
@@ -51,7 +55,7 @@ def chaperone(method):
             while attempts < self.max_attempts:
                 try:
 
-                    logger.info(
+                    logger.debug(
                         f'Communicating with {self.instrument.name} '
                         f'at {self.instrument.address}: {method}({args})'
                     )
@@ -68,9 +72,14 @@ def chaperone(method):
                         )
 
                     elif attempts > 0 or reconnects > 0:
-                        print("Resolved")
+                        logger.info(
+                            f"Communication issue with {self.instrument.name} "
+                            "is resolved"
+                        )
 
-                    logger.info(
+                    # Successful communication
+
+                    logger.debug(
                         f'Communication with {self.instrument.name} '
                         f'at {self.instrument.address} successful '
                         f'with response: {response}'
@@ -82,7 +91,8 @@ def chaperone(method):
                 except Exception as exception:
                     traceback = exception.__traceback__
 
-                    logger.warning(
+
+                    logger.error(
                         f"Encountered '{exception}' while trying "
                         f"to talk to {self.instrument.name}"
                     )
@@ -92,7 +102,7 @@ def chaperone(method):
             # getting here means attempts have maxed out;
             # disconnect adapter and potentially reconnect on next iteration
 
-            logger.info(
+            logger.debug(
                 f'Disconnecting from {self.instrument.name} '
                 f'at {self.instrument.address}'
             )
@@ -100,6 +110,7 @@ def chaperone(method):
             self.disconnect()
 
         # Getting here means that both attempts and reconnects have been maxed out
+        # and the communication was unsuccessful
         self.lock.release()
 
         raise AdapterError(
@@ -112,7 +123,7 @@ def chaperone(method):
     return wrapped_method
 
 
-class AdapterError(Exception):
+class AdapterError(ConnectionError):
     pass
 
 
@@ -170,7 +181,7 @@ class Adapter:
         if hasattr(self, "connected") and self.connected:
             try:
                 self.disconnect()
-            except BaseException as err:
+            except Exception as err:
                 print(f"Error while disconnecting {self.instrument.name}:", err)
                 pass
 
@@ -1169,6 +1180,20 @@ class Modbus(Adapter):
     def busy(self, busy):
         self._busy = busy
 
+    @property
+    def connected(self):
+        try:
+            return self.backend.connected
+        except AttributeError:
+            return False
+
+    @connected.setter
+    def connected(self, connected):
+        if connected and not self.connected:
+            self.connect()
+        elif not connected and self.connected:
+            self.disconnect()
+
     def connect(self):
         client = importlib.import_module(".client", package="pymodbus")
 
@@ -1181,9 +1206,9 @@ class Modbus(Adapter):
                 self.protocol = "UDP"
 
                 if len(address) == 1:
-                    address.append(
-                        502
-                    )  # standard Modbus UDP port (fascinating that it's the same as TCP)
+                    address.append(502)
+                    # standard Modbus UDP port (fascinating that it's the same as TCP)
+
                 self.backend = client.ModbusUdpClient(
                     host=address[0], port=int(address[1])
                 )
@@ -1240,8 +1265,6 @@ class Modbus(Adapter):
 
         # Utility for decoding data
         self._decoder_cls = payload_module.BinaryPayloadDecoder
-
-        self.connected = True
 
     def _write(self, func_code, address, values, _type="16bit_uint"):
         """
@@ -1402,9 +1425,9 @@ class Modbus(Adapter):
         return self._read(*args, **kwargs)
 
     def disconnect(self):
-        self.backend.close()
-
-        self.connected = False
+        while self.connected:
+            self.backend.close()
+            time.sleep(0.1)
 
 
 class Phidget(Adapter):
