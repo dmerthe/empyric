@@ -191,7 +191,7 @@ class PIDController(Instrument):
 
     supported_adapters = ((Adapter, {}),)
 
-    knobs = ("setpoint", "proportional gain" "derivative time" "integral time", "input")
+    knobs = ("setpoint", "proportional gain", "derivative time", "integral time", "input")
 
     presets = {"proportional gain": 1, "derivative time": 12, "integral time": 180}
 
@@ -200,7 +200,7 @@ class PIDController(Instrument):
     def __init__(self, *args, **kwargs):
         self.setpoint = None
 
-        Instrument.__init_(self, *args, **kwargs)
+        Instrument.__init__(self, *args, **kwargs)
         self.clock = Clock()
 
         self.times = np.array([])
@@ -233,10 +233,10 @@ class PIDController(Instrument):
         """Input the process value"""
 
         if len(self.times) == 0:
-            self.clock.start()
+            self.clock.set_state('START')
 
         if len(self.outputs) == len(self.inputs):
-            self.times = np.concatenate([self.times, [self.clock.time]])
+            self.times = np.concatenate([self.times, [self.clock.measure_time()]])
             self.setpoints = np.concatenate([self.setpoints, [self.setpoint]])
             self.inputs = np.concatenate([self.inputs, [input]])
 
@@ -274,7 +274,7 @@ class PIDController(Instrument):
 
             output = self.proportional_gain * (error + tD * derivative + integral / tI)
 
-            self.outputs.append(output)
+            self.outputs = np.concatenate([self.outputs, [output]])
 
             return output
         else:
