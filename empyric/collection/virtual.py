@@ -232,8 +232,7 @@ class PIDController(Instrument):
     def set_input(self, input: Float):
         """Input the process value"""
 
-        if len(self.times) == 0:
-            self.clock.set_state('START')
+        self.clock.set_state('START')
 
         if len(self.outputs) == len(self.inputs):
             self.times = np.concatenate([self.times, [self.clock.measure_time()]])
@@ -262,9 +261,12 @@ class PIDController(Instrument):
 
                 integral = np.sum(dt * errors)
 
-                derivative = -(self.inputs[-1] - self.inputs[-2]) / (
-                    self.times[-1] - self.times[-2]
-                )
+                if len(self.times) > 1:
+                    derivative = -(self.inputs[-1] - self.inputs[-2]) / (
+                        self.times[-1] - self.times[-2]
+                    )
+                else:
+                    derivative = 0.0
             else:
                 integral = 0
                 derivative = 0
@@ -277,8 +279,10 @@ class PIDController(Instrument):
             self.outputs = np.concatenate([self.outputs, [output]])
 
             return output
-        else:
+        elif np.any(self.outputs):
             return self.outputs[-1]
+        else:
+            return 0.0
 
 
 class RandomWalk(Instrument):
