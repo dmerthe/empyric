@@ -222,15 +222,22 @@ class Knob(Variable):
         """
 
         try:
-            if self.upper_limit and value > self.upper_limit:
+
+            upper_limit_exceeded = (self.upper_limit is not None) and (value > self.upper_limit)
+            lower_limit_exceeded = (self.lower_limit is not None) and (value < self.lower_limit)
+
+            if upper_limit_exceeded:
+
                 self.instrument.set(
                     self.knob, (self.upper_limit - self.offset) / self.multiplier
                 )
-            elif self.lower_limit and value < self.lower_limit:
+
+            if lower_limit_exceeded:
                 self.instrument.set(
                     self.knob, (self.lower_limit - self.offset) / self.multiplier
                 )
-            else:
+
+            if not upper_limit_exceeded and not lower_limit_exceeded:
                 if isinstance(value, numbers.Number):
                     self.instrument.set(
                         self.knob, (value - self.offset) / self.multiplier
