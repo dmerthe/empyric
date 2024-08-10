@@ -191,7 +191,13 @@ class PIDController(Instrument):
 
     supported_adapters = ((Adapter, {}),)
 
-    knobs = ("setpoint", "proportional gain", "derivative time", "integral time", "input")
+    knobs = (
+        "setpoint",
+        "proportional gain",
+        "derivative time",
+        "integral time",
+        "input",
+    )
 
     presets = {"proportional gain": 1, "derivative time": 12, "integral time": 180}
 
@@ -232,7 +238,7 @@ class PIDController(Instrument):
     def set_input(self, input: Float):
         """Input the process value"""
 
-        self.clock.set_state('START')
+        self.clock.set_state("START")
 
         if len(self.outputs) == len(self.inputs):
             self.times = np.concatenate([self.times, [self.clock.measure_time()]])

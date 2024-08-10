@@ -56,7 +56,7 @@ def setter(method):
             args = list(args)
             args[1] = recast(args[1], to=dtype)
 
-            logger.debug(f'Setting {knob} on {self.name} to {value}')
+            logger.debug(f"Setting {knob} on {self.name} to {value}")
 
             returned_value = method(*args, **kwargs)
 
@@ -65,8 +65,8 @@ def setter(method):
             if returned_value is not None:
 
                 logger.debug(
-                    f'Value returned by set method for {knob} on {self.name} '
-                    f'is {returned_value} instead of applied value {value}'
+                    f"Value returned by set method for {knob} on {self.name} "
+                    f"is {returned_value} instead of applied value {value}"
                 )
 
                 self.__setattr__(knob, recast(returned_value, to=dtype))
@@ -109,17 +109,17 @@ def getter(method):
 
         try:
 
-            logger.debug(f'Getting value of {knob} on {self.name}...')
+            logger.debug(f"Getting value of {knob} on {self.name}...")
 
             value = recast(method(*args, **kwargs), to=dtype)
 
-            logger.debug(f'Retrieved value of {knob} on {self.name} is {value}')
+            logger.debug(f"Retrieved value of {knob} on {self.name} is {value}")
         except AttributeError as err:
             # catches most errors caused by the adapter returning None
             if "NoneType" in str(err):
 
                 logger.debug(
-                    f'Unable to retrieve non-null value for {knob} on {self.name}'
+                    f"Unable to retrieve non-null value for {knob} on {self.name}"
                 )
 
                 value = None
@@ -164,17 +164,17 @@ def measurer(method):
 
         try:
 
-            logger.debug(f'Measuring value of {meter} on {self.name}...')
+            logger.debug(f"Measuring value of {meter} on {self.name}...")
 
             value = recast(method(*args, **kwargs), to=dtype)
 
-            logger.debug(f'Measured value of {meter} on {self.name} is {value}')
+            logger.debug(f"Measured value of {meter} on {self.name} is {value}")
         except AttributeError as err:
             # catches most errors caused by the adapter returning None
             if "NoneType" in str(err):
 
                 logger.debug(
-                    f'Unable to measure non-null value for {meter} on {self.name}'
+                    f"Unable to measure non-null value for {meter} on {self.name}"
                 )
 
                 value = None
@@ -432,9 +432,7 @@ class Instrument:
         """
 
         try:
-            measure_method = self.__getattribute__(
-                "measure_" + meter.replace(" ", "_")
-            )
+            measure_method = self.__getattribute__("measure_" + meter.replace(" ", "_"))
         except AttributeError:
             raise AttributeError(f"{meter} cannot be measured on {self.name}")
 

@@ -174,8 +174,14 @@ class Knob(Variable):
     ):
         self.instrument = instrument
         self.knob = knob  # name of the knob on instrument
+
         self.lower_limit = lower_limit
         self.upper_limit = upper_limit
+
+        if self.upper_limit is not None and self.lower_limit is not None:
+            if self.upper_limit < self.lower_limit:
+                raise ValueError("Upper limit must be greater than lower limit")
+
         self.multiplier = multiplier
         self.offset = offset
 
@@ -223,11 +229,15 @@ class Knob(Variable):
 
         try:
 
-            upper_limit_exceeded = (self.upper_limit is not None) and (value > self.upper_limit)
-            lower_limit_exceeded = (self.lower_limit is not None) and (value < self.lower_limit)
+            upper_limit_exceeded = (self.upper_limit is not None) and (
+                value > self.upper_limit
+            )
+
+            lower_limit_exceeded = (self.lower_limit is not None) and (
+                value < self.lower_limit
+            )
 
             if upper_limit_exceeded:
-
                 self.instrument.set(
                     self.knob, (self.upper_limit - self.offset) / self.multiplier
                 )
@@ -249,9 +259,7 @@ class Knob(Variable):
 
             logger.warning(str(type_error))
 
-        self._value = self.instrument.__getattribute__(
-            self.knob.replace(" ", "_")
-        )
+        self._value = self.instrument.__getattribute__(self.knob.replace(" ", "_"))
 
         if isinstance(self._value, numbers.Number):
             self._value = self.multiplier * self._value + self.offset
@@ -387,7 +395,7 @@ class Expression(Variable):
 
         expression = self.expression
 
-        logger.debug(f'Evaluating expression {expression}')
+        logger.debug(f"Evaluating expression {expression}")
 
         # carets represent exponents
         expression = expression.replace("^", "**")
@@ -415,9 +423,7 @@ class Expression(Variable):
                 self._value = eval(expression, {**globals(), **variables}, locals())
             else:
 
-                log_str = (
-                    f"Dependencies for {expression} contain invalid values: "
-                )
+                log_str = f"Dependencies for {expression} contain invalid values: "
 
                 for name, value in variables.items():
 
@@ -442,7 +448,7 @@ class Expression(Variable):
 
         self.last_evaluation = time.time()
 
-        logger.debug(f'Expression {self.expression} evaluated to {self._value}')
+        logger.debug(f"Expression {self.expression} evaluated to {self._value}")
 
         return self._value
 
@@ -651,9 +657,9 @@ class Remote(Variable):
             if self._type is not None:
 
                 logger.debug(
-                    f'Retrieving value of type {self._type} '
-                    f'starting at register {self.alias}'
-                    f'from Modbus server at {self.server}...'
+                    f"Retrieving value of type {self._type} "
+                    f"starting at register {self.alias}"
+                    f"from Modbus server at {self.server}..."
                 )
 
                 self._value = self._client.read(
@@ -661,17 +667,17 @@ class Remote(Variable):
                 )
 
                 logger.debug(
-                    f'Value retrieved starting at register {self.alias} '
-                    f'from Modbus server at {self.server} is {self._value}'
+                    f"Value retrieved starting at register {self.alias} "
+                    f"from Modbus server at {self.server} is {self._value}"
                 )
 
         else:
             write_to_socket(self._socket, f"{self.alias} ?")
 
             logger.debug(
-                f'Retrieving value of type {self._type} '
-                f'with alias {self.alias}'
-                f'from socket server at {self.server}...'
+                f"Retrieving value of type {self._type} "
+                f"with alias {self.alias}"
+                f"from socket server at {self.server}..."
             )
 
             response = read_from_socket(self._socket, timeout=60, decode=False)
@@ -694,8 +700,8 @@ class Remote(Variable):
                         )
 
                 logger.debug(
-                    f'Value with alias {self.alias} retrieved '
-                    f'from socket server at {self.server} is {self._value}'
+                    f"Value with alias {self.alias} retrieved "
+                    f"from socket server at {self.server} is {self._value}"
                 )
 
             except Exception as error:
@@ -724,8 +730,8 @@ class Remote(Variable):
         if self.protocol == "modbus":
 
             logger.info(
-                f'Writing value {value} to variable starting at register {self.alias}'
-                f'on Modbus server at {self.server}...'
+                f"Writing value {value} to variable starting at register {self.alias}"
+                f"on Modbus server at {self.server}..."
             )
 
             self._client.write(16, self.alias, value, _type=self.type_map[self._type])
@@ -733,8 +739,8 @@ class Remote(Variable):
         else:
 
             logger.debug(
-                f'Writing value {value} to variable with alias {self.alias} '
-                f'on socket server at {self.server}...'
+                f"Writing value {value} to variable with alias {self.alias} "
+                f"on socket server at {self.server}..."
             )
 
             write_to_socket(self._socket, f"{self.alias} {value}")
@@ -788,8 +794,8 @@ class Remote(Variable):
         if self.protocol == "modbus":
 
             logger.debug(
-                f'Getting data type of variable starting at register {self.alias}'
-                f'on Modbus server at {self.server}...'
+                f"Getting data type of variable starting at register {self.alias}"
+                f"on Modbus server at {self.server}..."
             )
 
             fcode = 3 if self.settable else 4
@@ -804,15 +810,15 @@ class Remote(Variable):
             }.get(type_int, None)
 
             logger.debug(
-                f'Data type of variable starting at register {self.alias} '
-                f'on Modbus server at {self.server} is {self._type}'
+                f"Data type of variable starting at register {self.alias} "
+                f"on Modbus server at {self.server} is {self._type}"
             )
 
         else:
 
             logger.debug(
-                f'Getting data type of variable with alias {self.alias}'
-                f'on socket server at {self.server}...'
+                f"Getting data type of variable with alias {self.alias}"
+                f"on socket server at {self.server}..."
             )
 
             write_to_socket(self._socket, f"{self.alias} type?")
@@ -827,8 +833,8 @@ class Remote(Variable):
                 self._type = None
 
             logger.debug(
-                f'Data type of variable with alias {self.alias} '
-                f'on socket server at {self.server} is {self._type}'
+                f"Data type of variable with alias {self.alias} "
+                f"on socket server at {self.server} is {self._type}"
             )
 
     def get_settable(self):
@@ -854,7 +860,7 @@ class Parameter(Variable):
     _settable = True  #:
 
     def __init__(
-            self, parameter: typing.Union[float, int, bool, str, Toggle, np.ndarray]
+        self, parameter: typing.Union[float, int, bool, str, Toggle, np.ndarray]
     ):
         self._value = recast(parameter)
 
@@ -863,9 +869,7 @@ class Parameter(Variable):
 
                 self._type = _type
 
-        logger.debug(
-            f'Setting data type of parameter {self._value} to {self._type}'
-        )
+        logger.debug(f"Setting data type of parameter {self._value} to {self._type}")
 
     @property
     @Variable.getter_type_validator
