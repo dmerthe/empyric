@@ -200,7 +200,7 @@ class SRSPS300(Instrument):
     Stanford Rsearch Systems PS-300 series high voltage power supply.
     """
 
-    name = "SRSPS350"
+    name = "SRSPS300"
 
     supported_adapters = ((GPIB, {}),)
 
