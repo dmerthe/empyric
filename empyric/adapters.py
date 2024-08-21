@@ -30,8 +30,8 @@ def chaperone(method):
             if not self.connected:
 
                 logger.debug(
-                    f'Connecting to {self.instrument.name} '
-                    f'at {self.instrument.address}'
+                    f"Connecting to {self.instrument.name} "
+                    f"at {self.instrument.address}"
                 )
 
                 time.sleep(self.delay * reconnects)
@@ -56,8 +56,8 @@ def chaperone(method):
                 try:
 
                     logger.debug(
-                        f'Communicating with {self.instrument.name} '
-                        f'at {self.instrument.address}: {method}({args})'
+                        f"Communicating with {self.instrument.name} "
+                        f"at {self.instrument.address}: {method}({args})"
                     )
 
                     response = method(self, *args, **kwargs)
@@ -80,9 +80,9 @@ def chaperone(method):
                     # Successful communication
 
                     logger.debug(
-                        f'Communication with {self.instrument.name} '
-                        f'at {self.instrument.address} successful '
-                        f'with response: {response}'
+                        f"Communication with {self.instrument.name} "
+                        f"at {self.instrument.address} successful "
+                        f"with response: {response}"
                     )
 
                     self.lock.release()
@@ -90,7 +90,6 @@ def chaperone(method):
 
                 except Exception as exception:
                     traceback = exception.__traceback__
-
 
                     logger.error(
                         f"Encountered '{exception}' while trying "
@@ -103,8 +102,8 @@ def chaperone(method):
             # disconnect adapter and potentially reconnect on next iteration
 
             logger.debug(
-                f'Disconnecting from {self.instrument.name} '
-                f'at {self.instrument.address}'
+                f"Disconnecting from {self.instrument.name} "
+                f"at {self.instrument.address}"
             )
 
             self.disconnect()

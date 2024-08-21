@@ -22,7 +22,8 @@ from empyric.tools import (
     autobind_socket,
     read_from_socket,
     write_to_socket,
-    get_ip_address, logger,
+    get_ip_address,
+    logger,
 )
 from empyric.types import (
     recast,
@@ -439,9 +440,9 @@ class Timecourse(Routine):
 
             if self.ramp:
                 # Ramp linearly between numerical values
-                value = last_value + (next_value - last_value) * (
-                    now - last_time
-                ) / (next_time - last_time)
+                value = last_value + (next_value - last_value) * (now - last_time) / (
+                    next_time - last_time
+                )
             else:
                 # or just set to last value
                 value = last_value

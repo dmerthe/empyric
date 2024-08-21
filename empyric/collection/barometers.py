@@ -88,9 +88,9 @@ class KJLSPARC(Instrument):
     @measurer
     def measure_pressure(self) -> Float:
 
-        response = self.query('vac?')
+        response = self.query("vac?")
 
-        if response[4:] == 'ERROR':
+        if response[4:] == "ERROR":
             return np.nan
         else:
             return float(response[4:])
