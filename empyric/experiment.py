@@ -402,13 +402,21 @@ class AsyncExperiment(Experiment):
         end: Union[numbers.Number, str, None] = None,
     ):
         super().__init__(variables, routines, end)
-        self.loop = None
 
     def __next__(self):
 
         # Start the clock and loop on first call
         if self.state.name is None:  # first step of the experiment
             self.start()
+
+            self.loop = asyncio.get_running_loop()
+
+            for name in self.variables:
+                self.loop.create_task(self._update_variable(name))
+
+            for name in self.routines:
+                self.loop.create_task(self._update_routine(name))
+
             self.status = Experiment.RUNNING
 
         logger.info(f'Iterating experiment (t = {self.state["Time"]} s)')
@@ -428,18 +436,6 @@ class AsyncExperiment(Experiment):
 
         return self.state
 
-    def start(self):
-
-        super().start()
-
-        self.loop = asyncio.get_running_loop()
-
-        for name in self.variables:
-            self.loop.create_task(self._update_variable(name))
-
-        for name in self.routines:
-            self.loop.create_task(self._update_routine(name))
-
     async def _update_variable(self, name):
         """Update named variable"""
         while not self.terminated:
@@ -451,7 +447,7 @@ class AsyncExperiment(Experiment):
                 self.state["Time"] = self.clock.time
                 self.state.name = datetime.datetime.now()
 
-            elif self.stopped:
+            else:
                 await asyncio.sleep(0.1)  # give other updating tasks a chance to run
 
     async def _update_routine(self, name):
@@ -465,7 +461,7 @@ class AsyncExperiment(Experiment):
 
                 await asyncio.to_thread(Experiment._update_routine, self, name)
 
-            elif self.holding or self.stopped:
+            else:
                 await asyncio.sleep(0.1)  # give other updating tasks a chance to run
 
 

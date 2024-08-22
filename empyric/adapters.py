@@ -624,7 +624,9 @@ class GPIB(Adapter):
         elif self.lib == "linux-gpib":
             self.backend.write(self._descr, message)
         elif self.lib == "prologix-gpib":
-            self.backend.write(message, address=self.instrument.address)
+
+            with self.backend.lock:
+                self.backend.write(message, address=self.instrument.address)
 
         return "Success"
 
@@ -634,12 +636,18 @@ class GPIB(Adapter):
         elif self.lib == "linux-gpib":
             return self.backend.read(self._descr, bytes).decode()
         elif self.lib == "prologix-gpib":
-            return self.backend.read(address=self.instrument.address)
+
+            with self.backend.lock:
+                return self.backend.read(address=self.instrument.address)
 
     def _query(self, question):
-        self._write(question)
-        time.sleep(self.delay)
-        return self._read()
+
+        with self.backend.lock:
+            self.backend.write(question, address=self.instrument.address)
+            time.sleep(self.delay)
+            response = self.backend.read(address=self.instrument.address)
+
+        return response
 
     def _linux_gpib_set_timeout(self, timeout):
         if timeout is None:
@@ -730,6 +738,8 @@ class PrologixGPIBUSB:
         self.address = None
         self.devices = []
 
+        self.lock = Lock()
+
     def write(self, message, to_controller=False, address=None):
         if address and address != self.address:
             self.write(f"addr {address}", to_controller=True)
@@ -812,6 +822,8 @@ class PrologixGPIBLAN:
 
         self.devices = []
         self.address = None
+
+        self.lock = Lock()
 
     def write(self, message, to_controller=False, address=None):
         if address and address != self.address:
