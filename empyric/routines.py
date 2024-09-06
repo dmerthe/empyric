@@ -1243,93 +1243,101 @@ class ModbusServer(Routine):
         return wrapped_method
 
     async def _update_registers(self):
+
         if self.state is None:  # do nothing if state is undefined
             await asyncio.sleep(0.1)
             asyncio.create_task(self._update_registers())
             return
 
-        # Store readwrite variable values in holding registers (fc = 3)
-        builder = self._builder_cls(byteorder=">")
+        try:
+            # Store readwrite variable values in holding registers (fc = 3)
+            builder = self._builder_cls(byteorder=">")
 
-        for i, (name, variable) in enumerate(self.knobs.items()):
-            value = variable._value
+            for i, (name, variable) in enumerate(self.knobs.items()):
+                value = variable._value
 
-            # encode the value into the 4 registers
-            if value is None or variable._type is None:
-                builder.add_64bit_float(float("nan"))
-            elif issubclass(variable._type, Boolean):
-                builder.add_64bit_uint(value)
-            elif issubclass(variable._type, Toggle):
-                builder.add_64bit_uint(1 if value == ON else 0)
-            elif issubclass(variable._type, Integer):
-                builder.add_64bit_int(value)
-            elif issubclass(variable._type, Float):
-                builder.add_64bit_float(value)
+                # encode the value into the 4 registers
+                if value is None or variable._type is None:
+                    builder.add_64bit_float(float("nan"))
+                elif issubclass(variable._type, Boolean):
+                    builder.add_64bit_uint(value)
+                elif issubclass(variable._type, Toggle):
+                    builder.add_64bit_uint(1 if value == ON else 0)
+                elif issubclass(variable._type, Integer):
+                    builder.add_64bit_int(value)
+                elif issubclass(variable._type, Float):
+                    builder.add_64bit_float(value)
+                else:
+                    raise ValueError(
+                        f"unable to update modbus server registers from value "
+                        f"{value} of variable {name} with data type "
+                        f"{variable._type}"
+                    )
+
+                # encode the meta data
+                meta_reg_val = {
+                    Boolean: 0,
+                    Toggle: 1,
+                    Integer: 2,
+                    Float: 3,
+                    Array: 4,
+                    String: 5,
+                }.get(variable._type, -1)
+
+                builder.add_16bit_int(meta_reg_val)
+
+            # from_vars kwarg added with setValues_decorator above
+            self.slave.setValues(3, 0, builder.to_registers(), from_vars=True)
+
+            # Store readonly variable values in input registers (fc = 4)
+            builder.reset()
+
+            if self.meters:
+                try:
+                    selection = {name: self.state[name] for name in self.meters}
+                except KeyError as err:
+                    raise ValueError(
+                        f"meter {err.args[0]} not found in experiment variables"
+                    )
             else:
-                raise ValueError(
-                    f"unable to update modbus server registers from value "
-                    f"{value} of variable {name} with data type "
-                    f"{variable._type}"
-                )
+                selection = self.state
 
-            # encode the meta data
-            meta_reg_val = {
-                Boolean: 0,
-                Toggle: 1,
-                Integer: 2,
-                Float: 3,
-                Array: 4,
-                String: 5,
-            }.get(variable._type, -1)
+            for i, (name, value) in enumerate(selection.items()):
+                _type = None
+                for supported_type in supported_types.values():
+                    if isinstance(value, supported_type):
+                        _type = supported_type
 
-            builder.add_16bit_int(meta_reg_val)
+                # encode the value into the 4 registers
+                if value is None or _type is None:
+                    builder.add_64bit_float(float("nan"))
+                elif _type == Boolean:
+                    builder.add_64bit_uint(value)
+                elif _type == Toggle:
+                    builder.add_64bit_uint(int(value in Toggle.on_values))
+                elif _type == Integer:
+                    builder.add_64bit_int(value)
+                elif _type == Float:
+                    builder.add_64bit_float(value)
+                else:
+                    raise ValueError(
+                        f"unable to update modbus server registers from value "
+                        f"{value} of variable {name} with data type "
+                        f"{_type}"
+                    )
 
-        # from_vars kwarg added with setValues_decorator above
-        self.slave.setValues(3, 0, builder.to_registers(), from_vars=True)
+                # encode the meta data
+                type_int = {Boolean: 0, Toggle: 1, Integer: 2, Float: 3}.get(_type, -1)
 
-        # Store readonly variable values in input registers (fc = 4)
-        builder.reset()
+                builder.add_16bit_int(type_int)
 
-        if self.meters:
-            selection = {name: self.state[name] for name in self.meters}
-        else:
-            selection = self.state
+            # from_vars kwarg added with setValues_decorator above
+            self.slave.setValues(4, 0, builder.to_registers(), from_vars=True)
 
-        for i, (name, value) in enumerate(selection.items()):
-            _type = None
-            for supported_type in supported_types.values():
-                if isinstance(value, supported_type):
-                    _type = supported_type
+            await asyncio.sleep(0.1)
 
-            # encode the value into the 4 registers
-            if value is None or _type is None:
-                builder.add_64bit_float(float("nan"))
-            elif _type == Boolean:
-                builder.add_64bit_uint(value)
-            elif _type == Toggle:
-                builder.add_64bit_uint(int(value in Toggle.on_values))
-            elif _type == Integer:
-                builder.add_64bit_int(value)
-            elif _type == Float:
-                builder.add_64bit_float(value)
-            else:
-                raise ValueError(
-                    f"unable to update modbus server registers from value "
-                    f"{value} of variable {name} with data type "
-                    f"{_type}"
-                )
-
-            # encode the meta data
-            type_int = {Boolean: 0, Toggle: 1, Integer: 2, Float: 3}.get(_type, -1)
-
-            builder.add_16bit_int(type_int)
-
-        # from_vars kwarg added with setValues_decorator above
-        self.slave.setValues(4, 0, builder.to_registers(), from_vars=True)
-
-        await asyncio.sleep(0.1)
-
-        asyncio.create_task(self._update_registers())
+        finally:
+            asyncio.create_task(self._update_registers())
 
     async def _run_async_server(self):
         asyncio.create_task(self._update_registers())

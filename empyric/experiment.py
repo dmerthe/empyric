@@ -94,10 +94,10 @@ class Experiment:
         return "Terminated" in self.status
 
     def __init__(
-        self,
-        variables: dict,
-        routines: dict = None,
-        end: Union[numbers.Number, str, None] = None,
+            self,
+            variables: dict,
+            routines: dict = None,
+            end: Union[numbers.Number, str, None] = None,
     ):
         self.variables = variables
         # dict of the form {..., name: variable, ...}
@@ -226,7 +226,6 @@ class Experiment:
             if isinstance(self.variables[name], _variables.Expression):
                 for symbol, dependee in self.variables[name].definitions.items():
                     if hasattr(dependee, "_eval_event"):
-
                         logger.debug(
                             f"Expression {name} is waiting for {symbol} to be evaluated"
                         )
@@ -396,10 +395,10 @@ class AsyncExperiment(Experiment):
     """
 
     def __init__(
-        self,
-        variables: dict,
-        routines: dict = None,
-        end: Union[numbers.Number, str, None] = None,
+            self,
+            variables: dict,
+            routines: dict = None,
+            end: Union[numbers.Number, str, None] = None,
     ):
         super().__init__(variables, routines, end)
 
@@ -732,7 +731,6 @@ class RuncardError(BaseException):
 
 
 def validate_runcard(runcard):
-
     logger.info("Validating runcard")
 
     is_dict = isinstance(runcard, dict)

@@ -302,7 +302,7 @@ class SRSPS300(Instrument):
 
     @measurer
     def measure_current(self) -> Float:
-        return float(self.query("IOUT?"))
+        return 1.0e-3 * float(self.query("IOUT?"))
 
 
 class KoradKWR100(Instrument):
