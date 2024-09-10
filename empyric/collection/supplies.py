@@ -258,7 +258,7 @@ class SRSPS300(Instrument):
 
     @setter
     def set_max_current(self, current: Float):
-        self.write("ILIM%f" % float(current))
+        self.write("ILIM%f" % float(current))  # all units are SI units-->Amps
 
     @getter
     def get_max_current(self) -> Float:
@@ -266,7 +266,7 @@ class SRSPS300(Instrument):
 
     @setter
     def set_trip_current(self, current: Float):
-        self.write("ITRP%f" % float(current))
+        self.write("ITRP%f" % (1e3 * float(current)))
 
     @getter
     def get_trip_current(self) -> Float:
@@ -281,6 +281,7 @@ class SRSPS300(Instrument):
 
     @getter
     def get_clear_trip(self):
+
         try:
             status_byte_1 = int(self.query("*STB? 1"))
             status_byte_2 = int(self.query("*STB? 2"))
@@ -302,7 +303,7 @@ class SRSPS300(Instrument):
 
     @measurer
     def measure_current(self) -> Float:
-        return 1.0e-3 * float(self.query("IOUT?"))
+        return float(self.query("IOUT?"))
 
 
 class KoradKWR100(Instrument):
