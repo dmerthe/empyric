@@ -266,7 +266,7 @@ class SRSPS300(Instrument):
 
     @setter
     def set_trip_current(self, current: Float):
-        self.write("ITRP%f" % (1e3 * float(current)))
+        self.write("ITRP%f" % float(current))
 
     @getter
     def get_trip_current(self) -> Float:
