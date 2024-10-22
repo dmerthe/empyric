@@ -1171,8 +1171,8 @@ class ModbusServer(Routine):
         device = importlib.import_module(".device", package="pymodbus")
         payload = importlib.import_module(".payload", package="pymodbus")
 
-        self._builder_cls = payload.BinaryPayloadBuilder
-        self._decoder_cls = payload.BinaryPayloadDecoder
+        self._payload_builder = payload.BinaryPayloadBuilder
+        self._payload_decoder = payload.BinaryPayloadDecoder
 
         DataBlock = datastore.ModbusSequentialDataBlock
 
@@ -1257,7 +1257,9 @@ class ModbusServer(Routine):
                             )
                             return
 
-                        decoder = self._decoder_cls.fromRegisters(values, byteorder=">")
+                        decoder = self._payload_decoder.fromRegisters(
+                            values, byteorder=">"
+                        )
 
                         if issubclass(variable._type, Boolean):
                             variable.value = decoder.decode_64bit_uint()
@@ -1281,10 +1283,10 @@ class ModbusServer(Routine):
         try:
             # Store readwrite variable values in holding registers (fc = 3)
 
-            builder = self._builder_cls(byteorder=">")
-
             for i, (name, variable) in enumerate(self.knobs.items()):
                 value = variable._value
+
+                builder = builder(byteorder=">")
 
                 # encode the value into the 4 registers
                 if value is None or variable._type is None:
@@ -1318,14 +1320,14 @@ class ModbusServer(Routine):
 
                 # from_vars kwarg added with setValues_decorator above
                 self.slave.setValues(
-                    3, self.knob_addresses[i], builder.to_registers(), from_vars=True
+                    3, self.knob_addresses[i],
+                    builder.to_registers(), from_vars=True
                 )
-
-                builder.reset()
 
             # Store readonly variable values in input registers (fc = 4)
 
             if not self.meter_addresses:
+                # assume consecutive sets of registers, if not specified
                 self.meter_addresses = [5*i for i in range(len(self.state))]
 
             if self.meters:
@@ -1339,10 +1341,13 @@ class ModbusServer(Routine):
                 selection = self.state
 
             for i, (name, value) in enumerate(selection.items()):
+
                 _type = None
                 for supported_type in supported_types.values():
                     if isinstance(value, supported_type):
                         _type = supported_type
+
+                builder = self._payload_builder(byteorder=">")
 
                 # encode the value into the 4 registers
                 if value is None or _type is None:
@@ -1369,15 +1374,14 @@ class ModbusServer(Routine):
 
                 # from_vars kwarg added with setValues_decorator above
                 self.slave.setValues(
-                    4, self.meter_addresses[i], builder.to_registers(), from_vars=True
+                    4, self.meter_addresses[i],
+                    builder.to_registers(), from_vars=True
                 )
-
-                builder.reset()
 
             await asyncio.sleep(0.1)
 
         finally:
-            
+
             asyncio.create_task(self._update_registers())
 
     async def _run_async_server(self):
