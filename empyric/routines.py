@@ -1286,7 +1286,7 @@ class ModbusServer(Routine):
             for i, (name, variable) in enumerate(self.knobs.items()):
                 value = variable._value
 
-                builder = builder(byteorder=">")
+                builder = self._payload_builder(byteorder=">")
 
                 # encode the value into the 4 registers
                 if value is None or variable._type is None:
@@ -1404,7 +1404,11 @@ class ModbusServer(Routine):
         self.state = state
 
     def terminate(self):
-        asyncio.run(self.server.shutdown())
+
+        try:
+            asyncio.create_task(self.server.shutdown())
+        except RuntimeError:  # happens if loop has already ended
+            pass
 
 
 supported = {
