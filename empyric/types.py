@@ -143,7 +143,7 @@ def recast(value: Any, to: type = Type) -> Union[Type, None]:
     Convert a value into the appropriate type for the information it contains.
 
     If a subclass of `Type` is passed to the optional `to` keyword argument,
-    the value is reast to that type. Otherwise, recasting goes as follows.
+    the value is recast to that type. Otherwise, recasting goes as follows.
 
     Booleans are converted into numpy booleans; integers are converted into
     64-bit numpy integers; floats are converted into 64-bit numpy floats.
