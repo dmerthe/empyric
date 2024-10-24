@@ -496,6 +496,8 @@ class LabJackT7(Instrument):
         "DIO5",
         "DIO6",
         "DIO7",
+        "DAC0",
+        "DAC1"
     )
 
     meters = (
@@ -664,6 +666,28 @@ class LabJackT7(Instrument):
     def measure_AIN_all(self) -> Array:
         """Reads all 14 analog inputs in a single call"""
         return self.read(4, 0, count=2 * 14, _type="32bit_float")
+
+    def _set_DACN(self, n, value: Float):
+        self.write(16, 1000 + 2 * n, value, _type="32bit_float")
+
+    def _get_DACN(self, n) -> Float:
+        return self.read(3, 1000 + 2 * n, count=2, _type="32bit_float")
+
+    @setter
+    def set_DAC0(self, value: Float):
+        self._set_DACN(0, value)
+
+    @getter
+    def get_DAC0(self) -> Float:
+        return self._get_DACN(0)
+
+    @setter
+    def set_DAC1(self, value: Float):
+        self._set_DACN(1, value)
+
+    @getter
+    def get_DAC1(self) -> Float:
+        return self._get_DACN(1)
 
     @measurer
     def measure_device_temperature(self) -> Float:
