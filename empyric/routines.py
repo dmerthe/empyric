@@ -1275,14 +1275,13 @@ class ModbusServer(Routine):
 
     async def _update_registers(self):
 
-        if self.state is None:  # do nothing if state is undefined
-            await asyncio.sleep(0.1)
-            asyncio.create_task(self._update_registers())
-            return
-
         try:
-            # Store readwrite variable values in holding registers (fc = 3)
 
+            if self.state is None:  # do nothing if state is undefined
+                await asyncio.sleep(0.1)
+                return
+
+            # Store readwrite variable values in holding registers (fc = 3)
             for i, (name, variable) in enumerate(self.knobs.items()):
                 value = variable._value
 
@@ -1326,11 +1325,11 @@ class ModbusServer(Routine):
 
             # Store readonly variable values in input registers (fc = 4)
 
-            if not self.meter_addresses:
+            if len(self.meter_addresses) != len(self.meters):
                 # assume consecutive sets of registers, if not specified
                 self.meter_addresses = [5*i for i in range(len(self.state))]
 
-            if self.meters:
+            if self.meters is not None:
                 try:
                     selection = {name: self.state[name] for name in self.meters}
                 except KeyError as err:
@@ -1385,6 +1384,7 @@ class ModbusServer(Routine):
             asyncio.create_task(self._update_registers())
 
     async def _run_async_server(self):
+
         asyncio.create_task(self._update_registers())
 
         server = importlib.import_module(".server", package="pymodbus")
@@ -1405,10 +1405,9 @@ class ModbusServer(Routine):
 
     def terminate(self):
 
-        try:
-            asyncio.create_task(self.server.shutdown())
-        except RuntimeError:  # happens if loop has already ended
-            pass
+        # Close modbus server
+        if not self.server.serving.done():
+            self.server.serving.set_result(True)
 
 
 supported = {

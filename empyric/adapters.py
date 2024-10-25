@@ -1438,7 +1438,6 @@ class Modbus(Adapter):
     def disconnect(self):
         while self.connected:
             self.backend.close()
-            time.sleep(0.1)
 
 
 class Phidget(Adapter):
