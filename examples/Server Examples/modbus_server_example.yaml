@@ -79,6 +79,8 @@ Routines:
   values: [0.0, 0.3]
  Server:
   type: ModbusServer
+  address: 127.0.0.1
+  port: 6174
   knobs:
    - Knob a
    - Knob b

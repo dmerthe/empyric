@@ -940,7 +940,9 @@ def convert_runcard(runcard):
             # Get knobs
             knobs = specs.pop("knobs", None)
 
-            if isinstance(knobs, dict):  # shortcut for ModbusServer
+            if np.isscalar(knobs):
+                knobs = [knobs]
+            elif isinstance(knobs, dict):  # shortcut for ModbusServer
                 knob_addresses = np.array(list(knobs.keys())).flatten()
                 knobs = np.array(list(knobs.values())).flatten()
                 specs["knob_addresses"] = knob_addresses
@@ -967,7 +969,9 @@ def convert_runcard(runcard):
             # Get meters
             meters = specs.pop("meters", None)
 
-            if isinstance(meters, dict):  # shortcut for ModbusServer
+            if np.isscalar(meters):
+                meters = [meters]
+            elif isinstance(meters, dict):  # shortcut for ModbusServer
                 meter_addresses = np.array(list(meters.keys())).flatten()
                 meters = np.array(list(meters.values())).flatten()
 
