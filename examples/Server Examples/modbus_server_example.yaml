@@ -79,7 +79,7 @@ Routines:
   values: [0.0, 0.3]
  Server:
   type: ModbusServer
-  address: 127.0.0.1  # this is the default localhost IP address, but can be set to any IP address assigned by a network to the host computer (clients must be on the same network)
+  address: 127.0.0.1  # this is the default localhost IP address, but can be set to any valid IP address of the host computer (clients must be on the same network)
   port: 6174  # the default port for modbus communication is 502, but any other valid port can be used
   knobs:
   # variables can be specified by a list
