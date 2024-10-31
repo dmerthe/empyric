@@ -642,10 +642,20 @@ class GPIB(Adapter):
 
     def _query(self, question):
 
-        with self.backend.lock:
-            self.backend.write(question, address=self.instrument.address)
+        if self.lib == "pyvisa":
+            self.backend.write(question)
             time.sleep(self.delay)
-            response = self.backend.read(address=self.instrument.address)
+            response = self.backend.read()
+        elif self.lib == "linux-gpib":
+            self.backend.write(self._descr, question)
+            time.sleep(self.delay)
+            response = self.backend.read(self._descr, bytes).decode()
+        elif self.lib == "prologix-gpib":
+
+            with self.backend.lock:
+                self.backend.write(question, address=self.instrument.address)
+                time.sleep(self.delay)
+                response = self.backend.read(address=self.instrument.address)
 
         return response
 
