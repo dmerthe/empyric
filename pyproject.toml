@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "empyric"
-version = "0.3.0"
+version = "0.3.1"
 description = "A package for experiment automation"
 authors = ["Daniel Merthe <dmerthe@gmail.com>"]
 readme = "README.md"
@@ -15,10 +15,10 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.11"
-numpy = "1.24.3"
+python = "^3.13"
+numpy = "2.1.0"
 scipy = "^1.10"
-matplotlib = "3.6.2"
+matplotlib = "3.8.4"  # does not work with Python 3.13; must wait for new release
 pandas = "1.5.3"
 pykwalify = "1.8.0"
 bayesian-optimization = "1.4.3"
