@@ -9,6 +9,7 @@ Empyric can be installed with pip:
 ```commandline
 pip install empyric
 ```
+This works with either Python 3.11 or 3.12. (Empyric relies on Matplotlib for plotting, which does not yet support Python 3.13).
 
 ### Instruments and Adapters
 
