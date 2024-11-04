@@ -5,7 +5,13 @@ For more details, [read the docs](https://empyric.readthedocs.io/en/latest/).
 
 Empyric, at its most basic level, is an easy-to-use Python interface for communication with and controlling laboratory instruments, such as digital multimeters, oscilloscopes, and power supplies. On top of that is a general purpose experiment-building architecture, which allows the user to combine process control, measurements and data plotting in a highly customizable fashion, using a straightforward "runcard" formalism, which additionally serves the purpose of experiment documentation.
 
-Empyric can be installed with pip:
+The preferred way to install Empyric is using [poetry](https://python-poetry.org/). Within your preferred environment and within the empyric root directory, make sure poetry is install and then install empyric:
+```commandline
+pip install poetry
+poetry install
+```
+
+Empyric can also be installed with pip:
 ```commandline
 pip install empyric
 ```
