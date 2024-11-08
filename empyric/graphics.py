@@ -390,7 +390,7 @@ class Plotter:
                     while not file_read:
                         try:
                             expanded_element = list(
-                                pd.read_csv(element, dtype=np.float64)[labels[i]].values
+                                pd.read_csv(element)[labels[i]].values
                             )
 
                             file_read = True
