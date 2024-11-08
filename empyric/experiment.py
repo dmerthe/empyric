@@ -18,6 +18,7 @@ from typing import Union
 import numpy as np
 import pandas as pd
 import pykwalify.errors
+from pandas.core.computation import expressions
 from pykwalify.core import Core as YamlValidator
 from ruamel.yaml import YAML
 
@@ -936,9 +937,24 @@ def convert_runcard(runcard):
 
             specs = {key.replace(" ", "_"): value for key, value in specs.items()}
 
-            # Convert list of knobs into dictionary
-            knobs = np.array([specs.get("knobs", [])]).flatten()
-            if knobs.size > 0:
+            # Get knobs
+            knobs = specs.pop("knobs", None)
+
+            if np.isscalar(knobs):
+                knobs = [knobs]
+            elif isinstance(knobs, dict):  # shortcut for ModbusServer
+                knob_addresses = np.array(list(knobs.keys())).flatten()
+                knobs = np.array(list(knobs.values())).flatten()
+                specs["knob_addresses"] = knob_addresses
+            elif knobs is not None and not isinstance(knobs, list):
+                raise ValueError(
+                    f"Invalid knobs specification for routine {name}; "
+                    "Must be a list of knob names or optionally a dictionary "
+                    "of register addresses and knob names for a ModbusServer"
+                )
+
+            # Convert list of knobs into dictionary of {name: knob} pairs
+            if knobs is not None and len(knobs) > 0:
                 for knob in knobs:
                     if knob not in variables:
                         raise KeyError(
@@ -947,6 +963,27 @@ def convert_runcard(runcard):
                         )
 
                 specs["knobs"] = {name: variables[name] for name in knobs}
+            else:
+                specs["knobs"] = None
+
+            # Get meters
+            meters = specs.pop("meters", None)
+
+            if np.isscalar(meters):
+                meters = [meters]
+            elif isinstance(meters, dict):  # shortcut for ModbusServer
+                meter_addresses = np.array(list(meters.keys())).flatten()
+                meters = np.array(list(meters.values())).flatten()
+
+                specs["meter_addresses"] = meter_addresses
+            elif meters is not None and not isinstance(meters, list):
+                raise ValueError(
+                    f"Invalid meters specification for routine {name}; "
+                    "Must be a list of meter names or optionally a dictionary "
+                    "of register addresses and meter names for a ModbusServer"
+                )
+
+            specs["meters"] = meters
 
             routines[name] = available_routines[_type](**specs)
 
