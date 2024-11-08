@@ -79,6 +79,14 @@ Routines:
   values: [0.0, 0.3]
  Server:
   type: ModbusServer
+  address: 127.0.0.1  # this is the default localhost IP address, but can be set to any valid IP address of the host computer (clients must be on the same network)
+  port: 6174  # the default port for modbus communication is 502, but any other valid port can be used
   knobs:
-   - Knob a
-   - Knob b
+  # variables can be specified by a list
+   - Knob a  # stored in registers 0 to 4
+   - Knob b  # stored in registers 5 to 9
+  meters:
+  # ... or by a dictionary that maps variables to specific starting registers
+   0: Coordinate x  # stored in registers 0 to 4
+   100: Coordinate y  # stored in registers 100 to 104
+   200: Distance r  # stored in registers 200 to 204

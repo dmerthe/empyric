@@ -873,8 +873,11 @@ class ExperimentGUI:
         plt.pause(0.1)  # give GUI and plotter enough time to wrap up
         self.root.update()
 
-        self.root.destroy()
-        self.root.quit()
+        try:
+            self.root.destroy()
+            self.root.quit()
+        except tk.TclError:  # happens when window has already been closed
+            pass
 
     @staticmethod
     def _entry_enter(entry, variable, root):
