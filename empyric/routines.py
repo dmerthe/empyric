@@ -636,12 +636,12 @@ class Optimization(Routine):
         # name of the meter to check from state argument of update
         self.meter = meter
 
+        if "sign" in kwargs:
+            self._sign = float(kwargs.pop("sign"))
+
         # Record best settings when an optimum is found
         self.best_meter = -self._sign * np.inf
         self.best_knobs = {name: None for name in self.knobs}
-
-        if "sign" in kwargs:
-            self._sign = float(kwargs.pop("sign"))
 
         self.method = method
 
