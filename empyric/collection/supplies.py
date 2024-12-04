@@ -30,14 +30,14 @@ class Keithley2260B(Instrument):
     @measurer
     def measure_current(self) -> Float:
         def validator(response):
-            return bool(re.match("[\+\-]\d+\.\d\d\d", response.decode().strip()))
+            return bool(re.match("[\+\-]\d+\.\d\d\d", response.strip()))
 
         return float(self.query("MEAS:CURR?", validator=validator))
 
     @measurer
     def measure_voltage(self) -> Float:
         def validator(response):
-            return bool(re.match("[\+\-]\d+\.\d\d\d", response.decode().strip()))
+            return bool(re.match("[\+\-]\d+\.\d\d\d", response.strip()))
 
         return float(self.query("MEAS:VOLT?", validator=validator))
 
@@ -68,14 +68,14 @@ class Keithley2260B(Instrument):
     @getter
     def get_max_current(self) -> Float:
         def validator(response):
-            return bool(re.match("[\+\-]\d+\.\d\d\d", response.decode().strip()))
+            return bool(re.match("[\+\-]\d+\.\d\d\d", response.strip()))
         
         return float(self.query("CURR?", validator=validator))
 
     @getter
     def get_max_voltage(self) -> Float:
         def validator(response):
-            return bool(re.match("[\+\-]\d+\.\d\d\d", response.decode().strip()))
+            return bool(re.match("[\+\-]\d+\.\d\d\d", response.strip()))
 
         return float(self.query("VOLT?", validator=validator))
 

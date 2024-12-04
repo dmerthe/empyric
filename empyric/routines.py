@@ -1325,11 +1325,8 @@ class ModbusServer(Routine):
 
             # Store readonly variable values in input registers (fc = 4)
 
-            if len(self.meter_addresses) != len(self.meters):
-                # assume consecutive sets of registers, if not specified
-                self.meter_addresses = [5*i for i in range(len(self.state))]
-
             if self.meters is not None:
+
                 try:
                     selection = {name: self.state[name] for name in self.meters}
                 except KeyError as err:
@@ -1338,6 +1335,10 @@ class ModbusServer(Routine):
                     )
             else:
                 selection = self.state
+
+            if len(self.meter_addresses) == 0:
+                # assume consecutive sets of registers, if not specified
+                self.meter_addresses = [5 * i for i in range(len(selection))]
 
             for i, (name, value) in enumerate(selection.items()):
 
