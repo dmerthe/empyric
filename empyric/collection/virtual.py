@@ -191,7 +191,13 @@ class PIDController(Instrument):
 
     supported_adapters = ((Adapter, {}),)
 
-    knobs = ("setpoint", "proportional gain" "derivative time" "integral time", "input")
+    knobs = (
+        "setpoint",
+        "proportional gain",
+        "derivative time",
+        "integral time",
+        "input",
+    )
 
     presets = {"proportional gain": 1, "derivative time": 12, "integral time": 180}
 
@@ -200,7 +206,7 @@ class PIDController(Instrument):
     def __init__(self, *args, **kwargs):
         self.setpoint = None
 
-        Instrument.__init_(self, *args, **kwargs)
+        Instrument.__init__(self, *args, **kwargs)
         self.clock = Clock()
 
         self.times = np.array([])
@@ -232,11 +238,10 @@ class PIDController(Instrument):
     def set_input(self, input: Float):
         """Input the process value"""
 
-        if len(self.times) == 0:
-            self.clock.start()
+        self.clock.set_state("START")
 
         if len(self.outputs) == len(self.inputs):
-            self.times = np.concatenate([self.times, [self.clock.time]])
+            self.times = np.concatenate([self.times, [self.clock.measure_time()]])
             self.setpoints = np.concatenate([self.setpoints, [self.setpoint]])
             self.inputs = np.concatenate([self.inputs, [input]])
 
@@ -262,9 +267,12 @@ class PIDController(Instrument):
 
                 integral = np.sum(dt * errors)
 
-                derivative = -(self.inputs[-1] - self.inputs[-2]) / (
-                    self.times[-1] - self.times[-2]
-                )
+                if len(self.times) > 1:
+                    derivative = -(self.inputs[-1] - self.inputs[-2]) / (
+                        self.times[-1] - self.times[-2]
+                    )
+                else:
+                    derivative = 0.0
             else:
                 integral = 0
                 derivative = 0
@@ -274,11 +282,13 @@ class PIDController(Instrument):
 
             output = self.proportional_gain * (error + tD * derivative + integral / tI)
 
-            self.outputs.append(output)
+            self.outputs = np.concatenate([self.outputs, [output]])
 
             return output
-        else:
+        elif np.any(self.outputs):
             return self.outputs[-1]
+        else:
+            return 0.0
 
 
 class RandomWalk(Instrument):

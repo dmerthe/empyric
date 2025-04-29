@@ -390,7 +390,7 @@ class Plotter:
                     while not file_read:
                         try:
                             expanded_element = list(
-                                pd.read_csv(element, dtype=np.float64)[labels[i]].values
+                                pd.read_csv(element)[labels[i]].values
                             )
 
                             file_read = True
@@ -873,8 +873,11 @@ class ExperimentGUI:
         plt.pause(0.1)  # give GUI and plotter enough time to wrap up
         self.root.update()
 
-        self.root.destroy()
-        self.root.quit()
+        try:
+            self.root.destroy()
+            self.root.quit()
+        except tk.TclError:  # happens when window has already been closed
+            pass
 
     @staticmethod
     def _entry_enter(entry, variable, root):

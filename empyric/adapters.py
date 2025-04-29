@@ -30,8 +30,8 @@ def chaperone(method):
             if not self.connected:
 
                 logger.debug(
-                    f'Connecting to {self.instrument.name} '
-                    f'at {self.instrument.address}'
+                    f"Connecting to {self.instrument.name} "
+                    f"at {self.instrument.address}"
                 )
 
                 time.sleep(self.delay * reconnects)
@@ -56,8 +56,8 @@ def chaperone(method):
                 try:
 
                     logger.debug(
-                        f'Communicating with {self.instrument.name} '
-                        f'at {self.instrument.address}: {method}({args})'
+                        f"Communicating with {self.instrument.name} "
+                        f"at {self.instrument.address}: {method}({args})"
                     )
 
                     response = method(self, *args, **kwargs)
@@ -80,9 +80,9 @@ def chaperone(method):
                     # Successful communication
 
                     logger.debug(
-                        f'Communication with {self.instrument.name} '
-                        f'at {self.instrument.address} successful '
-                        f'with response: {response}'
+                        f"Communication with {self.instrument.name} "
+                        f"at {self.instrument.address} successful "
+                        f"with response: {response}"
                     )
 
                     self.lock.release()
@@ -90,7 +90,6 @@ def chaperone(method):
 
                 except Exception as exception:
                     traceback = exception.__traceback__
-
 
                     logger.error(
                         f"Encountered '{exception}' while trying "
@@ -103,8 +102,8 @@ def chaperone(method):
             # disconnect adapter and potentially reconnect on next iteration
 
             logger.debug(
-                f'Disconnecting from {self.instrument.name} '
-                f'at {self.instrument.address}'
+                f"Disconnecting from {self.instrument.name} "
+                f"at {self.instrument.address}"
             )
 
             self.disconnect()
@@ -625,7 +624,9 @@ class GPIB(Adapter):
         elif self.lib == "linux-gpib":
             self.backend.write(self._descr, message)
         elif self.lib == "prologix-gpib":
-            self.backend.write(message, address=self.instrument.address)
+
+            with self.backend.lock:
+                self.backend.write(message, address=self.instrument.address)
 
         return "Success"
 
@@ -635,12 +636,28 @@ class GPIB(Adapter):
         elif self.lib == "linux-gpib":
             return self.backend.read(self._descr, bytes).decode()
         elif self.lib == "prologix-gpib":
-            return self.backend.read(address=self.instrument.address)
+
+            with self.backend.lock:
+                return self.backend.read(address=self.instrument.address)
 
     def _query(self, question):
-        self._write(question)
-        time.sleep(self.delay)
-        return self._read()
+
+        if self.lib == "pyvisa":
+            self.backend.write(question)
+            time.sleep(self.delay)
+            response = self.backend.read()
+        elif self.lib == "linux-gpib":
+            self.backend.write(self._descr, question)
+            time.sleep(self.delay)
+            response = self.backend.read(self._descr, bytes).decode()
+        elif self.lib == "prologix-gpib":
+
+            with self.backend.lock:
+                self.backend.write(question, address=self.instrument.address)
+                time.sleep(self.delay)
+                response = self.backend.read(address=self.instrument.address)
+
+        return response
 
     def _linux_gpib_set_timeout(self, timeout):
         if timeout is None:
@@ -731,6 +748,8 @@ class PrologixGPIBUSB:
         self.address = None
         self.devices = []
 
+        self.lock = Lock()
+
     def write(self, message, to_controller=False, address=None):
         if address and address != self.address:
             self.write(f"addr {address}", to_controller=True)
@@ -813,6 +832,8 @@ class PrologixGPIBLAN:
 
         self.devices = []
         self.address = None
+
+        self.lock = Lock()
 
     def write(self, message, to_controller=False, address=None):
         if address and address != self.address:
@@ -1427,7 +1448,6 @@ class Modbus(Adapter):
     def disconnect(self):
         while self.connected:
             self.backend.close()
-            time.sleep(0.1)
 
 
 class Phidget(Adapter):

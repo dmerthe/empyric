@@ -20,10 +20,10 @@ class AlphaLabMR3(Instrument):
     )
 
     meters = (
-        'x component',  # x component of magnetic field
-        'y component',
-        'z component',
-        'magnitude'  # magnitude of the magnetic field
+        "x component",  # x component of magnetic field
+        "y component",
+        "z component",
+        "magnitude",  # magnitude of the magnetic field
     )
 
     def _measure_field(self) -> list:
@@ -34,7 +34,7 @@ class AlphaLabMR3(Instrument):
             self.adapter.read(bytes=self.adapter.in_waiting, decode=False)
             time.sleep(0.1)
 
-        response = self.query('\x03\x00\x00\x00\x00\x00', bytes=31, decode=False)
+        response = self.query("\x03\x00\x00\x00\x00\x00", bytes=31, decode=False)
 
         _time = response[:6]
         vector = response[6:12], response[12:18], response[18:24]

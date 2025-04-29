@@ -13,15 +13,12 @@ logger.setLevel(logging.WARNING)
 
 log_stream_handler = logging.StreamHandler()
 log_stream_handler.setLevel(logging.WARNING)
-log_stream_handler.setFormatter(
-    logging.Formatter(
-        '%(asctime)s: %(message)s'
-    )
-)
+log_stream_handler.setFormatter(logging.Formatter("%(asctime)s: %(message)s"))
 
 logger.addHandler(log_stream_handler)
 
 # TODO add logging.FileHandler to drop log into file in working directory
+
 
 # Tools for time-keeping
 def convert_time(time_value):

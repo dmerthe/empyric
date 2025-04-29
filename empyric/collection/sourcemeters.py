@@ -340,7 +340,8 @@ class Keithley2400(Instrument):
     @setter
     def set_fast_voltages(self, voltages: Union[Array, String]):
         # import fast voltages, if specified as a path
-        if type(voltages) == str:
+
+        if isinstance(voltages, str):
             is_csv = ".csv" in voltages.lower()
             is_file = os.path.isfile(voltages)
 

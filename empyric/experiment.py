@@ -11,12 +11,14 @@ import sys
 import threading
 import time
 import tkinter as tk
+import warnings
 from tkinter.filedialog import askopenfilename
 from typing import Union
 
 import numpy as np
 import pandas as pd
 import pykwalify.errors
+from pandas.core.computation import expressions
 from pykwalify.core import Core as YamlValidator
 from ruamel.yaml import YAML
 
@@ -93,10 +95,10 @@ class Experiment:
         return "Terminated" in self.status
 
     def __init__(
-        self,
-        variables: dict,
-        routines: dict = None,
-        end: Union[numbers.Number, str, None] = None,
+            self,
+            variables: dict,
+            routines: dict = None,
+            end: Union[numbers.Number, str, None] = None,
     ):
         self.variables = variables
         # dict of the form {..., name: variable, ...}
@@ -135,7 +137,9 @@ class Experiment:
             data={**{"Time": None}, **{name: None for name in self.variables}},
             dtype=object,
         )
-        self.data = pd.DataFrame(columns=["Time"] + list(variables.keys()))
+        self.data = pd.DataFrame(
+            columns=["Time"] + list(variables.keys()), dtype=object
+        )
 
         self._status = Experiment.READY
         self.status_locked = True
@@ -200,7 +204,9 @@ class Experiment:
             self.status = base_status
 
             # Append new state to experiment data set
-            self.data.loc[self.state.name] = self.state
+            with warnings.catch_warnings():
+                warnings.simplefilter(action="ignore", category=FutureWarning)
+                self.data.loc[self.state.name] = self.state
 
         # End the experiment, if the duration of the experiment has passed
         if self.clock.time > self.end:
@@ -221,22 +227,21 @@ class Experiment:
             if isinstance(self.variables[name], _variables.Expression):
                 for symbol, dependee in self.variables[name].definitions.items():
                     if hasattr(dependee, "_eval_event"):
-
                         logger.debug(
-                            f'Expression {name} is waiting for {symbol} to be evaluated'
+                            f"Expression {name} is waiting for {symbol} to be evaluated"
                         )
 
                         dependee._eval_event.wait()
 
             try:
                 value = self.variables[name].value
-                logger.info(f'{name} evaluated to {value}')
+                logger.info(f"{name} evaluated to {value}")
             except AdapterError as adapter_error:
                 value = None
-                logger.warning(f'Unable to evaluate {name}: {adapter_error}')
+                logger.warning(f"Unable to evaluate {name}: {adapter_error}")
             except ValueError as value_error:
                 value = None
-                logger.warning(f'Unable to evaluate {name}: {value_error}')
+                logger.warning(f"Unable to evaluate {name}: {value_error}")
 
             self.variables[name]._eval_event.set()
             # unblock threads evaluating dependents
@@ -267,7 +272,7 @@ class Experiment:
             try:
                 self.routines[name].update(self.state)
             except AdapterError as adapter_error:
-                logger.warning(f'Unable to update routine {name}: {adapter_error}')
+                logger.warning(f"Unable to update routine {name}: {adapter_error}")
         except Exception as err:
             self.terminate()
             raise err
@@ -289,7 +294,7 @@ class Experiment:
         if directory:
             path = os.path.join(directory, path)
 
-        logger.info(f'Saving experiment data to {path}')
+        logger.info(f"Saving experiment data to {path}")
 
         if not os.path.exists(path):
             # if this is a new file, write column headers
@@ -316,7 +321,7 @@ class Experiment:
         """
         self.clock.start()
 
-        logger.info('Starting experiment')
+        logger.info("Starting experiment")
 
         self.status_locked = False
         self.status = Experiment.RUNNING
@@ -330,7 +335,7 @@ class Experiment:
         """
         self.clock.stop()
 
-        logger.info(f'Holding experiment ({reason})')
+        logger.info(f"Holding experiment ({reason})")
 
         self.status_locked = False
         self.status = Experiment.HOLDING
@@ -346,7 +351,7 @@ class Experiment:
         """
         self.clock.stop()
 
-        logger.info(f'Stopping experiment ({reason})')
+        logger.info(f"Stopping experiment ({reason})")
 
         self.status_locked = False
         self.status = Experiment.STOPPED
@@ -362,7 +367,7 @@ class Experiment:
         :return: None
         """
 
-        logger.info(f'Terminating experiment ({reason})')
+        logger.info(f"Terminating experiment ({reason})")
 
         self.stop()
         self.save()
@@ -391,19 +396,27 @@ class AsyncExperiment(Experiment):
     """
 
     def __init__(
-        self,
-        variables: dict,
-        routines: dict = None,
-        end: Union[numbers.Number, str, None] = None,
+            self,
+            variables: dict,
+            routines: dict = None,
+            end: Union[numbers.Number, str, None] = None,
     ):
         super().__init__(variables, routines, end)
-        self.loop = None
 
     def __next__(self):
 
         # Start the clock and loop on first call
         if self.state.name is None:  # first step of the experiment
             self.start()
+
+            self.loop = asyncio.get_running_loop()
+
+            for name in self.variables:
+                self.loop.create_task(self._update_variable(name))
+
+            for name in self.routines:
+                self.loop.create_task(self._update_routine(name))
+
             self.status = Experiment.RUNNING
 
         logger.info(f'Iterating experiment (t = {self.state["Time"]} s)')
@@ -414,24 +427,14 @@ class AsyncExperiment(Experiment):
 
         if (self.running or self.holding) and self.state.name is not None:
             # Append new state to experiment data set
-            self.data.loc[self.state.name] = self.state
+            with warnings.catch_warnings():
+                warnings.simplefilter(action="ignore", category=FutureWarning)
+                self.data.loc[self.state.name] = self.state
 
         elif self.terminated:
             raise StopIteration
 
         return self.state
-
-    def start(self):
-
-        super().start()
-
-        self.loop = asyncio.get_running_loop()
-
-        for name in self.variables:
-            self.loop.create_task(self._update_variable(name))
-
-        for name in self.routines:
-            self.loop.create_task(self._update_routine(name))
 
     async def _update_variable(self, name):
         """Update named variable"""
@@ -444,8 +447,8 @@ class AsyncExperiment(Experiment):
                 self.state["Time"] = self.clock.time
                 self.state.name = datetime.datetime.now()
 
-            elif self.stopped:
-                await asyncio.sleep(0)  # give other updating tasks a chance to run
+            else:
+                await asyncio.sleep(0.1)  # give other updating tasks a chance to run
 
     async def _update_routine(self, name):
         """Update named routine"""
@@ -458,8 +461,8 @@ class AsyncExperiment(Experiment):
 
                 await asyncio.to_thread(Experiment._update_routine, self, name)
 
-            elif self.holding or self.stopped:
-                await asyncio.sleep(0)  # give other updating tasks a chance to run
+            else:
+                await asyncio.sleep(0.1)  # give other updating tasks a chance to run
 
 
 class Alarm:
@@ -519,7 +522,7 @@ class Manager:
 
         if isinstance(self.runcard, str):
 
-            logger.info(f'Parsing runcard from file ({self.runcard})...')
+            logger.info(f"Parsing runcard from file ({self.runcard})...")
 
             if os.path.exists(self.runcard):
                 dirname = os.path.dirname(self.runcard)
@@ -534,7 +537,7 @@ class Manager:
                 raise FileNotFoundError(f'invalid runcard path "{self.runcard}"')
         elif isinstance(self.runcard, dict):
 
-            logger.info(f'Parsing runcard from dictionary...')
+            logger.info(f"Parsing runcard from dictionary...")
 
         else:
             raise TypeError(
@@ -550,7 +553,7 @@ class Manager:
         self.alarms = converted_runcard["Alarms"]
         self.plotter = converted_runcard.get("Plotter", None)
 
-        logger.info('Building experiment from runcard...')
+        logger.info("Building experiment from runcard...")
 
         self.experiment = converted_runcard["Experiment"]
 
@@ -593,12 +596,12 @@ class Manager:
             yaml.dump(self.runcard, runcard_file)
 
         # Run experiment loop in separate thread
-        logger.info(f'Starting {experiment_name}')
+        logger.info(f"Starting {experiment_name}")
         experiment_thread = threading.Thread(target=asyncio.run, args=(self._run(),))
         experiment_thread.start()
 
         # Set up the GUI for user interaction
-        logger.info('Launching GUI')
+        logger.info("Launching GUI")
         self.gui = _graphics.ExperimentGUI(
             self.experiment,
             alarms=self.alarms,
@@ -612,10 +615,10 @@ class Manager:
         self.gui.run()
 
         experiment_thread.join()
-        logger.info('Experiment complete; cleaning up...')
+        logger.info("Experiment complete; cleaning up...")
 
         # Disconnect instruments
-        logger.info('Disconnecting from instruments')
+        logger.info("Disconnecting from instruments")
         for instrument in self.instruments.values():
             instrument.disconnect()
 
@@ -623,12 +626,12 @@ class Manager:
 
         # Cancel follow-up if experiment terminated by user
         if self.experiment.terminated and "user" in self.experiment.status:
-            logger.info('Cancelling follow-up experiment')
+            logger.info("Cancelling follow-up experiment")
             self.followup = None
 
         # Execute the follow-up experiment if there is one
         if self.followup:
-            logger.info('Running follow-up experiment')
+            logger.info("Running follow-up experiment")
             if "yaml" in self.followup:
                 self.__init__(self.followup)
                 self.run(directory=directory)
@@ -642,9 +645,8 @@ class Manager:
         for state in self.experiment:
 
             logger.info(
-                'state =' + '.,'.join(
-                    [f'{key}: {value}' for key, value in state.items()]
-                )
+                "state ="
+                + ".,".join([f"{key}: {value}" for key, value in state.items()])
             )
 
             step_start = time.time()
@@ -730,8 +732,7 @@ class RuncardError(BaseException):
 
 
 def validate_runcard(runcard):
-
-    logger.info('Validating runcard')
+    logger.info("Validating runcard")
 
     is_dict = isinstance(runcard, dict)
     is_ordereddict = isinstance(runcard, collections.OrderedDict)
@@ -792,7 +793,7 @@ def convert_runcard(runcard):
     * The Plots section is converted into a corresponding ``Plotter`` instance.
     """
 
-    logger.info('Building experiment from runcard')
+    logger.info("Building experiment from runcard")
 
     # if runcard argument is a path to a YAML file, load into a dictionary
     if type(runcard) == str:
@@ -826,7 +827,7 @@ def convert_runcard(runcard):
     instruments = {}
     for name, specs in runcard.get("Instruments", {}).items():
 
-        logger.info(f'Initializing instrument {name}')
+        logger.info(f"Initializing instrument {name}")
 
         specs = specs.copy()
         _type = specs.pop("type")
@@ -858,7 +859,7 @@ def convert_runcard(runcard):
     variables = {}
     for name, specs in runcard["Variables"].items():
 
-        logger.info(f'Initializing variable {name}')
+        logger.info(f"Initializing variable {name}")
 
         if "meter" in specs:
             instrument = converted_runcard["Instruments"][specs["instrument"]]
@@ -929,16 +930,31 @@ def convert_runcard(runcard):
     if "Routines" in runcard:
         for name, specs in runcard["Routines"].items():
 
-            logger.info(f'Initializing routine {name}')
+            logger.info(f"Initializing routine {name}")
 
             specs = specs.copy()  # avoids modifying the runcard
             _type = specs.pop("type")
 
             specs = {key.replace(" ", "_"): value for key, value in specs.items()}
 
-            # Convert list of knobs into dictionary
-            knobs = np.array([specs.get("knobs", [])]).flatten()
-            if knobs.size > 0:
+            # Get knobs
+            knobs = specs.pop("knobs", None)
+
+            if np.isscalar(knobs):
+                knobs = [knobs]
+            elif isinstance(knobs, dict):  # shortcut for ModbusServer
+                knob_addresses = np.array(list(knobs.keys())).flatten()
+                knobs = np.array(list(knobs.values())).flatten()
+                specs["knob_addresses"] = knob_addresses
+            elif knobs is not None and not isinstance(knobs, list):
+                raise ValueError(
+                    f"Invalid knobs specification for routine {name}; "
+                    "Must be a list of knob names or optionally a dictionary "
+                    "of register addresses and knob names for a ModbusServer"
+                )
+
+            # Convert list of knobs into dictionary of {name: knob} pairs
+            if knobs is not None and len(knobs) > 0:
                 for knob in knobs:
                     if knob not in variables:
                         raise KeyError(
@@ -947,6 +963,27 @@ def convert_runcard(runcard):
                         )
 
                 specs["knobs"] = {name: variables[name] for name in knobs}
+            else:
+                specs["knobs"] = None
+
+            # Get meters
+            meters = specs.pop("meters", None)
+
+            if np.isscalar(meters):
+                meters = [meters]
+            elif isinstance(meters, dict):  # shortcut for ModbusServer
+                meter_addresses = np.array(list(meters.keys())).flatten()
+                meters = np.array(list(meters.values())).flatten()
+
+                specs["meter_addresses"] = meter_addresses
+            elif meters is not None and not isinstance(meters, list):
+                raise ValueError(
+                    f"Invalid meters specification for routine {name}; "
+                    "Must be a list of meter names or optionally a dictionary "
+                    "of register addresses and meter names for a ModbusServer"
+                )
+
+            specs["meters"] = meters
 
             routines[name] = available_routines[_type](**specs)
 
@@ -958,14 +995,14 @@ def convert_runcard(runcard):
 
     if async_experiment:
 
-        logger.info('Initializing synchronous experiment')
+        logger.info("Initializing synchronous experiment")
 
         converted_runcard["Experiment"] = AsyncExperiment(
             variables, routines=routines, end=runcard["Settings"].get("end", None)
         )
     else:
 
-        logger.info('Initializing asynchronous experiment')
+        logger.info("Initializing asynchronous experiment")
 
         converted_runcard["Experiment"] = Experiment(
             variables, routines=routines, end=runcard["Settings"].get("end", None)
@@ -976,7 +1013,7 @@ def convert_runcard(runcard):
     if "Alarms" in runcard:
         for name, specs in runcard["Alarms"].items():
 
-            logger.info(f'Initializing alarm {name}')
+            logger.info(f"Initializing alarm {name}")
 
             condition = specs.copy()["condition"]
             definitions = specs.copy().get("definitions", {})
@@ -1005,7 +1042,7 @@ def convert_runcard(runcard):
     # Plots section
     if "Plots" in runcard:
 
-        logger.info('Initializing plotter')
+        logger.info("Initializing plotter")
 
         converted_runcard["Plotter"] = _graphics.Plotter(
             converted_runcard["Experiment"].data, settings=runcard["Plots"]

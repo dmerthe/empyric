@@ -30,14 +30,14 @@ class Keithley2260B(Instrument):
     @measurer
     def measure_current(self) -> Float:
         def validator(response):
-            return bool(re.match("[\+\-]\d+\.\d\d\d", response))
+            return bool(re.match("[\+\-]\d+\.\d\d\d", response.strip()))
 
         return float(self.query("MEAS:CURR?", validator=validator))
 
     @measurer
     def measure_voltage(self) -> Float:
         def validator(response):
-            return bool(re.match("[\+\-]\d+\.\d\d\d", response))
+            return bool(re.match("[\+\-]\d+\.\d\d\d", response.strip()))
 
         return float(self.query("MEAS:VOLT?", validator=validator))
 
@@ -68,14 +68,14 @@ class Keithley2260B(Instrument):
     @getter
     def get_max_current(self) -> Float:
         def validator(response):
-            return bool(re.match("[\+\-]\d+\.\d\d\d", response))
-
+            return bool(re.match("[\+\-]\d+\.\d\d\d", response.strip()))
+        
         return float(self.query("CURR?", validator=validator))
 
     @getter
     def get_max_voltage(self) -> Float:
         def validator(response):
-            return bool(re.match("[\+\-]\d+\.\d\d\d", response))
+            return bool(re.match("[\+\-]\d+\.\d\d\d", response.strip()))
 
         return float(self.query("VOLT?", validator=validator))
 
@@ -200,7 +200,7 @@ class SRSPS300(Instrument):
     Stanford Rsearch Systems PS-300 series high voltage power supply.
     """
 
-    name = "SRSPS350"
+    name = "SRSPS300"
 
     supported_adapters = ((GPIB, {}),)
 
@@ -258,7 +258,7 @@ class SRSPS300(Instrument):
 
     @setter
     def set_max_current(self, current: Float):
-        self.write("ILIM%f" % float(current))
+        self.write("ILIM%f" % float(current))  # all units are SI units-->Amps
 
     @getter
     def get_max_current(self) -> Float:
@@ -281,6 +281,7 @@ class SRSPS300(Instrument):
 
     @getter
     def get_clear_trip(self):
+
         try:
             status_byte_1 = int(self.query("*STB? 1"))
             status_byte_2 = int(self.query("*STB? 2"))

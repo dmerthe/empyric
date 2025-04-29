@@ -22,7 +22,8 @@ from empyric.tools import (
     autobind_socket,
     read_from_socket,
     write_to_socket,
-    get_ip_address, logger,
+    get_ip_address,
+    logger,
 )
 from empyric.types import (
     recast,
@@ -300,7 +301,8 @@ class Ramp(Routine):
         self.now = state["Time"]
 
         if self.then is None or self.then < self.start:
-            self.then = state["Time"]
+            self.then = self.now
+            return
 
         for knob, rate, target in zip(self.knobs, self.rates, self.targets):
             # target and rate can be variables
@@ -331,7 +333,7 @@ class Ramp(Routine):
             else:
                 self.knobs[knob].value = val_nxt
 
-        self.then = state["Time"]
+        self.then = self.now
 
 
 class Timecourse(Routine):
@@ -410,13 +412,17 @@ class Timecourse(Routine):
 
     @Routine.enabler
     def update(self, state):
+
+        now = state["Time"]
+
         knobs_times_values = zip(self.knobs, self.times, self.values)
+
         for knob, times, values in knobs_times_values:
-            if np.min(times) > state["Time"] or np.max(times) < state["Time"]:
+            if np.min(times) > now or np.max(times) < now:
                 continue
 
-            j_last = np.argwhere(times <= state["Time"]).flatten()[-1]
-            j_next = np.argwhere(times > state["Time"]).flatten()[0]
+            j_last = np.argwhere(times <= now).flatten()[-1]
+            j_next = np.argwhere(times > now).flatten()[0]
 
             last_time = times[j_last]
             next_time = times[j_next]
@@ -434,9 +440,9 @@ class Timecourse(Routine):
 
             if self.ramp:
                 # Ramp linearly between numerical values
-                value = last_value + (next_value - last_value) * (
-                    state["Time"] - last_time
-                ) / (next_time - last_time)
+                value = last_value + (next_value - last_value) * (now - last_time) / (
+                    next_time - last_time
+                )
             else:
                 # or just set to last value
                 value = last_value
@@ -630,12 +636,12 @@ class Optimization(Routine):
         # name of the meter to check from state argument of update
         self.meter = meter
 
+        if "sign" in kwargs:
+            self._sign = float(kwargs.pop("sign"))
+
         # Record best settings when an optimum is found
         self.best_meter = -self._sign * np.inf
         self.best_knobs = {name: None for name in self.knobs}
-
-        if "sign" in kwargs:
-            self._sign = float(kwargs.pop("sign"))
 
         self.method = method
 
@@ -1126,6 +1132,8 @@ class ModbusServer(Routine):
         self,
         knobs: dict = None,
         meters: Union[list, tuple, np.ndarray] = None,
+        knob_addresses: Union[list, tuple, np.ndarray] = None,
+        meter_addresses: Union[list, tuple, np.ndarray] = None,
         **kwargs,
     ):
         if knobs is None:
@@ -1133,7 +1141,20 @@ class ModbusServer(Routine):
 
         Routine.__init__(self, knobs, **kwargs)
 
+        if knob_addresses is not None:
+            self.knob_addresses = knob_addresses
+        else:
+            self.knob_addresses = [5*i for i in range(len(knobs))]
+
         self.meters = meters
+
+        if meters is not None:
+            if meter_addresses is not None:
+                self.meter_addresses = meter_addresses
+            else:
+                self.meter_addresses = [5*i for i in range(len(meters))]
+        else:
+            self.meter_addresses = []  # to be filled upon obtaining a state
 
         self.state = None  # set by update method
 
@@ -1150,8 +1171,8 @@ class ModbusServer(Routine):
         device = importlib.import_module(".device", package="pymodbus")
         payload = importlib.import_module(".payload", package="pymodbus")
 
-        self._builder_cls = payload.BinaryPayloadBuilder
-        self._decoder_cls = payload.BinaryPayloadDecoder
+        self._payload_builder = payload.BinaryPayloadBuilder
+        self._payload_decoder = payload.BinaryPayloadDecoder
 
         DataBlock = datastore.ModbusSequentialDataBlock
 
@@ -1195,34 +1216,50 @@ class ModbusServer(Routine):
         @functools.wraps(setValues_method)
         def wrapped_method(*args, from_vars=False):
             if from_vars:
-                # update context from variables
+                # update registers from variables
                 return setValues_method(*args)
             else:
                 # update variables according to the request
                 fc_as_hex, address, values = args
 
                 if fc_as_hex != 16:
-                    print(
-                        f"Warning: an attempt was made to write to a readonly "
+                    logger.warning(
+                        f"an attempt was made to write to a readonly "
                         f"register at address {address}"
                     )
                 else:
                     if self.knobs:
-                        variable = list(self.knobs.values())[address // 5]
+
+                        # Identify knob corresponding to given register address
+                        try:
+                            index = [
+                                i for i, addr in enumerate(self.knob_addresses)
+                                if addr == address
+                            ][0]
+                        except IndexError:
+                            logger.warning(
+                                "an attempt was made to set a knob "
+                                "through an unassigned register"
+                            )
+                            return
+
+                        variable = list(self.knobs.values())[index]
 
                         controller = getattr(variable, "_controller", None)
 
                         if controller:
-                            name = list(self.knobs.keys())[address // 5]
+                            name = list(self.knobs.keys())[index]
 
-                            print(
-                                f"Warning: an attempt was made to set {name}, "
+                            logger.warning(
+                                f"an attempt was made to set {name}, "
                                 "but it is currently controlled by "
                                 f"{controller}."
                             )
                             return
 
-                        decoder = self._decoder_cls.fromRegisters(values, byteorder=">")
+                        decoder = self._payload_decoder.fromRegisters(
+                            values, byteorder=">"
+                        )
 
                         if issubclass(variable._type, Boolean):
                             variable.value = decoder.decode_64bit_uint()
@@ -1237,95 +1274,118 @@ class ModbusServer(Routine):
         return wrapped_method
 
     async def _update_registers(self):
-        if self.state is None:  # do nothing if state is undefined
+
+        try:
+
+            if self.state is None:  # do nothing if state is undefined
+                await asyncio.sleep(0.1)
+                return
+
+            # Store readwrite variable values in holding registers (fc = 3)
+            for i, (name, variable) in enumerate(self.knobs.items()):
+                value = variable._value
+
+                builder = self._payload_builder(byteorder=">")
+
+                # encode the value into the 4 registers
+                if value is None or variable._type is None:
+                    builder.add_64bit_float(float("nan"))
+                elif issubclass(variable._type, Boolean):
+                    builder.add_64bit_uint(value)
+                elif issubclass(variable._type, Toggle):
+                    builder.add_64bit_uint(1 if value == ON else 0)
+                elif issubclass(variable._type, Integer):
+                    builder.add_64bit_int(value)
+                elif issubclass(variable._type, Float):
+                    builder.add_64bit_float(value)
+                else:
+                    raise ValueError(
+                        f"unable to update modbus server registers from value "
+                        f"{value} of variable {name} with data type "
+                        f"{variable._type}"
+                    )
+
+                # encode the meta data
+                meta_reg_val = {
+                    Boolean: 0,
+                    Toggle: 1,
+                    Integer: 2,
+                    Float: 3,
+                    Array: 4,
+                    String: 5,
+                }.get(variable._type, -1)
+
+                builder.add_16bit_int(meta_reg_val)
+
+                # from_vars kwarg added with setValues_decorator above
+                self.slave.setValues(
+                    3, self.knob_addresses[i],
+                    builder.to_registers(), from_vars=True
+                )
+
+            # Store readonly variable values in input registers (fc = 4)
+
+            if self.meters is not None:
+
+                try:
+                    selection = {name: self.state[name] for name in self.meters}
+                except KeyError as err:
+                    raise ValueError(
+                        f"meter {err.args[0]} not found in experiment variables"
+                    )
+            else:
+                selection = self.state
+
+            if len(self.meter_addresses) == 0:
+                # assume consecutive sets of registers, if not specified
+                self.meter_addresses = [5 * i for i in range(len(selection))]
+
+            for i, (name, value) in enumerate(selection.items()):
+
+                _type = None
+                for supported_type in supported_types.values():
+                    if isinstance(value, supported_type):
+                        _type = supported_type
+
+                builder = self._payload_builder(byteorder=">")
+
+                # encode the value into the 4 registers
+                if value is None or _type is None:
+                    builder.add_64bit_float(float("nan"))
+                elif _type == Boolean:
+                    builder.add_64bit_uint(value)
+                elif _type == Toggle:
+                    builder.add_64bit_uint(int(value in Toggle.on_values))
+                elif _type == Integer:
+                    builder.add_64bit_int(value)
+                elif _type == Float:
+                    builder.add_64bit_float(value)
+                else:
+                    raise ValueError(
+                        f"unable to update modbus server registers from value "
+                        f"{value} of variable {name} with data type "
+                        f"{_type}"
+                    )
+
+                # encode the meta data
+                type_int = {Boolean: 0, Toggle: 1, Integer: 2, Float: 3}.get(_type, -1)
+
+                builder.add_16bit_int(type_int)
+
+                # from_vars kwarg added with setValues_decorator above
+                self.slave.setValues(
+                    4, self.meter_addresses[i],
+                    builder.to_registers(), from_vars=True
+                )
+
             await asyncio.sleep(0.1)
+
+        finally:
+
             asyncio.create_task(self._update_registers())
-            return
-
-        # Store readwrite variable values in holding registers (fc = 3)
-        builder = self._builder_cls(byteorder=">")
-
-        for i, (name, variable) in enumerate(self.knobs.items()):
-            value = variable._value
-
-            # encode the value into the 4 registers
-            if value is None or variable._type is None:
-                builder.add_64bit_float(float("nan"))
-            elif issubclass(variable._type, Boolean):
-                builder.add_64bit_uint(value)
-            elif issubclass(variable._type, Toggle):
-                builder.add_64bit_uint(1 if value == ON else 0)
-            elif issubclass(variable._type, Integer):
-                builder.add_64bit_int(value)
-            elif issubclass(variable._type, Float):
-                builder.add_64bit_float(value)
-            else:
-                raise ValueError(
-                    f"unable to update modbus server registers from value "
-                    f"{value} of variable {name} with data type "
-                    f"{variable._type}"
-                )
-
-            # encode the meta data
-            meta_reg_val = {
-                Boolean: 0,
-                Toggle: 1,
-                Integer: 2,
-                Float: 3,
-                Array: 4,
-                String: 5,
-            }.get(variable._type, -1)
-
-            builder.add_16bit_int(meta_reg_val)
-
-        # from_vars kwarg added with setValues_decorator above
-        self.slave.setValues(3, 0, builder.to_registers(), from_vars=True)
-
-        # Store readonly variable values in input registers (fc = 4)
-        builder.reset()
-
-        if self.meters:
-            selection = {name: self.state[name] for name in self.meters}
-        else:
-            selection = self.state
-
-        for i, (name, value) in enumerate(selection.items()):
-            _type = None
-            for supported_type in supported_types.values():
-                if isinstance(value, supported_type):
-                    _type = supported_type
-
-            # encode the value into the 4 registers
-            if value is None or _type is None:
-                builder.add_64bit_float(float("nan"))
-            elif _type == Boolean:
-                builder.add_64bit_uint(value)
-            elif _type == Toggle:
-                builder.add_64bit_uint(int(value in Toggle.on_values))
-            elif _type == Integer:
-                builder.add_64bit_int(value)
-            elif _type == Float:
-                builder.add_64bit_float(value)
-            else:
-                raise ValueError(
-                    f"unable to update modbus server registers from value "
-                    f"{value} of variable {name} with data type "
-                    f"{_type}"
-                )
-
-            # encode the meta data
-            type_int = {Boolean: 0, Toggle: 1, Integer: 2, Float: 3}.get(_type, -1)
-
-            builder.add_16bit_int(type_int)
-
-        # from_vars kwarg added with setValues_decorator above
-        self.slave.setValues(4, 0, builder.to_registers(), from_vars=True)
-
-        await asyncio.sleep(0.1)
-
-        asyncio.create_task(self._update_registers())
 
     async def _run_async_server(self):
+
         asyncio.create_task(self._update_registers())
 
         server = importlib.import_module(".server", package="pymodbus")
@@ -1345,7 +1405,10 @@ class ModbusServer(Routine):
         self.state = state
 
     def terminate(self):
-        asyncio.run(self.server.shutdown())
+
+        # Close modbus server
+        if not self.server.serving.done():
+            self.server.serving.set_result(True)
 
 
 supported = {

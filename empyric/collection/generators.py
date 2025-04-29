@@ -34,6 +34,8 @@ class SiglentSDG1000(Instrument):
         "channel 2 pulse delay",
         "channel 1 invert",
         "channel 2 invert",
+        "channel 1 phase",
+        "channel 2 phase",
         "equal phase",
         # BURST MODE PARAMETERS
         "channel 1 burst state",
@@ -419,6 +421,27 @@ class SiglentSDG1000(Instrument):
     @getter
     def get_channel_2_invert(self) -> Toggle:
         return self._get_channel_n_invert(2)
+    
+    # Phase (for SINE wave types)
+    @setter
+    def set_channel_1_phase(self, phase: Float):
+        self._set_channel_n_basic_waveform(1, phse=f"{phase}")
+
+    @getter
+    def get_channel_1_phase(self) -> Float:
+        delay_str = self._get_channel_n_waveform(1).get("PHSE", "nan")
+
+        return float(delay_str)
+
+    @setter
+    def set_channel_2_phase(self, phase: Float):
+        self._set_channel_n_basic_waveform(1, phse=f"{phase}")
+
+    @getter
+    def get_channel_2_phase(self) -> Float:
+        delay_str = self._get_channel_n_waveform(2).get("PHSE", "nan")
+
+        return float(delay_str)
 
     # Equalize phase of both channels
     @setter

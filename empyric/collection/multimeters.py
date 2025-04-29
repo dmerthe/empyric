@@ -488,16 +488,49 @@ class LabJackT7(Instrument):
     supported_adapters = ((Modbus, {}),)
 
     knobs = (
-        "DIO0", "DIO1", "DIO2", "DIO3", "DIO4", "DIO5", "DIO6", "DIO7",
+        "DIO0",
+        "DIO1",
+        "DIO2",
+        "DIO3",
+        "DIO4",
+        "DIO5",
+        "DIO6",
+        "DIO7",
+        "DAC0",
+        "DAC1"
     )
 
     meters = (
-        "AIN0", "AIN1", "AIN2", "AIN3", "AIN4", "AIN5", "AIN6",
-        "AIN7", "AIN8", "AIN9", "AIN10", "AIN11", "AIN12", "AIN13",
+        "AIN0",
+        "AIN1",
+        "AIN2",
+        "AIN3",
+        "AIN4",
+        "AIN5",
+        "AIN6",
+        "AIN7",
+        "AIN8",
+        "AIN9",
+        "AIN10",
+        "AIN11",
+        "AIN12",
+        "AIN13",
         "AIN all",
         "device temperature",
-        "AIN0_EF", "AIN1_EF", "AIN2_EF", "AIN3_EF", "AIN4_EF", "AIN5_EF", "AIN6_EF",
-        "AIN7_EF", "AIN8_EF", "AIN9_EF", "AIN10_EF", "AIN11_EF", "AIN12_EF", "AIN13_EF",
+        "AIN0_EF",
+        "AIN1_EF",
+        "AIN2_EF",
+        "AIN3_EF",
+        "AIN4_EF",
+        "AIN5_EF",
+        "AIN6_EF",
+        "AIN7_EF",
+        "AIN8_EF",
+        "AIN9_EF",
+        "AIN10_EF",
+        "AIN11_EF",
+        "AIN12_EF",
+        "AIN13_EF",
     )
 
     def _set_DION(self, n, value: Integer):
@@ -634,6 +667,28 @@ class LabJackT7(Instrument):
         """Reads all 14 analog inputs in a single call"""
         return self.read(4, 0, count=2 * 14, _type="32bit_float")
 
+    def _set_DACN(self, n, value: Float):
+        self.write(16, 1000 + 2 * n, value, _type="32bit_float")
+
+    def _get_DACN(self, n) -> Float:
+        return self.read(3, 1000 + 2 * n, count=2, _type="32bit_float")
+
+    @setter
+    def set_DAC0(self, value: Float):
+        self._set_DACN(0, value)
+
+    @getter
+    def get_DAC0(self) -> Float:
+        return self._get_DACN(0)
+
+    @setter
+    def set_DAC1(self, value: Float):
+        self._set_DACN(1, value)
+
+    @getter
+    def get_DAC1(self) -> Float:
+        return self._get_DACN(1)
+
     @measurer
     def measure_device_temperature(self) -> Float:
         """Device temperature in C"""
@@ -654,20 +709,20 @@ class LabJackT7(Instrument):
         """
 
         if index not in range(52):
-            raise ValueError('EF_INDEX must be an integer between 0 and 51')
+            raise ValueError("EF_INDEX must be an integer between 0 and 51")
 
-        self.write(16, 9000 + 2*n, index, _type="32bit_uint")
+        self.write(16, 9000 + 2 * n, index, _type="32bit_uint")
 
     def _get_ef_index(self, n: int):
-        return self.read(3, 9000 + 2*n, count=2, _type="32bit_uint")
+        return self.read(3, 9000 + 2 * n, count=2, _type="32bit_uint")
 
     def _set_ef_config_a(self, n: int, config: int):
         """0 = K, 1 = C, 2 = F"""
 
         if config not in range(3):
-            raise ValueError('EF_CONFIG_A must be 0, 1 or 2')
+            raise ValueError("EF_CONFIG_A must be 0, 1 or 2")
 
-        self.write(16, 9300 + 2*n, config, _type="32bit_uint")
+        self.write(16, 9300 + 2 * n, config, _type="32bit_uint")
 
     def _get_ef_config_a(self, n):
         return self.read(3, 9300 + 2 * n, count=2, _type="32bit_uint")

@@ -50,13 +50,9 @@ def execute():
         "-t", "--test", nargs="*", help="test empyric installation and components"
     )
 
-    parser.add_argument(
-        "-b", "--debug", nargs="*", help="set logger level to DEBUG"
-    )
+    parser.add_argument("-b", "--debug", nargs="*", help="set logger level to DEBUG")
 
-    parser.add_argument(
-        "-i", "--info", nargs="*", help="set logger level to INFO"
-    )
+    parser.add_argument("-i", "--info", nargs="*", help="set logger level to INFO")
 
     args = parser.parse_args()
 
