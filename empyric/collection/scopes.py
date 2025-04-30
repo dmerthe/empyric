@@ -417,7 +417,7 @@ class MulticompProScope(Instrument):
         self.write(":TRIG:SING:EDGE:SOUR CH%d" % int(source))
 
     @getter
-    def get_trigger_source(self) -> String:
+    def get_trigger_source(self) -> Integer:
         source = self.query(":TRIG:SING:EDGE:SOUR?")[:-2]
 
         if source == "CH1":
