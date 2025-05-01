@@ -1,3 +1,4 @@
+import logging
 import re
 import struct
 import time
@@ -247,7 +248,7 @@ class MulticompProScope(Instrument):
     """
 
     supported_adapters = (
-        (Socket, {'timeout': 1.0}),
+        (Socket, {"timeout": 0.5}),
         (USB, {"delay": 1}),
         # acquisitions can take a long time
     )
@@ -261,6 +262,7 @@ class MulticompProScope(Instrument):
         "scale ch2",
         "position ch2",
         "sweep mode",
+        "trigger timeout",
         "trigger level",
         "trigger source",
         "sweep mode",
@@ -330,13 +332,28 @@ class MulticompProScope(Instrument):
         5.0: "5v",
     }
 
-    _volt_div_table = {0: 1e-3, 9: 1.0}
+    _volt_div_table = {  # multipliers for waveform data
+        0: 1.e-3,
+        1: 2.e-3,
+        2: 5.e-3,
+        3: 10.e-3,
+        4: 20.e-3,
+        5: 50.e-3,
+        6: 100.e-3,
+        7: 200.e-3,
+        8: 500.e-3,
+        9: 1.0,
+        10: 2.0,
+        11: 5.0
+    }
 
     _resolutions = {1e3: "1K", 1e4: "10K", 1e5: "100K", 1e6: "1M", 1e7: "10M"}
 
     _sweep_modes = ["AUTO", "NORMAL", "NORM", "SINGLE", "SING"]
 
     _acquiring = False
+
+    _trigger_timeout = 10.0
 
     sample_rate = None
 
@@ -383,20 +400,36 @@ class MulticompProScope(Instrument):
         self.write((":CH%d:OFFS " % channel) + str(position))
 
     @setter
-    def set_scale_ch(self, scale: Float, channel=None):
-        self._set_scale_ch(channel, scale)
+    def set_scale_ch1(self, scale: Float):
+        self._set_scale_ch(1, scale)
 
     @getter
-    def get_scale_ch(self, channel=None) -> Float:
-        return self._get_scale_ch(channel)
+    def get_scale_ch1(self) -> Float:
+        return self._get_scale_ch(1)
 
     @setter
-    def set_position_ch(self, position: Float, channel=None):
-        self._set_position_ch(channel, position)
+    def set_scale_ch2(self, scale: Float):
+        self._set_scale_ch(2, scale)
 
     @getter
-    def get_position_ch(self, channel=None) -> Float:
-        return float(self.query(":CH%d:OFFS?" % channel)[:-2])
+    def get_scale_ch2(self) -> Float:
+        return self._get_scale_ch(2)
+
+    @setter
+    def set_position_ch1(self, position: Float):
+        self._set_position_ch(1, position)
+
+    @getter
+    def get_position_ch1(self) -> Float:
+        return float(self.query(":CH1:OFFS?")[:-2])
+
+    @setter
+    def set_position_ch2(self, position: Float):
+        self._set_position_ch(2, position)
+
+    @getter
+    def get_position_ch2(self) -> Float:
+        return float(self.query(":CH2:OFFS?")[:-2])
 
     @setter
     def set_sweep_mode(self, mode: String):
@@ -413,7 +446,15 @@ class MulticompProScope(Instrument):
         return self.query(":TRIG:SING:SWE?")[:-2].upper()
 
     @setter
-    def set_trigger_source(self, source: String):
+    def set_trigger_timeout(self, timeout: Float):
+        self._trigger_timeout = timeout
+
+    @getter
+    def get_trigger_timeout(self) -> Float:
+        return self._trigger_timeout
+
+    @setter
+    def set_trigger_source(self, source: Integer):
         self.write(":TRIG:SING:EDGE:SOUR CH%d" % int(source))
 
     @getter
@@ -470,34 +511,66 @@ class MulticompProScope(Instrument):
 
     @setter
     def set_acquire(self, _: Boolean):
+        """Set to single acquisition and wait for trigger"""
+
         self._acquiring = True
 
+        # Arm the trigger
         self.set_sweep_mode("SINGLE")
 
-        trig_status = self.measure_trigger_status()
+        trig_status = None
 
-        if trig_status == "TRIG":
-            # measurement has been triggered
-            pass
-        else:
-            # sweep needs to be reset
+        # Wait for trigger
+        start_time = time.time()
+        wait_time = 0.0
+
+        while trig_status != "TRIG" and wait_time < self._trigger_timeout:
+
             time.sleep(0.1)
-            self.set_acquire(1)
+
+            trig_status = self.measure_trigger_status()
+
+            wait_time = time.time() - start_time
+        print('Scope triggered')
+        start_time = time.time()
+        wait_time = 0.0
+
+        # Wait for acquisition to stop
+        while trig_status != "STOP" and wait_time < self._trigger_timeout:
+
+            time.sleep(0.1)
+
+            trig_status = self.measure_trigger_status()
+
+            wait_time = time.time() - start_time
+        print('Scope acquisition stopped')
+        self._acquiring = False
 
     def _read_preamble(self, channel):
+
         info_dict = {}
 
-        preamble = self.query(":WAV:PRE?", decode=False)
+        self.write(":WAV:PRE?")
 
-        header, info = preamble[:11], preamble[11:]
+        first_byte, second_byte = self.read(nbytes=2)
 
-        if header != b"#9000000000":  # indicates empty data buffer
+        nbytes_remaining_in_header = int(second_byte)
+
+        remaining_header = self.read(nbytes=nbytes_remaining_in_header)
+
+        nbytes_in_packet = int(remaining_header)
+
+        if nbytes_in_packet > 0:  # indicates empty data buffer
+
+            info = self.read(decode=False, nbytes=nbytes_in_packet)
+
             try:
                 # First 8 bytes is an integer signature, used for verification
                 ver_int = 651058244139746640
                 verified = struct.unpack("<q", info[:8])[0] == ver_int
 
                 if verified:
+
                     if channel == 1:
                         scale = self._volt_div_table[
                             struct.unpack("<h", info[260:262])[0]
@@ -515,23 +588,23 @@ class MulticompProScope(Instrument):
                     info_dict["scale"] = scale
                     info_dict["zero"] = zero
                     info_dict["sample rate"] = sample_rate
+                    self.sample_rate = info_dict["sample rate"]
                 else:
-                    print(
-                        f"Warning: {self.name} received unverified "
-                        f"signature when reading from channel {channel}"
+                    logging.warning(
+                        f"received unverified signature when reading "
+                        f"from channel {channel} of {self.name}"
                     )
 
             except struct.error:
-                print(
-                    f"Warning: {self.name} received truncated preamble when "
-                    f"reading from channel {channel}"
+                logging.warning(
+                    f"received truncated preamble when "
+                    f"reading from channel {channel} of {self.name}"
                 )
-
-        self.sample_rate = info_dict["sample rate"]
 
         return info_dict
 
     def _read_data(self, channel):
+
         info = self._read_preamble(channel)
 
         if info:
@@ -540,60 +613,71 @@ class MulticompProScope(Instrument):
         else:
             return None
 
+        voltages = None
+
         # Only 256k data points can be read at a time
         resolution = self.get_resolution()
 
         if resolution < 256000:  # can get all data in one pass
             self.write(":WAV:RANG 0, %d" % resolution)
 
-            raw_response = self.query(":WAV:FETC?", decode=False)
+            raw_response = self.query(
+                ":WAV:FETC?", decode=False, timeout=5.0, nbytes=2*resolution + 11
+            )
 
             header, byte_data = raw_response[:11], raw_response[11:]
 
             data_len = int(header[2:]) // 2
 
-            voltages = scale * (
-                np.array(struct.unpack(f"<{data_len}h", byte_data), dtype=float) / 6400
-                - zero
-            )
+            try:
+
+                unscaled = np.array(
+                    struct.unpack(f"<{data_len}h", byte_data), dtype=float
+                )
+
+                voltages = scale * (unscaled / 6400 - zero)
+
+            except struct.error:
+
+                logging.warning(
+                    f"received truncated/corrupted data from {self.name}"
+                )
 
         else:  # need to read data in chunks; max chunk size is 256k
             offset, size = 0, 200000
+            n_samples_remaining = resolution
 
-            voltages = np.empty(resolution)
+            voltages = np.full(resolution, np.nan)
 
-            while offset + size <= resolution:
+            while n_samples_remaining > 0:
+
                 self.write(":WAV:RANG %d, %d" % (offset, size))
 
-                raw_response = self.query(":WAV:FETC?", decode=False)
+                raw_response = self.query(
+                    ":WAV:FETC?", decode=False, timeout=5.0,
+                    nbytes=2*np.min([size, n_samples_remaining]) + 11
+                )
 
                 header, byte_data = raw_response[:11], raw_response[11:]
 
                 data_len = int(header[2:]) // 2
 
-                voltages[offset: offset + size] = scale * (
-                    np.array(struct.unpack(f"<{data_len}h", byte_data), dtype=float)
-                    / 6400
-                    - zero
+                unscaled = np.array(
+                    struct.unpack(f"<{data_len}h", byte_data), dtype=float
                 )
 
+                voltages[offset: offset + data_len] = scale * (unscaled / 6400 - zero)
+
                 offset += size
+                n_samples_remaining -= size
 
         if len(voltages) != resolution:
-            print(
-                f"Warning: {self.name} received truncated data "
-                f"for channel {channel}; discarding"
-            )
-            return None
+            logging.warning(f"received truncated data from {self.name}")
 
         return voltages
 
     @measurer
     def measure_channel_1(self) -> Array:
-        if not self._acquiring:
-            self.set_acquire(True)
-
-        self._acquiring = False
 
         self.write(":WAV:BEG CH1")
 
@@ -605,10 +689,6 @@ class MulticompProScope(Instrument):
 
     @measurer
     def measure_channel_2(self) -> Array:
-        if not self._acquiring:
-            self.set_acquire(True)
-
-        self._acquiring = False
 
         self.write(":WAV:BEG CH2")
 
