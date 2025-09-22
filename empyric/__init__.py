@@ -15,7 +15,7 @@ from empyric.experiment import Manager
 # List of testable features.
 # Tests are invoked at the command line with `empyric --test <feature>`
 testable_features = [
-    "experiment",  # tests Variable, Experiment and Manager classes (default)
+    "experiment",  # tests Variable, Experiment and Manager classes (default),
     "variable",  # tests Knob, Meter, Parameter and Expression
     # Adapters
     "serial",
@@ -54,6 +54,12 @@ def execute():
 
     parser.add_argument("-i", "--info", nargs="*", help="set logger level to INFO")
 
+    gui_type = None
+    parser.add_argument(
+        "-g", "--gui", nargs=1,
+        help="Choose GUI: 'Tk' (Tk window) or 'browser' (web browser tab/window)"
+    )
+
     args = parser.parse_args()
 
     if args.debug is not None:
@@ -65,6 +71,9 @@ def execute():
         logger.setLevel(logging.INFO)
         log_stream_handler.setLevel(logging.INFO)
         logger.info("Logger level set to INFO")
+
+    if args.gui is not None:
+        gui_type = args.gui[0]
 
     if args.test is not None:
         if pytest is None:
@@ -103,5 +112,5 @@ def execute():
                 )
             )
     else:
-        manager = Manager(runcard=args.runcard)
+        manager = Manager(runcard=args.runcard, gui_type=gui_type)
         manager.run(directory=args.directory)

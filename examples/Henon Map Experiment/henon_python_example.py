@@ -7,7 +7,7 @@ import threading
 from empyric.instruments import HenonMapper
 from empyric.experiment import Alarm, Experiment
 from empyric.variables import Meter
-from empyric.graphics import ExperimentGUI
+from empyric.graphics import TkGUI
 
 import matplotlib
 
@@ -44,7 +44,7 @@ plots = {
         "configure": {"marker": "o", "linestyle": "None", "markersize": 3},
     }
 }
-gui = ExperimentGUI(
+gui = TkGUI(
     experiment, alarms={"y>0": alarm}, title="Henon Map Example", plots=plots
 )
 

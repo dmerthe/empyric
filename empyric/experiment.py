@@ -495,12 +495,17 @@ class Manager:
     When initallized, it uses the given runcard to construct an experiment and
     run it in a separate thread. The Manager also handles alarms as specified
     by the runcard.
+
+    The constructor also has an optional `gui_type` argument, to specify the type of GUI
+    use. Options are 'Tk' (Tk window) or 'browser' (browser window/tab).
     """
 
-    def __init__(self, runcard=None):
+    def __init__(self, runcard=None, gui_type=None):
         """
         :param runcard: (dict/str) runcard as a dictionary or path pointing to
         a YAML file
+        :param gui_type: (str/None) type of gui to use: 'Tk' or 'browser' (defaults to
+        'Tk')
         """
 
         logger.info(f"Initializing experiment manager...")
@@ -567,6 +572,8 @@ class Manager:
 
         self.awaiting_alarms = {}  # dictionary of alarms that are triggered
 
+        self.gui_type = 'Tk' if gui_type is None else gui_type
+
     def run(self, directory=None):
         """
         Run the experiment defined by the runcard. A GUI shows experiment
@@ -602,15 +609,27 @@ class Manager:
 
         # Set up the GUI for user interaction
         logger.info("Launching GUI")
-        self.gui = _graphics.ExperimentGUI(
-            self.experiment,
-            alarms=self.alarms,
-            instruments=self.instruments,
-            title=self.description.get("name", "Experiment"),
-            plotter=self.plotter,
-            save_interval=self.save_interval,
-            plot_interval=self.plot_interval,
-        )
+
+        if self.gui_type == 'browser':
+            self.gui = _graphics.BrowserGUI(
+                self.experiment,
+                alarms=self.alarms,
+                instruments=self.instruments,
+                title=self.description.get("name", "Experiment"),
+                plotter=self.plotter,
+                save_interval=self.save_interval,
+                plot_interval=self.plot_interval,
+            )
+        else:
+            self.gui = _graphics.TkGUI(
+                self.experiment,
+                alarms=self.alarms,
+                instruments=self.instruments,
+                title=self.description.get("name", "Experiment"),
+                plotter=self.plotter,
+                save_interval=self.save_interval,
+                plot_interval=self.plot_interval,
+            )
 
         self.gui.run()
 
