@@ -460,12 +460,12 @@ class SynaccessNetbooter(Instrument):
         self.read(nbytes=np.inf, timeout=0.1, decode=False)
 
         def termination(message):
-            return re.search(rb"A0,\d+", message)
+            return re.search(b"A0,\d+", message)
 
         status_message = self.query("$A5", termination=termination, decode=False)
 
         # Port statuses are a sequence of 0s and 1s, starting from the right
-        statuses = re.search(rb"A0,\d+", status_message)[0]
+        statuses = re.search(b"A0,\d+", status_message)[0]
 
         port_n_toggle = ON if int(statuses.decode()[-n]) == 1 else OFF
 
