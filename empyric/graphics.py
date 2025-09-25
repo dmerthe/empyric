@@ -13,9 +13,8 @@ from nicegui import ui, app, binding
 from empyric.types import recast, Type, Float, String, Toggle
 from empyric.routines import SocketServer, ModbusServer, supported as supported_routines
 
+import matplotlib
 if sys.platform == "darwin":
-    import matplotlib
-
     matplotlib.use("TkAgg")  # works better on macOS
 
 import matplotlib.pyplot as plt
