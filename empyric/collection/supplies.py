@@ -30,14 +30,14 @@ class Keithley2260B(Instrument):
     @measurer
     def measure_current(self) -> Float:
         def validator(response):
-            return bool(re.match("[\+\-]\d+\.\d\d\d", response.strip()))
+            return bool(re.match(r"[\+\-]\d+\.\d\d\d", response.strip()))
 
         return float(self.query("MEAS:CURR?", validator=validator))
 
     @measurer
     def measure_voltage(self) -> Float:
         def validator(response):
-            return bool(re.match("[\+\-]\d+\.\d\d\d", response.strip()))
+            return bool(re.match(r"[\+\-]\d+\.\d\d\d", response.strip()))
 
         return float(self.query("MEAS:VOLT?", validator=validator))
 
@@ -68,14 +68,14 @@ class Keithley2260B(Instrument):
     @getter
     def get_max_current(self) -> Float:
         def validator(response):
-            return bool(re.match("[\+\-]\d+\.\d\d\d", response.strip()))
+            return bool(re.match(r"[\+\-]\d+\.\d\d\d", response.strip()))
         
         return float(self.query("CURR?", validator=validator))
 
     @getter
     def get_max_voltage(self) -> Float:
         def validator(response):
-            return bool(re.match("[\+\-]\d+\.\d\d\d", response.strip()))
+            return bool(re.match(r"[\+\-]\d+\.\d\d\d", response.strip()))
 
         return float(self.query("VOLT?", validator=validator))
 
@@ -106,29 +106,29 @@ class BK9183B(Instrument):
             self.write("OUT OFF")
 
     @measurer
-    def measure_current(self):
+    def measure_current(self) -> Float:
         # sometimes the first measurement is lagged
         return [float(self.query("MEAS:CURR?")) for i in range(3)][-1]
 
     @measurer
-    def measure_voltage(self):
+    def measure_voltage(self) -> Float:
         # sometimes the first measurement is lagged
         return [float(self.query("MEAS:VOLT?")) for i in range(3)][-1]
 
     @setter
-    def set_max_current(self, current):
+    def set_max_current(self, current: Float):
         self.write("SOUR:CURR " + str(current))
 
     @setter
-    def set_max_voltage(self, voltage):
+    def set_max_voltage(self, voltage: Float):
         self.write("SOUR:VOLT " + str(voltage))
 
     @getter
-    def get_max_current(self):
+    def get_max_current(self) -> Float:
         return float(self.query("SOUR:CURR?"))
 
     @getter
-    def get_max_voltage(self):
+    def get_max_voltage(self) -> Float:
         return float(self.query("SOUR:VOLT?"))
 
 
@@ -231,7 +231,7 @@ class SRSPS300(Instrument):
         # last bit of status byte is the output state
 
         def validator(response):
-            return re.match("\d{1}", response)
+            return re.match(r"\d{1}", response)
 
         status_bit_7 = int(self.query("*STB? 7", validator=validator))
 
@@ -607,7 +607,7 @@ class SorensenXG10250(Instrument):
         self.kwargs = kwargs
 
     def float_validator(self, response):
-        return bool(re.match("\d+\.\d+", response))
+        return bool(re.match(r"\d+\.\d+", response))
 
     @measurer
     def measure_current(self):
@@ -1126,14 +1126,14 @@ class PWX1500L(Instrument):
     @measurer
     def measure_current(self) -> Float:
         def validator(response):
-            return bool(re.match("[\+\-]\d+\.\d\d\d", response))
+            return bool(re.match(r"[\+\-]\d+\.\d\d\d", response))
 
         return float(self.query("MEAS:CURR?", validator=validator))
 
     @measurer
     def measure_voltage(self) -> Float:
         def validator(response):
-            return bool(re.match("[\+\-]\d+\.\d\d\d", response))
+            return bool(re.match(r"[\+\-]\d+\.\d\d\d", response))
 
         return float(self.query("MEAS:VOLT?", validator=validator))
 
@@ -1164,13 +1164,13 @@ class PWX1500L(Instrument):
     @getter
     def get_max_current(self) -> Float:
         def validator(response):
-            return bool(re.match("[\+\-]\d+\.\d\d\d", response))
+            return bool(re.match(r"[\+\-]\d+\.\d\d\d", response))
 
         return float(self.query("CURR?", validator=validator))
 
     @getter
     def get_max_voltage(self) -> Float:
         def validator(response):
-            return bool(re.match("[\+\-]\d+\.\d\d\d", response))
+            return bool(re.match(r"[\+\-]\d+\.\d\d\d", response))
 
         return float(self.query("VOLT?", validator=validator))
