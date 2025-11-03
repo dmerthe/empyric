@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "empyric"
-version = "0.3.1"
+version = "0.3.2"
 description = "A package for experiment automation"
 authors = ["Daniel Merthe <dmerthe@gmail.com>"]
 readme = "README.md"
