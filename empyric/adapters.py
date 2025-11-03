@@ -299,7 +299,7 @@ class Serial(Adapter):
         # First try connecting with PyVISA
         if self.lib == "pyvisa":
             if "COM" in self.instrument.address:
-                com_port = int(re.search("\d+", self.instrument.address)[0])
+                com_port = int(re.search(r"\d+", self.instrument.address)[0])
 
                 print(
                     "PyVISA is the serial communications backend; reformatting "
@@ -330,7 +330,7 @@ class Serial(Adapter):
         # Then try connecting with PySerial
         elif self.lib == "pyserial":
             if "ASRL" in self.instrument.address:
-                com_port = int(re.search("\d+", self.instrument.address)[0])
+                com_port = int(re.search(r"\d+", self.instrument.address)[0])
 
                 print(
                     f"PySerial is the serial communications backend; reformatting "
@@ -368,7 +368,7 @@ class Serial(Adapter):
             if bytes:
                 response = self.backend.read_bytes(bytes)
             else:
-                return self.backend.read_raw()  # decoded below
+                response = self.backend.read_raw()  # decoded below
 
         elif self.lib == "pyserial":
             if bytes:
@@ -599,7 +599,7 @@ class GPIB(Adapter):
             if self.prologix_address in GPIB.prologix_controllers:
                 self.backend = GPIB.prologix_controllers[self.prologix_address]
             else:
-                if re.match("\d+\.\d+\.\d+\.\d+", self.prologix_address):
+                if re.match(r"\d+\.\d+\.\d+\.\d+", self.prologix_address):
                     self.backend = PrologixGPIBLAN(self.prologix_address)
                 else:
                     self.backend = PrologixGPIBUSB(self.prologix_address)
@@ -1221,7 +1221,7 @@ class Modbus(Adapter):
         # Get port (Serial) or address & port (TCP)
         address = self.instrument.address.split("::")
 
-        if re.match("\d+\.\d+\.\d+\.\d+", address[0]):
+        if re.match(r"\d+\.\d+\.\d+\.\d+", address[0]):
             if str(self.protocol).upper() == "UDP":
                 # Modbus UDP
                 self.protocol = "UDP"
