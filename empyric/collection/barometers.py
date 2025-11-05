@@ -64,12 +64,12 @@ class BRAX3000(Instrument):
     @measurer
     def measure_ig_pressure(self) -> Float:
         def validator(response):
-            match = re.search("\d\.\d+E-?\d\d", response)
+            match = re.search(r"\d\.\d+E-?\d\d", response)
             return bool(match)
 
         response = self.query("#RDIG<CR>", validator=validator)
 
-        return float(re.findall("\d\.\d+E-?\d\d", response)[0])
+        return float(re.findall(r"\d\.\d+E-?\d\d", response)[0])
 
 
 class KJLSPARC(Instrument):

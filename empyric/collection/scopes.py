@@ -58,7 +58,7 @@ class TekTDSScope(Instrument):
         # Check for number of channels before standard initialization
         adapter = USB(Instrument(args[0]))
 
-        self.model = int(re.search("\d\d\d\d", adapter.query("*IDN?"))[0])
+        self.model = int(re.search(r"\d\d\d\d", adapter.query("*IDN?"))[0])
 
         adapter.disconnect()
 

@@ -62,7 +62,7 @@ class BrainboxesED560(Instrument):
 
     @staticmethod
     def _get_validator(response):
-        return re.match("!01\+\d\d\.\d\d\d", response)
+        return re.match(r"!01\+\d\d\.\d\d\d", response)
 
     @staticmethod
     def _set_validator(response):
@@ -110,7 +110,7 @@ class BrainboxesED549(Instrument):
 
     @staticmethod
     def _validator(response):
-        return re.match(">\+?\-?\d\d\.\d\d\d", response)
+        return re.match(r">\+?\-?\d\d\.\d\d\d", response)
 
 
 class ADAM6024(Instrument):

@@ -153,7 +153,7 @@ class Keithley2400(Instrument):
             self.set_output(ON)
 
         def validator(response):
-            match = re.match(".\d\.\d+E.\d\d", response)
+            match = re.match(r".\d\.\d+E.\d\d", response)
             return bool(match)
 
         return float(self.query(":READ?", validator=validator))
@@ -167,7 +167,7 @@ class Keithley2400(Instrument):
             self.set_output(ON)
 
         def validator(response):
-            match = re.match(".\d\.\d+E.\d\d", response)
+            match = re.match(r".\d\.\d+E.\d\d", response)
             return bool(match)
 
         return float(self.query(":READ?", validator=validator))
