@@ -221,7 +221,7 @@ def recast(value: Any, to: type = Type) -> Union[Type, None]:
                 return np.bool_(False)
             elif re.fullmatch("[-+]?[0-9]+", value):  # integer
                 return np.int64(value)
-            elif re.fullmatch("[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?", value):
+            elif re.fullmatch(r"[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?", value):
                 # float
                 return float(value)
             elif value in (Toggle.on_values + Toggle.off_values):  # Toggle
