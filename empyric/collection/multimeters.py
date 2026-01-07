@@ -785,3 +785,58 @@ class LabJackT7(Instrument):
     @measurer
     def measure_AIN13_EF(self) -> Float:
         return self._measure_AIN_EF_READ_A(13)
+
+
+class BK895(Instrument):
+    """
+    B&K Precision 500 kHz (894) / 1 MHz (895) LCR Meter
+    """
+
+    supported_adapters = (
+        (USB, {'timeout': 1}),
+    )
+
+    knobs = (
+        'frequency',
+        'trigger source'
+    )
+
+    meters = (
+        'impedance'
+    )
+
+    @setter
+    def set_frequency(self, frequency: Float):
+        self.write(f'FREQ {frequency}Hz')
+
+    @getter
+    def get_frequency(self) -> Float:
+        return float(self.query('FREQ?'))
+
+    @setter
+    def set_trigger_source(self, source: String):
+        self.write(f'TRIG:SOUR {source}')
+
+    @getter
+    def get_trigger_source(self) -> String:
+        return self.query(f'TRIG:SOUR?')
+
+    @measurer
+    def measure_impedance(self) -> Array:
+
+        ready = self.query('*OPC?') == '1\n'
+
+        while not ready:
+            time.sleep(0.1)
+            ready = self.query('*OPC?') == '1\n'
+
+        mode = self.query('FUNC:IMP?')
+
+        if 'RX' not in mode:
+            self.write('FUNC:IMP RX')
+
+        response = self.query('FETCH:IMP?')
+
+        R_str, X_str, stat_str = response.split(',')
+
+        return float(R_str), float(X_str)
